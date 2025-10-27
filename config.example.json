@@ -1,0 +1,38 @@
+{
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.7,
+    "max_tokens": 4096,
+    "streaming": true
+  },
+  "crabrace": {
+    "enabled": true,
+    "base_url": "http://localhost:8080",
+    "auto_update": true,
+    "update_interval_seconds": 3600
+  },
+  "api_keys": {
+    "anthropic": "sk-ant-...",
+    "openai": "sk-...",
+    "gemini": "...",
+    "azure": "..."
+  },
+  "ui": {
+    "theme": "dark",
+    "vim_mode": false,
+    "show_token_count": true,
+    "show_cost_estimate": true
+  },
+  "session": {
+    "auto_save": true,
+    "max_history": 1000
+  },
+  "tools": {
+    "enabled": ["bash", "read", "write", "edit", "grep", "git"],
+    "bash": {
+      "allowed_commands": ["ls", "cat", "grep", "git"],
+      "confirmation_required": true
+    }
+  }
+}
