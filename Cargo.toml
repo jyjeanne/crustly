@@ -33,8 +33,9 @@ ratatui-image = "1.0"
 viuer = "0.7"
 
 # Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "sqlite", "chrono", "uuid"] }
 # Note: Using only sqlx to avoid libsqlite3-sys version conflict
+# Note: Using native-tls on Windows to avoid aws-lc-rs CMake/NASM requirement
 # refinery = { version = "0.8", features = ["sqlx"] }  # TODO: Add migrations later
 
 # Serialization
@@ -48,9 +49,9 @@ dirs = "5.0"
 shellexpand = "3.1"
 
 # HTTP & LLM Clients
-reqwest = { version = "0.11", features = ["json", "rustls-tls", "stream"] }
-async-openai = "0.20"
-aws-sdk-bedrockruntime = "1.15"
+reqwest = { version = "0.11", features = ["json", "native-tls", "stream"], default-features = false }
+async-openai = { version = "0.20", optional = true }
+aws-sdk-bedrockruntime = { version = "1.15", optional = true }
 
 # Provider Registry (Crabrace - replaces Catwalk)
 crabrace = { path = "../crabrace" }
@@ -113,6 +114,9 @@ tokio-test = "0.4"
 [features]
 default = []
 profiling = ["pprof"]
+openai = ["async-openai"]
+aws-bedrock = ["aws-sdk-bedrockruntime"]
+all-llm = ["openai", "aws-bedrock"]
 
 [profile.dev]
 opt-level = 0

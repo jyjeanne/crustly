@@ -65,17 +65,17 @@ crustly sessions
 ## ✨ Features
 
 ### Multi-LLM Support
-- **Anthropic** - Claude 3.5 Sonnet, Opus, Haiku
+- **Anthropic** - Sonnet, Opus, Haiku models
 - **OpenAI** - GPT-4, GPT-3.5 Turbo
 - **Google Gemini** - Gemini Pro, Gemini Ultra
-- **AWS Bedrock** - Claude on Bedrock
+- **AWS Bedrock** - Anthropic models on Bedrock
 - **Azure OpenAI** - Enterprise GPT models
 - **VertexAI** - Google Cloud AI models
 
 ### Advanced Capabilities
 - **LSP Integration** - Semantic code understanding
 - **MCP Support** - Model Context Protocol
-- **Context Files** - Auto-load `.cursorrules`, `.claudemd`
+- **Context Files** - Auto-load `.cursorrules` and context files
 - **Tool System** - 13 extensible tools (bash, edit, write, grep, etc.)
 - **Session Management** - Persistent chat history
 - **Image Support** - Vision model integration
@@ -250,7 +250,7 @@ See [LICENSE.md](LICENSE.md) for details.
 
 - **Crush (Go)** - Original implementation
 - **Crabrace** - Provider registry (Rust port of Catwalk)
-- **Anthropic** - Claude API
+- **Anthropic** - API
 - **Ratatui Community** - Terminal UI framework
 
 ---

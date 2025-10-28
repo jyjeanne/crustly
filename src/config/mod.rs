@@ -33,6 +33,14 @@ pub struct DatabaseConfig {
     pub path: PathBuf,
 }
 
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            path: default_db_path(),
+        }
+    }
+}
+
 fn default_db_path() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -49,6 +57,15 @@ pub struct LoggingConfig {
     /// Log to file
     #[serde(default)]
     pub file: Option<PathBuf>,
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            level: default_log_level(),
+            file: None,
+        }
+    }
 }
 
 fn default_log_level() -> String {
