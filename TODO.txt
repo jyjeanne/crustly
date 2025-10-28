@@ -1,0 +1,24 @@
+## Completed Tasks ✅
+
+1. ✅ Rename project to crustly
+2. ✅ Add ASCII art logo of a croissant (see src/tui/components/logo.rs)
+3. ✅ Create comprehensive README.md
+4. ✅ Create .gitignore and GitHub workflow files
+5. ✅ Initialize git repository
+
+## In Progress 🚧
+
+6. ⏳ Add local LLM support with Ollama and LM Studio
+   - Need to implement provider in src/llm/provider/ollama.rs
+   - Need to implement provider in src/llm/provider/lm_studio.rs
+
+7. ⏳ Implement Rust equivalent of Catwalk
+   - Need to create Catwalk client integration
+
+## Future Tasks 📋
+
+8. Launch project on Linux with Rust installed
+9. Complete implementation of all LLM providers
+10. Add comprehensive test coverage
+11. Performance benchmarking
+12. Documentation improvements

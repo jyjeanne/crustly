@@ -33,9 +33,9 @@ ratatui-image = "1.0"
 viuer = "0.7"
 
 # Database
-rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
-refinery = { version = "0.8", features = ["rusqlite"] }
+# Note: Using only sqlx to avoid libsqlite3-sys version conflict
+# refinery = { version = "0.8", features = ["sqlx"] }  # TODO: Add migrations later
 
 # Serialization
 serde = { version = "1.0", features = ["derive", "rc"] }
@@ -134,10 +134,13 @@ strip = true
 name = "crustly"
 path = "src/main.rs"
 
-[[bench]]
-name = "database"
-harness = false
+# Benchmarks - uncomment when files are created
+# [[bench]]
+# name = "database"
+# harness = false
+# path = "benches/database.rs"
 
-[[bench]]
-name = "llm_processing"
-harness = false
+# [[bench]]
+# name = "llm_processing"
+# harness = false
+# path = "benches/llm_processing.rs"
