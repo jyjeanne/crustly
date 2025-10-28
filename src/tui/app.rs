@@ -2,7 +2,7 @@
 //!
 //! Core state management for the terminal user interface.
 
-use super::events::{AppMode, EventHandler, TuiEvent};
+use super::events::{AppMode, EventHandler, ToolApprovalRequest, TuiEvent};
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
 use crate::services::{MessageService, ServiceContext, SessionService};
@@ -53,6 +53,13 @@ pub struct App {
     pub streaming_response: Option<String>,
     pub error_message: Option<String>,
 
+    // Animation state
+    pub animation_frame: usize,
+
+    // Approval state
+    pub pending_approval: Option<ToolApprovalRequest>,
+    pub show_approval_details: bool,
+
     // Services
     agent_service: Arc<AgentService>,
     session_service: SessionService,
@@ -69,7 +76,7 @@ impl App {
             current_session: None,
             messages: Vec::new(),
             sessions: Vec::new(),
-            mode: AppMode::Chat,
+            mode: AppMode::Splash,
             input_buffer: String::new(),
             scroll_offset: 0,
             selected_session_index: 0,
@@ -77,6 +84,9 @@ impl App {
             is_processing: false,
             streaming_response: None,
             error_message: None,
+            animation_frame: 0,
+            pending_approval: None,
+            show_approval_details: false,
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context),
             agent_service,
@@ -150,7 +160,20 @@ impl App {
             TuiEvent::Quit => {
                 self.should_quit = true;
             }
-            TuiEvent::Tick | TuiEvent::Resize(_, _) | TuiEvent::AgentProcessing => {
+            TuiEvent::Tick => {
+                // Update animation frame for spinner
+                self.animation_frame = self.animation_frame.wrapping_add(1);
+            }
+            TuiEvent::ToolApprovalRequested(request) => {
+                self.handle_approval_requested(request);
+            }
+            TuiEvent::ToolApprovalResponse(_response) => {
+                // Response is sent via channel, just update UI state
+                self.pending_approval = None;
+                self.show_approval_details = false;
+                self.mode = AppMode::Chat;
+            }
+            TuiEvent::Resize(_, _) | TuiEvent::AgentProcessing => {
                 // These are handled by the render loop
             }
         }
@@ -184,8 +207,13 @@ impl App {
 
         // Mode-specific handling
         match self.mode {
+            AppMode::Splash => {
+                // Any key dismisses the splash screen
+                self.switch_mode(AppMode::Chat).await?;
+            }
             AppMode::Chat => self.handle_chat_key(event).await?,
             AppMode::Sessions => self.handle_sessions_key(event).await?,
+            AppMode::ToolApproval => self.handle_approval_key(event).await?,
             AppMode::Help | AppMode::Settings => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
@@ -405,6 +433,53 @@ impl App {
             .iter()
             .filter_map(|m| m.cost)
             .sum()
+    }
+
+    /// Handle tool approval request
+    fn handle_approval_requested(&mut self, request: ToolApprovalRequest) {
+        self.pending_approval = Some(request);
+        self.show_approval_details = false;
+        self.mode = AppMode::ToolApproval;
+    }
+
+    /// Handle keys in approval mode
+    async fn handle_approval_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::{keys, ToolApprovalResponse};
+
+        if let Some(ref approval_request) = self.pending_approval {
+            if keys::is_approve(&event) {
+                // User approved
+                let response = ToolApprovalResponse {
+                    request_id: approval_request.request_id,
+                    approved: true,
+                    reason: None,
+                };
+
+                // Send response back through the channel
+                let _ = approval_request.response_tx.send(response.clone());
+
+                // Send event to update UI
+                let _ = self.event_sender().send(TuiEvent::ToolApprovalResponse(response));
+            } else if keys::is_deny(&event) || keys::is_cancel(&event) {
+                // User denied
+                let response = ToolApprovalResponse {
+                    request_id: approval_request.request_id,
+                    approved: false,
+                    reason: Some("User denied permission".to_string()),
+                };
+
+                // Send response back through the channel
+                let _ = approval_request.response_tx.send(response.clone());
+
+                // Send event to update UI
+                let _ = self.event_sender().send(TuiEvent::ToolApprovalResponse(response));
+            } else if keys::is_view_details(&event) {
+                // Toggle details view
+                self.show_approval_details = !self.show_approval_details;
+            }
+        }
+
+        Ok(())
     }
 }
 

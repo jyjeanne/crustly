@@ -8,6 +8,6 @@ pub mod error;
 pub mod context;
 
 // Re-exports
-pub use service::{AgentService, AgentResponse, AgentStreamResponse};
+pub use service::{AgentService, AgentResponse, AgentStreamResponse, ToolApprovalInfo, ApprovalCallback};
 pub use error::{AgentError, Result};
 pub use context::AgentContext;

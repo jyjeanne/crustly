@@ -89,6 +89,7 @@ impl Database {
 }
 
 /// Extension trait for SqlitePool to add convenience methods
+#[allow(async_fn_in_trait)]
 pub trait PoolExt {
     /// Connect to a database file
     async fn connect_file<P: AsRef<Path>>(path: P) -> Result<Self>

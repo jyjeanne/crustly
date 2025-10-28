@@ -1,0 +1,99 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         ENHANCED HELP SCREEN PREVIEW                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ 📚 Help & Commands                                                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│ 🥐 Crustly Help                                                              │
+│                                                                              │
+│ ╭─ GLOBAL COMMANDS ─────────────────────────────────────────╮               │
+│                                                                              │
+│   Ctrl+C       → Quit application                                           │
+│   Ctrl+N       → Create new chat session                                    │
+│   Ctrl+L       → List all sessions (switch sessions)                        │
+│   Ctrl+H       → Show this help screen                                      │
+│                                                                              │
+│ ╭─ CHAT MODE ───────────────────────────────────────────────╮               │
+│                                                                              │
+│   Ctrl+Enter   → Send your message to Claude                                │
+│   Enter        → New line in message (multi-line input)                     │
+│   Backspace    → Delete last character                                      │
+│   Escape       → Clear input buffer                                         │
+│   Page Up      → Scroll chat history up                                     │
+│   Page Down    → Scroll chat history down                                   │
+│                                                                              │
+│ ╭─ SESSION LIST ────────────────────────────────────────────╮               │
+│                                                                              │
+│   ↑/↓          → Navigate through sessions                                  │
+│   Enter        → Load selected session                                      │
+│   Escape       → Return to chat                                             │
+│                                                                              │
+│ ╭─ FEATURES ────────────────────────────────────────────────╮               │
+│                                                                              │
+│   ✓ Markdown Rendering - Rich text with headings, lists, code              │
+│   ✓ Syntax Highlighting - 100+ languages supported                         │
+│   ✓ Multi-line Input - Write long messages with ease                       │
+│   ✓ Session Management - Persistent conversation history                   │
+│   ✓ Streaming Responses - See responses as they're generated               │
+│   ✓ Token & Cost Tracking - Monitor usage in real-time                     │
+│                                                                              │
+│                                                                              │
+│                    Press Esc to return to chat                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              COLOR SCHEME                                    ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  🥐 Crustly Help        - Croissant golden (218,165,32) + Cyan underline    ║
+║  Section Headers        - Cyan borders (╭─ text ─╮)                         ║
+║  Global Commands        - Yellow bold                                       ║
+║  Chat Mode Commands     - Green bold                                        ║
+║  Session Commands       - Magenta bold                                      ║
+║  Arrow symbols (→)      - Dark gray                                         ║
+║  Descriptions           - White text                                        ║
+║  Features (✓)           - Green checkmarks                                  ║
+║  Feature names          - White bold                                        ║
+║  Feature descriptions   - Dark gray                                         ║
+║  Exit prompt            - Dark gray with yellow "Esc"                       ║
+║  Border & Title         - Cyan                                              ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+ORGANIZATION:
+═════════════
+
+1. GLOBAL COMMANDS (Yellow)
+   - Always available regardless of mode
+   - Essential app-wide shortcuts
+
+2. CHAT MODE (Green)
+   - Commands specific to chatting with Claude
+   - Message composition and navigation
+
+3. SESSION LIST (Magenta)
+   - Commands for managing and switching sessions
+   - Navigation within session list
+
+4. FEATURES (Green checkmarks)
+   - Showcase of Crustly's capabilities
+   - Quick feature overview for new users
+
+KEY IMPROVEMENTS:
+═════════════════
+
+✓ Color-coded sections for easy scanning
+✓ Arrow symbols (→) for clear command-to-action mapping
+✓ Organized by context (Global, Chat, Sessions, Features)
+✓ Beautiful Unicode borders and separators
+✓ Feature list shows what Crustly can do
+✓ Clear exit instruction at bottom
+✓ Croissant emoji for branding consistency
+
+ACCESS:
+═══════
+
+Press Ctrl+H from anywhere in the app to open the help screen.
+Press Esc to close the help screen and return to chat.

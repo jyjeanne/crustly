@@ -4,6 +4,7 @@
 
 use crate::llm::agent::AgentResponse;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use serde_json::Value;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -46,11 +47,54 @@ pub enum TuiEvent {
 
     /// Tick event for animations/updates
     Tick,
+
+    /// Tool approval requested
+    ToolApprovalRequested(ToolApprovalRequest),
+
+    /// Tool approval response
+    ToolApprovalResponse(ToolApprovalResponse),
+}
+
+/// Tool approval request details
+#[derive(Debug, Clone)]
+pub struct ToolApprovalRequest {
+    /// Unique ID for this approval request
+    pub request_id: Uuid,
+
+    /// Tool name
+    pub tool_name: String,
+
+    /// Tool description
+    pub tool_description: String,
+
+    /// Tool input parameters
+    pub tool_input: Value,
+
+    /// Tool capabilities
+    pub capabilities: Vec<String>,
+
+    /// Channel to send response back
+    pub response_tx: mpsc::UnboundedSender<ToolApprovalResponse>,
+}
+
+/// Tool approval response
+#[derive(Debug, Clone)]
+pub struct ToolApprovalResponse {
+    /// Request ID this is responding to
+    pub request_id: Uuid,
+
+    /// Whether the user approved
+    pub approved: bool,
+
+    /// Optional reason for denial
+    pub reason: Option<String>,
 }
 
 /// Application mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppMode {
+    /// Splash screen
+    Splash,
     /// Main chat interface
     Chat,
     /// Session list/management
@@ -59,6 +103,8 @@ pub enum AppMode {
     Help,
     /// Settings
     Settings,
+    /// Tool approval dialog
+    ToolApproval,
 }
 
 /// Event handler for the TUI
@@ -190,6 +236,24 @@ pub mod keys {
     /// Page down
     pub fn is_page_down(event: &KeyEvent) -> bool {
         event.code == KeyCode::PageDown
+    }
+
+    /// 'A' or 'Y' - Approve
+    pub fn is_approve(event: &KeyEvent) -> bool {
+        matches!(event.code, KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Char('y') | KeyCode::Char('Y'))
+            && event.modifiers.is_empty()
+    }
+
+    /// 'D' or 'N' - Deny
+    pub fn is_deny(event: &KeyEvent) -> bool {
+        matches!(event.code, KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('n') | KeyCode::Char('N'))
+            && event.modifiers.is_empty()
+    }
+
+    /// 'V' - View details
+    pub fn is_view_details(event: &KeyEvent) -> bool {
+        matches!(event.code, KeyCode::Char('v') | KeyCode::Char('V'))
+            && event.modifiers.is_empty()
     }
 }
 

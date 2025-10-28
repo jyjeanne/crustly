@@ -19,12 +19,237 @@
 
 ---
 
+## 🎯 Main Coding Features
+
+**Your AI coding assistant that lives in your terminal.**
+
+### ⚡ **Core Capabilities**
+
+| Feature | Description | Benefit |
+|---------|-------------|---------|
+| 🔧 **Built-in Tools** | Read/Write files, Execute commands | Direct code manipulation from chat |
+| 🔒 **Interactive Approval** | Permission dialogs for dangerous operations | Full control over what AI can do |
+| 🎨 **Syntax Highlighting** | 100+ languages with line numbers | Beautiful code display in terminal |
+| 🏠 **Local LLM Support** | Run with LM Studio/Ollama | 100% private, $0 cost, offline |
+| 💬 **Multi-line Input** | Paste entire functions | Natural code interaction |
+| 🧠 **Session Context** | Persistent conversation memory | Maintains project context |
+| ⌨️ **Terminal Native** | Fast keyboard shortcuts | No context switching |
+| 💰 **Cost Tracking** | Per-message token & cost | Budget control |
+| 🌊 **Streaming** | Real-time response generation | See code as it's written |
+
+### 🚀 **Quick Example**
+
+```bash
+$ crustly
+
+You: "Read src/main.rs"
+Crustly: [reads file with syntax highlighting]
+
+You: "Add error handling to the database connection"
+Crustly: [modifies file with write tool]
+
+You: "Run cargo test"
+Crustly: [executes] ✅ 145 tests passed
+
+You: "Generate documentation for this module"
+Crustly: [creates comprehensive docs]
+```
+
+### 🔒 **Privacy First**
+
+```bash
+# Use local LLMs for sensitive code
+# 100% private - code never leaves your machine
+# See "Using Crustly with Local LLMs" section below
+```
+
+### 💡 **Perfect For**
+
+- ✅ **Code Generation** - Functions, tests, entire modules
+- ✅ **Debugging** - Error analysis and fixes with context
+- ✅ **Refactoring** - Improve code quality
+- ✅ **Documentation** - Generate docs, comments, READMEs
+- ✅ **Code Review** - Get feedback on your code
+- ✅ **Learning** - Understand complex concepts
+- ✅ **Terminal Workflow** - Stay in your flow, no browser tabs
+
+### 🆚 **Why Choose Crustly?**
+
+| You Want | Crustly Delivers |
+|----------|------------------|
+| Privacy | ✅ Local LLM support, data stays on your machine |
+| Cost Control | ✅ Token tracking + free local inference |
+| Terminal Native | ✅ No GUI, perfect for CLI lovers |
+| File Operations | ✅ Built-in read/write/execute tools |
+| Context Awareness | ✅ Persistent sessions, never lose context |
+| Beautiful Code | ✅ Syntax highlighting for 100+ languages |
+| Fast Workflow | ✅ Keyboard shortcuts, streaming responses |
+
+---
+
+## 🔒 Interactive Approval System
+
+**Crustly gives you complete control over dangerous operations with beautiful interactive approval dialogs.**
+
+### How It Works
+
+When Claude wants to modify files or execute commands, Crustly pauses and asks for your permission:
+
+```
+┌────────────────────────────────────────────────────┐
+│ ⚠️  PERMISSION REQUIRED                            │
+├────────────────────────────────────────────────────┤
+│ 🔒 Permission Request                              │
+│                                                    │
+│ Claude wants to use the tool: write_file          │
+│                                                    │
+│ Description: Write content to a file...            │
+│                                                    │
+│ ⚠️  Capabilities:                                   │
+│    • WriteFiles                                    │
+│    • SystemModification                            │
+│                                                    │
+│ Parameters:                                        │
+│    path: "config.json"                             │
+│    content: "{ \"debug\": true }"                  │
+│                                                    │
+│ [A]pprove  [D]eny  [V]iew Details  [Esc] Cancel  │
+└────────────────────────────────────────────────────┘
+```
+
+### Security Features
+
+✅ **Dangerous operations always require approval:**
+- File writes (`write_file`)
+- Shell commands (`bash`)
+- System modifications
+
+✅ **Safe operations proceed automatically:**
+- File reads (`read_file`)
+- Information queries
+
+✅ **Full transparency:**
+- See exactly what Claude wants to do
+- View all parameters before deciding
+- Toggle detailed JSON view with `V` key
+
+✅ **Complete control:**
+- Press `A` or `Y` to approve
+- Press `D` or `N` to deny
+- Press `Esc` to cancel
+- No way to bypass (unless explicitly configured)
+
+### Example Workflow
+
+```bash
+You: "Create a config file with debug enabled"
+
+[Approval Dialog Appears]
+Claude wants to: write_file
+Path: config.json
+Content: { "debug": true }
+
+[You Press 'A']
+
+Claude: ✅ "I've created the config file at config.json"
+```
+
+**Your safety is our priority.** Every dangerous operation requires your explicit approval.
+
+---
+
+## ⚠️ Important Disclaimers
+
+### 🚧 Development Status
+
+**Crustly is currently under active development.** While functional, it is not yet production-ready and may contain bugs or incomplete features.
+
+### 💰 Token Cost Responsibility
+
+**You are responsible for monitoring and managing your own API usage and costs.**
+
+- We are **NOT responsible** for token cost overload from paid cloud AI services (Anthropic Claude, OpenAI, etc.)
+- API costs are your responsibility - always monitor your usage
+- Set up billing alerts with your cloud provider
+- Consider using local LLMs (LM Studio, Ollama) for cost-free operation
+
+### 🔧 Support Limitations
+
+**We are NOT responsible for troubleshooting issues with paid cloud AI services.**
+
+- Cloud API issues should be directed to the respective providers
+- Billing questions should go to Anthropic, OpenAI, etc.
+- We provide the tool, you manage your API relationships
+
+### 💡 Recommendations
+
+✅ **Always monitor your API usage dashboard**
+✅ **Set billing limits with your cloud provider**
+✅ **Test with small requests first**
+✅ **Use local LLMs for cost-free development**
+✅ **Review pricing before using cloud APIs**
+
+> **By using Crustly, you acknowledge these risks and responsibilities.**
+
+---
+
+## 🌐 Supported AI Providers
+
+The quickest way to get started is to grab an API key for your preferred provider such as **Anthropic, OpenAI, Groq, or OpenRouter** and just start Crustly. You can configure your API key through environment variables or the configuration file.
+
+### Environment Variables
+
+You can set environment variables for your preferred providers:
+
+| Environment Variable | Provider | Notes |
+|---------------------|----------|-------|
+| `ANTHROPIC_API_KEY` | Anthropic | Claude 3.5 Sonnet, Claude 3 Opus, etc. |
+| `OPENAI_API_KEY` | OpenAI | GPT-4, GPT-3.5, etc. |
+| `OPENROUTER_API_KEY` | OpenRouter | Access to multiple models |
+| `GEMINI_API_KEY` | Google Gemini | Gemini Pro, Gemini Ultra |
+| `GROQ_API_KEY` | Groq | Ultra-fast inference |
+| `CEREBRAS_API_KEY` | Cerebras | High-performance AI |
+| `HF_TOKEN` | Huggingface Inference | Open-source models |
+| `VERTEXAI_PROJECT` | Google Cloud VertexAI | Gemini on GCP |
+| `VERTEXAI_LOCATION` | Google Cloud VertexAI | GCP region (e.g., us-central1) |
+| `AWS_ACCESS_KEY_ID` | AWS Bedrock | Claude on AWS |
+| `AWS_SECRET_ACCESS_KEY` | AWS Bedrock | AWS credentials |
+| `AWS_REGION` | AWS Bedrock | AWS region (e.g., us-east-1) |
+| `AWS_PROFILE` | AWS Bedrock | Custom AWS profile |
+| `AWS_BEARER_TOKEN_BEDROCK` | AWS Bedrock | Bearer token authentication |
+| `AZURE_OPENAI_API_ENDPOINT` | Azure OpenAI | Azure endpoint URL |
+| `AZURE_OPENAI_API_KEY` | Azure OpenAI | Optional with Entra ID |
+| `AZURE_OPENAI_API_VERSION` | Azure OpenAI | API version (e.g., 2023-05-15) |
+
+### Example Configuration
+
+```bash
+# Linux/Mac
+export ANTHROPIC_API_KEY="sk-ant-api03-YOUR_KEY_HERE"
+export OPENAI_API_KEY="sk-YOUR_OPENAI_KEY"
+
+# Windows PowerShell
+$env:ANTHROPIC_API_KEY="sk-ant-api03-YOUR_KEY_HERE"
+$env:OPENAI_API_KEY="sk-YOUR_OPENAI_KEY"
+```
+
+### Local LLMs (No API Key Required)
+
+You can also use Crustly with **local LLMs** for 100% private, cost-free operation:
+- **LM Studio** - Desktop app with OpenAI-compatible API
+- **Ollama** - Command-line local model runner
+- **LocalAI** - Self-hosted OpenAI alternative
+
+See the "Using Crustly with Local LLMs" section below for detailed setup instructions.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Rust 1.75+** - [Install Rust](https://rustup.rs/)
-- **Anthropic API Key** - [Get one here](https://console.anthropic.com/)
+- **API Key** from your preferred provider (see Supported AI Providers above)
 - **SQLite** (bundled with sqlx)
 - **Git** (optional)
 
@@ -38,8 +263,11 @@ cd crustly
 # Build the project
 cargo build --release
 
-# Set your API key
+# Set your API key (choose your preferred provider)
 export ANTHROPIC_API_KEY="sk-ant-api03-YOUR_KEY_HERE"
+# or
+export OPENAI_API_KEY="sk-YOUR_OPENAI_KEY"
+# See "Supported AI Providers" section for all options
 
 # Initialize configuration (optional)
 cargo run -- init
@@ -50,14 +278,22 @@ cargo run
 
 ### First Run
 
-1. **Set your API key:**
+1. **Set your API key** (choose your preferred provider):
 ```bash
-# Linux/Mac
+# Example with Anthropic (Linux/Mac)
 export ANTHROPIC_API_KEY="sk-ant-api03-YOUR_KEY_HERE"
+
+# Example with OpenAI (Linux/Mac)
+export OPENAI_API_KEY="sk-YOUR_OPENAI_KEY"
 
 # Windows PowerShell
 $env:ANTHROPIC_API_KEY="sk-ant-api03-YOUR_KEY_HERE"
+# or
+$env:OPENAI_API_KEY="sk-YOUR_OPENAI_KEY"
 ```
+
+> 💡 See the **Supported AI Providers** section above for the complete list of environment variables.
+
 
 2. **Launch the TUI:**
 ```bash
@@ -67,7 +303,10 @@ cargo run
 3. **Start chatting:**
    - Type your message
    - Press `Ctrl+Enter` to send
+   - Press `Ctrl+H` to see all available commands and help
    - Press `Ctrl+C` to quit
+
+> 💡 **Tip:** Press `Ctrl+H` at any time to display the comprehensive help screen with all keyboard shortcuts and features!
 
 ### Usage
 
@@ -104,6 +343,756 @@ cargo run -- db stats
 
 ---
 
+## 📋 A Note on Claude Max and GitHub Copilot
+
+**Crustly only supports model providers through official, compliant APIs.**
+
+We do not support or endorse any methods that rely on personal Claude Max and GitHub Copilot accounts or OAuth workarounds, which violate Anthropic and Microsoft's Terms of Service.
+
+### Official API Access Only
+
+✅ **Supported & Compliant:**
+- Anthropic API (with official API key from console.anthropic.com)
+- OpenAI API (with official API key)
+- Local LLMs (LM Studio, Ollama, LocalAI)
+- Any OpenAI-compatible API endpoint with proper authorization
+
+❌ **Not Supported & Against ToS:**
+- Using Claude Max subscription through unofficial methods
+- Using GitHub Copilot through OAuth workarounds
+- Reverse-engineered or unofficial API endpoints
+- Account-sharing or credential-borrowing schemes
+
+### Why This Matters
+
+- **Legal Compliance** - Using unofficial methods violates provider Terms of Service
+- **Account Safety** - Your accounts could be suspended or banned
+- **Security Risks** - Unofficial methods may expose your credentials
+- **Ethical Development** - We respect provider agreements and policies
+
+### Recommended Alternatives
+
+If you can't afford cloud API costs, consider these legitimate alternatives:
+1. **Local LLMs** - Run models on your own hardware (see section below)
+2. **API Credits** - Many providers offer free trial credits
+3. **Educational Programs** - Some providers offer discounts for students/researchers
+
+---
+
+## 🏠 Using Crustly with Local LLMs (LM Studio)
+
+Want to run Crustly completely offline with your own hardware? Here's how to use it with **LM Studio** for local inference.
+
+### What is LM Studio?
+
+[LM Studio](https://lmstudio.ai/) is a desktop application that lets you run large language models locally on your computer. It provides an OpenAI-compatible API server, making it perfect for use with Crustly.
+
+**Benefits:**
+- ✅ **100% Private** - All data stays on your machine
+- ✅ **No API Costs** - Free inference after model download
+- ✅ **Offline Operation** - Works without internet
+- ✅ **Fast Responses** - No network latency (with good hardware)
+- ✅ **OpenAI Compatible** - Drop-in replacement for cloud APIs
+
+---
+
+### Step-by-Step Setup Guide
+
+#### Step 1: Install LM Studio
+
+1. **Download LM Studio:**
+   - Visit [https://lmstudio.ai/](https://lmstudio.ai/)
+   - Download for your platform (Windows, macOS, or Linux)
+   - Install the application
+
+2. **Launch LM Studio:**
+   ```bash
+   # Open LM Studio from your applications menu
+   # Or on Windows: Start Menu → LM Studio
+   # Or on macOS: Applications → LM Studio
+   ```
+
+---
+
+#### Step 2: Download a Model
+
+1. **Open the Model Discovery Tab:**
+   - Click the 🔍 **"Discover"** or **"Search"** tab in LM Studio
+
+2. **Choose a Model:**
+
+   **Recommended Models for Crustly:**
+
+   | Model | Size | RAM Needed | Best For |
+   |-------|------|------------|----------|
+   | **Mistral-7B-Instruct** | 4-8 GB | 16 GB | General chat, fast responses |
+   | **Llama-3-8B-Instruct** | 4-8 GB | 16 GB | Balanced performance |
+   | **Qwen-2.5-7B-Instruct** | 4-8 GB | 16 GB | Coding tasks |
+   | **DeepSeek-Coder-6.7B** | 4-7 GB | 16 GB | Code-focused |
+   | **Llama-3.1-8B-Instruct** | 4-8 GB | 16 GB | Latest, very capable |
+
+   > 💡 **Tip:** Start with a 7B-8B parameter model in Q4 or Q5 quantization for best speed/quality balance.
+
+3. **Download Your Chosen Model:**
+   - Search for the model (e.g., "Mistral 7B Instruct")
+   - Click the **"Download"** button
+   - Select quantization: **Q4_K_M** (recommended) or **Q5_K_M** (higher quality)
+   - Wait for download to complete (may take 5-30 minutes depending on size)
+
+---
+
+#### Step 3: Load the Model
+
+1. **Go to Chat Tab:**
+   - Click the 💬 **"Chat"** tab in LM Studio
+
+2. **Select Your Model:**
+   - Click the dropdown at the top
+   - Choose your downloaded model from the list
+   - Wait for the model to load (10-60 seconds)
+
+3. **Verify Model Loaded:**
+   - You should see "Model loaded" in green
+   - The model name appears at the top
+
+---
+
+#### Step 4: Start the Local Server
+
+1. **Open the Local Server Tab:**
+   - Click the **"Local Server"** or **"Developer"** tab (⚙️ icon)
+
+2. **Configure Server Settings:**
+   ```
+   Port: 1234 (default - don't change unless needed)
+   CORS: Enabled (✓)
+   Model: [Your selected model should be shown]
+   ```
+
+3. **Start the Server:**
+   - Click the **"Start Server"** button (green play icon)
+   - Wait for "Server running on http://localhost:1234" message
+
+4. **Verify Server Running:**
+   ```bash
+   # Test the server with curl
+   curl http://localhost:1234/v1/models
+   ```
+
+   **Expected Response:**
+   ```json
+   {
+     "object": "list",
+     "data": [
+       {
+         "id": "mistral-7b-instruct-v0.2",
+         "object": "model",
+         "created": 1234567890,
+         "owned_by": "lmstudio"
+       }
+     ]
+   }
+   ```
+
+---
+
+#### Step 5: Configure Crustly for LM Studio
+
+1. **Create or Edit Crustly Config:**
+   ```bash
+   # Initialize config if not done already
+   cargo run -- init
+
+   # Open config file
+   # Linux/Mac: ~/.config/crustly/config.toml
+   # Windows: C:\Users\YourName\AppData\Roaming\crustly\config.toml
+   ```
+
+2. **Add OpenAI Provider Configuration:**
+
+   Edit `config.toml` and add:
+
+   ```toml
+   [llm]
+   default_provider = "openai"  # Use OpenAI-compatible provider
+
+   [llm.providers.openai]
+   api_key = "lm-studio"  # Can be any non-empty value for local
+   base_url = "http://localhost:1234/v1"  # LM Studio local endpoint
+   default_model = "local-model"  # Will use whatever is loaded in LM Studio
+
+   # Optional: Add timeout settings for slower hardware
+   timeout = 120  # 2 minutes for generation
+   ```
+
+3. **Alternative: Use Environment Variables:**
+   ```bash
+   # Linux/Mac
+   export OPENAI_API_KEY="lm-studio"
+   export OPENAI_BASE_URL="http://localhost:1234/v1"
+
+   # Windows PowerShell
+   $env:OPENAI_API_KEY="lm-studio"
+   $env:OPENAI_BASE_URL="http://localhost:1234/v1"
+
+   # Windows Command Prompt
+   set OPENAI_API_KEY=lm-studio
+   set OPENAI_BASE_URL=http://localhost:1234/v1
+   ```
+
+---
+
+#### Step 6: Test the Connection
+
+1. **Simple Test with Non-Interactive Mode:**
+   ```bash
+   cargo run -- run "Hello! Can you introduce yourself?"
+   ```
+
+2. **Expected Output:**
+   ```
+   🤔 Processing...
+
+   Hello! I'm an AI assistant running locally on your machine through
+   LM Studio. I'm based on [Model Name] and I'm here to help you with
+   various tasks while keeping all your data private and secure.
+
+   📊 Tokens: 45
+   💰 Cost: $0.000000 (Local - FREE!)
+   ```
+
+3. **Launch Full TUI:**
+   ```bash
+   cargo run
+   ```
+
+4. **Verify in Header:**
+   - Model should show as "local-model" or your actual model name
+   - Cost should show $0.0000 (local inference)
+
+---
+
+### Step 7: Using Crustly with Local LLM
+
+**Normal Usage:**
+```bash
+# Just use Crustly as normal!
+cargo run
+```
+
+**Tips for Local LLMs:**
+
+1. **First Response is Slower:**
+   - The first message loads the model into memory
+   - Subsequent messages are much faster
+
+2. **Adjust Expectations:**
+   - Local 7B models are smart but not Claude-level
+   - Better for coding, simple tasks, and conversation
+   - May struggle with very complex reasoning
+
+3. **Monitor Performance:**
+   ```bash
+   # Check LM Studio logs for:
+   # - Tokens per second (tok/s)
+   # - Memory usage
+   # - GPU utilization (if using GPU)
+   ```
+
+4. **Optimize Speed:**
+   - Use GPU acceleration if available
+   - Lower quantization (Q4) for speed
+   - Reduce max tokens in responses
+   - Close other memory-intensive apps
+
+---
+
+### Recommended Models by Use Case
+
+#### 🚀 **Fast & Lightweight (4GB RAM)**
+```
+Model: TinyLlama-1.1B-Chat
+Size: ~1 GB
+Speed: Very fast
+Use: Quick responses, simple tasks
+```
+
+#### ⚖️ **Balanced (16GB RAM)**
+```
+Model: Mistral-7B-Instruct-v0.2
+Size: 4-8 GB (Q4_K_M quantization)
+Speed: Fast
+Use: General purpose, coding, chat
+```
+
+#### 💪 **High Quality (32GB RAM)**
+```
+Model: Llama-3-70B-Instruct
+Size: 40+ GB (Q4 quantization)
+Speed: Slower but very capable
+Use: Complex reasoning, production use
+```
+
+#### 👨‍💻 **Coding Focused (16GB RAM)**
+```
+Model: DeepSeek-Coder-33B-Instruct
+Size: 20 GB (Q4)
+Speed: Medium
+Use: Code generation, debugging
+```
+
+---
+
+### Troubleshooting Local Setup
+
+#### Problem: "Connection refused" error
+
+**Solution:**
+```bash
+# 1. Verify LM Studio server is running
+curl http://localhost:1234/v1/models
+
+# 2. Check the port (default is 1234)
+# In LM Studio: Server tab → verify port number
+
+# 3. Make sure config.toml has correct URL
+base_url = "http://localhost:1234/v1"
+```
+
+---
+
+#### Problem: Very slow responses
+
+**Solution:**
+1. **Enable GPU acceleration in LM Studio:**
+   - Settings → Enable GPU
+   - Restart LM Studio
+
+2. **Use lower quantization:**
+   - Q4_K_M instead of Q8 or FP16
+   - Smaller model (7B instead of 13B)
+
+3. **Reduce context length:**
+   ```toml
+   [llm.providers.openai]
+   max_tokens = 512  # Reduce from default 2048
+   ```
+
+4. **Close other apps to free RAM**
+
+---
+
+#### Problem: Model responses are poor quality
+
+**Solutions:**
+1. **Try a different model:**
+   - Llama-3.1-8B is generally better than Mistral-7B
+   - Qwen-2.5 is excellent for coding
+
+2. **Use higher quantization:**
+   - Q5_K_M or Q6_K instead of Q4_K_M
+   - More VRAM/RAM needed but better quality
+
+3. **Adjust temperature in LM Studio:**
+   - Lower temperature (0.7) for factual responses
+   - Higher temperature (1.0) for creative responses
+
+---
+
+#### Problem: Out of memory errors
+
+**Solutions:**
+1. **Use smaller model:**
+   - 7B instead of 13B
+   - Q4 instead of Q8
+
+2. **Enable offloading in LM Studio:**
+   - Settings → GPU offloading → Adjust layers
+   - Offload some layers to CPU if GPU memory limited
+
+3. **Close browser tabs and other apps**
+
+---
+
+### Performance Benchmarks (Approximate)
+
+| Hardware | Model | Speed (tok/s) | Experience |
+|----------|-------|---------------|------------|
+| **M1 Mac 16GB** | Mistral-7B Q4 | 30-40 | Excellent |
+| **M2 Mac 16GB** | Llama-3-8B Q4 | 40-60 | Excellent |
+| **RTX 3060 12GB** | Mistral-7B Q4 | 50-70 | Excellent |
+| **RTX 4090 24GB** | Llama-3-70B Q4 | 20-30 | Very Good |
+| **CPU Only (i7)** | Mistral-7B Q4 | 5-10 | Usable |
+| **CPU Only (i5)** | TinyLlama Q4 | 15-25 | Good |
+
+---
+
+### Comparison: Cloud vs Local
+
+| Aspect | Cloud (Anthropic) | Local (LM Studio) |
+|--------|-------------------|-------------------|
+| **Privacy** | Data sent to API | 100% private |
+| **Cost** | ~$3-15 per 1M tokens | Free (after download) |
+| **Speed** | Very fast (1-2s) | Fast (2-10s depending on hardware) |
+| **Quality** | Excellent (Claude) | Good (depends on model) |
+| **Setup** | API key only | Download model + setup |
+| **Offline** | ❌ Needs internet | ✅ Works offline |
+| **Hardware** | None needed | 16GB+ RAM recommended |
+
+---
+
+### Best Practices for Local LLM Usage
+
+1. **Start Small:**
+   - Begin with 7B model to test your hardware
+   - Upgrade to larger if needed and capable
+
+2. **Keep LM Studio Updated:**
+   - New versions have better performance
+   - New models added regularly
+
+3. **Monitor Resources:**
+   - Watch RAM/VRAM usage
+   - Check CPU/GPU temperature
+
+4. **Use Appropriate Models:**
+   - Coding: DeepSeek-Coder, Qwen
+   - Chat: Llama-3, Mistral
+   - Speed: TinyLlama, Phi
+
+5. **Cache Models:**
+   - LM Studio caches models in:
+     - Mac: `~/.cache/lm-studio`
+     - Windows: `C:\Users\YourName\.cache\lm-studio`
+     - Linux: `~/.cache/lm-studio`
+
+---
+
+### Alternative Local Solutions
+
+Besides LM Studio, Crustly can work with:
+
+1. **Ollama** (CLI-based)
+   ```bash
+   # Install Ollama
+   curl https://ollama.ai/install.sh | sh
+
+   # Pull model
+   ollama pull mistral
+
+   # Configure Crustly
+   base_url = "http://localhost:11434/v1"
+   ```
+
+2. **LocalAI** (Docker)
+   ```bash
+   docker run -p 8080:8080 localai/localai
+   base_url = "http://localhost:8080/v1"
+   ```
+
+3. **Text-Generation-WebUI** (Advanced)
+   ```bash
+   # OpenAI API extension
+   base_url = "http://localhost:5000/v1"
+   ```
+
+---
+
+**🎉 You're now running Crustly completely locally and privately!**
+
+> 💡 **Pro Tip:** Keep LM Studio running in the background, and Crustly will automatically use your local LLM instead of cloud APIs.
+
+---
+
+## 👨‍💻 Why Crustly for Coding?
+
+Crustly is specifically designed to be a **developer's best friend** in the terminal. Here's what makes it perfect for coders:
+
+### 🚀 **Core Coding Features**
+
+#### 1. **Built-in Tool Execution System**
+Execute commands and manipulate files directly from chat:
+
+```
+You: "Read the contents of src/main.rs"
+Crustly: [executes read tool] Here's your code: ...
+
+You: "Create a new test file with basic structure"
+Crustly: [executes write tool] Created tests/integration_test.rs with: ...
+
+You: "Run cargo test"
+Crustly: [executes bash tool] Running tests... ✅ 145 tests passed
+```
+
+**Available Tools:**
+- 📖 **`read`** - Read file contents with syntax awareness
+- ✏️ **`write`** - Create or modify files
+- 💻 **`bash`** - Execute shell commands safely
+- 📁 **File tracking** - Monitors all files touched by tools
+
+#### 2. **Syntax Highlighting for 100+ Languages**
+Code appears with proper highlighting in the terminal:
+- Rust, Python, JavaScript, TypeScript, Go, Java, C++, and 100+ more
+- Uses `syntect` with professional color schemes
+- Automatic language detection
+- Line numbers for easy reference
+
+#### 3. **Markdown Code Blocks**
+Code snippets are beautifully rendered:
+```rust
+╭─ rust ─────────────────╮
+│  1 │ fn fibonacci(n: u32) -> u32 {
+│  2 │     match n {
+│  3 │         0 => 0,
+│  4 │         1 => 1,
+│  5 │         _ => fibonacci(n-1) + fibonacci(n-2)
+│  6 │     }
+│  7 │ }
+╰────────────────────────╯
+```
+
+#### 4. **Multi-line Input**
+Write or paste long code snippets naturally:
+- Press `Enter` for new lines
+- `Ctrl+Enter` to send
+- Perfect for pasting entire functions or classes
+
+#### 5. **Session-Based Context**
+Crustly remembers your entire conversation:
+```
+You: "I'm working on a REST API in Rust"
+Crustly: Great! I'll help you...
+
+[Later in same session]
+You: "Add error handling to the API"
+Crustly: [Remembers you're working on Rust REST API]
+```
+
+#### 6. **Terminal-Native Workflow**
+Stay in your terminal, no context switching:
+- Launch with `crustly` or `cargo run`
+- Split screen with your editor
+- No browser tabs needed
+- Fast keyboard shortcuts (`Ctrl+H` for help)
+
+#### 7. **Local LLM Support (Privacy)**
+Run completely offline with LM Studio:
+- **100% Private** - Your proprietary code never leaves your machine
+- **Zero API Costs** - Use local models like DeepSeek-Coder
+- **Offline Development** - Work on sensitive projects securely
+- See detailed guide above ⬆️
+
+#### 8. **Streaming Responses**
+See code generation in real-time:
+- Character-by-character streaming
+- Animated spinner shows processing
+- No waiting for complete response
+- Stop mid-generation if needed
+
+#### 9. **Cost & Token Tracking**
+Monitor your API usage:
+```
+💬 Tokens: 1,248  💰 Cost: $0.0037
+```
+- Per-message tracking
+- Session totals
+- Database persistence
+- Budget control
+
+---
+
+### 🎯 **Common Coding Tasks**
+
+#### **Code Generation**
+```
+You: "Write a binary search function in Rust with tests"
+Crustly: [Generates implementation + tests with proper syntax highlighting]
+```
+
+#### **Code Review**
+```
+You: "Review this code for potential bugs"
+[Paste your code]
+Crustly: [Analyzes and provides feedback with specific line references]
+```
+
+#### **Debugging Help**
+```
+You: "I'm getting 'borrow checker error' in this code"
+[Paste code]
+Crustly: [Explains the issue and shows the fix with highlighting]
+```
+
+#### **Refactoring**
+```
+You: "Refactor this function to be more idiomatic Rust"
+Crustly: [Shows before/after with explanations]
+```
+
+#### **Documentation**
+```
+You: "Generate doc comments for this module"
+Crustly: [Creates comprehensive rustdoc comments]
+```
+
+#### **Testing**
+```
+You: "Write unit tests for this struct"
+Crustly: [Generates test cases with proper assertions]
+```
+
+#### **Command Execution**
+```
+You: "Show me all TODO comments in the project"
+Crustly: [Executes] grep -r "TODO" src/
+```
+
+---
+
+### 🔄 **Typical Developer Workflow**
+
+**Morning:**
+```bash
+$ crustly
+> "Show me what we worked on yesterday"
+[Crustly loads previous session and summarizes]
+
+> "Let's continue with the authentication module"
+[Crustly maintains context from yesterday]
+```
+
+**Implementing Feature:**
+```
+> "Create a new user authentication service"
+[Crustly generates code with write tool]
+
+> "Add password hashing with bcrypt"
+[Crustly adds the feature]
+
+> "Write integration tests"
+[Crustly creates test file]
+
+> "Run the tests"
+[Executes: cargo test]
+```
+
+**Debugging:**
+```
+> "The login endpoint returns 500, here's the error:"
+[Paste error]
+
+> "Read the auth service file"
+[Crustly reads it with read tool]
+
+> "Fix the issue"
+[Crustly modifies file with write tool]
+
+> "Run tests again"
+[Executes: cargo test] ✅ All passing!
+```
+
+**Documentation:**
+```
+> "Generate API documentation for the endpoints"
+[Crustly creates comprehensive docs]
+
+> "Add examples to the README"
+[Crustly updates README with code examples]
+```
+
+---
+
+### 💡 **Pro Tips for Coders**
+
+1. **Keep Context in Sessions:**
+   - Start new session per feature/bug
+   - Use `Ctrl+L` to switch between projects
+   - Session history persists indefinitely
+
+2. **Leverage Tool System:**
+   - Let Crustly read files instead of pasting
+   - Use bash tool for git commands
+   - Write tool for quick file generation
+
+3. **Use Local LLMs for Sensitive Code:**
+   - Company proprietary code
+   - Pre-release features
+   - Security-sensitive implementations
+
+4. **Keyboard Shortcuts:**
+   ```
+   Ctrl+Enter  - Send message
+   Ctrl+H      - Help (full command list)
+   Ctrl+N      - New session (new feature)
+   Ctrl+L      - Switch sessions (different projects)
+   Page Up/Down - Scroll through long code outputs
+   ```
+
+5. **Multi-line for Code:**
+   - Paste entire functions
+   - Press Enter for newlines
+   - `Ctrl+Enter` when ready to send
+
+6. **Markdown for Formatting:**
+   - Use triple backticks for code blocks
+   - Specify language for syntax highlighting
+   - Makes responses easier to read
+
+---
+
+### 🆚 **Comparison with Other Coding Assistants**
+
+| Feature | Crustly | GitHub Copilot | ChatGPT | Cursor |
+|---------|---------|----------------|---------|--------|
+| **Terminal Native** | ✅ | ❌ | ❌ | ❌ |
+| **File Operations** | ✅ Built-in | ❌ | ❌ | ✅ |
+| **Command Execution** | ✅ | ❌ | ❌ | ❌ |
+| **Local LLM Support** | ✅ | ❌ | ❌ | ❌ |
+| **Session History** | ✅ Persistent | ❌ | ✅ Limited | ✅ |
+| **Syntax Highlighting** | ✅ 100+ langs | ✅ | ❌ | ✅ |
+| **Cost Tracking** | ✅ | ❌ | ❌ | ❌ |
+| **Offline Mode** | ✅ | ❌ | ❌ | ❌ |
+| **Open Source** | ✅ | ❌ | ❌ | ❌ |
+| **Privacy First** | ✅ | ⚠️ | ⚠️ | ⚠️ |
+
+---
+
+### 🎓 **Perfect For:**
+
+- ✅ **Backend Developers** - Rust, Go, Python, Node.js
+- ✅ **Systems Programmers** - C, C++, Rust
+- ✅ **DevOps Engineers** - Shell scripting, automation
+- ✅ **Full-Stack Developers** - Multiple languages
+- ✅ **Open Source Contributors** - Code review, documentation
+- ✅ **Students** - Learning programming concepts
+- ✅ **Security-Conscious Devs** - Local inference for proprietary code
+- ✅ **CLI Enthusiasts** - Terminal workflow lovers
+- ✅ **Budget-Conscious** - Cost tracking + local LLMs
+
+---
+
+### 🚀 **Future Coding Features (Planned)**
+
+- 🔜 **LSP Integration** - Semantic code understanding
+- 🔜 **Git Integration** - Commit message generation, PR reviews
+- 🔜 **Project Context** - Auto-load `.cursorrules`, codebase awareness
+- 🔜 **Code Search** - Grep across entire projects
+- 🔜 **Refactoring Tools** - Automated code transformations
+- 🔜 **Test Generation** - Intelligent test case creation
+- 🔜 **Performance Analysis** - Profiling suggestions
+- 🔜 **Security Scanning** - Vulnerability detection
+
+---
+
+**Ready to supercharge your coding workflow?** 🚀
+
+```bash
+cargo run
+# Start coding with Crustly!
+```
+
+---
+
 ## ✨ Features
 
 ### Currently Implemented (Sprint 7 Complete ✅)
@@ -116,10 +1105,15 @@ cargo run -- db stats
   - `Ctrl+Enter` - Send message
   - `Ctrl+N` - New session
   - `Ctrl+L` - List sessions
-  - `Ctrl+H` - Show help
+  - `Ctrl+H` - Show help (📚 **Press Ctrl+H from anywhere to see all commands!**)
   - `Ctrl+C` - Quit
   - `Escape` - Clear input
   - `Page Up/Down` - Scroll chat history
+- **Enhanced Help Screen** - Comprehensive command reference with:
+  - Global commands (always available)
+  - Chat mode commands (message composition)
+  - Session list commands (navigation)
+  - Feature showcase (what Crustly can do)
 
 #### LLM Integration
 - **Anthropic Claude** - Full support for Claude 3 models

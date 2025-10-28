@@ -10,8 +10,32 @@ use crate::llm::provider::{
 };
 use crate::llm::tools::{ToolExecutionContext, ToolRegistry};
 use crate::services::{MessageService, SessionService, ServiceContext};
+use serde_json::Value;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use uuid::Uuid;
+
+/// Tool approval request information
+#[derive(Debug, Clone)]
+pub struct ToolApprovalInfo {
+    /// Tool name
+    pub tool_name: String,
+    /// Tool description
+    pub tool_description: String,
+    /// Tool input parameters
+    pub tool_input: Value,
+    /// Tool capabilities
+    pub capabilities: Vec<String>,
+}
+
+/// Type alias for approval callback function
+/// Returns true if approved, false if denied
+pub type ApprovalCallback = Arc<
+    dyn Fn(ToolApprovalInfo) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// Agent Service for managing AI conversations
 pub struct AgentService {
@@ -32,6 +56,9 @@ pub struct AgentService {
 
     /// Whether to auto-approve tool execution
     auto_approve_tools: bool,
+
+    /// Callback for requesting tool approval from user
+    approval_callback: Option<ApprovalCallback>,
 }
 
 impl AgentService {
@@ -44,6 +71,7 @@ impl AgentService {
             max_tool_iterations: 10,
             default_system_prompt: None,
             auto_approve_tools: false,
+            approval_callback: None,
         }
     }
 
@@ -68,6 +96,12 @@ impl AgentService {
     /// Set whether to auto-approve tool execution
     pub fn with_auto_approve_tools(mut self, auto_approve: bool) -> Self {
         self.auto_approve_tools = auto_approve;
+        self
+    }
+
+    /// Set the approval callback for interactive tool approval
+    pub fn with_approval_callback(mut self, callback: Option<ApprovalCallback>) -> Self {
+        self.approval_callback = callback;
         self
     }
 
@@ -375,6 +409,80 @@ impl AgentService {
                     self.max_tool_iterations
                 );
 
+                // Check if approval is needed
+                let needs_approval = if let Some(tool) = self.tool_registry.get(&tool_name) {
+                    tool.requires_approval() && !self.auto_approve_tools && !tool_context.auto_approve
+                } else {
+                    false
+                };
+
+                // Request approval if needed
+                if needs_approval {
+                    if let Some(ref approval_callback) = self.approval_callback {
+                        // Get tool details for approval request
+                        let tool_info = if let Some(tool) = self.tool_registry.get(&tool_name) {
+                            ToolApprovalInfo {
+                                tool_name: tool_name.clone(),
+                                tool_description: tool.description().to_string(),
+                                tool_input: tool_input.clone(),
+                                capabilities: tool
+                                    .capabilities()
+                                    .iter()
+                                    .map(|c| format!("{:?}", c))
+                                    .collect(),
+                            }
+                        } else {
+                            // Tool not found, skip approval
+                            tool_results.push(ContentBlock::ToolResult {
+                                tool_use_id: tool_id,
+                                content: format!("Tool not found: {}", tool_name),
+                                is_error: Some(true),
+                            });
+                            continue;
+                        };
+
+                        // Call approval callback
+                        tracing::info!("Requesting user approval for tool '{}'", tool_name);
+                        match approval_callback(tool_info).await {
+                            Ok(approved) => {
+                                if !approved {
+                                    tracing::warn!("User denied approval for tool '{}'", tool_name);
+                                    tool_results.push(ContentBlock::ToolResult {
+                                        tool_use_id: tool_id,
+                                        content: "User denied permission to execute this tool".to_string(),
+                                        is_error: Some(true),
+                                    });
+                                    continue;
+                                }
+                                tracing::info!("User approved tool '{}'", tool_name);
+                            }
+                            Err(e) => {
+                                tracing::error!("Approval callback error: {}", e);
+                                tool_results.push(ContentBlock::ToolResult {
+                                    tool_use_id: tool_id,
+                                    content: format!("Approval request failed: {}", e),
+                                    is_error: Some(true),
+                                });
+                                continue;
+                            }
+                        }
+                    } else {
+                        // No approval callback configured, deny execution
+                        tracing::warn!(
+                            "Tool '{}' requires approval but no approval callback configured",
+                            tool_name
+                        );
+                        tool_results.push(ContentBlock::ToolResult {
+                            tool_use_id: tool_id,
+                            content: "Tool requires approval but no approval mechanism configured"
+                                .to_string(),
+                            is_error: Some(true),
+                        });
+                        continue;
+                    }
+                }
+
+                // Execute the tool
                 match self
                     .tool_registry
                     .execute(&tool_name, tool_input, &tool_context)

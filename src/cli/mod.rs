@@ -284,18 +284,64 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
 
-    // Create agent service
-    tracing::debug!("Creating agent service");
+    // Create TUI app first (so we can get the event sender)
+    tracing::debug!("Creating TUI app");
+    let mut app = tui::App::new(
+        Arc::new(AgentService::new(provider.clone(), service_context.clone())),
+        service_context.clone(),
+    );
+
+    // Get event sender from app
+    let event_sender = app.event_sender();
+
+    // Create approval callback that sends requests to TUI
+    let approval_callback: crate::llm::agent::ApprovalCallback = Arc::new(move |tool_info| {
+        let sender = event_sender.clone();
+        Box::pin(async move {
+            use tokio::sync::mpsc;
+            use crate::tui::events::{ToolApprovalRequest, TuiEvent};
+
+            // Create response channel
+            let (response_tx, mut response_rx) = mpsc::unbounded_channel();
+
+            // Create approval request
+            let request = ToolApprovalRequest {
+                request_id: uuid::Uuid::new_v4(),
+                tool_name: tool_info.tool_name,
+                tool_description: tool_info.tool_description,
+                tool_input: tool_info.tool_input,
+                capabilities: tool_info.capabilities,
+                response_tx,
+            };
+
+            // Send to TUI
+            sender
+                .send(TuiEvent::ToolApprovalRequested(request))
+                .map_err(|e| crate::llm::agent::AgentError::Internal(format!("Failed to send approval request: {}", e)))?;
+
+            // Wait for response
+            let response = response_rx
+                .recv()
+                .await
+                .ok_or_else(|| crate::llm::agent::AgentError::Internal("Approval response channel closed".to_string()))?;
+
+            Ok(response.approved)
+        })
+    });
+
+    // Create agent service with approval callback
+    tracing::debug!("Creating agent service with approval callback");
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
             .with_tool_registry(Arc::new(tool_registry))
+            .with_approval_callback(Some(approval_callback))
     );
 
-    // Create TUI app
-    tracing::debug!("Launching TUI");
-    let app = tui::App::new(agent_service, service_context.clone());
+    // Update app with the configured agent service
+    app = tui::App::new(agent_service, service_context.clone());
 
     // Run TUI
+    tracing::debug!("Launching TUI");
     tui::run(app).await.context("TUI error")?;
 
     println!("\n👋 Goodbye!");
