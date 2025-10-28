@@ -192,10 +192,15 @@ impl SessionService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::Pool;
+    use crate::db::{Pool, PoolExt};
 
     async fn create_test_service() -> SessionService {
-        let pool = Pool::connect_in_memory().await.unwrap();
+        use crate::db::Database;
+
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        let pool = db.pool().clone();
+
         let context = ServiceContext::new(pool);
         SessionService::new(context)
     }
@@ -308,8 +313,9 @@ mod tests {
     async fn test_get_most_recent_session() {
         let service = create_test_service().await;
 
-        let session1 = service.create_session(Some("Session 1".to_string())).await.unwrap();
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        let _session1 = service.create_session(Some("Session 1".to_string())).await.unwrap();
+        // Sleep for 1 second to ensure different Unix timestamps (which have second resolution)
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         let session2 = service.create_session(Some("Session 2".to_string())).await.unwrap();
 
         let recent = service.get_most_recent_session().await.unwrap();

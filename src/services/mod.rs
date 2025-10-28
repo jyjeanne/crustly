@@ -80,10 +80,14 @@ impl ServiceManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::Pool;
+    use crate::db::{Pool, PoolExt};
 
     async fn create_test_pool() -> Pool {
-        Pool::connect_in_memory().await.unwrap()
+        use crate::db::Database;
+
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        db.pool().clone()
     }
 
     #[tokio::test]

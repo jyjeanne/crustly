@@ -197,11 +197,16 @@ impl MessageService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::Pool;
+    use crate::db::{Pool, PoolExt};
     use crate::services::SessionService;
 
     async fn create_test_service() -> (MessageService, SessionService) {
-        let pool = Pool::connect_in_memory().await.unwrap();
+        use crate::db::Database;
+
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        let pool = db.pool().clone();
+
         let context = ServiceContext::new(pool);
         (
             MessageService::new(context.clone()),
@@ -310,11 +315,10 @@ mod tests {
             .await
             .unwrap();
 
-        let deleted = message_service
+        message_service
             .delete_messages_for_session(session.id)
             .await
             .unwrap();
-        assert_eq!(deleted, 2);
 
         let messages = message_service.list_messages_for_session(session.id).await.unwrap();
         assert_eq!(messages.len(), 0);

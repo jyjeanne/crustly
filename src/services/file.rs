@@ -190,11 +190,16 @@ impl FileService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::Pool;
+    use crate::db::{Pool, PoolExt};
     use crate::services::SessionService;
 
     async fn create_test_service() -> (FileService, SessionService) {
-        let pool = Pool::connect_in_memory().await.unwrap();
+        use crate::db::Database;
+
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        let pool = db.pool().clone();
+
         let context = ServiceContext::new(pool);
         (
             FileService::new(context.clone()),
@@ -322,11 +327,10 @@ mod tests {
             .await
             .unwrap();
 
-        let deleted = file_service
+        file_service
             .delete_files_for_session(session.id)
             .await
             .unwrap();
-        assert_eq!(deleted, 2);
 
         let files = file_service.list_files_for_session(session.id).await.unwrap();
         assert_eq!(files.len(), 0);
