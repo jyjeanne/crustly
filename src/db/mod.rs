@@ -23,8 +23,19 @@ pub struct Database {
 impl Database {
     /// Connect to a SQLite database file
     pub async fn connect<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let path_str = path.as_ref().to_string_lossy().into_owned();
-        let url = format!("sqlite:{}", path_str);
+        let path = path.as_ref();
+
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                tracing::debug!("Creating database directory: {:?}", parent);
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("Failed to create database directory: {:?}", parent))?;
+            }
+        }
+
+        let path_str = path.to_string_lossy().into_owned();
+        let url = format!("sqlite://{}?mode=rwc", path_str);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)

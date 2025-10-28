@@ -1,0 +1,80 @@
+   Compiling crustly v0.1.0 (C:\Users\jjeanne\Documents\Perso\Projects\Crusty-cli\crustly)
+error[E0761]: file for module `components` found at both "src\tui\components.rs" and "src\tui\components\mod.rs"
+  --> src\tui\mod.rs:11:1
+   |
+11 | pub mod components;
+   | ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: delete or rename one of them to remove the ambiguity
+
+error[E0761]: file for module `pages` found at both "src\tui\pages.rs" and "src\tui\pages\mod.rs"
+  --> src\tui\mod.rs:12:1
+   |
+12 | pub mod pages;
+   | ^^^^^^^^^^^^^^
+   |
+   = help: delete or rename one of them to remove the ambiguity
+
+error[E0761]: file for module `styles` found at both "src\tui\styles.rs" and "src\tui\styles\mod.rs"
+  --> src\tui\mod.rs:13:1
+   |
+13 | pub mod styles;
+   | ^^^^^^^^^^^^^^^
+   |
+   = help: delete or rename one of them to remove the ambiguity
+
+error[E0761]: file for module `utils` found at both "src\tui\utils.rs" and "src\tui\utils\mod.rs"
+  --> src\tui\mod.rs:14:1
+   |
+14 | pub mod utils;
+   | ^^^^^^^^^^^^^^
+   |
+   = help: delete or rename one of them to remove the ambiguity
+
+warning: unused import: `crate::llm::provider::types::Message`
+  --> src\llm\provider\trait.rs:91:9
+   |
+91 |     use crate::llm::provider::types::Message;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Pool`
+   --> src\services\session.rs:195:21
+    |
+195 |     use crate::db::{Pool, PoolExt};
+    |                     ^^^^
+
+warning: unused import: `Pool`
+   --> src\services\message.rs:200:21
+    |
+200 |     use crate::db::{Pool, PoolExt};
+    |                     ^^^^
+
+warning: unused import: `Pool`
+   --> src\services\file.rs:193:21
+    |
+193 |     use crate::db::{Pool, PoolExt};
+    |                     ^^^^
+
+warning: unused import: `PoolExt`
+   --> src\services\file.rs:193:27
+    |
+193 |     use crate::db::{Pool, PoolExt};
+    |                           ^^^^^^^
+
+warning: unused import: `PoolExt`
+   --> src\services\message.rs:200:27
+    |
+200 |     use crate::db::{Pool, PoolExt};
+    |                           ^^^^^^^
+
+warning: unused import: `PoolExt`
+   --> src\services\session.rs:195:27
+    |
+195 |     use crate::db::{Pool, PoolExt};
+    |                           ^^^^^^^
+
+For more information about this error, try `rustc --explain E0761`.
+warning: `crustly` (lib test) generated 7 warnings
+error: could not compile `crustly` (lib test) due to 4 previous errors; 7 warnings emitted
