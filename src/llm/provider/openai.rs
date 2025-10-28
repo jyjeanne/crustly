@@ -221,20 +221,53 @@ impl OpenAIProvider {
     async fn handle_error(&self, response: reqwest::Response) -> ProviderError {
         let status = response.status().as_u16();
 
+        // Extract Retry-After header for rate limits
+        let retry_after = response.headers().get("retry-after").and_then(|v| {
+            v.to_str().ok().and_then(|s| {
+                // Retry-After can be either seconds or HTTP date
+                // Try parsing as seconds first
+                s.parse::<u64>().ok()
+            })
+        });
+
         // Try to parse error body
         if let Ok(error_body) = response.json::<OpenAIErrorResponse>().await {
-            return ProviderError::ApiError {
-                status,
-                message: error_body.error.message,
-                error_type: Some(error_body.error.error_type.unwrap_or_default()),
+            let message = if status == 429 {
+                // Enhance rate limit error message
+                if let Some(secs) = retry_after {
+                    format!("{} (retry after {} seconds)", error_body.error.message, secs)
+                } else {
+                    format!("{} (rate limited, please retry later)", error_body.error.message)
+                }
+            } else {
+                error_body.error.message
+            };
+
+            return if status == 429 {
+                ProviderError::RateLimitExceeded(message)
+            } else {
+                ProviderError::ApiError {
+                    status,
+                    message,
+                    error_type: Some(error_body.error.error_type.unwrap_or_default()),
+                }
             };
         }
 
         // Fallback error
-        ProviderError::ApiError {
-            status,
-            message: "Unknown error".to_string(),
-            error_type: None,
+        if status == 429 {
+            let message = if let Some(secs) = retry_after {
+                format!("Rate limit exceeded (retry after {} seconds)", secs)
+            } else {
+                "Rate limit exceeded, please retry later".to_string()
+            };
+            ProviderError::RateLimitExceeded(message)
+        } else {
+            ProviderError::ApiError {
+                status,
+                message: "Unknown error".to_string(),
+                error_type: None,
+            }
         }
     }
 }
@@ -242,7 +275,10 @@ impl OpenAIProvider {
 #[async_trait]
 impl Provider for OpenAIProvider {
     async fn complete(&self, request: LLMRequest) -> Result<LLMResponse> {
+        use super::retry::{retry_with_backoff, RetryConfig};
+
         let openai_request = self.to_openai_request(request);
+        let retry_config = RetryConfig::default();
 
         tracing::debug!(
             "Sending OpenAI request to {} with model {}",
@@ -250,25 +286,35 @@ impl Provider for OpenAIProvider {
             openai_request.model
         );
 
-        let response = self
-            .client
-            .post(&self.base_url)
-            .headers(self.headers())
-            .json(&openai_request)
-            .send()
-            .await?;
+        // Retry the entire API call with exponential backoff
+        retry_with_backoff(
+            || async {
+                let response = self
+                    .client
+                    .post(&self.base_url)
+                    .headers(self.headers())
+                    .json(&openai_request)
+                    .send()
+                    .await?;
 
-        if !response.status().is_success() {
-            return Err(self.handle_error(response).await);
-        }
+                if !response.status().is_success() {
+                    return Err(self.handle_error(response).await);
+                }
 
-        let openai_response: OpenAIResponse = response.json().await?;
-        Ok(self.from_openai_response(openai_response))
+                let openai_response: OpenAIResponse = response.json().await?;
+                Ok(self.from_openai_response(openai_response))
+            },
+            &retry_config,
+        )
+        .await
     }
 
     async fn stream(&self, request: LLMRequest) -> Result<ProviderStream> {
+        use super::retry::{retry_with_backoff, RetryConfig};
+
         let mut openai_request = self.to_openai_request(request);
         openai_request.stream = Some(true);
+        let retry_config = RetryConfig::default();
 
         tracing::debug!(
             "Starting OpenAI stream to {} with model {}",
@@ -276,17 +322,26 @@ impl Provider for OpenAIProvider {
             openai_request.model
         );
 
-        let response = self
-            .client
-            .post(&self.base_url)
-            .headers(self.headers())
-            .json(&openai_request)
-            .send()
-            .await?;
+        // Retry the stream connection establishment
+        let response = retry_with_backoff(
+            || async {
+                let response = self
+                    .client
+                    .post(&self.base_url)
+                    .headers(self.headers())
+                    .json(&openai_request)
+                    .send()
+                    .await?;
 
-        if !response.status().is_success() {
-            return Err(self.handle_error(response).await);
-        }
+                if !response.status().is_success() {
+                    return Err(self.handle_error(response).await);
+                }
+
+                Ok(response)
+            },
+            &retry_config,
+        )
+        .await?;
 
         // Parse Server-Sent Events stream
         let byte_stream = response.bytes_stream();

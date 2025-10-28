@@ -76,6 +76,7 @@ which = "6.0"
 shell-words = "1.1"
 notify = { version = "6.1", features = ["serde"] }
 git2 = "0.18"
+rand = "0.8"
 
 # Syntax & Parsing
 syntect = { version = "5.2", default-features = false, features = ["default-fancy"] }

@@ -96,20 +96,53 @@ impl AnthropicProvider {
     async fn handle_error(&self, response: reqwest::Response) -> ProviderError {
         let status = response.status().as_u16();
 
+        // Extract Retry-After header for rate limits
+        let retry_after = response.headers().get("retry-after").and_then(|v| {
+            v.to_str().ok().and_then(|s| {
+                // Retry-After can be either seconds or HTTP date
+                // Try parsing as seconds first
+                s.parse::<u64>().ok()
+            })
+        });
+
         // Try to parse error body
         if let Ok(error_body) = response.json::<AnthropicError>().await {
-            return ProviderError::ApiError {
-                status,
-                message: error_body.error.message,
-                error_type: Some(error_body.error.error_type),
+            let message = if status == 429 {
+                // Enhance rate limit error message
+                if let Some(secs) = retry_after {
+                    format!("{} (retry after {} seconds)", error_body.error.message, secs)
+                } else {
+                    format!("{} (rate limited, please retry later)", error_body.error.message)
+                }
+            } else {
+                error_body.error.message
+            };
+
+            return if status == 429 {
+                ProviderError::RateLimitExceeded(message)
+            } else {
+                ProviderError::ApiError {
+                    status,
+                    message,
+                    error_type: Some(error_body.error.error_type),
+                }
             };
         }
 
         // Fallback error
-        ProviderError::ApiError {
-            status,
-            message: "Unknown error".to_string(),
-            error_type: None,
+        if status == 429 {
+            let message = if let Some(secs) = retry_after {
+                format!("Rate limit exceeded (retry after {} seconds)", secs)
+            } else {
+                "Rate limit exceeded, please retry later".to_string()
+            };
+            ProviderError::RateLimitExceeded(message)
+        } else {
+            ProviderError::ApiError {
+                status,
+                message: "Unknown error".to_string(),
+                error_type: None,
+            }
         }
     }
 }
@@ -117,39 +150,61 @@ impl AnthropicProvider {
 #[async_trait]
 impl Provider for AnthropicProvider {
     async fn complete(&self, request: LLMRequest) -> Result<LLMResponse> {
+        use super::retry::{retry_with_backoff, RetryConfig};
+
         let anthropic_request = self.to_anthropic_request(request);
+        let retry_config = RetryConfig::default();
 
-        let response = self
-            .client
-            .post(ANTHROPIC_API_URL)
-            .headers(self.headers())
-            .json(&anthropic_request)
-            .send()
-            .await?;
+        // Retry the entire API call with exponential backoff
+        retry_with_backoff(
+            || async {
+                let response = self
+                    .client
+                    .post(ANTHROPIC_API_URL)
+                    .headers(self.headers())
+                    .json(&anthropic_request)
+                    .send()
+                    .await?;
 
-        if !response.status().is_success() {
-            return Err(self.handle_error(response).await);
-        }
+                if !response.status().is_success() {
+                    return Err(self.handle_error(response).await);
+                }
 
-        let anthropic_response: AnthropicResponse = response.json().await?;
-        Ok(self.from_anthropic_response(anthropic_response))
+                let anthropic_response: AnthropicResponse = response.json().await?;
+                Ok(self.from_anthropic_response(anthropic_response))
+            },
+            &retry_config,
+        )
+        .await
     }
 
     async fn stream(&self, request: LLMRequest) -> Result<ProviderStream> {
+        use super::retry::{retry_with_backoff, RetryConfig};
+
         let mut anthropic_request = self.to_anthropic_request(request);
         anthropic_request.stream = Some(true);
+        let retry_config = RetryConfig::default();
 
-        let response = self
-            .client
-            .post(ANTHROPIC_API_URL)
-            .headers(self.headers())
-            .json(&anthropic_request)
-            .send()
-            .await?;
+        // Retry the stream connection establishment
+        let response = retry_with_backoff(
+            || async {
+                let response = self
+                    .client
+                    .post(ANTHROPIC_API_URL)
+                    .headers(self.headers())
+                    .json(&anthropic_request)
+                    .send()
+                    .await?;
 
-        if !response.status().is_success() {
-            return Err(self.handle_error(response).await);
-        }
+                if !response.status().is_success() {
+                    return Err(self.handle_error(response).await);
+                }
+
+                Ok(response)
+            },
+            &retry_config,
+        )
+        .await?;
 
         // Parse Server-Sent Events stream
         let byte_stream = response.bytes_stream();

@@ -4,6 +4,7 @@
 
 pub mod error;
 pub mod types;
+pub mod retry;
 #[allow(clippy::module_inception)]
 mod r#trait;
 
