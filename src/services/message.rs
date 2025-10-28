@@ -4,7 +4,7 @@
 
 use crate::db::{
     models::Message,
-    repositories::MessageRepository,
+    repository::MessageRepository,
 };
 use crate::services::ServiceContext;
 use anyhow::{Context, Result};
@@ -130,14 +130,14 @@ impl MessageService {
     }
 
     /// Delete all messages for a session
-    pub async fn delete_messages_for_session(&self, session_id: Uuid) -> Result<u64> {
+    pub async fn delete_messages_for_session(&self, session_id: Uuid) -> Result<()> {
         let repo = MessageRepository::new(self.context.pool());
-        let deleted = repo.delete_by_session(session_id)
+        repo.delete_by_session(session_id)
             .await
             .context("Failed to delete messages for session")?;
 
-        tracing::info!("Deleted {} messages for session {}", deleted, session_id);
-        Ok(deleted)
+        tracing::info!("Deleted messages for session {}", session_id);
+        Ok(())
     }
 
     /// Count messages in a session

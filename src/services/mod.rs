@@ -12,7 +12,6 @@ pub use message::MessageService;
 pub use file::FileService;
 
 use crate::db::Pool;
-use anyhow::Result;
 use std::sync::Arc;
 
 /// Service context that holds shared resources
@@ -30,9 +29,9 @@ impl ServiceContext {
         }
     }
 
-    /// Get a reference to the database pool
-    pub fn pool(&self) -> &Pool {
-        &self.pool
+    /// Get a clone of the database pool (cheap operation)
+    pub fn pool(&self) -> Pool {
+        (*self.pool).clone()
     }
 }
 

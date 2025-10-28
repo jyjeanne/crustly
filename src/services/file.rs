@@ -4,7 +4,7 @@
 
 use crate::db::{
     models::File,
-    repositories::FileRepository,
+    repository::FileRepository,
 };
 use crate::services::ServiceContext;
 use anyhow::{Context, Result};
@@ -128,14 +128,14 @@ impl FileService {
     }
 
     /// Delete all files for a session
-    pub async fn delete_files_for_session(&self, session_id: Uuid) -> Result<u64> {
+    pub async fn delete_files_for_session(&self, session_id: Uuid) -> Result<()> {
         let repo = FileRepository::new(self.context.pool());
-        let deleted = repo.delete_by_session(session_id)
+        repo.delete_by_session(session_id)
             .await
             .context("Failed to delete files for session")?;
 
-        tracing::info!("Deleted {} files for session {}", deleted, session_id);
-        Ok(deleted)
+        tracing::info!("Deleted files for session {}", session_id);
+        Ok(())
     }
 
     /// Count files in a session

@@ -4,7 +4,7 @@
 
 use crate::db::{
     models::Session,
-    repositories::{SessionRepository, SessionListOptions},
+    repository::{SessionRepository, SessionListOptions},
 };
 use crate::services::ServiceContext;
 use anyhow::{Context, Result};
