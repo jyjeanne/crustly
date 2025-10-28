@@ -474,7 +474,7 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
             let json_str = serde_json::to_string_pretty(&request.tool_input).unwrap_or_else(|_| "{}".to_string());
             for line in json_str.lines() {
                 lines.push(Line::from(vec![
-                    Span::styled(line, Style::default().fg(Color::Green)),
+                    Span::styled(line.to_string(), Style::default().fg(Color::Green)),
                 ]));
             }
             lines.push(Line::from(""));
