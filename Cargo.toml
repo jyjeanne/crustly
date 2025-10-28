@@ -139,11 +139,11 @@ strip = true
 name = "crustly"
 path = "src/main.rs"
 
-# Benchmarks - uncomment when files are created
-# [[bench]]
-# name = "database"
-# harness = false
-# path = "benches/database.rs"
+# Benchmarks
+[[bench]]
+name = "database"
+harness = false
+path = "benches/database.rs"
 
 # [[bench]]
 # name = "llm_processing"

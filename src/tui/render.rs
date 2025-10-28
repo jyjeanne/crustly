@@ -68,7 +68,11 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         .and_then(|s| s.title.as_deref())
         .unwrap_or("No Session");
 
-    let model = "claude-3-5-sonnet"; // TODO: Get from app state
+    let model = app
+        .current_session
+        .as_ref()
+        .and_then(|s| s.model.as_deref())
+        .unwrap_or("unknown");
     let tokens = app.total_tokens();
     let cost = app.total_cost();
 
@@ -431,12 +435,28 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
 
         let dialog_area = center_chunks[1];
 
-        // Build dialog content
+        // Build dialog content - calculate time remaining
+        let time_remaining = request.time_remaining();
+        let seconds_remaining = time_remaining.as_secs();
+        let time_color = if seconds_remaining < 60 {
+            Color::Red
+        } else if seconds_remaining < 180 {
+            Color::Yellow
+        } else {
+            Color::Green
+        };
+
         let mut lines = vec![
             Line::from(""),
             Line::from(vec![
                 Span::styled("🔒 ", Style::default().fg(Color::Yellow)),
                 Span::styled("Permission Request", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+                Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("⏱️  ", Style::default().fg(time_color)),
+                Span::styled(
+                    format!("{}m {}s remaining", seconds_remaining / 60, seconds_remaining % 60),
+                    Style::default().fg(time_color)
+                ),
             ]),
             Line::from(""),
             Line::from(vec![

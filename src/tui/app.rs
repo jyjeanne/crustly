@@ -2,7 +2,7 @@
 //!
 //! Core state management for the terminal user interface.
 
-use super::events::{AppMode, EventHandler, ToolApprovalRequest, TuiEvent};
+use super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResponse, TuiEvent};
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
 use crate::services::{MessageService, ServiceContext, SessionService};
@@ -163,6 +163,32 @@ impl App {
             TuiEvent::Tick => {
                 // Update animation frame for spinner
                 self.animation_frame = self.animation_frame.wrapping_add(1);
+
+                // Check for approval timeout
+                if let Some(ref approval_request) = self.pending_approval {
+                    if approval_request.is_timed_out() {
+                        tracing::warn!(
+                            "Approval request {} timed out after 5 minutes",
+                            approval_request.request_id
+                        );
+
+                        // Auto-deny the timed-out request
+                        let response = ToolApprovalResponse {
+                            request_id: approval_request.request_id,
+                            approved: false,
+                            reason: Some("Approval request timed out after 5 minutes".to_string()),
+                        };
+
+                        // Send response
+                        let _ = approval_request.response_tx.send(response.clone());
+                        let _ = self.event_sender().send(TuiEvent::ToolApprovalResponse(response));
+
+                        // Clear pending approval and return to chat
+                        self.pending_approval = None;
+                        self.mode = AppMode::Chat;
+                        self.error_message = Some("⏱️  Approval request timed out".to_string());
+                    }
+                }
             }
             TuiEvent::ToolApprovalRequested(request) => {
                 self.handle_approval_requested(request);
@@ -444,7 +470,7 @@ impl App {
 
     /// Handle keys in approval mode
     async fn handle_approval_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
-        use super::events::{keys, ToolApprovalResponse};
+        use super::events::keys;
 
         if let Some(ref approval_request) = self.pending_approval {
             if keys::is_approve(&event) {

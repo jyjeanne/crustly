@@ -75,6 +75,23 @@ pub struct ToolApprovalRequest {
 
     /// Channel to send response back
     pub response_tx: mpsc::UnboundedSender<ToolApprovalResponse>,
+
+    /// When this request was created (for timeout)
+    pub requested_at: std::time::Instant,
+}
+
+impl ToolApprovalRequest {
+    /// Check if this approval request has timed out (default: 5 minutes)
+    pub fn is_timed_out(&self) -> bool {
+        self.requested_at.elapsed() > std::time::Duration::from_secs(300)
+    }
+
+    /// Get remaining time before timeout
+    pub fn time_remaining(&self) -> std::time::Duration {
+        let timeout = std::time::Duration::from_secs(300);
+        let elapsed = self.requested_at.elapsed();
+        timeout.saturating_sub(elapsed)
+    }
 }
 
 /// Tool approval response

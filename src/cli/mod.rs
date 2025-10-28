@@ -119,11 +119,9 @@ pub async fn run() -> Result<()> {
 async fn load_config(config_path: Option<&str>) -> Result<crate::config::Config> {
     use crate::config::Config;
 
-    let config = if let Some(_path) = config_path {
-        tracing::info!("Loading configuration from custom path");
-        // For now, just use the default load which handles everything
-        // TODO: Add support for custom config paths
-        Config::load()?
+    let config = if let Some(path) = config_path {
+        tracing::info!("Loading configuration from custom path: {}", path);
+        Config::load_from_path(path)?
     } else {
         tracing::debug!("Loading default configuration");
         Config::load()?
@@ -312,6 +310,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
                 tool_input: tool_info.tool_input,
                 capabilities: tool_info.capabilities,
                 response_tx,
+                requested_at: std::time::Instant::now(),
             };
 
             // Send to TUI

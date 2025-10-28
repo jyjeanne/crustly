@@ -19,7 +19,9 @@ use std::time::Duration;
 
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);  // Total request timeout
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);  // Connection timeout
+const DEFAULT_POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(90);  // Keep connections alive
 
 /// Anthropic provider for Claude models
 #[derive(Clone)]
@@ -32,7 +34,10 @@ impl AnthropicProvider {
     /// Create a new Anthropic provider
     pub fn new(api_key: String) -> Self {
         let client = Client::builder()
-            .timeout(DEFAULT_TIMEOUT)
+            .timeout(DEFAULT_TIMEOUT)  // Total request timeout (including streaming)
+            .connect_timeout(DEFAULT_CONNECT_TIMEOUT)  // Connection establishment timeout
+            .pool_idle_timeout(DEFAULT_POOL_IDLE_TIMEOUT)  // Keep connections in pool
+            .pool_max_idle_per_host(2)  // Max idle connections per host
             .build()
             .expect("Failed to create HTTP client");
 

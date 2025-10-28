@@ -211,6 +211,33 @@ impl Config {
         Ok(config)
     }
 
+    /// Load configuration from a specific file path
+    ///
+    /// Priority (lowest to highest):
+    /// 1. Default values
+    /// 2. Custom config file (specified path)
+    /// 3. Environment variables
+    pub fn load_from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path = path.as_ref();
+        tracing::debug!("Loading configuration from custom path: {:?}", path);
+
+        // Start with defaults
+        let mut config = Self::default();
+
+        // Load from custom path
+        if path.exists() {
+            config = Self::merge_from_file(config, path)?;
+        } else {
+            anyhow::bail!("Config file not found: {:?}", path);
+        }
+
+        // Apply environment variable overrides
+        config = Self::apply_env_overrides(config)?;
+
+        tracing::debug!("Configuration loaded successfully from custom path");
+        Ok(config)
+    }
+
     /// Get the system config path: ~/.config/crustly/config.toml
     fn system_config_path() -> Option<PathBuf> {
         dirs::config_dir().map(|dir| dir.join("crustly").join("config.toml"))
