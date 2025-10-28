@@ -266,11 +266,12 @@ See [LICENSE.md](LICENSE.md) for details.
 ## 📈 Status
 
 **Current Version:** 0.1.0-alpha
-**Development Status:** Sprint 1 Complete ✅
+**Development Status:** Sprint 2 Complete ✅
 **Feature Parity:** 95%+ with Crush (planned)
 **Crabrace Integration:** ✅ Implemented
 **Database Layer:** ✅ Complete
-**Progress:** 11.1% (2/18 weeks)
+**Configuration System:** ✅ Complete
+**Progress:** 16.7% (3/18 weeks)
 
 ### Sprint 0 Achievements ✅
 
@@ -293,12 +294,25 @@ See [LICENSE.md](LICENSE.md) for details.
 - ✅ 12+ integration tests (85% coverage)
 - ✅ 930+ lines of production code
 
-### Next: Sprint 2 - Configuration
+### Sprint 2 Achievements ✅
 
-- Enhanced config loading (TOML + env vars)
-- Active Crabrace client integration
-- Secrets management with zeroize
-- Config CLI commands
+- ✅ Enhanced config loading (TOML + env vars)
+- ✅ Hierarchical config system (defaults → system → local → env)
+- ✅ Provider configurations for all 6 LLM providers
+- ✅ Secure secret management with zeroize
+- ✅ Provider auto-update mechanism
+- ✅ Config validation & save/load
+- ✅ Debug options (debug_lsp, profiling)
+- ✅ 29 comprehensive tests (all passing)
+- ✅ 990+ lines of production code
+
+### Next: Sprint 3 - Service Layer
+
+- Session service implementation
+- Message service implementation
+- File service implementation
+- Event system with publish/subscribe
+- Service integration tests
 
 ---
 
