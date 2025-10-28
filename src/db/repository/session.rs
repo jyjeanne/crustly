@@ -6,6 +6,17 @@ use crate::db::models::Session;
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 
+/// Options for listing sessions
+#[derive(Debug, Clone, Default)]
+pub struct SessionListOptions {
+    /// Include archived sessions
+    pub include_archived: bool,
+    /// Maximum number of sessions to return
+    pub limit: Option<usize>,
+    /// Number of sessions to skip
+    pub offset: usize,
+}
+
 /// Repository for session operations
 #[derive(Clone)]
 pub struct SessionRepository {
@@ -100,13 +111,23 @@ impl SessionRepository {
     }
 
     /// List all sessions (most recent first)
-    pub async fn list(&self) -> Result<Vec<Session>> {
-        let sessions = sqlx::query_as::<_, Session>(
-            "SELECT * FROM sessions ORDER BY updated_at DESC"
-        )
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to list sessions")?;
+    pub async fn list(&self, options: SessionListOptions) -> Result<Vec<Session>> {
+        let mut query = String::from("SELECT * FROM sessions");
+
+        if !options.include_archived {
+            query.push_str(" WHERE is_archived = 0");
+        }
+
+        query.push_str(" ORDER BY updated_at DESC");
+
+        if let Some(limit) = options.limit {
+            query.push_str(&format!(" LIMIT {} OFFSET {}", limit, options.offset));
+        }
+
+        let sessions = sqlx::query_as::<_, Session>(&query)
+            .fetch_all(&self.pool)
+            .await
+            .context("Failed to list sessions")?;
 
         Ok(sessions)
     }
@@ -199,6 +220,22 @@ impl SessionRepository {
         .context("Failed to update session stats")?;
 
         Ok(())
+    }
+
+    /// Count sessions
+    pub async fn count(&self, archived_only: bool) -> Result<i64> {
+        let query = if archived_only {
+            "SELECT COUNT(*) as count FROM sessions WHERE is_archived = 1"
+        } else {
+            "SELECT COUNT(*) as count FROM sessions WHERE is_archived = 0"
+        };
+
+        let result: (i64,) = sqlx::query_as(query)
+            .fetch_one(&self.pool)
+            .await
+            .context("Failed to count sessions")?;
+
+        Ok(result.0)
     }
 }
 

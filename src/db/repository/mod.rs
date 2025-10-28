@@ -6,7 +6,7 @@ pub mod session;
 pub mod message;
 pub mod file;
 
-pub use session::SessionRepository;
+pub use session::{SessionRepository, SessionListOptions};
 pub use message::MessageRepository;
 pub use file::FileRepository;
 
