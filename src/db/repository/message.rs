@@ -232,7 +232,7 @@ mod tests {
                 session.id,
                 "user".to_string(),
                 format!("Message {}", i),
-                i as i32 + 1,
+                i + 1,
             );
             message_repo
                 .create(&msg)

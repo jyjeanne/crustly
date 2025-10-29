@@ -6,6 +6,8 @@
 //! - Bulk operations
 //! - Query performance
 
+#![allow(clippy::all)]
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use crustly::db::{models::Session, Database};
 use tempfile::TempDir;

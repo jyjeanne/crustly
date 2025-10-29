@@ -233,8 +233,10 @@ mod tests {
         let crabrace = CrabraceIntegration::new(crabrace_config.clone()).unwrap();
         let updater = ProviderUpdater::new(crabrace);
 
-        let mut config = Config::default();
-        config.crabrace = crabrace_config;
+        let config = Config {
+            crabrace: crabrace_config,
+            ..Default::default()
+        };
 
         assert!(!updater.should_update(&config));
     }
@@ -249,8 +251,10 @@ mod tests {
         let crabrace = CrabraceIntegration::new(crabrace_config.clone()).unwrap();
         let updater = ProviderUpdater::new(crabrace);
 
-        let mut config = Config::default();
-        config.crabrace = crabrace_config;
+        let config = Config {
+            crabrace: crabrace_config,
+            ..Default::default()
+        };
 
         assert!(updater.should_update(&config));
     }

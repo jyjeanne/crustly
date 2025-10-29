@@ -179,7 +179,6 @@ impl SessionService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{Pool, PoolExt};
 
     async fn create_test_service() -> SessionService {
         use crate::db::Database;

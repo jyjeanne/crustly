@@ -171,7 +171,6 @@ impl FileService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{Pool, PoolExt};
     use crate::services::SessionService;
 
     async fn create_test_service() -> (FileService, SessionService) {

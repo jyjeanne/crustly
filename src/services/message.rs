@@ -172,7 +172,6 @@ impl MessageService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{Pool, PoolExt};
     use crate::services::SessionService;
 
     async fn create_test_service() -> (MessageService, SessionService) {

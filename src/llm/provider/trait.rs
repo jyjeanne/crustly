@@ -88,7 +88,7 @@ impl ProviderCapabilities {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::llm::provider::types::Message;
+    
 
     /// Mock provider for testing
     struct MockProvider;

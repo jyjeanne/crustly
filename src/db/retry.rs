@@ -274,8 +274,7 @@ mod tests {
         use sqlx::Error;
 
         // Test with a mock database error containing "locked"
-        let err = Error::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        let err = Error::Io(std::io::Error::other(
             "database is locked",
         ));
         assert!(!is_database_locked(&err)); // IO errors don't count

@@ -140,10 +140,12 @@ async fn test_streaming_basic() -> Result<()> {
     // Verify text deltas
     let mut text_chunks = vec![];
     for event in &events {
-        if let StreamEvent::ContentBlockDelta { delta, .. } = event {
-            if let ContentDelta::TextDelta { text } = delta {
-                text_chunks.push(text.clone());
-            }
+        if let StreamEvent::ContentBlockDelta {
+            delta: ContentDelta::TextDelta { text },
+            ..
+        } = event
+        {
+            text_chunks.push(text.clone());
         }
     }
     assert_eq!(text_chunks, vec!["Hello", " ", "world", "!"]);
@@ -165,10 +167,12 @@ async fn test_streaming_single_chunk() -> Result<()> {
 
     while let Some(event) = stream.next().await {
         event_count += 1;
-        if let StreamEvent::ContentBlockDelta { delta, .. } = event? {
-            if let ContentDelta::TextDelta { text } = delta {
-                text_received.push_str(&text);
-            }
+        if let StreamEvent::ContentBlockDelta {
+            delta: ContentDelta::TextDelta { text },
+            ..
+        } = event?
+        {
+            text_received.push_str(&text);
         }
     }
 
@@ -196,10 +200,12 @@ async fn test_streaming_multiple_chunks() -> Result<()> {
     let mut received_chunks = vec![];
 
     while let Some(event) = stream.next().await {
-        if let StreamEvent::ContentBlockDelta { delta, .. } = event? {
-            if let ContentDelta::TextDelta { text } = delta {
-                received_chunks.push(text);
-            }
+        if let StreamEvent::ContentBlockDelta {
+            delta: ContentDelta::TextDelta { text },
+            ..
+        } = event?
+        {
+            received_chunks.push(text);
         }
     }
 
@@ -306,10 +312,12 @@ async fn test_streaming_content_accumulation() -> Result<()> {
     let mut accumulated_text = String::new();
 
     while let Some(event) = stream.next().await {
-        if let StreamEvent::ContentBlockDelta { delta, .. } = event? {
-            if let ContentDelta::TextDelta { text } = delta {
-                accumulated_text.push_str(&text);
-            }
+        if let StreamEvent::ContentBlockDelta {
+            delta: ContentDelta::TextDelta { text },
+            ..
+        } = event?
+        {
+            accumulated_text.push_str(&text);
         }
     }
 

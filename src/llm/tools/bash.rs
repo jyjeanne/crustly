@@ -197,11 +197,7 @@ mod tests {
         let session_id = Uuid::new_v4();
         let context = ToolExecutionContext::new(session_id).with_auto_approve(true);
 
-        let command = if cfg!(target_os = "windows") {
-            "exit 1"
-        } else {
-            "exit 1"
-        };
+        let command = "exit 1";
 
         let input = serde_json::json!({
             "command": command

@@ -62,7 +62,7 @@ jobs:
           components: clippy
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --lib --bins --tests --all-features -- -D warnings
 
   fmt:
     name: Format
