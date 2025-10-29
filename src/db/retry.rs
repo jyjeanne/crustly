@@ -84,13 +84,18 @@ fn is_database_locked(err: &sqlx::Error) -> bool {
 /// # Example
 /// ```no_run
 /// use crustly::db::retry::{retry_db_operation, DbRetryConfig};
+/// use sqlx::SqlitePool;
 ///
-/// async fn insert_record(pool: &SqlitePool) -> Result<(), sqlx::Error> {
-///     // ... database operation
+/// async fn example() {
+///     async fn insert_record(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+///         // ... database operation
+///         Ok(())
+///     }
+///
+///     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+///     let config = DbRetryConfig::default();
+///     let result = retry_db_operation(|| insert_record(&pool), &config).await;
 /// }
-///
-/// let config = DbRetryConfig::default();
-/// let result = retry_db_operation(|| insert_record(&pool), &config).await;
 /// ```
 pub async fn retry_db_operation<F, Fut, T, E>(
     mut operation: F,

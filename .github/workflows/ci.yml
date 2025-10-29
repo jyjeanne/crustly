@@ -26,6 +26,10 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
+      - name: Install CMake (Windows)
+        if: runner.os == 'Windows'
+        run: choco install cmake -y
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -44,10 +48,20 @@ jobs:
           path: target
           key: ${{ runner.os }}-target-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run tests
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo test --features openai,aws-bedrock --verbose
+
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
         run: cargo test --all-features --verbose
 
-      - name: Run doc tests
+      - name: Run doc tests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo test --doc --features openai,aws-bedrock
+
+      - name: Run doc tests (Unix)
+        if: runner.os != 'Windows'
         run: cargo test --doc --all-features
 
   clippy:
@@ -90,7 +104,16 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build
+      - name: Install CMake (Windows)
+        if: runner.os == 'Windows'
+        run: choco install cmake -y
+
+      - name: Build (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo build --release --features openai,aws-bedrock
+
+      - name: Build (Unix)
+        if: matrix.os != 'windows-latest'
         run: cargo build --release --all-features
 
       - name: Upload artifacts

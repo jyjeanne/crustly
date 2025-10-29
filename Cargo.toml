@@ -96,9 +96,6 @@ arc-swap = "1.6"
 # Security
 zeroize = { version = "1.7", features = ["derive"] }
 
-# Profiling (optional)
-pprof = { version = "0.13", features = ["flamegraph", "frame-pointer"], optional = true }
-
 # Misc
 bytes = "1.5"
 mime = "0.3"
@@ -113,9 +110,15 @@ insta = { version = "1.34", features = ["json", "yaml"] }
 tempfile = "3.9"
 tokio-test = "0.4"
 
+# Platform-specific dependencies
+[target.'cfg(unix)'.dependencies]
+# Profiling (Unix-only - not supported on Windows)
+pprof = { version = "0.13", features = ["flamegraph", "frame-pointer"], optional = true }
+
 [features]
 default = []
-profiling = ["pprof"]
+# Profiling feature enables pprof on Unix only (no-op on Windows)
+profiling = []
 openai = ["async-openai"]
 aws-bedrock = ["aws-sdk-bedrockruntime"]
 all-llm = ["openai", "aws-bedrock"]

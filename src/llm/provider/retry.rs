@@ -97,13 +97,17 @@ impl RetryConfig {
 /// # Example
 /// ```no_run
 /// use crustly::llm::provider::retry::{retry_with_backoff, RetryConfig};
+/// use crustly::llm::ProviderError;
 ///
-/// async fn make_api_call() -> Result<Response, ProviderError> {
-///     // ... API call logic
+/// async fn example() {
+///     async fn make_api_call() -> Result<String, ProviderError> {
+///         // ... API call logic
+///         Ok("response".to_string())
+///     }
+///
+///     let config = RetryConfig::default();
+///     let result = retry_with_backoff(|| make_api_call(), &config).await;
 /// }
-///
-/// let config = RetryConfig::default();
-/// let result = retry_with_backoff(|| make_api_call(), &config).await;
 /// ```
 pub async fn retry_with_backoff<F, Fut, T>(mut operation: F, config: &RetryConfig) -> Result<T>
 where
