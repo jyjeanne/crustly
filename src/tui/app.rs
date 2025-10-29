@@ -56,6 +56,9 @@ pub struct App {
     // Animation state
     pub animation_frame: usize,
 
+    // Splash screen state
+    splash_shown_at: Option<std::time::Instant>,
+
     // Approval state
     pub pending_approval: Option<ToolApprovalRequest>,
     pub show_approval_details: bool,
@@ -85,6 +88,7 @@ impl App {
             streaming_response: None,
             error_message: None,
             animation_frame: 0,
+            splash_shown_at: Some(std::time::Instant::now()),
             pending_approval: None,
             show_approval_details: false,
             session_service: SessionService::new(context.clone()),
@@ -234,8 +238,14 @@ impl App {
         // Mode-specific handling
         match self.mode {
             AppMode::Splash => {
-                // Any key dismisses the splash screen
-                self.switch_mode(AppMode::Chat).await?;
+                // Check if minimum display time (3 seconds) has elapsed
+                if let Some(shown_at) = self.splash_shown_at {
+                    if shown_at.elapsed() >= std::time::Duration::from_secs(3) {
+                        self.splash_shown_at = None;
+                        self.switch_mode(AppMode::Chat).await?;
+                    }
+                    // If not enough time has elapsed, ignore the key press
+                }
             }
             AppMode::Chat => self.handle_chat_key(event).await?,
             AppMode::Sessions => self.handle_sessions_key(event).await?,
