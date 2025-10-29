@@ -4,9 +4,11 @@
 
 pub mod models;
 pub mod repository;
+pub mod retry;
 
 pub use models::*;
 pub use repository::*;
+pub use retry::{retry_db_anyhow, retry_db_operation, retry_db_sqlx, DbRetryConfig};
 
 use anyhow::{Context, Result};
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
@@ -35,15 +37,17 @@ impl Database {
         }
 
         let path_str = path.to_string_lossy().into_owned();
-        let url = format!("sqlite://{}?mode=rwc", path_str);
+        // Add busy_timeout to handle database locks
+        let url = format!("sqlite://{}?mode=rwc&busy_timeout=5000", path_str);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(10))
             .connect(&url)
             .await
             .context("Failed to connect to database")?;
 
-        tracing::info!("Connected to database: {}", path_str);
+        tracing::info!("Connected to database: {} (busy_timeout: 5s)", path_str);
         Ok(Self { pool })
     }
 
