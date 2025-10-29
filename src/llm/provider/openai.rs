@@ -177,6 +177,7 @@ impl OpenAIProvider {
     }
 
     /// Convert OpenAI response to our generic format
+    #[allow(clippy::wrong_self_convention)]
     fn from_openai_response(&self, response: OpenAIResponse) -> LLMResponse {
         let choice = response.choices.into_iter().next().unwrap_or_else(|| {
             OpenAIChoice {
@@ -348,7 +349,7 @@ impl Provider for OpenAIProvider {
         let event_stream = byte_stream.map(|chunk_result| {
             chunk_result
                 .map_err(|e| ProviderError::StreamError(e.to_string()))
-                .and_then(|chunk| {
+                .map(|chunk| {
                     let text = String::from_utf8_lossy(&chunk);
 
                     // Parse SSE format: "data: {...}\n\n"
@@ -356,7 +357,7 @@ impl Provider for OpenAIProvider {
                         if let Some(json_str) = line.strip_prefix("data: ") {
                             // Check for stream end
                             if json_str == "[DONE]" {
-                                return Ok(StreamEvent::MessageStop);
+                                return StreamEvent::MessageStop;
                             }
 
                             // Parse JSON chunk
@@ -365,12 +366,12 @@ impl Provider for OpenAIProvider {
                                     if let Some(ref delta) = choice.delta {
                                         if let Some(ref content) = delta.content {
                                             if !content.is_empty() {
-                                                return Ok(StreamEvent::ContentBlockDelta {
+                                                return StreamEvent::ContentBlockDelta {
                                                     index: 0,
                                                     delta: ContentDelta::TextDelta {
                                                         text: content.clone(),
                                                     },
-                                                });
+                                                };
                                             }
                                         }
                                     }
@@ -380,7 +381,7 @@ impl Provider for OpenAIProvider {
                     }
 
                     // Skip non-data lines
-                    Ok(StreamEvent::Ping)
+                    StreamEvent::Ping
                 })
         });
 
@@ -493,6 +494,7 @@ struct OpenAIResponse {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIChoice {
     index: u32,
     message: OpenAIMessage,
@@ -506,12 +508,14 @@ struct OpenAIUsage {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIStreamChunk {
     id: String,
     choices: Vec<OpenAIStreamChoice>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIStreamChoice {
     index: u32,
     delta: Option<OpenAIMessageDelta>,
@@ -519,6 +523,7 @@ struct OpenAIStreamChoice {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIMessageDelta {
     role: Option<String>,
     content: Option<String>,

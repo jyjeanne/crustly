@@ -41,6 +41,7 @@ pub struct Config {
 
 /// Debug configuration options
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct DebugConfig {
     /// Enable LSP debug logging
     #[serde(default)]
@@ -51,14 +52,6 @@ pub struct DebugConfig {
     pub profiling: bool,
 }
 
-impl Default for DebugConfig {
-    fn default() -> Self {
-        Self {
-            debug_lsp: false,
-            profiling: false,
-        }
-    }
-}
 
 /// LLM Provider configurations
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -321,7 +314,7 @@ impl Config {
     fn load_provider_api_keys(config: &mut Self) -> Result<()> {
         // Anthropic
         if let Ok(api_key) = std::env::var("ANTHROPIC_API_KEY") {
-            let provider = config.providers.anthropic.get_or_insert_with(|| ProviderConfig {
+            let provider = config.providers.anthropic.get_or_insert(ProviderConfig {
                 enabled: true,
                 api_key: None,
                 base_url: None,
@@ -332,7 +325,7 @@ impl Config {
 
         // OpenAI
         if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
-            let provider = config.providers.openai.get_or_insert_with(|| ProviderConfig {
+            let provider = config.providers.openai.get_or_insert(ProviderConfig {
                 enabled: true,
                 api_key: None,
                 base_url: None,
@@ -343,7 +336,7 @@ impl Config {
 
         // OpenAI base URL (for LM Studio, Ollama, etc.)
         if let Ok(base_url) = std::env::var("OPENAI_BASE_URL") {
-            let provider = config.providers.openai.get_or_insert_with(|| ProviderConfig {
+            let provider = config.providers.openai.get_or_insert(ProviderConfig {
                 enabled: true,
                 api_key: None,
                 base_url: None,
@@ -354,7 +347,7 @@ impl Config {
 
         // Google Gemini
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
-            let provider = config.providers.gemini.get_or_insert_with(|| ProviderConfig {
+            let provider = config.providers.gemini.get_or_insert(ProviderConfig {
                 enabled: true,
                 api_key: None,
                 base_url: None,
@@ -366,7 +359,7 @@ impl Config {
         // AWS credentials are typically loaded via AWS SDK default chain
         // Azure uses AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT
         if let Ok(api_key) = std::env::var("AZURE_OPENAI_KEY") {
-            let provider = config.providers.azure.get_or_insert_with(|| ProviderConfig {
+            let provider = config.providers.azure.get_or_insert(ProviderConfig {
                 enabled: true,
                 api_key: None,
                 base_url: None,
@@ -376,7 +369,7 @@ impl Config {
         }
 
         if let Ok(endpoint) = std::env::var("AZURE_OPENAI_ENDPOINT") {
-            let provider = config.providers.azure.get_or_insert_with(|| ProviderConfig {
+            let provider = config.providers.azure.get_or_insert(ProviderConfig {
                 enabled: true,
                 api_key: None,
                 base_url: None,
@@ -406,11 +399,10 @@ impl Config {
         }
 
         // Validate Crabrace URL if enabled
-        if self.crabrace.enabled {
-            if self.crabrace.base_url.is_empty() {
+        if self.crabrace.enabled
+            && self.crabrace.base_url.is_empty() {
                 anyhow::bail!("Crabrace is enabled but base_url is empty");
             }
-        }
 
         tracing::debug!("Configuration validation passed");
         Ok(())

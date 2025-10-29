@@ -103,7 +103,7 @@ impl Tool for ReadTool {
         // Read file contents
         let contents = fs::read_to_string(&path)
             .await
-            .map_err(|e| ToolError::Io(e))?;
+            .map_err(ToolError::Io)?;
 
         // Apply line range if specified
         let output = if input.start_line.is_some() || input.line_count.is_some() {

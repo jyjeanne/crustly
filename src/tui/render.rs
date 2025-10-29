@@ -177,7 +177,7 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
 
     // Add cursor indicator
     if !app.is_processing {
-        input_text.push_str("█");
+        input_text.push('█');
     }
 
     let input_lines: Vec<Line> = input_text

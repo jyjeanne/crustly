@@ -24,6 +24,7 @@ impl SecretString {
     }
 
     /// Create a new SecretString from a &str
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(value: &str) -> Self {
         Self {
             inner: value.to_string(),

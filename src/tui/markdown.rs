@@ -203,7 +203,7 @@ pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
     }
 
     // Remove trailing empty lines
-    while lines.last().map_or(false, |line| line.spans.is_empty()) {
+    while lines.last().is_some_and(|line| line.spans.is_empty()) {
         lines.pop();
     }
 

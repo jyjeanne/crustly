@@ -102,7 +102,7 @@ where
     E: std::fmt::Display,
 {
     let mut attempt = 0;
-    let mut last_error: Option<E> = None;
+    let mut last_error;
 
     loop {
         // Try the operation
@@ -116,7 +116,7 @@ where
             Err(err) => {
                 // Store error for potential final return
                 let error_msg = err.to_string();
-                last_error = Some(err);
+                last_error = err;
 
                 // Check if we should retry
                 let is_locked = error_msg.to_lowercase().contains("locked")
@@ -124,7 +124,7 @@ where
 
                 if !is_locked {
                     tracing::debug!("Database error is not retryable: {}", error_msg);
-                    return Err(last_error.unwrap());
+                    return Err(last_error);
                 }
 
                 // Check if we've exhausted attempts
@@ -133,7 +133,7 @@ where
                         "Max database retry attempts ({}) exceeded for lock error",
                         config.max_attempts
                     );
-                    return Err(last_error.unwrap());
+                    return Err(last_error);
                 }
 
                 // Calculate delay for this attempt
@@ -179,7 +179,7 @@ where
     Fut: Future<Output = std::result::Result<T, sqlx::Error>>,
 {
     let mut attempt = 0;
-    let mut last_error: Option<sqlx::Error> = None;
+    let mut last_error;
 
     loop {
         // Try the operation
@@ -200,7 +200,7 @@ where
                 }
 
                 // Store error
-                last_error = Some(err);
+                last_error = err;
 
                 // Check if we've exhausted attempts
                 if attempt >= config.max_attempts {
@@ -208,7 +208,7 @@ where
                         "Max database retry attempts ({}) exceeded for lock error",
                         config.max_attempts
                     );
-                    return Err(last_error.unwrap());
+                    return Err(last_error);
                 }
 
                 // Calculate delay for this attempt

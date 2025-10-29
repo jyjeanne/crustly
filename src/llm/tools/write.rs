@@ -87,7 +87,7 @@ impl Tool for WriteTool {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)
                     .await
-                    .map_err(|e| ToolError::Io(e))?;
+                    .map_err(ToolError::Io)?;
             }
         }
 
@@ -104,7 +104,7 @@ impl Tool for WriteTool {
         // Write the file
         fs::write(&path, &input.content)
             .await
-            .map_err(|e| ToolError::Io(e))?;
+            .map_err(ToolError::Io)?;
 
         let message = format!(
             "Successfully wrote {} bytes to {}",

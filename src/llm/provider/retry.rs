@@ -168,7 +168,7 @@ where
 ///
 /// This variant respects Retry-After headers from rate limit responses
 pub async fn retry_with_rate_limit<F, Fut, T>(
-    mut operation: F,
+    operation: F,
     config: &RetryConfig,
     retry_after: Option<Duration>,
 ) -> Result<T>

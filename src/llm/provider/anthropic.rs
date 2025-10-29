@@ -82,6 +82,7 @@ impl AnthropicProvider {
     }
 
     /// Convert Anthropic response to our generic format
+    #[allow(clippy::wrong_self_convention)]
     fn from_anthropic_response(&self, response: AnthropicResponse) -> LLMResponse {
         LLMResponse {
             id: response.id,
@@ -224,7 +225,7 @@ impl Provider for AnthropicProvider {
 
                             // Parse the JSON event
                             return serde_json::from_str::<StreamEvent>(json_str)
-                                .map_err(|e| ProviderError::JsonError(e));
+                                .map_err(ProviderError::JsonError);
                         }
                     }
 

@@ -161,11 +161,10 @@ impl EventHandler {
                             crossterm::event::Event::Key(key) => {
                                 // Only process key press events to avoid duplicates
                                 // Ignore key release and repeat events
-                                if key.kind == crossterm::event::KeyEventKind::Press {
-                                    if tx.send(TuiEvent::Key(key)).is_err() {
+                                if key.kind == crossterm::event::KeyEventKind::Press
+                                    && tx.send(TuiEvent::Key(key)).is_err() {
                                         break;
                                     }
-                                }
                             }
                             crossterm::event::Event::Resize(w, h) => {
                                 if tx.send(TuiEvent::Resize(w, h)).is_err() {
