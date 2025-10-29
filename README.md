@@ -257,11 +257,21 @@ $env:OPENAI_API_KEY="sk-YOUR_OPENAI_KEY"
 ### Local LLMs (No API Key Required)
 
 You can also use Crustly with **local LLMs** for 100% private, cost-free operation:
-- **LM Studio** - Desktop app with OpenAI-compatible API
-- **Ollama** - Command-line local model runner
-- **LocalAI** - Self-hosted OpenAI alternative
+- **LM Studio** - Desktop app with OpenAI-compatible API ✅ **Ready to use!**
+- **Ollama** - Command-line local model runner ✅ **Ready to use!**
+- **LocalAI** - Self-hosted OpenAI alternative ✅ **Ready to use!**
 
-See the "Using Crustly with Local LLMs" section below for detailed setup instructions.
+**Quick Start with LM Studio:**
+```bash
+# 1. Start LM Studio with a model loaded
+# 2. Set environment variable
+export OPENAI_BASE_URL="http://localhost:1234/v1"
+
+# 3. Run Crustly
+cargo run
+```
+
+See [LM_STUDIO_GUIDE.md](LM_STUDIO_GUIDE.md) for complete setup instructions.
 
 ---
 

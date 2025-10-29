@@ -236,7 +236,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         db::Database,
         llm::{
             agent::AgentService,
-            provider::anthropic::AnthropicProvider,
+            provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{bash::BashTool, read::ReadTool, registry::ToolRegistry, write::WriteTool},
         },
         services::ServiceContext,
@@ -256,21 +256,56 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         .await
         .context("Failed to run database migrations")?;
 
-    // Get Anthropic API key
-    let anthropic_config = config
-        .providers
-        .anthropic
-        .as_ref()
-        .context("Anthropic provider not configured")?;
+    // Select provider based on configuration
+    let provider: Arc<dyn Provider> = if let Some(openai_config) = &config.providers.openai {
+        // OpenAI provider is configured
+        if let Some(base_url) = &openai_config.base_url {
+            // Local LLM (LM Studio, Ollama, etc.)
+            tracing::info!("Using local LLM at: {}", base_url);
+            println!("🏠 Using local LLM at: {}\n", base_url);
+            Arc::new(OpenAIProvider::local(base_url.clone()))
+        } else if let Some(api_key) = &openai_config.api_key {
+            // Official OpenAI API
+            tracing::info!("Using OpenAI provider");
+            println!("🤖 Using OpenAI provider\n");
+            Arc::new(OpenAIProvider::new(api_key.clone()))
+        } else {
+            // OpenAI configured but no credentials - fall back to Anthropic
+            tracing::debug!("OpenAI configured but no credentials, falling back to Anthropic");
+            let anthropic_config = config
+                .providers
+                .anthropic
+                .as_ref()
+                .context("No provider configured. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY")?;
 
-    let api_key = anthropic_config
-        .api_key
-        .as_ref()
-        .context("Anthropic API key not set.\n\nPlease set ANTHROPIC_API_KEY environment variable or add it to config file:\n  crustly init\n  # Then edit ~/.config/crustly/config.toml")?
-        .clone();
+            let api_key = anthropic_config
+                .api_key
+                .as_ref()
+                .context("Anthropic API key not set")?
+                .clone();
 
-    tracing::debug!("Initializing Anthropic provider");
-    let provider = Arc::new(AnthropicProvider::new(api_key.clone()));
+            tracing::info!("Using Anthropic provider");
+            println!("🤖 Using Anthropic Claude\n");
+            Arc::new(AnthropicProvider::new(api_key))
+        }
+    } else {
+        // No OpenAI config, use Anthropic
+        let anthropic_config = config
+            .providers
+            .anthropic
+            .as_ref()
+            .context("No provider configured.\n\nPlease set one of:\n  - ANTHROPIC_API_KEY for Claude\n  - OPENAI_API_KEY for OpenAI/GPT\n  - OPENAI_BASE_URL for local LLMs (LM Studio, Ollama)\n\nExample for LM Studio:\n  export OPENAI_BASE_URL=\"http://localhost:1234/v1\"")?;
+
+        let api_key = anthropic_config
+            .api_key
+            .as_ref()
+            .context("Anthropic API key not set")?
+            .clone();
+
+        tracing::info!("Using Anthropic provider");
+        println!("🤖 Using Anthropic Claude\n");
+        Arc::new(AnthropicProvider::new(api_key))
+    };
 
     // Create tool registry
     tracing::debug!("Setting up tool registry");
@@ -359,7 +394,7 @@ async fn cmd_run(
         db::Database,
         llm::{
             agent::AgentService,
-            provider::anthropic::AnthropicProvider,
+            provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{bash::BashTool, read::ReadTool, registry::ToolRegistry, write::WriteTool},
         },
         services::{ServiceContext, SessionService},
@@ -371,20 +406,39 @@ async fn cmd_run(
     let db = Database::connect(&config.database.path).await?;
     db.run_migrations().await?;
 
-    // Get Anthropic API key
-    let anthropic_config = config
-        .providers
-        .anthropic
-        .as_ref()
-        .context("Anthropic provider not configured")?;
-
-    let api_key = anthropic_config
-        .api_key
-        .as_ref()
-        .context("Anthropic API key not set")?
-        .clone();
-
-    let provider = Arc::new(AnthropicProvider::new(api_key.clone()));
+    // Select provider based on configuration
+    let provider: Arc<dyn Provider> = if let Some(openai_config) = &config.providers.openai {
+        // OpenAI provider is configured
+        if let Some(base_url) = &openai_config.base_url {
+            // Local LLM (LM Studio, Ollama, etc.)
+            tracing::info!("Using local LLM at: {}", base_url);
+            Arc::new(OpenAIProvider::local(base_url.clone()))
+        } else if let Some(api_key) = &openai_config.api_key {
+            // Official OpenAI API
+            tracing::info!("Using OpenAI provider");
+            Arc::new(OpenAIProvider::new(api_key.clone()))
+        } else {
+            // Fall back to Anthropic
+            let anthropic_config = config
+                .providers
+                .anthropic
+                .as_ref()
+                .context("No provider configured")?;
+            let api_key = anthropic_config.api_key.as_ref().context("Anthropic API key not set")?.clone();
+            tracing::info!("Using Anthropic provider");
+            Arc::new(AnthropicProvider::new(api_key))
+        }
+    } else {
+        // No OpenAI config, use Anthropic
+        let anthropic_config = config
+            .providers
+            .anthropic
+            .as_ref()
+            .context("No provider configured")?;
+        let api_key = anthropic_config.api_key.as_ref().context("Anthropic API key not set")?.clone();
+        tracing::info!("Using Anthropic provider");
+        Arc::new(AnthropicProvider::new(api_key))
+    };
 
     // Create tool registry
     let mut tool_registry = ToolRegistry::new();

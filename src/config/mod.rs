@@ -341,6 +341,17 @@ impl Config {
             provider.api_key = Some(api_key);
         }
 
+        // OpenAI base URL (for LM Studio, Ollama, etc.)
+        if let Ok(base_url) = std::env::var("OPENAI_BASE_URL") {
+            let provider = config.providers.openai.get_or_insert_with(|| ProviderConfig {
+                enabled: true,
+                api_key: None,
+                base_url: None,
+                default_model: None,
+            });
+            provider.base_url = Some(base_url);
+        }
+
         // Google Gemini
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
             let provider = config.providers.gemini.get_or_insert_with(|| ProviderConfig {
