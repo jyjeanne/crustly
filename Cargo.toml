@@ -54,7 +54,7 @@ async-openai = { version = "0.20", optional = true }
 aws-sdk-bedrockruntime = { version = "1.15", optional = true }
 
 # Provider Registry (Crabrace - replaces Catwalk)
-crabrace = { path = "../crabrace" }
+crabrace = "0.1.0"
 
 # Error Handling
 anyhow = "1.0"
