@@ -72,7 +72,7 @@ We actively welcome your pull requests! Here's how to get started:
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/crustly.git
+git clone https://github.com/jyjeanne/crustly.git
 cd crustly
 
 # Build the project

@@ -253,7 +253,7 @@ $env:OPENAI_BASE_URL   # Windows PowerShell
 ## Support
 
 - **LM Studio docs:** https://lmstudio.ai/docs
-- **Crustly issues:** https://github.com/your-org/crustly/issues
+- **Crustly issues:** https://github.com/jyjeanne/crustly/issues
 - **Model recommendations:** Check HuggingFace leaderboard for coding
 
 ---

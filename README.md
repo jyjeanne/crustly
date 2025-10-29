@@ -288,7 +288,7 @@ See [LM_STUDIO_GUIDE.md](LM_STUDIO_GUIDE.md) for complete setup instructions.
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/crustly.git
+git clone https://github.com/jyjeanne/crustly.git
 cd crustly
 
 # Build the project
@@ -1830,8 +1830,8 @@ See [LICENSE.md](LICENSE.md) for details.
 
 ## 📞 Support
 
-- **Issues:** [GitHub Issues](https://github.com/your-org/crustly/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/your-org/crustly/discussions)
+- **Issues:** [GitHub Issues](https://github.com/jyjeanne/crustly/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/jyjeanne/crustly/discussions)
 - **Documentation:** [docs/](docs/)
 
 ---
