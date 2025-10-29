@@ -88,7 +88,6 @@ impl ProviderCapabilities {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     /// Mock provider for testing
     struct MockProvider;
