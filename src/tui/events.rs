@@ -159,8 +159,12 @@ impl EventHandler {
                     if let Ok(event) = crossterm::event::read() {
                         match event {
                             crossterm::event::Event::Key(key) => {
-                                if tx.send(TuiEvent::Key(key)).is_err() {
-                                    break;
+                                // Only process key press events to avoid duplicates
+                                // Ignore key release and repeat events
+                                if key.kind == crossterm::event::KeyEventKind::Press {
+                                    if tx.send(TuiEvent::Key(key)).is_err() {
+                                        break;
+                                    }
                                 }
                             }
                             crossterm::event::Event::Resize(w, h) => {
