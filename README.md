@@ -271,7 +271,7 @@ export OPENAI_BASE_URL="http://localhost:1234/v1"
 cargo run
 ```
 
-See [LM_STUDIO_GUIDE.md](LM_STUDIO_GUIDE.md) for complete setup instructions.
+See [LM_STUDIO_GUIDE.md](docs/guides/LM_STUDIO_GUIDE.md) for complete setup instructions.
 
 ---
 
@@ -1767,16 +1767,16 @@ cargo clippy -- -D warnings
 ## 📖 Documentation
 
 ### User Documentation
-- **[User Guide](README_USER_GUIDE.md)** - Complete user guide with examples
-- **[Manual Testing Guide](MANUAL_TESTING_GUIDE.md)** - Step-by-step testing instructions
+- **[User Guide](docs/guides/README_USER_GUIDE.md)** - Complete user guide with examples
+- **[Manual Testing Guide](docs/guides/MANUAL_TESTING_GUIDE.md)** - Step-by-step testing instructions
 
 ### Development Documentation
-- **[Testing Summary](TESTING_SUMMARY.md)** - Test coverage and infrastructure
-- **[Sprint 6 Complete](SPRINT_6_COMPLETE.md)** - Runnable application completion
+- **[Testing Summary](docs/development/TESTING_SUMMARY.md)** - Test coverage and infrastructure
+- **[Sprint 6 Complete](docs/development/SPRINT_6_COMPLETE.md)** - Runnable application completion
 - **[Technical Specification](docs/CRUSTLY_SPECIFICATION_FINAL.md)** - Complete spec (v3.0)
 - **[Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)** - Development roadmap
-- **[Crabrace Integration](CRABRACE_INTEGRATION.md)** - Provider registry guide
-- **[Build Notes](BUILD_NOTES.md)** - Build instructions & known issues
+- **[Crabrace Integration](docs/guides/CRABRACE_INTEGRATION.md)** - Provider registry guide
+- **[Build Notes](docs/guides/BUILD_NOTES.md)** - Build instructions & known issues
 - **[Specification Review](docs/SPECIFICATION_REVIEW.md)** - Feature analysis
 
 ---
@@ -1802,7 +1802,7 @@ Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidel
 
 **Error:** `dlltool.exe not found`
 
-**Solution:** See [BUILD_NOTES.md](BUILD_NOTES.md) for Windows setup instructions.
+**Solution:** See [BUILD_NOTES.md](docs/guides/BUILD_NOTES.md) for Windows setup instructions.
 
 Alternative: Use WSL2 or Linux/macOS for development.
 
@@ -1934,14 +1934,14 @@ See [LICENSE.md](LICENSE.md) for details.
 - ✅ **Comprehensive test coverage** across all layers
 
 📄 **Documentation:**
-- [TESTING_SUMMARY.md](TESTING_SUMMARY.md) - Complete test overview
-- [MANUAL_TESTING_GUIDE.md](MANUAL_TESTING_GUIDE.md) - Step-by-step testing guide
-- [SPRINT_6_COMPLETE.md](SPRINT_6_COMPLETE.md) - Sprint 6 completion report
-- [SPRINT_8_COMPLETE.md](SPRINT_8_COMPLETE.md) - Sprint 8 completion report
-- [SPRINT_9_COMPLETE.md](SPRINT_9_COMPLETE.md) - Sprint 9 completion report
-- [SPRINT_10_STATUS.md](SPRINT_10_STATUS.md) - Sprint 10 completion report
-- [SPRINT_11_STATUS.md](SPRINT_11_STATUS.md) - Sprint 11 completion report
-- [README_USER_GUIDE.md](README_USER_GUIDE.md) - User-facing guide
+- [TESTING_SUMMARY.md](docs/development/TESTING_SUMMARY.md) - Complete test overview
+- [MANUAL_TESTING_GUIDE.md](docs/guides/MANUAL_TESTING_GUIDE.md) - Step-by-step testing guide
+- [SPRINT_6_COMPLETE.md](docs/development/SPRINT_6_COMPLETE.md) - Sprint 6 completion report
+- [SPRINT_8_COMPLETE.md](docs/development/SPRINT_8_COMPLETE.md) - Sprint 8 completion report
+- [SPRINT_9_COMPLETE.md](docs/development/SPRINT_9_COMPLETE.md) - Sprint 9 completion report
+- [SPRINT_10_STATUS.md](docs/development/SPRINT_10_STATUS.md) - Sprint 10 completion report
+- [SPRINT_11_STATUS.md](docs/development/SPRINT_11_STATUS.md) - Sprint 11 completion report
+- [README_USER_GUIDE.md](docs/guides/README_USER_GUIDE.md) - User-facing guide
 
 ### Sprint 8-11 Achievements (Recently Completed)
 
