@@ -83,18 +83,28 @@ Desktop.ini
 # Cross-compilation
 /cross/
 
-# Claude Code specific
+# Claude Code / AI Development Files
 .claude/
 .claudemd
 .cursorrules
 .context/
 *.claude.md
 claude-session-*.json
-
-# AI assistant files
 .aichat/
 .ai/
 ai-context/
+.anthropic/
+claude_desktop_config.json
+.mcp/
+
+# Development/Planning Documents (optional - uncomment to ignore)
+# SPRINT_*.md
+# GIT_COMMIT_SUMMARY.md
+# WINDOWS_BUILD_FIX.md
+# *_PLAN.md
+# *_PROGRESS.md
+# *_STATUS.md
+# *_COMPLETE.md
 
 # Development scripts
 create_stubs.sh
