@@ -38,12 +38,20 @@ impl Database {
         }
 
         let path_str = path.to_string_lossy().into_owned();
-        // Add busy_timeout to handle database locks
-        let url = format!("sqlite://{}?mode=rwc&busy_timeout=5000", path_str);
+        let url = format!("sqlite://{}?mode=rwc", path_str);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
             .acquire_timeout(std::time::Duration::from_secs(10))
+            .after_connect(|conn, _meta| {
+                Box::pin(async move {
+                    // Set busy_timeout to 5 seconds to handle database locks
+                    sqlx::query("PRAGMA busy_timeout = 5000")
+                        .execute(&mut *conn)
+                        .await?;
+                    Ok(())
+                })
+            })
             .connect(&url)
             .await
             .context("Failed to connect to database")?;
