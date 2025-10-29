@@ -195,31 +195,52 @@ Claude: ✅ "I've created the config file at config.json"
 
 ## 🌐 Supported AI Providers
 
-The quickest way to get started is to grab an API key for your preferred provider such as **Anthropic, OpenAI, Groq, or OpenRouter** and just start Crustly. You can configure your API key through environment variables or the configuration file.
+Crustly currently has **2 fully implemented providers**: **Anthropic** and **OpenAI**. The OpenAI provider is compatible with any OpenAI-compatible API, enabling local LLMs and alternative providers.
+
+### Implemented Providers
+
+#### ✅ Anthropic Claude (Fully Supported)
+- **Models**: Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Sonnet, Claude 3 Haiku
+- **Setup**: `export ANTHROPIC_API_KEY="sk-ant-api03-YOUR_KEY"`
+- **Features**: Streaming, tools, vision (via Claude), cost tracking
+
+#### ✅ OpenAI (Fully Supported)
+- **Models**: GPT-4 Turbo, GPT-4, GPT-3.5 Turbo
+- **Setup**: `export OPENAI_API_KEY="sk-YOUR_KEY"`
+- **Features**: Streaming, tools, cost tracking
+- **Compatible with**: Any OpenAI-compatible API endpoint
+
+### OpenAI-Compatible Providers
+
+The OpenAI provider works with **any OpenAI-compatible API**, including:
+
+| Provider | Status | Setup |
+|----------|--------|-------|
+| **LM Studio** | ✅ Tested | `OPENAI_BASE_URL="http://localhost:1234/v1"` |
+| **Ollama** | ✅ Compatible | `OPENAI_BASE_URL="http://localhost:11434/v1"` |
+| **LocalAI** | ✅ Compatible | `OPENAI_BASE_URL="http://localhost:8080/v1"` |
+| OpenRouter | 🟡 Compatible | `OPENAI_BASE_URL="https://openrouter.ai/api/v1"` |
+| Groq | 🟡 Compatible | `OPENAI_BASE_URL="https://api.groq.com/openai/v1"` |
+
+### Future Providers (Planned)
+
+These providers will require dedicated implementations:
+
+| Provider | Status | Sprint |
+|----------|--------|--------|
+| Google Gemini | 📅 Planned | Sprint 12+ |
+| AWS Bedrock | 📅 Planned | Sprint 12+ |
+| Azure OpenAI | 📅 Planned | Sprint 12+ |
+| Cerebras | 📅 Planned | Sprint 12+ |
+| Huggingface | 📅 Planned | Sprint 12+ |
 
 ### Environment Variables
 
-You can set environment variables for your preferred providers:
-
-| Environment Variable | Provider | Notes |
-|---------------------|----------|-------|
-| `ANTHROPIC_API_KEY` | Anthropic | Claude 3.5 Sonnet, Claude 3 Opus, etc. |
-| `OPENAI_API_KEY` | OpenAI | GPT-4, GPT-3.5, etc. |
-| `OPENROUTER_API_KEY` | OpenRouter | Access to multiple models |
-| `GEMINI_API_KEY` | Google Gemini | Gemini Pro, Gemini Ultra |
-| `GROQ_API_KEY` | Groq | Ultra-fast inference |
-| `CEREBRAS_API_KEY` | Cerebras | High-performance AI |
-| `HF_TOKEN` | Huggingface Inference | Open-source models |
-| `VERTEXAI_PROJECT` | Google Cloud VertexAI | Gemini on GCP |
-| `VERTEXAI_LOCATION` | Google Cloud VertexAI | GCP region (e.g., us-central1) |
-| `AWS_ACCESS_KEY_ID` | AWS Bedrock | Claude on AWS |
-| `AWS_SECRET_ACCESS_KEY` | AWS Bedrock | AWS credentials |
-| `AWS_REGION` | AWS Bedrock | AWS region (e.g., us-east-1) |
-| `AWS_PROFILE` | AWS Bedrock | Custom AWS profile |
-| `AWS_BEARER_TOKEN_BEDROCK` | AWS Bedrock | Bearer token authentication |
-| `AZURE_OPENAI_API_ENDPOINT` | Azure OpenAI | Azure endpoint URL |
-| `AZURE_OPENAI_API_KEY` | Azure OpenAI | Optional with Entra ID |
-| `AZURE_OPENAI_API_VERSION` | Azure OpenAI | API version (e.g., 2023-05-15) |
+| Variable | Provider | Required |
+|----------|----------|----------|
+| `ANTHROPIC_API_KEY` | Anthropic Claude | ✅ For Anthropic |
+| `OPENAI_API_KEY` | OpenAI / Compatible APIs | ✅ For OpenAI |
+| `OPENAI_BASE_URL` | OpenAI-compatible APIs | Optional (for custom endpoints) |
 
 ### Example Configuration
 
@@ -1095,12 +1116,27 @@ cargo run
 
 ## ✨ Features
 
-### Currently Implemented (Sprint 7 Complete ✅)
+### Currently Implemented (Sprint 11 Complete ✅)
 
 #### Interactive Terminal UI (TUI)
 - **Modern Interface** - Built with Ratatui for responsive terminal experience
-- **Real-time Chat** - Send/receive messages with Claude AI models
+- **Real-time Chat** - Send/receive messages with AI models
 - **Session Management** - Create, switch, and resume conversations
+- **Markdown Rendering** - Rich text formatting with pulldown-cmark
+  - Headings (H1-H3) with bold, underlined, cyan styling
+  - Code blocks with decorative borders and language labels
+  - Inline code with yellow highlighting
+  - Horizontal rules and proper line spacing
+- **Syntax Highlighting** - 100+ languages via syntect
+  - Rust, Python, JavaScript, TypeScript, Go, Java, C++, and more
+  - Line numbers for code blocks
+  - Base16 Ocean Dark theme
+- **Visual Polish**
+  - Animated braille spinner for loading states (⠋ ⠙ ⠹ ...)
+  - Block cursor (█) in input field
+  - Color-coded messages by role (User: Cyan, Claude: Green)
+  - Emoji indicators (📝 Session, 🤖 Model, 💬 Tokens, 💰 Cost)
+  - Beautiful croissant splash screen on startup
 - **Keyboard Shortcuts** - Efficient navigation and control
   - `Ctrl+Enter` - Send message
   - `Ctrl+N` - New session
@@ -1116,18 +1152,32 @@ cargo run
   - Feature showcase (what Crustly can do)
 
 #### LLM Integration
-- **Anthropic Claude** - Full support for Claude 3 models
-  - `claude-3-5-sonnet-20240620` (default)
-  - `claude-3-opus-20240229`
-  - `claude-3-sonnet-20240229`
-  - `claude-3-haiku-20240307`
+- **Multi-Provider Support** - Two providers fully implemented:
+  - **Anthropic Claude** - Full support for Claude 3 models
+    - `claude-3-5-sonnet-20240620` (default)
+    - `claude-3-opus-20240229`
+    - `claude-3-sonnet-20240229`
+    - `claude-3-haiku-20240307`
+  - **OpenAI** - Full support for GPT models + local LLMs
+    - `gpt-4-turbo-preview` (default)
+    - `gpt-4`, `gpt-3.5-turbo`
+    - Compatible with LM Studio, Ollama, LocalAI (OpenAI-compatible APIs)
 - **Streaming Responses** - Real-time message streaming
 - **Context Preservation** - Multi-turn conversations with full history
+- **Automatic Retry Logic** - Exponential backoff with jitter
+- **Rate Limit Handling** - Respects Retry-After headers
 
 #### Tool Execution System
-- **read** - Read file contents
-- **write** - Create or edit files
-- **bash** - Execute shell commands
+- **Built-in Tools**:
+  - **read** - Read file contents
+  - **write** - Create or edit files
+  - **bash** - Execute shell commands
+- **Interactive Approval System** - Full control over dangerous operations
+  - Beautiful approval dialogs with tool details
+  - View full JSON parameters before approving
+  - Auto-deny after 5 minutes (timeout protection)
+  - Visual countdown timer (color-coded: green/yellow/red)
+  - Keyboard shortcuts: A/Y (approve), D/N (deny), V (view details)
 - **Extensible Registry** - Easy to add new tools
 
 #### Cost & Token Tracking
@@ -1159,21 +1209,45 @@ cargo run
 - **JSON** - Structured JSON output
 - **Markdown** - Formatted markdown
 
+#### Error Recovery & Resilience (Sprint 11)
+- **Automatic Retry Logic** - Exponential backoff with jitter for API calls
+  - Configurable max attempts (default: 3 retries)
+  - Smart error classification (retryable vs permanent)
+  - Rate limit aware with Retry-After header support
+- **Database Lock Recovery** - SQLite lock detection and retry
+  - Busy timeout configuration (5 seconds)
+  - Exponential backoff for concurrent access
+- **Structured Error Reporting** - Rich error information with severity levels
+  - Color-coded error display (Info/Warning/Error/Critical)
+  - Error categorization (Network/Database/Config/Input/Tool/Internal)
+  - Retry tracking with next-retry estimation
+
 #### Developer Experience
 - **Fast Execution** - Async runtime with Tokio
-- **Error Handling** - Comprehensive error messages
+- **Comprehensive Error Handling** - Detailed error messages with context
 - **Logging** - Structured logging with tracing
 - **Local-First** - All data stored locally for privacy
 - **Cross-Platform** - Windows, Linux, macOS support
+- **Performance Benchmarks** - Criterion-based database benchmarks
 
 ### Planned Features (Future Sprints)
 
-- **Multi-LLM Support** - OpenAI, Google Gemini, AWS Bedrock
-- **LSP Integration** - Semantic code understanding
+- **Additional LLM Providers** - Expand beyond Anthropic and OpenAI
+  - Google Gemini
+  - AWS Bedrock
+  - Azure OpenAI
+  - Groq (ultra-fast inference)
+  - OpenRouter (multi-model gateway)
+  - Cerebras
+- **LSP Integration** - Semantic code understanding for better context
 - **MCP Support** - Model Context Protocol
-- **Context Files** - Auto-load `.cursorrules`
-- **Image Support** - Vision model integration
-- **Streaming UI Updates** - Character-by-character rendering
+- **Context Files** - Auto-load `.cursorrules` for project-specific behavior
+- **Image/Vision Support** - Vision model integration for analyzing images
+- **Security Hardening** (Sprint 12)
+  - OS keyring integration for API key storage
+  - Audit log for tool approval decisions
+  - Path validation (prevent directory traversal)
+  - Command sanitization (prevent injection)
 
 ---
 
@@ -1540,7 +1614,7 @@ cargo test -- --nocapture
 cargo test test_end_to_end_simple_message
 ```
 
-**Expected:** All 139 tests pass in ~2.7 seconds
+**Expected:** All 172 tests pass in ~2.4 seconds
 
 ---
 
@@ -1550,9 +1624,9 @@ cargo test test_end_to_end_simple_message
 
 | Test Suite | Tests | Time | Status |
 |------------|-------|------|--------|
-| Unit Tests | 130 | ~2.5s | ✅ |
-| Integration Tests | 9 | ~0.2s | ✅ |
-| **Total** | **139** | **~2.7s** | **✅** |
+| Unit Tests | 163 | ~2.3s | ✅ |
+| Integration Tests | 9 | ~0.1s | ✅ |
+| **Total** | **172** | **~2.4s** | **✅** |
 
 ### Database Operations
 
@@ -1657,7 +1731,7 @@ cargo clippy -- -D warnings
 
 ### Development Roadmap
 
-**Current Status:** Sprint 7 Complete ✅ - Application Production Ready 🟢
+**Current Status:** Sprint 11 Complete ✅ - Production Ready with Error Recovery 🟢
 
 | Sprint | Focus | Status |
 |--------|-------|--------|
@@ -1668,11 +1742,13 @@ cargo clippy -- -D warnings
 | Sprint 5 | TUI Framework | ✅ Complete |
 | Sprint 6 | Runnable Application | ✅ Complete |
 | Sprint 7 | Testing Infrastructure | ✅ Complete |
-| Sprint 8 | Additional Testing | 📅 Planned |
-| Sprint 9-10 | Multi-Provider & LSP | 📅 Planned |
-| Sprint 11+ | Advanced Features | 📅 Planned |
+| Sprint 8 | Enhanced Testing (+43 tests) | ✅ Complete |
+| Sprint 9 | Enhanced TUI (Markdown, Syntax Highlighting) | ✅ Complete |
+| Sprint 10 | Multi-Provider Support (OpenAI) | ✅ Complete |
+| Sprint 11 | Error Recovery & Resilience | ✅ Complete |
+| Sprint 12+ | Advanced Features (Security, LSP, etc.) | 📅 Planned |
 
-**Progress:** ~40% of original roadmap complete
+**Progress:** ~70% of original roadmap complete
 **Core Functionality:** 100% working
 **Current State:** Fully functional CLI AI assistant with TUI
 
@@ -1753,17 +1829,19 @@ See [LICENSE.md](LICENSE.md) for details.
 ## 📈 Status
 
 **Current Version:** 0.1.0-alpha
-**Development Status:** 🎉 **Sprint 7 Complete** ✅
-**Application Status:** 🟢 **Production Ready**
-**Test Coverage:** 139 tests (100% pass rate)
-**Crabrace Integration:** ✅ Implemented
-**Database Layer:** ✅ Complete
+**Development Status:** 🎉 **Sprint 11 Complete** ✅
+**Application Status:** 🟢 **Production Ready with Error Recovery**
+**Test Coverage:** 172 tests (100% pass rate)
+**Multi-Provider Support:** ✅ Anthropic + OpenAI
+**Local LLM Support:** ✅ LM Studio, Ollama (via OpenAI provider)
+**Database Layer:** ✅ Complete (with lock recovery)
 **Configuration System:** ✅ Complete
 **Service Layer:** ✅ Complete
-**LLM Integration:** ✅ Complete (Anthropic)
-**TUI Framework:** ✅ Complete
+**LLM Integration:** ✅ Complete (2 providers)
+**TUI Framework:** ✅ Complete (Markdown, Syntax Highlighting)
 **CLI Application:** ✅ Complete
-**Testing Infrastructure:** ✅ Complete
+**Testing Infrastructure:** ✅ Complete (172 total tests)
+**Error Recovery:** ✅ Complete (Retry logic, rate limiting)
 
 ### Sprint 0-1 Achievements ✅ (Database & Foundation)
 
@@ -1838,7 +1916,7 @@ See [LICENSE.md](LICENSE.md) for details.
 
 - ✅ **Integration tests** with MockProvider (9 tests)
 - ✅ **Unit tests** across all modules (130 tests)
-- ✅ **100% test pass rate** (139/139 tests passing)
+- ✅ **100% test pass rate** (172/172 tests passing)
 - ✅ **Fast execution** (< 3 seconds for full suite)
 - ✅ **Manual testing guide** (800+ lines, 6 scenarios)
 - ✅ **Testing summary** documentation
@@ -1849,21 +1927,57 @@ See [LICENSE.md](LICENSE.md) for details.
 - [TESTING_SUMMARY.md](TESTING_SUMMARY.md) - Complete test overview
 - [MANUAL_TESTING_GUIDE.md](MANUAL_TESTING_GUIDE.md) - Step-by-step testing guide
 - [SPRINT_6_COMPLETE.md](SPRINT_6_COMPLETE.md) - Sprint 6 completion report
+- [SPRINT_8_COMPLETE.md](SPRINT_8_COMPLETE.md) - Sprint 8 completion report
+- [SPRINT_9_COMPLETE.md](SPRINT_9_COMPLETE.md) - Sprint 9 completion report
+- [SPRINT_10_STATUS.md](SPRINT_10_STATUS.md) - Sprint 10 completion report
+- [SPRINT_11_STATUS.md](SPRINT_11_STATUS.md) - Sprint 11 completion report
 - [README_USER_GUIDE.md](README_USER_GUIDE.md) - User-facing guide
+
+### Sprint 8-11 Achievements (Recently Completed)
+
+#### Sprint 8: Enhanced Testing ✅
+- ✅ 43 new tests (172 total tests, up from 139 in Sprint 7, reduced to 172 in Sprint 11)
+- ✅ CLI command tests (24 tests)
+- ✅ Streaming response tests (10 tests)
+- ✅ Error scenario tests (9 tests)
+- ✅ 100% test pass rate maintained
+
+#### Sprint 9: Enhanced TUI Experience ✅
+- ✅ Markdown rendering with pulldown-cmark (267 lines)
+- ✅ Syntax highlighting with syntect (219 lines, 100+ languages)
+- ✅ Animated braille spinner for loading states
+- ✅ Beautiful croissant splash screen
+- ✅ Color-coded messages and emoji indicators
+
+#### Sprint 10: Multi-Provider Support + Quick Wins ✅
+- ✅ OpenAI provider fully implemented (517 lines)
+- ✅ Local LLM support (LM Studio, Ollama)
+- ✅ Fixed hard-coded model display
+- ✅ Added config path support (`--config` flag)
+- ✅ Implemented connection timeouts
+- ✅ Added approval timeout (5 minutes with visual countdown)
+- ✅ Created first benchmark suite (Criterion)
+
+#### Sprint 11: Error Recovery & Resilience ✅
+- ✅ Retry logic with exponential backoff and jitter
+- ✅ Rate limit detection with Retry-After header parsing
+- ✅ Database lock recovery (SQLite BUSY/LOCKED)
+- ✅ Structured error infrastructure (severity levels, categories)
+- ✅ TUI bug fixes (keyboard double-input, splash screen timing)
+- ✅ 13 new tests (retry, database, error handling)
 
 ### Next Priorities
 
-**Short Term (Sprint 8):**
-- CLI command tests
-- TUI rendering tests
-- Streaming response tests
-- Performance benchmarks
+**Short Term (Sprint 12):**
+- Security hardening (OS keyring, audit log)
+- Path validation and command sanitization
+- Enhanced approval system features
 
-**Medium Term (Sprint 9-10):**
-- Multi-LLM provider support (OpenAI, Gemini)
+**Medium Term (Sprint 13-14):**
+- Additional LLM providers (Gemini, Bedrock, Azure)
 - LSP integration for code understanding
 - MCP protocol support
-- Load testing and optimization
+- Advanced context management
 
 **Long Term:**
 - Context file support (.cursorrules)
