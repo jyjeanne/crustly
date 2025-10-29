@@ -43,7 +43,12 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
         // Beautiful Croissant ASCII Art with flaky layers
         Line::from(vec![
             Span::raw("                    "),
-            Span::styled("▄▄▄██", Style::default().fg(Color::Rgb(160, 82, 45)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "▄▄▄██",
+                Style::default()
+                    .fg(Color::Rgb(160, 82, 45))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("████▄▄", Style::default().fg(Color::Rgb(205, 133, 63))),
         ]),
         Line::from(vec![
@@ -59,24 +64,44 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
             Span::styled("▄██", Style::default().fg(Color::Rgb(160, 82, 45))),
             Span::styled("▀", Style::default().fg(Color::Rgb(222, 184, 135))),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▒▒▒▒▒▒▒▒", Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "▒▒▒▒▒▒▒▒",
+                Style::default()
+                    .fg(Color::Rgb(218, 165, 32))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
             Span::styled("▀", Style::default().fg(Color::Rgb(222, 184, 135))),
             Span::styled("██▄", Style::default().fg(Color::Rgb(160, 82, 45))),
         ]),
         Line::from(vec![
             Span::raw("            "),
-            Span::styled("▄█", Style::default().fg(Color::Rgb(139, 69, 19)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "▄█",
+                Style::default()
+                    .fg(Color::Rgb(139, 69, 19))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("▀", Style::default().fg(Color::Rgb(210, 180, 140))),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
             Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
             Span::styled("▓▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled("▓▓▓▓", Style::default().fg(Color::Rgb(255, 215, 0)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "▓▓▓▓",
+                Style::default()
+                    .fg(Color::Rgb(255, 215, 0))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("▓▓", Style::default().fg(Color::Rgb(184, 134, 11))),
             Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
             Span::styled("▀", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled("█▄", Style::default().fg(Color::Rgb(139, 69, 19)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "█▄",
+                Style::default()
+                    .fg(Color::Rgb(139, 69, 19))
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(vec![
             Span::raw("           "),
@@ -85,9 +110,24 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
             Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
             Span::styled("▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled("█", Style::default().fg(Color::Rgb(255, 215, 0)).add_modifier(Modifier::BOLD)),
-            Span::styled("██████", Style::default().fg(Color::Rgb(255, 223, 0)).add_modifier(Modifier::BOLD)),
-            Span::styled("█", Style::default().fg(Color::Rgb(255, 215, 0)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "█",
+                Style::default()
+                    .fg(Color::Rgb(255, 215, 0))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "██████",
+                Style::default()
+                    .fg(Color::Rgb(255, 223, 0))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "█",
+                Style::default()
+                    .fg(Color::Rgb(255, 215, 0))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("▓", Style::default().fg(Color::Rgb(184, 134, 11))),
             Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
@@ -96,24 +136,44 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
         ]),
         Line::from(vec![
             Span::raw("            "),
-            Span::styled("▀█", Style::default().fg(Color::Rgb(139, 69, 19)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "▀█",
+                Style::default()
+                    .fg(Color::Rgb(139, 69, 19))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("▄", Style::default().fg(Color::Rgb(210, 180, 140))),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
             Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
             Span::styled("▓▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled("▓▓▓▓", Style::default().fg(Color::Rgb(255, 215, 0)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "▓▓▓▓",
+                Style::default()
+                    .fg(Color::Rgb(255, 215, 0))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("▓▓", Style::default().fg(Color::Rgb(184, 134, 11))),
             Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
             Span::styled("▄", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled("█▀", Style::default().fg(Color::Rgb(139, 69, 19)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "█▀",
+                Style::default()
+                    .fg(Color::Rgb(139, 69, 19))
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(vec![
             Span::raw("              "),
             Span::styled("▀██", Style::default().fg(Color::Rgb(160, 82, 45))),
             Span::styled("▄", Style::default().fg(Color::Rgb(222, 184, 135))),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▒▒▒▒▒▒▒▒", Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "▒▒▒▒▒▒▒▒",
+                Style::default()
+                    .fg(Color::Rgb(218, 165, 32))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
             Span::styled("▄", Style::default().fg(Color::Rgb(222, 184, 135))),
             Span::styled("██▀", Style::default().fg(Color::Rgb(160, 82, 45))),
@@ -128,15 +188,30 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
         ]),
         Line::from(vec![
             Span::raw("                    "),
-            Span::styled("▀▀▀███", Style::default().fg(Color::Rgb(160, 82, 45)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "▀▀▀███",
+                Style::default()
+                    .fg(Color::Rgb(160, 82, 45))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("████▀▀▀", Style::default().fg(Color::Rgb(139, 69, 19))),
         ]),
         Line::from(""),
         // Project name and version
         Line::from(vec![
             Span::styled("              ╭─── ", Style::default().fg(Color::Cyan)),
-            Span::styled("🥐 Crustly", Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
-            Span::styled(format!(" v{} ", version), Style::default().fg(Color::Rgb(184, 134, 11)).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "🥐 Crustly",
+                Style::default()
+                    .fg(Color::Rgb(218, 165, 32))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" v{} ", version),
+                Style::default()
+                    .fg(Color::Rgb(184, 134, 11))
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("───╮", Style::default().fg(Color::Cyan)),
         ]),
         Line::from(""),
@@ -144,7 +219,12 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
         Line::from(vec![
             Span::raw("                    "),
             Span::styled("Model: ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Claude 3.5 Sonnet", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Claude 3.5 Sonnet",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(vec![
             Span::raw("                    "),
@@ -152,18 +232,28 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
             Span::styled("Crabrace Registry", Style::default().fg(Color::Cyan)),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("              High-performance terminal AI assistant", Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)),
-        ]),
+        Line::from(vec![Span::styled(
+            "              High-performance terminal AI assistant",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        )]),
         Line::from(""),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("                   Press any key to continue...", Style::default().fg(Color::Yellow).add_modifier(Modifier::DIM)),
-        ]),
+        Line::from(vec![Span::styled(
+            "                   Press any key to continue...",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::DIM),
+        )]),
     ];
 
     let splash = Paragraph::new(splash_text)
-        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Cyan)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan)),
+        )
         .alignment(Alignment::Left);
 
     f.render_widget(splash, area);

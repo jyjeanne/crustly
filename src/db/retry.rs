@@ -156,10 +156,7 @@ where
 }
 
 /// Retry a database operation that returns anyhow::Result
-pub async fn retry_db_anyhow<F, Fut, T>(
-    operation: F,
-    config: &DbRetryConfig,
-) -> Result<T>
+pub async fn retry_db_anyhow<F, Fut, T>(operation: F, config: &DbRetryConfig) -> Result<T>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T>>,
@@ -290,8 +287,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_success_immediate() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
 
         let config = DbRetryConfig::default();
         let call_count = Arc::new(AtomicU32::new(0));
@@ -316,8 +313,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_success_after_retries() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
 
         let config = DbRetryConfig::new(3, Duration::from_millis(10));
         let call_count = Arc::new(AtomicU32::new(0));
@@ -346,8 +343,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_max_attempts_exceeded() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
 
         let config = DbRetryConfig::new(2, Duration::from_millis(10));
         let call_count = Arc::new(AtomicU32::new(0));
@@ -371,8 +368,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_non_retryable_error() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
 
         let config = DbRetryConfig::default();
         let call_count = Arc::new(AtomicU32::new(0));

@@ -31,9 +31,7 @@ impl Message {
     pub fn user(text: impl Into<String>) -> Self {
         Self {
             role: Role::User,
-            content: vec![ContentBlock::Text {
-                text: text.into(),
-            }],
+            content: vec![ContentBlock::Text { text: text.into() }],
         }
     }
 
@@ -41,9 +39,7 @@ impl Message {
     pub fn assistant(text: impl Into<String>) -> Self {
         Self {
             role: Role::Assistant,
-            content: vec![ContentBlock::Text {
-                text: text.into(),
-            }],
+            content: vec![ContentBlock::Text { text: text.into() }],
         }
     }
 
@@ -51,9 +47,7 @@ impl Message {
     pub fn system(text: impl Into<String>) -> Self {
         Self {
             role: Role::System,
-            content: vec![ContentBlock::Text {
-                text: text.into(),
-            }],
+            content: vec![ContentBlock::Text { text: text.into() }],
         }
     }
 }
@@ -63,13 +57,9 @@ impl Message {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
     /// Plain text content
-    Text {
-        text: String,
-    },
+    Text { text: String },
     /// Image content (base64 or URL)
-    Image {
-        source: ImageSource,
-    },
+    Image { source: ImageSource },
     /// Tool use request from assistant
     ToolUse {
         id: String,
@@ -90,14 +80,9 @@ pub enum ContentBlock {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ImageSource {
     /// Base64-encoded image
-    Base64 {
-        media_type: String,
-        data: String,
-    },
+    Base64 { media_type: String, data: String },
     /// Image URL
-    Url {
-        url: String,
-    },
+    Url { url: String },
 }
 
 /// LLM request parameters
@@ -234,23 +219,16 @@ impl TokenUsage {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StreamEvent {
     /// Stream started
-    MessageStart {
-        message: StreamMessage,
-    },
+    MessageStart { message: StreamMessage },
     /// Content block started
     ContentBlockStart {
         index: usize,
         content_block: ContentBlock,
     },
     /// Content block delta (incremental update)
-    ContentBlockDelta {
-        index: usize,
-        delta: ContentDelta,
-    },
+    ContentBlockDelta { index: usize, delta: ContentDelta },
     /// Content block stopped
-    ContentBlockStop {
-        index: usize,
-    },
+    ContentBlockStop { index: usize },
     /// Message completed
     MessageDelta {
         delta: MessageDelta,
@@ -261,9 +239,7 @@ pub enum StreamEvent {
     /// Ping event (keep-alive)
     Ping,
     /// Error event
-    Error {
-        error: String,
-    },
+    Error { error: String },
 }
 
 /// Partial message information at stream start
@@ -280,13 +256,9 @@ pub struct StreamMessage {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentDelta {
     /// Text delta
-    TextDelta {
-        text: String,
-    },
+    TextDelta { text: String },
     /// Tool input delta (JSON)
-    InputJsonDelta {
-        partial_json: String,
-    },
+    InputJsonDelta { partial_json: String },
 }
 
 /// Message delta for final updates

@@ -9,7 +9,7 @@ use crate::llm::provider::{
     ContentBlock, LLMRequest, LLMResponse, Message, Provider, ProviderStream, StopReason,
 };
 use crate::llm::tools::{ToolExecutionContext, ToolRegistry};
-use crate::services::{MessageService, SessionService, ServiceContext};
+use crate::services::{MessageService, ServiceContext, SessionService};
 use serde_json::Value;
 use std::future::Future;
 use std::pin::Pin;
@@ -32,9 +32,7 @@ pub struct ToolApprovalInfo {
 /// Type alias for approval callback function
 /// Returns true if approved, false if denied
 pub type ApprovalCallback = Arc<
-    dyn Fn(ToolApprovalInfo) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>
-        + Send
-        + Sync,
+    dyn Fn(ToolApprovalInfo) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>> + Send + Sync,
 >;
 
 /// Agent Service for managing AI conversations
@@ -135,10 +133,7 @@ impl AgentService {
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
         let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self
-            .provider
-            .context_window(&model_name)
-            .unwrap_or(4096);
+        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
 
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
@@ -159,8 +154,8 @@ impl AgentService {
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
         // Build LLM request
-        let request = LLMRequest::new(model_name.clone(), context.messages.clone())
-            .with_max_tokens(4096);
+        let request =
+            LLMRequest::new(model_name.clone(), context.messages.clone()).with_max_tokens(4096);
 
         let request = if let Some(system) = context.system_prompt {
             request.with_system(system)
@@ -239,10 +234,7 @@ impl AgentService {
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
         let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self
-            .provider
-            .context_window(&model_name)
-            .unwrap_or(4096);
+        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
 
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
@@ -317,10 +309,7 @@ impl AgentService {
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
         let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self
-            .provider
-            .context_window(&model_name)
-            .unwrap_or(4096);
+        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
 
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
@@ -355,8 +344,8 @@ impl AgentService {
             iteration += 1;
 
             // Build LLM request with tools if available
-            let mut request = LLMRequest::new(model_name.clone(), context.messages.clone())
-                .with_max_tokens(4096);
+            let mut request =
+                LLMRequest::new(model_name.clone(), context.messages.clone()).with_max_tokens(4096);
 
             if let Some(system) = &context.system_prompt {
                 request = request.with_system(system.clone());
@@ -411,7 +400,9 @@ impl AgentService {
 
                 // Check if approval is needed
                 let needs_approval = if let Some(tool) = self.tool_registry.get(&tool_name) {
-                    tool.requires_approval() && !self.auto_approve_tools && !tool_context.auto_approve
+                    tool.requires_approval()
+                        && !self.auto_approve_tools
+                        && !tool_context.auto_approve
                 } else {
                     false
                 };
@@ -449,7 +440,8 @@ impl AgentService {
                                     tracing::warn!("User denied approval for tool '{}'", tool_name);
                                     tool_results.push(ContentBlock::ToolResult {
                                         tool_use_id: tool_id,
-                                        content: "User denied permission to execute this tool".to_string(),
+                                        content: "User denied permission to execute this tool"
+                                            .to_string(),
                                         is_error: Some(true),
                                     });
                                     continue;
@@ -494,7 +486,9 @@ impl AgentService {
                             content: if result.success {
                                 result.output
                             } else {
-                                result.error.unwrap_or_else(|| "Tool execution failed".to_string())
+                                result
+                                    .error
+                                    .unwrap_or_else(|| "Tool execution failed".to_string())
                             },
                             is_error: Some(!result.success),
                         });
@@ -544,11 +538,9 @@ impl AgentService {
 
         // Calculate total cost
         let total_tokens = total_input_tokens + total_output_tokens;
-        let cost = self.provider.calculate_cost(
-            &response.model,
-            total_input_tokens,
-            total_output_tokens,
-        );
+        let cost =
+            self.provider
+                .calculate_cost(&response.model, total_input_tokens, total_output_tokens);
 
         // Update message with usage info
         message_service
@@ -645,7 +637,10 @@ mod tests {
 
     #[async_trait]
     impl Provider for MockProvider {
-        async fn complete(&self, _request: LLMRequest) -> crate::llm::provider::Result<LLMResponse> {
+        async fn complete(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<LLMResponse> {
             Ok(LLMResponse {
                 id: "test-response-1".to_string(),
                 model: "mock-model".to_string(),
@@ -660,7 +655,10 @@ mod tests {
             })
         }
 
-        async fn stream(&self, _request: LLMRequest) -> crate::llm::provider::Result<ProviderStream> {
+        async fn stream(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<ProviderStream> {
             unimplemented!("Streaming not needed for basic tests")
         }
 
@@ -755,7 +753,10 @@ mod tests {
 
     #[async_trait]
     impl Provider for MockProviderWithTools {
-        async fn complete(&self, _request: LLMRequest) -> crate::llm::provider::Result<LLMResponse> {
+        async fn complete(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<LLMResponse> {
             let mut count = self.call_count.lock().unwrap();
             *count += 1;
             let call_num = *count;
@@ -798,7 +799,10 @@ mod tests {
             }
         }
 
-        async fn stream(&self, _request: LLMRequest) -> crate::llm::provider::Result<ProviderStream> {
+        async fn stream(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<ProviderStream> {
             unimplemented!("Streaming not needed for tool tests")
         }
 

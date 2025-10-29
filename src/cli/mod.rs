@@ -177,13 +177,39 @@ async fn cmd_config(config: &crate::config::Config, show_secrets: bool) -> Resul
         println!("\nProviders:");
 
         if let Some(ref anthropic) = config.providers.anthropic {
-            println!("  - anthropic: {}", anthropic.default_model.as_ref().unwrap_or(&"claude-3-5-sonnet-20240620".to_string()));
-            println!("    API Key: {}", if anthropic.api_key.is_some() { "[SET]" } else { "[NOT SET]" });
+            println!(
+                "  - anthropic: {}",
+                anthropic
+                    .default_model
+                    .as_ref()
+                    .unwrap_or(&"claude-3-5-sonnet-20240620".to_string())
+            );
+            println!(
+                "    API Key: {}",
+                if anthropic.api_key.is_some() {
+                    "[SET]"
+                } else {
+                    "[NOT SET]"
+                }
+            );
         }
 
         if let Some(ref openai) = config.providers.openai {
-            println!("  - openai: {}", openai.default_model.as_ref().unwrap_or(&"gpt-4".to_string()));
-            println!("    API Key: {}", if openai.api_key.is_some() { "[SET]" } else { "[NOT SET]" });
+            println!(
+                "  - openai: {}",
+                openai
+                    .default_model
+                    .as_ref()
+                    .unwrap_or(&"gpt-4".to_string())
+            );
+            println!(
+                "    API Key: {}",
+                if openai.api_key.is_some() {
+                    "[SET]"
+                } else {
+                    "[NOT SET]"
+                }
+            );
         }
 
         println!("\n💡 Use --show-secrets to display API keys");
@@ -201,7 +227,10 @@ async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result
             println!("🗄️  Initializing database...");
             let db = Database::connect(&config.database.path).await?;
             db.run_migrations().await?;
-            println!("✅ Database initialized at: {}", config.database.path.display());
+            println!(
+                "✅ Database initialized at: {}",
+                config.database.path.display()
+            );
             Ok(())
         }
         DbCommands::Stats => {
@@ -272,11 +301,9 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         } else {
             // OpenAI configured but no credentials - fall back to Anthropic
             tracing::debug!("OpenAI configured but no credentials, falling back to Anthropic");
-            let anthropic_config = config
-                .providers
-                .anthropic
-                .as_ref()
-                .context("No provider configured. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY")?;
+            let anthropic_config = config.providers.anthropic.as_ref().context(
+                "No provider configured. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY",
+            )?;
 
             let api_key = anthropic_config
                 .api_key
@@ -331,8 +358,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     let approval_callback: crate::llm::agent::ApprovalCallback = Arc::new(move |tool_info| {
         let sender = event_sender.clone();
         Box::pin(async move {
-            use tokio::sync::mpsc;
             use crate::tui::events::{ToolApprovalRequest, TuiEvent};
+            use tokio::sync::mpsc;
 
             // Create response channel
             let (response_tx, mut response_rx) = mpsc::unbounded_channel();
@@ -351,13 +378,19 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             // Send to TUI
             sender
                 .send(TuiEvent::ToolApprovalRequested(request))
-                .map_err(|e| crate::llm::agent::AgentError::Internal(format!("Failed to send approval request: {}", e)))?;
+                .map_err(|e| {
+                    crate::llm::agent::AgentError::Internal(format!(
+                        "Failed to send approval request: {}",
+                        e
+                    ))
+                })?;
 
             // Wait for response
-            let response = response_rx
-                .recv()
-                .await
-                .ok_or_else(|| crate::llm::agent::AgentError::Internal("Approval response channel closed".to_string()))?;
+            let response = response_rx.recv().await.ok_or_else(|| {
+                crate::llm::agent::AgentError::Internal(
+                    "Approval response channel closed".to_string(),
+                )
+            })?;
 
             Ok(response.approved)
         })
@@ -368,7 +401,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
             .with_tool_registry(Arc::new(tool_registry))
-            .with_approval_callback(Some(approval_callback))
+            .with_approval_callback(Some(approval_callback)),
     );
 
     // Update app with the configured agent service
@@ -424,7 +457,11 @@ async fn cmd_run(
                 .anthropic
                 .as_ref()
                 .context("No provider configured")?;
-            let api_key = anthropic_config.api_key.as_ref().context("Anthropic API key not set")?.clone();
+            let api_key = anthropic_config
+                .api_key
+                .as_ref()
+                .context("Anthropic API key not set")?
+                .clone();
             tracing::info!("Using Anthropic provider");
             Arc::new(AnthropicProvider::new(api_key))
         }
@@ -435,7 +472,11 @@ async fn cmd_run(
             .anthropic
             .as_ref()
             .context("No provider configured")?;
-        let api_key = anthropic_config.api_key.as_ref().context("Anthropic API key not set")?.clone();
+        let api_key = anthropic_config
+            .api_key
+            .as_ref()
+            .context("Anthropic API key not set")?
+            .clone();
         tracing::info!("Using Anthropic provider");
         Arc::new(AnthropicProvider::new(api_key))
     };
@@ -460,16 +501,17 @@ async fn cmd_run(
 
     // Send message
     println!("🤔 Processing...\n");
-    let response = agent_service
-        .send_message(session.id, prompt, None)
-        .await?;
+    let response = agent_service.send_message(session.id, prompt, None).await?;
 
     // Format and display output
     match format {
         OutputFormat::Text => {
             println!("{}", response.content);
             println!();
-            println!("📊 Tokens: {}", response.usage.input_tokens + response.usage.output_tokens);
+            println!(
+                "📊 Tokens: {}",
+                response.usage.input_tokens + response.usage.output_tokens
+            );
             println!("💰 Cost: ${:.6}", response.cost);
         }
         OutputFormat::Json => {
@@ -488,7 +530,10 @@ async fn cmd_run(
             println!("# Response\n");
             println!("{}\n", response.content);
             println!("---");
-            println!("**Tokens:** {}", response.usage.input_tokens + response.usage.output_tokens);
+            println!(
+                "**Tokens:** {}",
+                response.usage.input_tokens + response.usage.output_tokens
+            );
             println!("**Cost:** ${:.6}", response.cost);
         }
     }

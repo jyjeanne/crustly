@@ -3,8 +3,8 @@
 //! Provides abstraction over multiple LLM providers (Anthropic, OpenAI, etc.)
 //! and agent services for handling conversations, tool execution, and context management.
 
-pub mod provider;
 pub mod agent;
+pub mod provider;
 pub mod tools;
 
 // Re-exports for convenience

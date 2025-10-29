@@ -179,16 +179,18 @@ impl OpenAIProvider {
     /// Convert OpenAI response to our generic format
     #[allow(clippy::wrong_self_convention)]
     fn from_openai_response(&self, response: OpenAIResponse) -> LLMResponse {
-        let choice = response.choices.into_iter().next().unwrap_or_else(|| {
-            OpenAIChoice {
+        let choice = response
+            .choices
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| OpenAIChoice {
                 index: 0,
                 message: OpenAIMessage {
                     role: "assistant".to_string(),
                     content: "".to_string(),
                 },
                 finish_reason: Some("error".to_string()),
-            }
-        });
+            });
 
         // Convert content to content blocks
         let mut content_blocks = Vec::new();
@@ -199,12 +201,14 @@ impl OpenAIProvider {
         }
 
         // Map finish_reason to StopReason
-        let stop_reason = choice.finish_reason.and_then(|reason| match reason.as_str() {
-            "stop" => Some(StopReason::EndTurn),
-            "length" => Some(StopReason::MaxTokens),
-            "tool_calls" | "function_call" => Some(StopReason::ToolUse),
-            _ => None,
-        });
+        let stop_reason = choice
+            .finish_reason
+            .and_then(|reason| match reason.as_str() {
+                "stop" => Some(StopReason::EndTurn),
+                "length" => Some(StopReason::MaxTokens),
+                "tool_calls" | "function_call" => Some(StopReason::ToolUse),
+                _ => None,
+            });
 
         LLMResponse {
             id: response.id,
@@ -236,9 +240,15 @@ impl OpenAIProvider {
             let message = if status == 429 {
                 // Enhance rate limit error message
                 if let Some(secs) = retry_after {
-                    format!("{} (retry after {} seconds)", error_body.error.message, secs)
+                    format!(
+                        "{} (retry after {} seconds)",
+                        error_body.error.message, secs
+                    )
                 } else {
-                    format!("{} (rate limited, please retry later)", error_body.error.message)
+                    format!(
+                        "{} (rate limited, please retry later)",
+                        error_body.error.message
+                    )
                 }
             } else {
                 error_body.error.message
@@ -554,7 +564,8 @@ mod tests {
 
     #[test]
     fn test_local_provider_creation() {
-        let provider = OpenAIProvider::local("http://localhost:1234/v1/chat/completions".to_string());
+        let provider =
+            OpenAIProvider::local("http://localhost:1234/v1/chat/completions".to_string());
         assert_eq!(provider.api_key, "not-needed");
     }
 
@@ -570,7 +581,10 @@ mod tests {
     fn test_context_window() {
         let provider = OpenAIProvider::new("test-key".to_string());
         assert_eq!(provider.context_window("gpt-4"), Some(8_192));
-        assert_eq!(provider.context_window("gpt-4-turbo-preview"), Some(128_000));
+        assert_eq!(
+            provider.context_window("gpt-4-turbo-preview"),
+            Some(128_000)
+        );
         assert_eq!(provider.context_window("unknown"), None);
     }
 

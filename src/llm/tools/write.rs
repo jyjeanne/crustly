@@ -59,7 +59,10 @@ impl Tool for WriteTool {
     }
 
     fn capabilities(&self) -> Vec<ToolCapability> {
-        vec![ToolCapability::WriteFiles, ToolCapability::SystemModification]
+        vec![
+            ToolCapability::WriteFiles,
+            ToolCapability::SystemModification,
+        ]
     }
 
     fn requires_approval(&self) -> bool {
@@ -85,9 +88,7 @@ impl Tool for WriteTool {
         // Create parent directories if requested
         if input.create_dirs {
             if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)
-                    .await
-                    .map_err(ToolError::Io)?;
+                fs::create_dir_all(parent).await.map_err(ToolError::Io)?;
             }
         }
 
@@ -208,7 +209,9 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
 
         // Write initial content
-        tokio::fs::write(&file_path, "Initial content").await.unwrap();
+        tokio::fs::write(&file_path, "Initial content")
+            .await
+            .unwrap();
 
         let tool = WriteTool;
         let session_id = Uuid::new_v4();

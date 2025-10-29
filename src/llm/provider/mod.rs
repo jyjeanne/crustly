@@ -3,10 +3,10 @@
 //! Provides a unified interface for interacting with different LLM providers.
 
 pub mod error;
-pub mod types;
 pub mod retry;
 #[allow(clippy::module_inception)]
 mod r#trait;
+pub mod types;
 
 // Re-exports
 pub use error::{ProviderError, Result};

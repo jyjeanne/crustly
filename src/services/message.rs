@@ -2,10 +2,7 @@
 //!
 //! Provides business logic for message management operations.
 
-use crate::db::{
-    models::Message,
-    repository::MessageRepository,
-};
+use crate::db::{models::Message, repository::MessageRepository};
 use crate::services::ServiceContext;
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -62,9 +59,7 @@ impl MessageService {
     /// Get a message by ID
     pub async fn get_message(&self, id: Uuid) -> Result<Option<Message>> {
         let repo = MessageRepository::new(self.context.pool());
-        repo.find_by_id(id)
-            .await
-            .context("Failed to get message")
+        repo.find_by_id(id).await.context("Failed to get message")
     }
 
     /// Get a message by ID, returning an error if not found
@@ -94,12 +89,7 @@ impl MessageService {
     }
 
     /// Update message usage statistics
-    pub async fn update_message_usage(
-        &self,
-        id: Uuid,
-        token_count: i32,
-        cost: f64,
-    ) -> Result<()> {
+    pub async fn update_message_usage(&self, id: Uuid, token_count: i32, cost: f64) -> Result<()> {
         let mut message = self.get_message_required(id).await?;
         message.token_count = Some(token_count);
         message.cost = Some(cost);
@@ -121,9 +111,7 @@ impl MessageService {
     /// Delete a message
     pub async fn delete_message(&self, id: Uuid) -> Result<()> {
         let repo = MessageRepository::new(self.context.pool());
-        repo.delete(id)
-            .await
-            .context("Failed to delete message")?;
+        repo.delete(id).await.context("Failed to delete message")?;
 
         tracing::debug!("Deleted message: {}", id);
         Ok(())
@@ -161,35 +149,22 @@ impl MessageService {
     }
 
     /// Get messages by role
-    pub async fn get_messages_by_role(
-        &self,
-        session_id: Uuid,
-        role: &str,
-    ) -> Result<Vec<Message>> {
+    pub async fn get_messages_by_role(&self, session_id: Uuid, role: &str) -> Result<Vec<Message>> {
         let messages = self.list_messages_for_session(session_id).await?;
-        Ok(messages
-            .into_iter()
-            .filter(|m| m.role == role)
-            .collect())
+        Ok(messages.into_iter().filter(|m| m.role == role).collect())
     }
 
     /// Calculate total tokens for a session
     pub async fn calculate_total_tokens(&self, session_id: Uuid) -> Result<i32> {
         let messages = self.list_messages_for_session(session_id).await?;
-        let total = messages
-            .iter()
-            .filter_map(|m| m.token_count)
-            .sum();
+        let total = messages.iter().filter_map(|m| m.token_count).sum();
         Ok(total)
     }
 
     /// Calculate total cost for a session
     pub async fn calculate_total_cost(&self, session_id: Uuid) -> Result<f64> {
         let messages = self.list_messages_for_session(session_id).await?;
-        let total = messages
-            .iter()
-            .filter_map(|m| m.cost)
-            .sum();
+        let total = messages.iter().filter_map(|m| m.cost).sum();
         Ok(total)
     }
 }
@@ -217,7 +192,10 @@ mod tests {
     #[tokio::test]
     async fn test_create_message() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let message = message_service
             .create_message(session.id, "user".to_string(), "Hello".to_string())
@@ -233,7 +211,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_message() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let created = message_service
             .create_message(session.id, "user".to_string(), "Test".to_string())
@@ -248,7 +229,10 @@ mod tests {
     #[tokio::test]
     async fn test_list_messages_for_session() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         message_service
             .create_message(session.id, "user".to_string(), "Message 1".to_string())
@@ -259,7 +243,10 @@ mod tests {
             .await
             .unwrap();
 
-        let messages = message_service.list_messages_for_session(session.id).await.unwrap();
+        let messages = message_service
+            .list_messages_for_session(session.id)
+            .await
+            .unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].sequence, 1);
         assert_eq!(messages[1].sequence, 2);
@@ -268,7 +255,10 @@ mod tests {
     #[tokio::test]
     async fn test_update_message_usage() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let message = message_service
             .create_message(session.id, "user".to_string(), "Test".to_string())
@@ -280,7 +270,10 @@ mod tests {
             .await
             .unwrap();
 
-        let updated = message_service.get_message_required(message.id).await.unwrap();
+        let updated = message_service
+            .get_message_required(message.id)
+            .await
+            .unwrap();
         assert_eq!(updated.token_count, Some(100));
         assert_eq!(updated.cost, Some(0.05));
     }
@@ -288,7 +281,10 @@ mod tests {
     #[tokio::test]
     async fn test_delete_message() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let message = message_service
             .create_message(session.id, "user".to_string(), "Test".to_string())
@@ -304,7 +300,10 @@ mod tests {
     #[tokio::test]
     async fn test_delete_messages_for_session() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         message_service
             .create_message(session.id, "user".to_string(), "Message 1".to_string())
@@ -320,14 +319,20 @@ mod tests {
             .await
             .unwrap();
 
-        let messages = message_service.list_messages_for_session(session.id).await.unwrap();
+        let messages = message_service
+            .list_messages_for_session(session.id)
+            .await
+            .unwrap();
         assert_eq!(messages.len(), 0);
     }
 
     #[tokio::test]
     async fn test_count_messages_in_session() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         message_service
             .create_message(session.id, "user".to_string(), "Message 1".to_string())
@@ -338,14 +343,20 @@ mod tests {
             .await
             .unwrap();
 
-        let count = message_service.count_messages_in_session(session.id).await.unwrap();
+        let count = message_service
+            .count_messages_in_session(session.id)
+            .await
+            .unwrap();
         assert_eq!(count, 2);
     }
 
     #[tokio::test]
     async fn test_get_last_message() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         message_service
             .create_message(session.id, "user".to_string(), "First".to_string())
@@ -364,14 +375,21 @@ mod tests {
     #[tokio::test]
     async fn test_get_messages_by_role() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         message_service
             .create_message(session.id, "user".to_string(), "User 1".to_string())
             .await
             .unwrap();
         message_service
-            .create_message(session.id, "assistant".to_string(), "Assistant 1".to_string())
+            .create_message(
+                session.id,
+                "assistant".to_string(),
+                "Assistant 1".to_string(),
+            )
             .await
             .unwrap();
         message_service
@@ -395,22 +413,37 @@ mod tests {
     #[tokio::test]
     async fn test_calculate_totals() {
         let (message_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let msg1 = message_service
             .create_message(session.id, "user".to_string(), "Message 1".to_string())
             .await
             .unwrap();
-        message_service.update_message_usage(msg1.id, 100, 0.05).await.unwrap();
+        message_service
+            .update_message_usage(msg1.id, 100, 0.05)
+            .await
+            .unwrap();
 
         let msg2 = message_service
             .create_message(session.id, "assistant".to_string(), "Message 2".to_string())
             .await
             .unwrap();
-        message_service.update_message_usage(msg2.id, 200, 0.10).await.unwrap();
+        message_service
+            .update_message_usage(msg2.id, 200, 0.10)
+            .await
+            .unwrap();
 
-        let total_tokens = message_service.calculate_total_tokens(session.id).await.unwrap();
-        let total_cost = message_service.calculate_total_cost(session.id).await.unwrap();
+        let total_tokens = message_service
+            .calculate_total_tokens(session.id)
+            .await
+            .unwrap();
+        let total_cost = message_service
+            .calculate_total_cost(session.id)
+            .await
+            .unwrap();
 
         assert_eq!(total_tokens, 300);
         assert!((total_cost - 0.15).abs() < 0.0001);

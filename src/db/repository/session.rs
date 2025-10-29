@@ -33,13 +33,11 @@ impl SessionRepository {
 
     /// Find session by ID
     pub async fn find_by_id(&self, id: Uuid) -> Result<Option<Session>> {
-        let session = sqlx::query_as::<_, Session>(
-            "SELECT * FROM sessions WHERE id = ?"
-        )
-        .bind(id.to_string())
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to find session")?;
+        let session = sqlx::query_as::<_, Session>("SELECT * FROM sessions WHERE id = ?")
+            .bind(id.to_string())
+            .fetch_optional(&self.pool)
+            .await
+            .context("Failed to find session")?;
 
         Ok(session)
     }
@@ -51,7 +49,7 @@ impl SessionRepository {
             INSERT INTO sessions (id, title, model, created_at, updated_at,
                                  archived_at, token_count, total_cost)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            "#
+            "#,
         )
         .bind(session.id.to_string())
         .bind(&session.title)
@@ -77,7 +75,7 @@ impl SessionRepository {
             SET title = ?, model = ?, updated_at = ?,
                 archived_at = ?, token_count = ?, total_cost = ?
             WHERE id = ?
-            "#
+            "#,
         )
         .bind(&session.title)
         .bind(&session.model)
@@ -131,7 +129,7 @@ impl SessionRepository {
     /// List non-archived sessions
     pub async fn list_active(&self) -> Result<Vec<Session>> {
         let sessions = sqlx::query_as::<_, Session>(
-            "SELECT * FROM sessions WHERE archived_at IS NULL ORDER BY updated_at DESC"
+            "SELECT * FROM sessions WHERE archived_at IS NULL ORDER BY updated_at DESC",
         )
         .fetch_all(&self.pool)
         .await
@@ -143,7 +141,7 @@ impl SessionRepository {
     /// List archived sessions
     pub async fn list_archived(&self) -> Result<Vec<Session>> {
         let sessions = sqlx::query_as::<_, Session>(
-            "SELECT * FROM sessions WHERE archived_at IS NOT NULL ORDER BY updated_at DESC"
+            "SELECT * FROM sessions WHERE archived_at IS NOT NULL ORDER BY updated_at DESC",
         )
         .fetch_all(&self.pool)
         .await
@@ -156,15 +154,13 @@ impl SessionRepository {
     pub async fn archive(&self, id: Uuid) -> Result<()> {
         let now = Utc::now();
 
-        sqlx::query(
-            "UPDATE sessions SET archived_at = ?, updated_at = ? WHERE id = ?"
-        )
-        .bind(now.timestamp())
-        .bind(now.timestamp())
-        .bind(id.to_string())
-        .execute(&self.pool)
-        .await
-        .context("Failed to archive session")?;
+        sqlx::query("UPDATE sessions SET archived_at = ?, updated_at = ? WHERE id = ?")
+            .bind(now.timestamp())
+            .bind(now.timestamp())
+            .bind(id.to_string())
+            .execute(&self.pool)
+            .await
+            .context("Failed to archive session")?;
 
         tracing::debug!("Archived session: {}", id);
         Ok(())
@@ -174,26 +170,19 @@ impl SessionRepository {
     pub async fn unarchive(&self, id: Uuid) -> Result<()> {
         let now = Utc::now();
 
-        sqlx::query(
-            "UPDATE sessions SET archived_at = NULL, updated_at = ? WHERE id = ?"
-        )
-        .bind(now.timestamp())
-        .bind(id.to_string())
-        .execute(&self.pool)
-        .await
-        .context("Failed to unarchive session")?;
+        sqlx::query("UPDATE sessions SET archived_at = NULL, updated_at = ? WHERE id = ?")
+            .bind(now.timestamp())
+            .bind(id.to_string())
+            .execute(&self.pool)
+            .await
+            .context("Failed to unarchive session")?;
 
         tracing::debug!("Unarchived session: {}", id);
         Ok(())
     }
 
     /// Update session statistics
-    pub async fn update_stats(
-        &self,
-        id: Uuid,
-        token_delta: i32,
-        cost_delta: f64,
-    ) -> Result<()> {
+    pub async fn update_stats(&self, id: Uuid, token_delta: i32, cost_delta: f64) -> Result<()> {
         let updated_at = Utc::now();
 
         sqlx::query(
@@ -203,7 +192,7 @@ impl SessionRepository {
                 total_cost = total_cost + ?,
                 updated_at = ?
             WHERE id = ?
-            "#
+            "#,
         )
         .bind(token_delta)
         .bind(cost_delta)
@@ -240,7 +229,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_session_crud() {
-        let db = Database::connect_in_memory().await.expect("Failed to create database");
+        let db = Database::connect_in_memory()
+            .await
+            .expect("Failed to create database");
         db.run_migrations().await.expect("Failed to run migrations");
         let repo = SessionRepository::new(db.pool().clone());
 
@@ -249,44 +240,76 @@ mod tests {
             Some("Test Session".to_string()),
             Some("claude-sonnet-4-5".to_string()),
         );
-        repo.create(&session).await.expect("Failed to create session");
+        repo.create(&session)
+            .await
+            .expect("Failed to create session");
 
         // Read
-        let found = repo.find_by_id(session.id).await.expect("Failed to find session");
+        let found = repo
+            .find_by_id(session.id)
+            .await
+            .expect("Failed to find session");
         assert!(found.is_some());
-        assert_eq!(found.as_ref().unwrap().title, Some("Test Session".to_string()));
+        assert_eq!(
+            found.as_ref().unwrap().title,
+            Some("Test Session".to_string())
+        );
 
         // Update
         let mut updated_session = session.clone();
         updated_session.title = Some("Updated Title".to_string());
-        repo.update(&updated_session).await.expect("Failed to update session");
+        repo.update(&updated_session)
+            .await
+            .expect("Failed to update session");
 
-        let found = repo.find_by_id(session.id).await.expect("Failed to find session");
+        let found = repo
+            .find_by_id(session.id)
+            .await
+            .expect("Failed to find session");
         assert_eq!(found.unwrap().title, Some("Updated Title".to_string()));
 
         // Delete
-        repo.delete(session.id).await.expect("Failed to delete session");
-        let found = repo.find_by_id(session.id).await.expect("Failed to find session");
+        repo.delete(session.id)
+            .await
+            .expect("Failed to delete session");
+        let found = repo
+            .find_by_id(session.id)
+            .await
+            .expect("Failed to find session");
         assert!(found.is_none());
     }
 
     #[tokio::test]
     async fn test_session_archive() {
-        let db = Database::connect_in_memory().await.expect("Failed to create database");
+        let db = Database::connect_in_memory()
+            .await
+            .expect("Failed to create database");
         db.run_migrations().await.expect("Failed to run migrations");
         let repo = SessionRepository::new(db.pool().clone());
 
         let session = Session::new(Some("Test".to_string()), Some("model".to_string()));
-        repo.create(&session).await.expect("Failed to create session");
+        repo.create(&session)
+            .await
+            .expect("Failed to create session");
 
         // Archive
         repo.archive(session.id).await.expect("Failed to archive");
-        let found = repo.find_by_id(session.id).await.expect("Failed to find").unwrap();
+        let found = repo
+            .find_by_id(session.id)
+            .await
+            .expect("Failed to find")
+            .unwrap();
         assert!(found.is_archived());
 
         // Unarchive
-        repo.unarchive(session.id).await.expect("Failed to unarchive");
-        let found = repo.find_by_id(session.id).await.expect("Failed to find").unwrap();
+        repo.unarchive(session.id)
+            .await
+            .expect("Failed to unarchive");
+        let found = repo
+            .find_by_id(session.id)
+            .await
+            .expect("Failed to find")
+            .unwrap();
         assert!(!found.is_archived());
     }
 }

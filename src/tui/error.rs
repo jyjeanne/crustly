@@ -106,7 +106,12 @@ pub struct ErrorInfo {
 
 impl ErrorInfo {
     /// Create a new error info
-    pub fn new(severity: ErrorSeverity, category: ErrorCategory, title: String, message: String) -> Self {
+    pub fn new(
+        severity: ErrorSeverity,
+        category: ErrorCategory,
+        title: String,
+        message: String,
+    ) -> Self {
         Self {
             severity,
             category,
@@ -156,13 +161,23 @@ impl ErrorInfo {
 
     /// Get a short summary for status bar
     pub fn summary(&self) -> String {
-        format!("{} {}: {}", self.severity.prefix(), self.category.name(), self.title)
+        format!(
+            "{} {}: {}",
+            self.severity.prefix(),
+            self.category.name(),
+            self.title
+        )
     }
 
     /// Get full description for error dialog
     pub fn description(&self) -> Vec<String> {
         let mut lines = vec![
-            format!("{}  {} - {}", self.severity.prefix(), self.severity.name(), self.category.name()),
+            format!(
+                "{}  {} - {}",
+                self.severity.prefix(),
+                self.severity.name(),
+                self.category.name()
+            ),
             String::new(),
             format!("Title: {}", self.title),
             format!("Time: {}", self.timestamp.format("%Y-%m-%d %H:%M:%S")),
@@ -203,7 +218,11 @@ impl From<String> for ErrorInfo {
 
 impl From<&str> for ErrorInfo {
     fn from(message: &str) -> Self {
-        Self::error(ErrorCategory::Internal, "Error".to_string(), message.to_string())
+        Self::error(
+            ErrorCategory::Internal,
+            "Error".to_string(),
+            message.to_string(),
+        )
     }
 }
 

@@ -6,8 +6,8 @@
 //! - Bulk operations
 //! - Query performance
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use crustly::db::{Database, models::Session};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use crustly::db::{models::Session, Database};
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 

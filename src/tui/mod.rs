@@ -9,8 +9,8 @@ pub mod render;
 pub mod runner;
 
 // Enhanced rendering modules
-pub mod markdown;
 pub mod highlight;
+pub mod markdown;
 pub mod splash;
 
 // Component modules (to be implemented)

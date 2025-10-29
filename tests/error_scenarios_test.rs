@@ -112,11 +112,12 @@ async fn create_error_agent(
 #[tokio::test]
 async fn test_error_api_error() -> Result<()> {
     let db = create_test_db().await?;
-    let (agent_service, service_context) =
-        create_error_agent(&db, ErrorType::ApiError).await?;
+    let (agent_service, service_context) = create_error_agent(&db, ErrorType::ApiError).await?;
 
     let session_service = SessionService::new(service_context);
-    let session = session_service.create_session(Some("Error Test".to_string())).await?;
+    let session = session_service
+        .create_session(Some("Error Test".to_string()))
+        .await?;
 
     let result = agent_service
         .send_message(session.id, "Test".to_string(), None)
@@ -131,11 +132,12 @@ async fn test_error_api_error() -> Result<()> {
 #[tokio::test]
 async fn test_error_rate_limit() -> Result<()> {
     let db = create_test_db().await?;
-    let (agent_service, service_context) =
-        create_error_agent(&db, ErrorType::RateLimit).await?;
+    let (agent_service, service_context) = create_error_agent(&db, ErrorType::RateLimit).await?;
 
     let session_service = SessionService::new(service_context);
-    let session = session_service.create_session(Some("Rate Limit Test".to_string())).await?;
+    let session = session_service
+        .create_session(Some("Rate Limit Test".to_string()))
+        .await?;
 
     let result = agent_service
         .send_message(session.id, "Test".to_string(), None)
@@ -150,11 +152,12 @@ async fn test_error_rate_limit() -> Result<()> {
 #[tokio::test]
 async fn test_error_timeout() -> Result<()> {
     let db = create_test_db().await?;
-    let (agent_service, service_context) =
-        create_error_agent(&db, ErrorType::Timeout).await?;
+    let (agent_service, service_context) = create_error_agent(&db, ErrorType::Timeout).await?;
 
     let session_service = SessionService::new(service_context);
-    let session = session_service.create_session(Some("Timeout Test".to_string())).await?;
+    let session = session_service
+        .create_session(Some("Timeout Test".to_string()))
+        .await?;
 
     let result = agent_service
         .send_message(session.id, "Test".to_string(), None)
@@ -174,7 +177,9 @@ async fn test_error_invalid_response() -> Result<()> {
         create_error_agent(&db, ErrorType::InvalidResponse).await?;
 
     let session_service = SessionService::new(service_context);
-    let session = session_service.create_session(Some("Invalid Response Test".to_string())).await?;
+    let session = session_service
+        .create_session(Some("Invalid Response Test".to_string()))
+        .await?;
 
     let result = agent_service
         .send_message(session.id, "Test".to_string(), None)
@@ -182,9 +187,7 @@ async fn test_error_invalid_response() -> Result<()> {
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(
-        err.to_string().contains("Invalid") || err.to_string().contains("Malformed")
-    );
+    assert!(err.to_string().contains("Invalid") || err.to_string().contains("Malformed"));
     Ok(())
 }
 
@@ -195,7 +198,9 @@ async fn test_error_authentication() -> Result<()> {
         create_error_agent(&db, ErrorType::AuthenticationError).await?;
 
     let session_service = SessionService::new(service_context);
-    let session = session_service.create_session(Some("Auth Test".to_string())).await?;
+    let session = session_service
+        .create_session(Some("Auth Test".to_string()))
+        .await?;
 
     let result = agent_service
         .send_message(session.id, "Test".to_string(), None)
@@ -214,8 +219,7 @@ async fn test_error_authentication() -> Result<()> {
 #[tokio::test]
 async fn test_error_session_not_found() -> Result<()> {
     let db = create_test_db().await?;
-    let (agent_service, _service_context) =
-        create_error_agent(&db, ErrorType::ApiError).await?;
+    let (agent_service, _service_context) = create_error_agent(&db, ErrorType::ApiError).await?;
 
     // Try to send message to non-existent session
     let fake_session_id = Uuid::new_v4();
@@ -238,7 +242,9 @@ async fn test_error_empty_message() -> Result<()> {
     let agent_service = AgentService::new(provider, service_context.clone());
 
     let session_service = SessionService::new(service_context);
-    let session = session_service.create_session(Some("Empty Message Test".to_string())).await?;
+    let session = session_service
+        .create_session(Some("Empty Message Test".to_string()))
+        .await?;
 
     // Try to send empty message
     let result = agent_service
@@ -258,20 +264,18 @@ async fn test_error_database_concurrent_access() -> Result<()> {
     let session_service = SessionService::new(service_context.clone());
 
     // Create session
-    let session = session_service.create_session(Some("Concurrent Test".to_string())).await?;
+    let session = session_service
+        .create_session(Some("Concurrent Test".to_string()))
+        .await?;
 
     // Try to access from multiple "threads" (tasks)
     let session_id = session.id;
     let service1 = SessionService::new(service_context.clone());
     let service2 = SessionService::new(service_context);
 
-    let handle1 = tokio::spawn(async move {
-        service1.get_session(session_id).await
-    });
+    let handle1 = tokio::spawn(async move { service1.get_session(session_id).await });
 
-    let handle2 = tokio::spawn(async move {
-        service2.get_session(session_id).await
-    });
+    let handle2 = tokio::spawn(async move { service2.get_session(session_id).await });
 
     let result1 = handle1.await??;
     let result2 = handle2.await??;
@@ -285,11 +289,12 @@ async fn test_error_database_concurrent_access() -> Result<()> {
 #[tokio::test]
 async fn test_error_recovery_after_failure() -> Result<()> {
     let db = create_test_db().await?;
-    let (agent_service, service_context) =
-        create_error_agent(&db, ErrorType::Timeout).await?;
+    let (agent_service, service_context) = create_error_agent(&db, ErrorType::Timeout).await?;
 
     let session_service = SessionService::new(service_context);
-    let session = session_service.create_session(Some("Recovery Test".to_string())).await?;
+    let session = session_service
+        .create_session(Some("Recovery Test".to_string()))
+        .await?;
 
     // First attempt should fail
     let result1 = agent_service

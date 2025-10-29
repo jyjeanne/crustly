@@ -58,7 +58,9 @@ fn find_syntax(language: &str) -> Option<&'static SyntaxReference> {
     let language_lower = language.to_lowercase();
     SYNTAX_SET.syntaxes().iter().find(|s| {
         s.name.to_lowercase() == language_lower
-            || s.file_extensions.iter().any(|ext| ext.to_lowercase() == language_lower)
+            || s.file_extensions
+                .iter()
+                .any(|ext| ext.to_lowercase() == language_lower)
     })
 }
 
@@ -80,10 +82,7 @@ pub fn highlight_code(code: &str, language: &str) -> Vec<Line<'static>> {
                             format!("{:3} ", idx + 1),
                             Style::default().fg(Color::DarkGray),
                         ),
-                        Span::styled(
-                            format!("│ {}", line),
-                            Style::default().fg(Color::Green),
-                        ),
+                        Span::styled(format!("│ {}", line), Style::default().fg(Color::Green)),
                     ])
                 })
                 .collect();
@@ -118,10 +117,7 @@ pub fn highlight_code(code: &str, language: &str) -> Vec<Line<'static>> {
             Style::default().fg(Color::DarkGray),
         )];
 
-        styled_line.push(Span::styled(
-            "│ ",
-            Style::default().fg(Color::DarkGray),
-        ));
+        styled_line.push(Span::styled("│ ", Style::default().fg(Color::DarkGray)));
 
         for (style, text) in ranges {
             styled_line.push(Span::styled(

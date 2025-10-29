@@ -40,8 +40,7 @@ pub struct Config {
 }
 
 /// Debug configuration options
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DebugConfig {
     /// Enable LSP debug logging
     #[serde(default)]
@@ -51,7 +50,6 @@ pub struct DebugConfig {
     #[serde(default)]
     pub profiling: bool,
 }
-
 
 /// LLM Provider configurations
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -388,21 +386,27 @@ impl Config {
         // Validate database path parent directory exists
         if let Some(parent) = self.database.path.parent() {
             if !parent.exists() {
-                tracing::warn!("Database parent directory does not exist, will be created: {:?}", parent);
+                tracing::warn!(
+                    "Database parent directory does not exist, will be created: {:?}",
+                    parent
+                );
             }
         }
 
         // Validate log level
         let valid_levels = ["trace", "debug", "info", "warn", "error"];
         if !valid_levels.contains(&self.logging.level.as_str()) {
-            anyhow::bail!("Invalid log level: {}. Must be one of: {:?}", self.logging.level, valid_levels);
+            anyhow::bail!(
+                "Invalid log level: {}. Must be one of: {:?}",
+                self.logging.level,
+                valid_levels
+            );
         }
 
         // Validate Crabrace URL if enabled
-        if self.crabrace.enabled
-            && self.crabrace.base_url.is_empty() {
-                anyhow::bail!("Crabrace is enabled but base_url is empty");
-            }
+        if self.crabrace.enabled && self.crabrace.base_url.is_empty() {
+            anyhow::bail!("Crabrace is enabled but base_url is empty");
+        }
 
         tracing::debug!("Configuration validation passed");
         Ok(())
@@ -410,8 +414,8 @@ impl Config {
 
     /// Save configuration to a file
     pub fn save(&self, path: &Path) -> Result<()> {
-        let toml_string = toml::to_string_pretty(self)
-            .context("Failed to serialize config to TOML")?;
+        let toml_string =
+            toml::to_string_pretty(self).context("Failed to serialize config to TOML")?;
 
         // Create parent directory if it doesn't exist
         if let Some(parent) = path.parent() {
@@ -479,7 +483,10 @@ enabled = false
         "#;
 
         let config: Config = toml::from_str(toml_content).unwrap();
-        assert_eq!(config.database.path, PathBuf::from("/custom/path/db.sqlite"));
+        assert_eq!(
+            config.database.path,
+            PathBuf::from("/custom/path/db.sqlite")
+        );
         assert_eq!(config.logging.level, "debug");
         assert!(config.debug.debug_lsp);
         assert!(config.debug.profiling);
@@ -536,7 +543,12 @@ enabled = false
 
         assert!(config_with_env.providers.anthropic.is_some());
         assert_eq!(
-            config_with_env.providers.anthropic.as_ref().unwrap().api_key,
+            config_with_env
+                .providers
+                .anthropic
+                .as_ref()
+                .unwrap()
+                .api_key,
             Some("test-anthropic-key".to_string())
         );
 

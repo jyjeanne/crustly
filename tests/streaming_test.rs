@@ -180,7 +180,14 @@ async fn test_streaming_single_chunk() -> Result<()> {
 #[tokio::test]
 async fn test_streaming_multiple_chunks() -> Result<()> {
     let chunks = vec![
-        "This", " is", " a", " longer", " response", " with", " many", " chunks",
+        "This",
+        " is",
+        " a",
+        " longer",
+        " response",
+        " with",
+        " many",
+        " chunks",
     ];
     let provider = StreamingMockProvider::new(chunks.clone());
     let request = LLMRequest::new("mock-model", vec![]).with_streaming();

@@ -78,7 +78,12 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
 
     let header_line = Line::from(vec![
         Span::styled(" 📝 Session: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(session_name, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            session_name,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
         Span::styled("🤖 Model: ", Style::default().fg(Color::DarkGray)),
         Span::styled(model, Style::default().fg(Color::Green)),
@@ -90,14 +95,17 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         Span::styled(format!("{:.4}", cost), Style::default().fg(Color::Magenta)),
     ]);
 
-    let header = Paragraph::new(header_line)
-        .block(Block::default()
+    let header = Paragraph::new(header_line).block(
+        Block::default()
             .borders(Borders::ALL)
             .title(Span::styled(
                 " 🦀 Crustly AI Assistant ",
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ))
-            .border_style(Style::default().fg(Color::Cyan)));
+            .border_style(Style::default().fg(Color::Cyan)),
+    );
 
     f.render_widget(header, area);
 }
@@ -110,15 +118,30 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
         // Add timestamp and role with better formatting
         let timestamp = msg.timestamp.format("%H:%M:%S");
         let (role_text, role_style, prefix) = if msg.role == "user" {
-            ("You", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD), "  ")
+            (
+                "You",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+                "  ",
+            )
         } else {
-            ("🤖 Claude", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD), "")
+            (
+                "🤖 Claude",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+                "",
+            )
         };
 
         lines.push(Line::from(vec![
             Span::styled(prefix, Style::default()),
             Span::styled(role_text, role_style),
-            Span::styled(format!(" ({})", timestamp), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" ({})", timestamp),
+                Style::default().fg(Color::DarkGray),
+            ),
         ]));
 
         // Parse and render message content as markdown
@@ -137,7 +160,12 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
     // Add streaming response if present
     if let Some(ref response) = app.streaming_response {
         lines.push(Line::from(vec![
-            Span::styled("🤖 Claude ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "🤖 Claude ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("[streaming]", Style::default().fg(Color::DarkGray)),
         ]));
 
@@ -152,19 +180,28 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
 
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
-            Span::styled(format!("{} ", frame), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ", frame),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("Claude is thinking...", Style::default().fg(Color::Yellow)),
         ]));
     }
 
     let chat = Paragraph::new(lines)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(Span::styled(
-                " 💬 Chat ",
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-            ))
-            .border_style(Style::default().fg(Color::Cyan)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(Span::styled(
+                    " 💬 Chat ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ))
+                .border_style(Style::default().fg(Color::Cyan)),
+        )
         .wrap(Wrap { trim: false })
         .scroll((app.scroll_offset as u16, 0));
 
@@ -188,12 +225,14 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
     let title = if app.is_processing {
         Span::styled(
             " ⏸️  Input (waiting for response...) ",
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(Color::DarkGray),
         )
     } else {
         Span::styled(
             " ✏️  Type your message (Ctrl+Enter to send, Esc to clear) ",
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         )
     };
 
@@ -222,7 +261,9 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
 
     lines.push(Line::from(Span::styled(
         "Sessions (↑/↓ to navigate, Enter to select, Esc to cancel)",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(""));
 
@@ -241,7 +282,9 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
         let created = session.created_at.format("%Y-%m-%d %H:%M");
 
         let style = if is_selected {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
         } else if is_current {
             Style::default().fg(Color::Green)
         } else {
@@ -266,129 +309,289 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
     let help_text = vec![
         Line::from(vec![
             Span::styled("🥐 ", Style::default().fg(Color::Rgb(218, 165, 32))),
-            Span::styled("Crustly Help", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD | Modifier::UNDERLINED)),
+            Span::styled(
+                "Crustly Help",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            ),
         ]),
         Line::from(""),
-        Line::from(Span::styled("╭─ GLOBAL COMMANDS ─────────────────────────────────────────╮", Style::default().fg(Color::Cyan))),
+        Line::from(Span::styled(
+            "╭─ GLOBAL COMMANDS ─────────────────────────────────────────╮",
+            Style::default().fg(Color::Cyan),
+        )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Ctrl+C       ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Ctrl+C       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Quit application", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+N       ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Ctrl+N       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Create new chat session", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+L       ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Ctrl+L       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("List all sessions (switch sessions)", Style::default().fg(Color::White)),
+            Span::styled(
+                "List all sessions (switch sessions)",
+                Style::default().fg(Color::White),
+            ),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+H       ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Ctrl+H       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Show this help screen", Style::default().fg(Color::White)),
         ]),
         Line::from(""),
-        Line::from(Span::styled("╭─ CHAT MODE ───────────────────────────────────────────────╮", Style::default().fg(Color::Cyan))),
+        Line::from(Span::styled(
+            "╭─ CHAT MODE ───────────────────────────────────────────────╮",
+            Style::default().fg(Color::Cyan),
+        )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Ctrl+Enter   ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Ctrl+Enter   ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Send your message to Claude", Style::default().fg(Color::White)),
+            Span::styled(
+                "Send your message to Claude",
+                Style::default().fg(Color::White),
+            ),
         ]),
         Line::from(vec![
-            Span::styled("  Enter        ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Enter        ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("New line in message (multi-line input)", Style::default().fg(Color::White)),
+            Span::styled(
+                "New line in message (multi-line input)",
+                Style::default().fg(Color::White),
+            ),
         ]),
         Line::from(vec![
-            Span::styled("  Backspace    ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Backspace    ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Delete last character", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
-            Span::styled("  Escape       ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Escape       ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Clear input buffer", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
-            Span::styled("  Page Up      ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Page Up      ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Scroll chat history up", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
-            Span::styled("  Page Down    ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Page Down    ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Scroll chat history down", Style::default().fg(Color::White)),
+            Span::styled(
+                "Scroll chat history down",
+                Style::default().fg(Color::White),
+            ),
         ]),
         Line::from(""),
-        Line::from(Span::styled("╭─ SESSION LIST ────────────────────────────────────────────╮", Style::default().fg(Color::Cyan))),
+        Line::from(Span::styled(
+            "╭─ SESSION LIST ────────────────────────────────────────────╮",
+            Style::default().fg(Color::Cyan),
+        )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  ↑/↓          ", Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  ↑/↓          ",
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Navigate through sessions", Style::default().fg(Color::White)),
+            Span::styled(
+                "Navigate through sessions",
+                Style::default().fg(Color::White),
+            ),
         ]),
         Line::from(vec![
-            Span::styled("  Enter        ", Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Enter        ",
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Load selected session", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
-            Span::styled("  Escape       ", Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "  Escape       ",
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Return to chat", Style::default().fg(Color::White)),
         ]),
         Line::from(""),
-        Line::from(Span::styled("╭─ FEATURES ────────────────────────────────────────────────╮", Style::default().fg(Color::Cyan))),
+        Line::from(Span::styled(
+            "╭─ FEATURES ────────────────────────────────────────────────╮",
+            Style::default().fg(Color::Cyan),
+        )),
         Line::from(""),
         Line::from(vec![
             Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled("Markdown Rendering", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled(" - Rich text with headings, lists, code", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Markdown Rendering",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " - Rich text with headings, lists, code",
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
         Line::from(vec![
             Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled("Syntax Highlighting", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled(" - 100+ languages supported", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Syntax Highlighting",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " - 100+ languages supported",
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
         Line::from(vec![
             Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled("Multi-line Input", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled(" - Write long messages with ease", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Multi-line Input",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " - Write long messages with ease",
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
         Line::from(vec![
             Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled("Session Management", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled(" - Persistent conversation history", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Session Management",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " - Persistent conversation history",
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
         Line::from(vec![
             Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled("Streaming Responses", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled(" - See responses as they're generated", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Streaming Responses",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " - See responses as they're generated",
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
         Line::from(vec![
             Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled("Token & Cost Tracking", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled(" - Monitor usage in real-time", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Token & Cost Tracking",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " - Monitor usage in real-time",
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
         Line::from(""),
         Line::from(""),
         Line::from(vec![
-            Span::styled("                    Press ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Esc", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "                    Press ",
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(
+                "Esc",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" to return to chat", Style::default().fg(Color::DarkGray)),
         ]),
     ];
 
     let help = Paragraph::new(help_text)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(Span::styled(" 📚 Help & Commands ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)))
-            .border_style(Style::default().fg(Color::Cyan)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(Span::styled(
+                    " 📚 Help & Commands ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ))
+                .border_style(Style::default().fg(Color::Cyan)),
+        )
         .alignment(Alignment::Left);
 
     f.render_widget(help, area);
@@ -397,11 +600,19 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
 /// Render the settings screen
 fn render_settings(f: &mut Frame, _app: &App, area: Rect) {
     let settings_text = vec![
-        Line::from(Span::styled("Settings", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(
+            "Settings",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
         Line::from(""),
         Line::from("Coming soon..."),
         Line::from(""),
-        Line::from(Span::styled("Press Esc to return", Style::default().fg(Color::Yellow))),
+        Line::from(Span::styled(
+            "Press Esc to return",
+            Style::default().fg(Color::Yellow),
+        )),
     ];
 
     let settings = Paragraph::new(settings_text)
@@ -450,18 +661,33 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
             Line::from(""),
             Line::from(vec![
                 Span::styled("🔒 ", Style::default().fg(Color::Yellow)),
-                Span::styled("Permission Request", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Permission Request",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
                 Span::styled("⏱️  ", Style::default().fg(time_color)),
                 Span::styled(
-                    format!("{}m {}s remaining", seconds_remaining / 60, seconds_remaining % 60),
-                    Style::default().fg(time_color)
+                    format!(
+                        "{}m {}s remaining",
+                        seconds_remaining / 60,
+                        seconds_remaining % 60
+                    ),
+                    Style::default().fg(time_color),
                 ),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("Claude wants to use the tool: ", Style::default().fg(Color::White)),
-                Span::styled(&request.tool_name, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "Claude wants to use the tool: ",
+                    Style::default().fg(Color::White),
+                ),
+                Span::styled(
+                    &request.tool_name,
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]),
             Line::from(""),
             Line::from(vec![
@@ -473,9 +699,10 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
 
         // Show capabilities
         if !request.capabilities.is_empty() {
-            lines.push(Line::from(vec![
-                Span::styled("⚠️  Capabilities: ", Style::default().fg(Color::Yellow)),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                "⚠️  Capabilities: ",
+                Style::default().fg(Color::Yellow),
+            )]));
             for cap in &request.capabilities {
                 lines.push(Line::from(vec![
                     Span::styled("   • ", Style::default().fg(Color::DarkGray)),
@@ -487,24 +714,28 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
 
         // Show input parameters (basic or detailed)
         if app.show_approval_details {
-            lines.push(Line::from(vec![
-                Span::styled("Tool Input (JSON):", Style::default().fg(Color::DarkGray)),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                "Tool Input (JSON):",
+                Style::default().fg(Color::DarkGray),
+            )]));
             lines.push(Line::from(""));
-            let json_str = serde_json::to_string_pretty(&request.tool_input).unwrap_or_else(|_| "{}".to_string());
+            let json_str = serde_json::to_string_pretty(&request.tool_input)
+                .unwrap_or_else(|_| "{}".to_string());
             for line in json_str.lines() {
-                lines.push(Line::from(vec![
-                    Span::styled(line.to_string(), Style::default().fg(Color::Green)),
-                ]));
+                lines.push(Line::from(vec![Span::styled(
+                    line.to_string(),
+                    Style::default().fg(Color::Green),
+                )]));
             }
             lines.push(Line::from(""));
         } else {
             // Show simplified input
             if let Some(obj) = request.tool_input.as_object() {
                 if !obj.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled("Parameters: ", Style::default().fg(Color::DarkGray)),
-                    ]));
+                    lines.push(Line::from(vec![Span::styled(
+                        "Parameters: ",
+                        Style::default().fg(Color::DarkGray),
+                    )]));
                     for (key, value) in obj.iter().take(3) {
                         let value_str = match value {
                             serde_json::Value::String(s) => {
@@ -513,7 +744,7 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
                                 } else {
                                     format!("\"{}\"", s)
                                 }
-                            },
+                            }
                             _ => value.to_string(),
                         };
                         lines.push(Line::from(vec![
@@ -524,7 +755,10 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
                     if obj.len() > 3 {
                         lines.push(Line::from(vec![
                             Span::styled("   ... ", Style::default().fg(Color::DarkGray)),
-                            Span::styled(format!("({} more)", obj.len() - 3), Style::default().fg(Color::DarkGray)),
+                            Span::styled(
+                                format!("({} more)", obj.len() - 3),
+                                Style::default().fg(Color::DarkGray),
+                            ),
                         ]));
                     }
                     lines.push(Line::from(""));
@@ -535,13 +769,31 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
         // Show action buttons
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
-            Span::styled("[A]", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[A]",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("pprove  ", Style::default().fg(Color::White)),
-            Span::styled("[D]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[D]",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
             Span::styled("eny  ", Style::default().fg(Color::White)),
-            Span::styled("[V]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[V]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("iew Details  ", Style::default().fg(Color::White)),
-            Span::styled("[Esc]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[Esc]",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Cancel", Style::default().fg(Color::White)),
         ]));
 
@@ -550,7 +802,10 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(Color::Red))
-                    .title(Span::styled(" ⚠️  PERMISSION REQUIRED ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)))
+                    .title(Span::styled(
+                        " ⚠️  PERMISSION REQUIRED ",
+                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    )),
             )
             .alignment(Alignment::Left);
 
@@ -574,7 +829,10 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     } else if app.is_processing {
         format!(" [{}] Processing...", mode_text)
     } else {
-        format!(" [{}] Ready │ Ctrl+H: Help │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit", mode_text)
+        format!(
+            " [{}] Ready │ Ctrl+H: Help │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            mode_text
+        )
     };
 
     let status_color = if app.error_message.is_some() {
@@ -585,8 +843,8 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         Color::Green
     };
 
-    let status_bar = Paragraph::new(status)
-        .style(Style::default().fg(Color::Black).bg(status_color));
+    let status_bar =
+        Paragraph::new(status).style(Style::default().fg(Color::Black).bg(status_color));
 
     f.render_widget(status_bar, area);
 }

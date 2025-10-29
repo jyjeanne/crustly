@@ -185,7 +185,9 @@ impl App {
 
                         // Send response
                         let _ = approval_request.response_tx.send(response.clone());
-                        let _ = self.event_sender().send(TuiEvent::ToolApprovalResponse(response));
+                        let _ = self
+                            .event_sender()
+                            .send(TuiEvent::ToolApprovalResponse(response));
 
                         // Clear pending approval and return to chat
                         self.pending_approval = None;
@@ -304,7 +306,8 @@ impl App {
         } else if keys::is_up(&event) {
             self.selected_session_index = self.selected_session_index.saturating_sub(1);
         } else if keys::is_down(&event) {
-            self.selected_session_index = (self.selected_session_index + 1).min(self.sessions.len().saturating_sub(1));
+            self.selected_session_index =
+                (self.selected_session_index + 1).min(self.sessions.len().saturating_sub(1));
         } else if keys::is_enter(&event) {
             if let Some(session) = self.sessions.get(self.selected_session_index) {
                 self.load_session(session.id).await?;
@@ -416,7 +419,10 @@ impl App {
     }
 
     /// Complete the streaming response
-    async fn complete_response(&mut self, response: crate::llm::agent::AgentResponse) -> Result<()> {
+    async fn complete_response(
+        &mut self,
+        response: crate::llm::agent::AgentResponse,
+    ) -> Result<()> {
         self.is_processing = false;
         self.streaming_response = None;
 
@@ -426,7 +432,9 @@ impl App {
             role: "assistant".to_string(),
             content: response.content,
             timestamp: chrono::Utc::now(),
-            token_count: Some(response.usage.input_tokens as i32 + response.usage.output_tokens as i32),
+            token_count: Some(
+                response.usage.input_tokens as i32 + response.usage.output_tokens as i32,
+            ),
             cost: Some(response.cost),
         };
         self.messages.push(assistant_msg);
@@ -457,18 +465,12 @@ impl App {
 
     /// Get total token count for current session
     pub fn total_tokens(&self) -> i32 {
-        self.messages
-            .iter()
-            .filter_map(|m| m.token_count)
-            .sum()
+        self.messages.iter().filter_map(|m| m.token_count).sum()
     }
 
     /// Get total cost for current session
     pub fn total_cost(&self) -> f64 {
-        self.messages
-            .iter()
-            .filter_map(|m| m.cost)
-            .sum()
+        self.messages.iter().filter_map(|m| m.cost).sum()
     }
 
     /// Handle tool approval request
@@ -495,7 +497,9 @@ impl App {
                 let _ = approval_request.response_tx.send(response.clone());
 
                 // Send event to update UI
-                let _ = self.event_sender().send(TuiEvent::ToolApprovalResponse(response));
+                let _ = self
+                    .event_sender()
+                    .send(TuiEvent::ToolApprovalResponse(response));
             } else if keys::is_deny(&event) || keys::is_cancel(&event) {
                 // User denied
                 let response = ToolApprovalResponse {
@@ -508,7 +512,9 @@ impl App {
                 let _ = approval_request.response_tx.send(response.clone());
 
                 // Send event to update UI
-                let _ = self.event_sender().send(TuiEvent::ToolApprovalResponse(response));
+                let _ = self
+                    .event_sender()
+                    .send(TuiEvent::ToolApprovalResponse(response));
             } else if keys::is_view_details(&event) {
                 // Toggle details view
                 self.show_approval_details = !self.show_approval_details;

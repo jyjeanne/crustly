@@ -40,18 +40,14 @@ pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
                             lines.push(Line::from(std::mem::take(&mut current_line)));
                         }
                         lines.push(Line::from(vec![
-                            Span::styled(
-                                "╭─ ",
-                                Style::default().fg(Color::DarkGray),
-                            ),
+                            Span::styled("╭─ ", Style::default().fg(Color::DarkGray)),
                             Span::styled(
                                 code_language.clone(),
-                                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                                Style::default()
+                                    .fg(Color::Cyan)
+                                    .add_modifier(Modifier::BOLD),
                             ),
-                            Span::styled(
-                                " ─",
-                                Style::default().fg(Color::DarkGray),
-                            ),
+                            Span::styled(" ─", Style::default().fg(Color::DarkGray)),
                         ]));
                     }
                 }
@@ -85,7 +81,9 @@ pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
 
                         let mut styled_line = vec![Span::styled(
                             prefix.to_string(),
-                            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(Modifier::BOLD),
                         )];
 
                         for span in &mut current_line {

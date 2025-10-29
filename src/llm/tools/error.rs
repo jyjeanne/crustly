@@ -59,9 +59,6 @@ mod tests {
         assert_eq!(err.to_string(), "Tool not found: test_tool");
 
         let err = ToolError::PermissionDenied("dangerous_operation".to_string());
-        assert_eq!(
-            err.to_string(),
-            "Permission denied: dangerous_operation"
-        );
+        assert_eq!(err.to_string(), "Permission denied: dangerous_operation");
     }
 }

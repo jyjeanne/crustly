@@ -61,10 +61,8 @@ async fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Resu
         }
 
         // Wait for next event with timeout
-        let event = tokio::time::timeout(
-            tokio::time::Duration::from_millis(100),
-            app.next_event()
-        ).await;
+        let event =
+            tokio::time::timeout(tokio::time::Duration::from_millis(100), app.next_event()).await;
 
         // Handle event if received
         if let Ok(Some(event)) = event {

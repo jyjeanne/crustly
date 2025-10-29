@@ -111,7 +111,10 @@ impl Tool for BashTool {
         {
             Ok(Ok(output)) => output,
             Ok(Err(e)) => {
-                return Ok(ToolResult::error(format!("Command execution failed: {}", e)));
+                return Ok(ToolResult::error(format!(
+                    "Command execution failed: {}",
+                    e
+                )));
             }
             Err(_) => {
                 return Err(ToolError::Timeout(context.timeout_secs));

@@ -105,10 +105,7 @@ impl RetryConfig {
 /// let config = RetryConfig::default();
 /// let result = retry_with_backoff(|| make_api_call(), &config).await;
 /// ```
-pub async fn retry_with_backoff<F, Fut, T>(
-    mut operation: F,
-    config: &RetryConfig,
-) -> Result<T>
+pub async fn retry_with_backoff<F, Fut, T>(mut operation: F, config: &RetryConfig) -> Result<T>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T>>,
@@ -202,7 +199,9 @@ pub fn extract_retry_after(error: &ProviderError) -> Option<Duration> {
             // Default to 1 minute if no specific time found
             Some(Duration::from_secs(60))
         }
-        ProviderError::ApiError { status, message, .. } if *status == 429 => {
+        ProviderError::ApiError {
+            status, message, ..
+        } if *status == 429 => {
             if let Some(secs) = parse_retry_seconds(message) {
                 return Some(Duration::from_secs(secs));
             }
@@ -287,8 +286,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_success_immediate() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
 
         let config = RetryConfig::default();
         let call_count = Arc::new(AtomicU32::new(0));
@@ -313,8 +312,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_success_after_retries() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
 
         let config = RetryConfig::new(3, Duration::from_millis(10));
         let call_count = Arc::new(AtomicU32::new(0));
@@ -343,8 +342,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_max_attempts_exceeded() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
 
         let config = RetryConfig::new(2, Duration::from_millis(10));
         let call_count = Arc::new(AtomicU32::new(0));
@@ -368,8 +367,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_non_retryable_error() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
 
         let config = RetryConfig::default();
         let call_count = Arc::new(AtomicU32::new(0));
@@ -393,7 +392,9 @@ mod tests {
 
     #[test]
     fn test_extract_retry_after() {
-        let err = ProviderError::RateLimitExceeded("Rate limit exceeded, retry in 60 seconds".to_string());
+        let err = ProviderError::RateLimitExceeded(
+            "Rate limit exceeded, retry in 60 seconds".to_string(),
+        );
         let retry_after = extract_retry_after(&err);
         assert_eq!(retry_after, Some(Duration::from_secs(60)));
 

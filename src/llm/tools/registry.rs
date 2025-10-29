@@ -212,7 +212,10 @@ mod tests {
         let context = ToolExecutionContext::new(session_id);
         let input = serde_json::json!({ "message": "test" });
 
-        let result = registry.execute("test_tool", input, &context).await.unwrap();
+        let result = registry
+            .execute("test_tool", input, &context)
+            .await
+            .unwrap();
         assert!(result.success);
         assert_eq!(result.output, "Mock execution successful");
     }

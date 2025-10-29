@@ -13,6 +13,6 @@ pub mod read;
 pub mod write;
 
 // Re-exports
-pub use error::{ToolError, Result};
+pub use error::{Result, ToolError};
 pub use r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 pub use registry::ToolRegistry;

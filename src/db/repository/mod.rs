@@ -2,13 +2,13 @@
 //!
 //! Repository pattern implementations for database access.
 
-pub mod session;
-pub mod message;
 pub mod file;
+pub mod message;
+pub mod session;
 
-pub use session::{SessionRepository, SessionListOptions};
-pub use message::MessageRepository;
 pub use file::FileRepository;
+pub use message::MessageRepository;
+pub use session::{SessionListOptions, SessionRepository};
 
 use anyhow::Result;
 

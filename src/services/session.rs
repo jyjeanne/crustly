@@ -4,7 +4,7 @@
 
 use crate::db::{
     models::Session,
-    repository::{SessionRepository, SessionListOptions},
+    repository::{SessionListOptions, SessionRepository},
 };
 use crate::services::ServiceContext;
 use anyhow::{Context, Result};
@@ -49,9 +49,7 @@ impl SessionService {
     /// Get a session by ID
     pub async fn get_session(&self, id: Uuid) -> Result<Option<Session>> {
         let repo = SessionRepository::new(self.context.pool());
-        repo.find_by_id(id)
-            .await
-            .context("Failed to get session")
+        repo.find_by_id(id).await.context("Failed to get session")
     }
 
     /// Get a session by ID, returning an error if not found
@@ -64,9 +62,7 @@ impl SessionService {
     /// List all sessions
     pub async fn list_sessions(&self, options: SessionListOptions) -> Result<Vec<Session>> {
         let repo = SessionRepository::new(self.context.pool());
-        repo.list(options)
-            .await
-            .context("Failed to list sessions")
+        repo.list(options).await.context("Failed to list sessions")
     }
 
     /// Update a session
@@ -101,12 +97,7 @@ impl SessionService {
     }
 
     /// Update session usage statistics
-    pub async fn update_session_usage(
-        &self,
-        id: Uuid,
-        token_count: i32,
-        cost: f64,
-    ) -> Result<()> {
+    pub async fn update_session_usage(&self, id: Uuid, token_count: i32, cost: f64) -> Result<()> {
         let mut session = self.get_session_required(id).await?;
         session.token_count += token_count;
         session.total_cost += cost;
@@ -151,9 +142,7 @@ impl SessionService {
     /// Delete a session permanently
     pub async fn delete_session(&self, id: Uuid) -> Result<()> {
         let repo = SessionRepository::new(self.context.pool());
-        repo.delete(id)
-            .await
-            .context("Failed to delete session")?;
+        repo.delete(id).await.context("Failed to delete session")?;
 
         tracing::info!("Deleted session: {}", id);
         Ok(())
@@ -175,9 +164,7 @@ impl SessionService {
     /// Count total sessions (excluding archived)
     pub async fn count_sessions(&self) -> Result<i64> {
         let repo = SessionRepository::new(self.context.pool());
-        repo.count(false)
-            .await
-            .context("Failed to count sessions")
+        repo.count(false).await.context("Failed to count sessions")
     }
 
     /// Count archived sessions
@@ -208,7 +195,10 @@ mod tests {
     #[tokio::test]
     async fn test_create_session() {
         let service = create_test_service().await;
-        let session = service.create_session(Some("Test Session".to_string())).await.unwrap();
+        let session = service
+            .create_session(Some("Test Session".to_string()))
+            .await
+            .unwrap();
 
         assert_eq!(session.title, Some("Test Session".to_string()));
         assert_eq!(session.token_count, 0);
@@ -219,7 +209,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_session() {
         let service = create_test_service().await;
-        let created = service.create_session(Some("Test".to_string())).await.unwrap();
+        let created = service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let found = service.get_session(created.id).await.unwrap();
         assert!(found.is_some());
@@ -229,7 +222,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_session_required() {
         let service = create_test_service().await;
-        let created = service.create_session(Some("Test".to_string())).await.unwrap();
+        let created = service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let found = service.get_session_required(created.id).await.unwrap();
         assert_eq!(found.id, created.id);
@@ -242,9 +238,15 @@ mod tests {
     #[tokio::test]
     async fn test_update_session_title() {
         let service = create_test_service().await;
-        let session = service.create_session(Some("Original".to_string())).await.unwrap();
+        let session = service
+            .create_session(Some("Original".to_string()))
+            .await
+            .unwrap();
 
-        service.update_session_title(session.id, Some("Updated".to_string())).await.unwrap();
+        service
+            .update_session_title(session.id, Some("Updated".to_string()))
+            .await
+            .unwrap();
 
         let updated = service.get_session_required(session.id).await.unwrap();
         assert_eq!(updated.title, Some("Updated".to_string()));
@@ -253,10 +255,19 @@ mod tests {
     #[tokio::test]
     async fn test_update_session_usage() {
         let service = create_test_service().await;
-        let session = service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
-        service.update_session_usage(session.id, 100, 0.05).await.unwrap();
-        service.update_session_usage(session.id, 50, 0.025).await.unwrap();
+        service
+            .update_session_usage(session.id, 100, 0.05)
+            .await
+            .unwrap();
+        service
+            .update_session_usage(session.id, 50, 0.025)
+            .await
+            .unwrap();
 
         let updated = service.get_session_required(session.id).await.unwrap();
         assert_eq!(updated.token_count, 150);
@@ -266,7 +277,10 @@ mod tests {
     #[tokio::test]
     async fn test_archive_unarchive_session() {
         let service = create_test_service().await;
-        let session = service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         // Archive
         service.archive_session(session.id).await.unwrap();
@@ -282,7 +296,10 @@ mod tests {
     #[tokio::test]
     async fn test_delete_session() {
         let service = create_test_service().await;
-        let session = service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         service.delete_session(session.id).await.unwrap();
 
@@ -295,9 +312,18 @@ mod tests {
         let service = create_test_service().await;
 
         // Create multiple sessions
-        service.create_session(Some("Session 1".to_string())).await.unwrap();
-        service.create_session(Some("Session 2".to_string())).await.unwrap();
-        service.create_session(Some("Session 3".to_string())).await.unwrap();
+        service
+            .create_session(Some("Session 1".to_string()))
+            .await
+            .unwrap();
+        service
+            .create_session(Some("Session 2".to_string()))
+            .await
+            .unwrap();
+        service
+            .create_session(Some("Session 3".to_string()))
+            .await
+            .unwrap();
 
         let options = SessionListOptions {
             include_archived: false,
@@ -313,10 +339,16 @@ mod tests {
     async fn test_get_most_recent_session() {
         let service = create_test_service().await;
 
-        let _session1 = service.create_session(Some("Session 1".to_string())).await.unwrap();
+        let _session1 = service
+            .create_session(Some("Session 1".to_string()))
+            .await
+            .unwrap();
         // Sleep for 1 second to ensure different Unix timestamps (which have second resolution)
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        let session2 = service.create_session(Some("Session 2".to_string())).await.unwrap();
+        let session2 = service
+            .create_session(Some("Session 2".to_string()))
+            .await
+            .unwrap();
 
         let recent = service.get_most_recent_session().await.unwrap();
         assert!(recent.is_some());
@@ -327,9 +359,18 @@ mod tests {
     async fn test_count_sessions() {
         let service = create_test_service().await;
 
-        service.create_session(Some("Session 1".to_string())).await.unwrap();
-        let session2 = service.create_session(Some("Session 2".to_string())).await.unwrap();
-        service.create_session(Some("Session 3".to_string())).await.unwrap();
+        service
+            .create_session(Some("Session 1".to_string()))
+            .await
+            .unwrap();
+        let session2 = service
+            .create_session(Some("Session 2".to_string()))
+            .await
+            .unwrap();
+        service
+            .create_session(Some("Session 3".to_string()))
+            .await
+            .unwrap();
 
         // Archive one session
         service.archive_session(session2.id).await.unwrap();

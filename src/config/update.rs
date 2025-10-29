@@ -93,7 +93,10 @@ impl ProviderUpdater {
         // Update last update timestamp
         self.last_update = Some(SystemTime::now());
 
-        info!("Provider update completed: {} providers updated", updated_count);
+        info!(
+            "Provider update completed: {} providers updated",
+            updated_count
+        );
 
         Ok(UpdateResult {
             success: true,

@@ -3,13 +3,13 @@
 //! This module contains the business logic services that orchestrate
 //! operations between the database layer and the application layer.
 
-pub mod session;
-pub mod message;
 pub mod file;
+pub mod message;
+pub mod session;
 
-pub use session::SessionService;
-pub use message::MessageService;
 pub use file::FileService;
+pub use message::MessageService;
+pub use session::SessionService;
 
 use crate::db::Pool;
 use std::sync::Arc;

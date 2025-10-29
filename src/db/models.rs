@@ -63,8 +63,8 @@ pub struct ToolExecution {
     pub id: Uuid,
     pub message_id: Uuid,
     pub tool_name: String,
-    pub arguments: String,  // JSON
-    pub result: Option<String>,  // JSON
+    pub arguments: String,      // JSON
+    pub result: Option<String>, // JSON
     pub status: String,
     pub approved_at: Option<DateTime<Utc>>,
     pub executed_at: Option<DateTime<Utc>>,
@@ -130,14 +130,16 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for Session {
         use sqlx::Row;
 
         Ok(Session {
-            id: Uuid::parse_str(row.try_get("id")?).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            id: Uuid::parse_str(row.try_get("id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
             title: row.try_get("title")?,
             model: row.try_get("model")?,
             created_at: DateTime::from_timestamp(row.try_get("created_at")?, 0)
                 .ok_or_else(|| sqlx::Error::Decode("Invalid timestamp for created_at".into()))?,
             updated_at: DateTime::from_timestamp(row.try_get("updated_at")?, 0)
                 .ok_or_else(|| sqlx::Error::Decode("Invalid timestamp for updated_at".into()))?,
-            archived_at: row.try_get::<Option<i64>, _>("archived_at")?
+            archived_at: row
+                .try_get::<Option<i64>, _>("archived_at")?
                 .and_then(|ts| DateTime::from_timestamp(ts, 0)),
             token_count: row.try_get("token_count")?,
             total_cost: row.try_get("total_cost")?,
@@ -150,8 +152,10 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for Message {
         use sqlx::Row;
 
         Ok(Message {
-            id: Uuid::parse_str(row.try_get("id")?).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
-            session_id: Uuid::parse_str(row.try_get("session_id")?).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            id: Uuid::parse_str(row.try_get("id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            session_id: Uuid::parse_str(row.try_get("session_id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
             role: row.try_get("role")?,
             content: row.try_get("content")?,
             sequence: row.try_get("sequence")?,
@@ -168,8 +172,10 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for File {
         use sqlx::Row;
 
         Ok(File {
-            id: Uuid::parse_str(row.try_get("id")?).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
-            session_id: Uuid::parse_str(row.try_get("session_id")?).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            id: Uuid::parse_str(row.try_get("id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            session_id: Uuid::parse_str(row.try_get("session_id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
             path: std::path::PathBuf::from(row.try_get::<String, _>("path")?),
             content: row.try_get("content")?,
             created_at: DateTime::from_timestamp(row.try_get("created_at")?, 0)
@@ -200,12 +206,7 @@ mod tests {
     #[test]
     fn test_message_new() {
         let session_id = Uuid::new_v4();
-        let message = Message::new(
-            session_id,
-            "user".to_string(),
-            "Hello!".to_string(),
-            1,
-        );
+        let message = Message::new(session_id, "user".to_string(), "Hello!".to_string(), 1);
 
         assert_eq!(message.session_id, session_id);
         assert_eq!(message.role, "user");
@@ -218,11 +219,7 @@ mod tests {
     fn test_file_new() {
         let session_id = Uuid::new_v4();
         let path = std::path::PathBuf::from("/path/to/file.rs");
-        let file = File::new(
-            session_id,
-            path.clone(),
-            None,
-        );
+        let file = File::new(session_id, path.clone(), None);
 
         assert_eq!(file.session_id, session_id);
         assert_eq!(file.path, path);
@@ -231,10 +228,7 @@ mod tests {
 
     #[test]
     fn test_session_archived() {
-        let mut session = Session::new(
-            Some("Test".to_string()),
-            Some("model".to_string()),
-        );
+        let mut session = Session::new(Some("Test".to_string()), Some("model".to_string()));
 
         assert!(!session.is_archived());
 

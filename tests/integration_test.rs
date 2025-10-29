@@ -3,6 +3,7 @@
 //! End-to-end tests with mocked LLM responses.
 
 use anyhow::Result;
+use async_trait::async_trait;
 use crustly::{
     config::Config,
     db::Database,
@@ -16,7 +17,6 @@ use crustly::{
     },
     services::{MessageService, ServiceContext, SessionService},
 };
-use async_trait::async_trait;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -41,7 +41,10 @@ impl MockProvider {
 
 #[async_trait]
 impl Provider for MockProvider {
-    async fn complete(&self, _request: LLMRequest) -> crustly::llm::provider::error::Result<LLMResponse> {
+    async fn complete(
+        &self,
+        _request: LLMRequest,
+    ) -> crustly::llm::provider::error::Result<LLMResponse> {
         let mut idx = self.current.lock().unwrap();
         let response_text = self
             .responses
@@ -65,7 +68,10 @@ impl Provider for MockProvider {
         })
     }
 
-    async fn stream(&self, _request: LLMRequest) -> crustly::llm::provider::error::Result<ProviderStream> {
+    async fn stream(
+        &self,
+        _request: LLMRequest,
+    ) -> crustly::llm::provider::error::Result<ProviderStream> {
         Err(crustly::llm::provider::error::ProviderError::StreamingNotSupported)
     }
 
@@ -103,7 +109,10 @@ async fn create_test_db() -> Result<Database> {
 }
 
 /// Test helper to create agent service with mock provider
-async fn create_test_agent(db: &Database, responses: Vec<String>) -> Result<(AgentService, ServiceContext)> {
+async fn create_test_agent(
+    db: &Database,
+    responses: Vec<String>,
+) -> Result<(AgentService, ServiceContext)> {
     let provider = Arc::new(MockProvider::new(responses));
     let service_context = ServiceContext::new(db.pool().clone());
 
@@ -122,10 +131,8 @@ async fn create_test_agent(db: &Database, responses: Vec<String>) -> Result<(Age
 async fn test_end_to_end_simple_message() -> Result<()> {
     // Setup
     let db = create_test_db().await?;
-    let (agent_service, service_context) = create_test_agent(&db, vec![
-        "Hello! I'm a mock AI assistant.".to_string(),
-    ])
-    .await?;
+    let (agent_service, service_context) =
+        create_test_agent(&db, vec!["Hello! I'm a mock AI assistant.".to_string()]).await?;
 
     // Create session
     let session_service = SessionService::new(service_context.clone());
@@ -163,11 +170,14 @@ async fn test_end_to_end_simple_message() -> Result<()> {
 async fn test_end_to_end_multi_turn_conversation() -> Result<()> {
     // Setup
     let db = create_test_db().await?;
-    let (agent_service, service_context) = create_test_agent(&db, vec![
-        "Nice to meet you!".to_string(),
-        "I'm doing great, thanks for asking!".to_string(),
-        "Goodbye!".to_string(),
-    ])
+    let (agent_service, service_context) = create_test_agent(
+        &db,
+        vec![
+            "Nice to meet you!".to_string(),
+            "I'm doing great, thanks for asking!".to_string(),
+            "Goodbye!".to_string(),
+        ],
+    )
     .await?;
 
     let session_service = SessionService::new(service_context.clone());
@@ -210,10 +220,10 @@ async fn test_end_to_end_multi_turn_conversation() -> Result<()> {
 async fn test_end_to_end_session_management() -> Result<()> {
     // Setup
     let db = create_test_db().await?;
-    let (agent_service, service_context) = create_test_agent(&db, vec![
-        "Response 1".to_string(),
-        "Response 2".to_string(),
-    ])
+    let (agent_service, service_context) = create_test_agent(
+        &db,
+        vec!["Response 1".to_string(), "Response 2".to_string()],
+    )
     .await?;
 
     let session_service = SessionService::new(service_context.clone());
@@ -267,11 +277,14 @@ async fn test_end_to_end_session_management() -> Result<()> {
 async fn test_end_to_end_cost_tracking() -> Result<()> {
     // Setup
     let db = create_test_db().await?;
-    let (agent_service, service_context) = create_test_agent(&db, vec![
-        "Response 1".to_string(),
-        "Response 2".to_string(),
-        "Response 3".to_string(),
-    ])
+    let (agent_service, service_context) = create_test_agent(
+        &db,
+        vec![
+            "Response 1".to_string(),
+            "Response 2".to_string(),
+            "Response 3".to_string(),
+        ],
+    )
     .await?;
 
     let session_service = SessionService::new(service_context.clone());
@@ -311,10 +324,8 @@ async fn test_end_to_end_cost_tracking() -> Result<()> {
 async fn test_end_to_end_error_handling() -> Result<()> {
     // Setup
     let db = create_test_db().await?;
-    let (agent_service, _service_context) = create_test_agent(&db, vec![
-        "Response".to_string(),
-    ])
-    .await?;
+    let (agent_service, _service_context) =
+        create_test_agent(&db, vec!["Response".to_string()]).await?;
 
     // Try to send message to non-existent session
     let fake_session_id = Uuid::new_v4();
@@ -332,10 +343,8 @@ async fn test_end_to_end_error_handling() -> Result<()> {
 async fn test_end_to_end_token_usage() -> Result<()> {
     // Setup
     let db = create_test_db().await?;
-    let (agent_service, service_context) = create_test_agent(&db, vec![
-        "Short response".to_string(),
-    ])
-    .await?;
+    let (agent_service, service_context) =
+        create_test_agent(&db, vec!["Short response".to_string()]).await?;
 
     let session_service = SessionService::new(service_context.clone());
     let session = session_service
@@ -440,7 +449,10 @@ async fn test_database_persistence() -> Result<()> {
     // Verify session persisted
     let loaded_session = session_service2.get_session(session_id).await?;
     assert!(loaded_session.is_some());
-    assert_eq!(loaded_session.unwrap().title, Some("Persistence Test".to_string()));
+    assert_eq!(
+        loaded_session.unwrap().title,
+        Some("Persistence Test".to_string())
+    );
 
     // Cleanup
     let _ = std::fs::remove_file(&db_path);

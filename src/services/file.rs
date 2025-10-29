@@ -2,10 +2,7 @@
 //!
 //! Provides business logic for file tracking operations.
 
-use crate::db::{
-    models::File,
-    repository::FileRepository,
-};
+use crate::db::{models::File, repository::FileRepository};
 use crate::services::ServiceContext;
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -42,9 +39,7 @@ impl FileService {
             updated_at: Utc::now(),
         };
 
-        repo.create(&file)
-            .await
-            .context("Failed to track file")?;
+        repo.create(&file).await.context("Failed to track file")?;
 
         tracing::debug!("Tracked new file: {:?} in session {}", path, session_id);
         Ok(file)
@@ -53,9 +48,7 @@ impl FileService {
     /// Get a file by ID
     pub async fn get_file(&self, id: Uuid) -> Result<Option<File>> {
         let repo = FileRepository::new(self.context.pool());
-        repo.find_by_id(id)
-            .await
-            .context("Failed to get file")
+        repo.find_by_id(id).await.context("Failed to get file")
     }
 
     /// Get a file by ID, returning an error if not found
@@ -74,11 +67,7 @@ impl FileService {
     }
 
     /// Find a file by path in a session
-    pub async fn find_file_by_path(
-        &self,
-        session_id: Uuid,
-        path: &Path,
-    ) -> Result<Option<File>> {
+    pub async fn find_file_by_path(&self, session_id: Uuid, path: &Path) -> Result<Option<File>> {
         let repo = FileRepository::new(self.context.pool());
         repo.find_by_path(session_id, path)
             .await
@@ -119,9 +108,7 @@ impl FileService {
     /// Delete a file
     pub async fn delete_file(&self, id: Uuid) -> Result<()> {
         let repo = FileRepository::new(self.context.pool());
-        repo.delete(id)
-            .await
-            .context("Failed to delete file")?;
+        repo.delete(id).await.context("Failed to delete file")?;
 
         tracing::debug!("Deleted file: {}", id);
         Ok(())
@@ -171,19 +158,13 @@ impl FileService {
     /// Get files with content
     pub async fn get_files_with_content(&self, session_id: Uuid) -> Result<Vec<File>> {
         let files = self.list_files_for_session(session_id).await?;
-        Ok(files
-            .into_iter()
-            .filter(|f| f.content.is_some())
-            .collect())
+        Ok(files.into_iter().filter(|f| f.content.is_some()).collect())
     }
 
     /// Get files without content
     pub async fn get_files_without_content(&self, session_id: Uuid) -> Result<Vec<File>> {
         let files = self.list_files_for_session(session_id).await?;
-        Ok(files
-            .into_iter()
-            .filter(|f| f.content.is_none())
-            .collect())
+        Ok(files.into_iter().filter(|f| f.content.is_none()).collect())
     }
 }
 
@@ -210,7 +191,10 @@ mod tests {
     #[tokio::test]
     async fn test_track_file() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let file = file_service
             .track_file(
@@ -229,7 +213,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_file() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let created = file_service
             .track_file(session.id, PathBuf::from("/test/file.txt"), None)
@@ -244,7 +231,10 @@ mod tests {
     #[tokio::test]
     async fn test_list_files_for_session() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         file_service
             .track_file(session.id, PathBuf::from("/test/file1.txt"), None)
@@ -255,14 +245,20 @@ mod tests {
             .await
             .unwrap();
 
-        let files = file_service.list_files_for_session(session.id).await.unwrap();
+        let files = file_service
+            .list_files_for_session(session.id)
+            .await
+            .unwrap();
         assert_eq!(files.len(), 2);
     }
 
     #[tokio::test]
     async fn test_find_file_by_path() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let path = PathBuf::from("/test/file.txt");
         file_service
@@ -281,7 +277,10 @@ mod tests {
     #[tokio::test]
     async fn test_update_file_content() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let file = file_service
             .track_file(session.id, PathBuf::from("/test/file.txt"), None)
@@ -300,7 +299,10 @@ mod tests {
     #[tokio::test]
     async fn test_delete_file() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let file = file_service
             .track_file(session.id, PathBuf::from("/test/file.txt"), None)
@@ -316,7 +318,10 @@ mod tests {
     #[tokio::test]
     async fn test_delete_files_for_session() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         file_service
             .track_file(session.id, PathBuf::from("/test/file1.txt"), None)
@@ -332,14 +337,20 @@ mod tests {
             .await
             .unwrap();
 
-        let files = file_service.list_files_for_session(session.id).await.unwrap();
+        let files = file_service
+            .list_files_for_session(session.id)
+            .await
+            .unwrap();
         assert_eq!(files.len(), 0);
     }
 
     #[tokio::test]
     async fn test_count_files_in_session() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         file_service
             .track_file(session.id, PathBuf::from("/test/file1.txt"), None)
@@ -350,14 +361,20 @@ mod tests {
             .await
             .unwrap();
 
-        let count = file_service.count_files_in_session(session.id).await.unwrap();
+        let count = file_service
+            .count_files_in_session(session.id)
+            .await
+            .unwrap();
         assert_eq!(count, 2);
     }
 
     #[tokio::test]
     async fn test_is_file_tracked() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let path = PathBuf::from("/test/file.txt");
         file_service
@@ -365,7 +382,10 @@ mod tests {
             .await
             .unwrap();
 
-        let is_tracked = file_service.is_file_tracked(session.id, &path).await.unwrap();
+        let is_tracked = file_service
+            .is_file_tracked(session.id, &path)
+            .await
+            .unwrap();
         assert!(is_tracked);
 
         let not_tracked = file_service
@@ -378,7 +398,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_or_create_file() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         let path = PathBuf::from("/test/file.txt");
 
@@ -400,7 +423,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_files_with_content() {
         let (file_service, session_service) = create_test_service().await;
-        let session = session_service.create_session(Some("Test".to_string())).await.unwrap();
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
 
         file_service
             .track_file(
@@ -415,8 +441,14 @@ mod tests {
             .await
             .unwrap();
 
-        let with_content = file_service.get_files_with_content(session.id).await.unwrap();
-        let without_content = file_service.get_files_without_content(session.id).await.unwrap();
+        let with_content = file_service
+            .get_files_with_content(session.id)
+            .await
+            .unwrap();
+        let without_content = file_service
+            .get_files_without_content(session.id)
+            .await
+            .unwrap();
 
         assert_eq!(with_content.len(), 1);
         assert_eq!(without_content.len(), 1);

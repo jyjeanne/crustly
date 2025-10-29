@@ -162,9 +162,10 @@ impl EventHandler {
                                 // Only process key press events to avoid duplicates
                                 // Ignore key release and repeat events
                                 if key.kind == crossterm::event::KeyEventKind::Press
-                                    && tx.send(TuiEvent::Key(key)).is_err() {
-                                        break;
-                                    }
+                                    && tx.send(TuiEvent::Key(key)).is_err()
+                                {
+                                    break;
+                                }
                             }
                             crossterm::event::Event::Resize(w, h) => {
                                 if tx.send(TuiEvent::Resize(w, h)).is_err() {
@@ -260,20 +261,23 @@ pub mod keys {
 
     /// 'A' or 'Y' - Approve
     pub fn is_approve(event: &KeyEvent) -> bool {
-        matches!(event.code, KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Char('y') | KeyCode::Char('Y'))
-            && event.modifiers.is_empty()
+        matches!(
+            event.code,
+            KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Char('y') | KeyCode::Char('Y')
+        ) && event.modifiers.is_empty()
     }
 
     /// 'D' or 'N' - Deny
     pub fn is_deny(event: &KeyEvent) -> bool {
-        matches!(event.code, KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('n') | KeyCode::Char('N'))
-            && event.modifiers.is_empty()
+        matches!(
+            event.code,
+            KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('n') | KeyCode::Char('N')
+        ) && event.modifiers.is_empty()
     }
 
     /// 'V' - View details
     pub fn is_view_details(event: &KeyEvent) -> bool {
-        matches!(event.code, KeyCode::Char('v') | KeyCode::Char('V'))
-            && event.modifiers.is_empty()
+        matches!(event.code, KeyCode::Char('v') | KeyCode::Char('V')) && event.modifiers.is_empty()
     }
 }
 
@@ -292,8 +296,16 @@ mod tests {
     #[test]
     fn test_key_matches() {
         let event = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
-        assert!(key_matches(&event, KeyCode::Char('c'), KeyModifiers::CONTROL));
-        assert!(!key_matches(&event, KeyCode::Char('c'), KeyModifiers::empty()));
+        assert!(key_matches(
+            &event,
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL
+        ));
+        assert!(!key_matches(
+            &event,
+            KeyCode::Char('c'),
+            KeyModifiers::empty()
+        ));
     }
 
     #[test]

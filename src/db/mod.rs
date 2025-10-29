@@ -31,8 +31,9 @@ impl Database {
         if let Some(parent) = path.parent() {
             if !parent.exists() {
                 tracing::debug!("Creating database directory: {:?}", parent);
-                std::fs::create_dir_all(parent)
-                    .with_context(|| format!("Failed to create database directory: {:?}", parent))?;
+                std::fs::create_dir_all(parent).with_context(|| {
+                    format!("Failed to create database directory: {:?}", parent)
+                })?;
             }
         }
 
