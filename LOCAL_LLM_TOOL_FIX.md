@@ -1,9 +1,21 @@
 # Local LLM Tool Support Fix
 
 **Date:** 2025-11-10
+**Status:** ✅ FULLY FIXED
 **Fixed:** Tools now work with local LLMs (LM Studio, Ollama, etc.)
 
-## Problem
+## ⚠️ IMPORTANT: TWO Bugs Were Fixed
+
+This document describes **TWO critical bugs** that prevented tools from working with local LLMs:
+
+1. **Bug #1 (Fixed):** Tools not sent to LLM → Tools definitions missing from requests
+2. **Bug #2 (Fixed):** Infinite loop with empty messages → Tool results not sent back to LLM
+
+**Both bugs are now fixed!** Follow the testing instructions below to verify.
+
+---
+
+## Problem #1: Tools Not Sent to LLM
 
 When asking local LLMs to create files or execute commands, they would respond with:
 > "I'm currently unable to directly interact with your local files"
@@ -28,7 +40,7 @@ And the response confirmed:
 "tool_calls": []  // Empty!
 ```
 
-## Solution
+## Solution #1
 
 **Changed:** `src/tui/app.rs` line 398
 
@@ -42,6 +54,118 @@ This one-line change:
 - ✅ Enables tool execution loop
 - ✅ Shows approval dialogs for dangerous operations
 - ✅ Works with local LLMs and cloud APIs
+
+---
+
+## Problem #2: Infinite Loop with Empty Messages
+
+After fixing Bug #1, tools WERE being sent and the LLM WAS generating tool calls, BUT:
+- ❌ No approval dialog appeared
+- ❌ Files were not created
+- ❌ System entered infinite loop sending empty messages
+- ❌ Each request added 2 empty messages (assistant + user)
+- ❌ Message count grew: 3 → 5 → 7 → 9 → 11 → 13...
+
+**Root Cause:** The `to_openai_request()` function only extracted `ContentBlock::Text` and **completely ignored** `ContentBlock::ToolResult`. When the agent executed a tool and tried to send the result back to the LLM, the tool result was silently dropped, causing empty messages to be sent instead.
+
+### Evidence from Logs
+
+Your LM Studio logs showed this pattern repeating:
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Create test.txt" },
+    { "role": "assistant", "content": "", "tool_calls": [...] },  // LLM calls tool
+    { "role": "assistant", "content": "" },  // ❌ EMPTY! Should contain result
+    { "role": "user", "content": "" },       // ❌ EMPTY!
+    { "role": "assistant", "content": "", "tool_calls": [...] },  // Tries again
+    { "role": "assistant", "content": "" },  // ❌ EMPTY!
+    ...  // Infinite loop
+  ]
+}
+```
+
+## Solution #2
+
+**Changed:** `src/llm/provider/openai.rs` lines 519-215
+
+### 2.1 Updated OpenAIMessage Struct
+
+```diff
+  #[derive(Debug, Clone, Serialize, Deserialize)]
+  struct OpenAIMessage {
+      role: String,
+-     content: String,
++     #[serde(skip_serializing_if = "Option::is_none")]
++     content: Option<String>,
+      #[serde(skip_serializing_if = "Option::is_none")]
+      tool_calls: Option<Vec<OpenAIToolCall>>,
++     #[serde(skip_serializing_if = "Option::is_none")]
++     tool_call_id: Option<String>,
+  }
+```
+
+**Why:**
+- Made `content` optional (tool result messages don't always have content in the same field)
+- Added `tool_call_id` for tool result messages (OpenAI format requires this)
+
+### 2.2 Rewrote to_openai_request() Method
+
+**Before (BROKEN):** Only extracted text, ignored everything else
+```rust
+let content: String = msg.content.iter()
+    .filter_map(|block| {
+        if let ContentBlock::Text { text } = block {
+            Some(text.clone())
+        } else {
+            None  // ❌ Silently drops ToolResult!
+        }
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
+```
+
+**After (FIXED):** Handles ALL ContentBlock types properly
+```rust
+// Separate content blocks by type
+for block in msg.content {
+    match block {
+        ContentBlock::Text { text } => {
+            text_parts.push(text);
+        }
+        ContentBlock::ToolUse { id, name, input } => {
+            tool_uses.push((id, name, input));
+        }
+        ContentBlock::ToolResult { tool_use_id, content, .. } => {
+            tool_results.push((tool_use_id, content));  // ✅ Now handled!
+        }
+        ContentBlock::Image { .. } => {
+            tracing::warn!("Image content blocks not yet supported");
+        }
+    }
+}
+
+// Convert ToolResult to OpenAI "tool" role messages
+if !tool_results.is_empty() {
+    for (tool_use_id, content) in tool_results {
+        messages.push(OpenAIMessage {
+            role: "tool".to_string(),           // ✅ Correct OpenAI format
+            content: Some(content),             // ✅ Tool result content
+            tool_calls: None,
+            tool_call_id: Some(tool_use_id),    // ✅ Links to tool call
+        });
+    }
+}
+```
+
+**Impact:**
+- ✅ Tool results now properly sent back to LLM
+- ✅ Stops infinite loop with empty messages
+- ✅ Enables full tool execution flow
+- ✅ Local LLMs can now complete tool operations
+- ✅ Also handles ToolUse blocks (for when agent replies contain tool calls)
+
+---
 
 ## Testing the Fix
 
@@ -133,7 +257,9 @@ Press `A` to approve.
 
 ## What You Should See in LM Studio Logs Now
 
-**BEFORE fix:**
+### Initial Request (After Fix #1)
+
+**BEFORE fix #1:**
 ```json
 {
   "model": "...",
@@ -143,13 +269,13 @@ Press `A` to approve.
 }
 ```
 
-**AFTER fix:**
+**AFTER fix #1:**
 ```json
 {
   "model": "...",
   "messages": [...],
   "max_tokens": 4096,
-  "tools": [
+  "tools": [  // ✅ Tools now included!
     {
       "type": "function",
       "function": {
@@ -178,15 +304,15 @@ Press `A` to approve.
 }
 ```
 
-And the LLM response might include:
+**LLM Response (calls tool):**
 ```json
 {
   "message": {
     "role": "assistant",
     "content": "",
-    "tool_calls": [
+    "tool_calls": [  // ✅ LLM now generates tool calls!
       {
-        "id": "call_123",
+        "id": "call_abc123",
         "type": "function",
         "function": {
           "name": "write_file",
@@ -194,6 +320,57 @@ And the LLM response might include:
         }
       }
     ]
+  }
+}
+```
+
+### Tool Result Sent Back (After Fix #2)
+
+**BEFORE fix #2 (BROKEN):**
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Create hello.txt" },
+    { "role": "assistant", "content": "", "tool_calls": [...] },
+    { "role": "assistant", "content": "" },  // ❌ EMPTY! Tool result lost
+    { "role": "user", "content": "" }        // ❌ EMPTY! Infinite loop
+  ]
+}
+```
+
+**AFTER fix #2 (CORRECT):**
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Create hello.txt" },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [{
+        "id": "call_abc123",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\":\"hello.txt\",\"content\":\"Hello World\"}"
+        }
+      }]
+    },
+    {
+      "role": "tool",               // ✅ Correct role for tool results
+      "tool_call_id": "call_abc123", // ✅ Links to the tool call
+      "content": "File written successfully: hello.txt (12 bytes)"  // ✅ Tool result!
+    }
+  ],
+  "tools": [...]
+}
+```
+
+**Final LLM Response:**
+```json
+{
+  "message": {
+    "role": "assistant",
+    "content": "✅ I've created hello.txt with the content 'Hello World'"
   }
 }
 ```
@@ -442,16 +619,42 @@ Crustly: [Calls bash: cargo run]
 
 ## Summary
 
-This fix enables **full tool support** for local LLMs by ensuring tool definitions are sent in every request. Your Qwen 2.5 Coder 7B model can now:
+### What Was Fixed
 
-- ✅ Create and modify files
-- ✅ Read project files
-- ✅ Execute shell commands
-- ✅ Generate code with context
-- ✅ Run tests and builds
+**Two critical bugs** prevented tools from working with local LLMs:
 
-All with **interactive approval** for dangerous operations and **100% local privacy**.
+1. **Bug #1 - Tools Not Sent:** `src/tui/app.rs` called wrong method
+   - Fix: Changed `send_message()` → `send_message_with_tools()`
+   - Result: Tool definitions now sent to LLM in every request
+
+2. **Bug #2 - Tool Results Lost:** `src/llm/provider/openai.rs` ignored tool results
+   - Fix: Rewrote message conversion to handle all ContentBlock types
+   - Result: Tool results properly sent back to LLM, stopping infinite loop
+
+### What Works Now
+
+Your Qwen 2.5 Coder 7B model (or any OpenAI-compatible local LLM) can now:
+
+- ✅ **Create and modify files** - Full write_file tool support
+- ✅ **Read project files** - Full read_file tool support
+- ✅ **Execute shell commands** - Full bash tool support
+- ✅ **Generate code with context** - Understands your codebase
+- ✅ **Run tests and builds** - Complete development workflow
+- ✅ **Interactive approval** - Security dialogs for dangerous operations
+- ✅ **100% local privacy** - All processing stays on your machine
+
+### Files Modified
+
+1. `src/tui/app.rs:398` - Use send_message_with_tools()
+2. `src/llm/provider/openai.rs:519-215` - Handle all ContentBlock types
+   - Updated OpenAIMessage struct (content optional, added tool_call_id)
+   - Rewrote to_openai_request() to convert ToolResult to role="tool"
+
+### Commits
+
+- **Fix #1:** "Fix: Convert OpenAI tool_calls to ContentBlock::ToolUse"
+- **Fix #2:** "Fix: Send tool results back to LLM to stop infinite loop"
 
 ---
 
-**Enjoy your now-functional AI coding assistant!** 🚀
+**Enjoy your now-fully-functional AI coding assistant!** 🚀
