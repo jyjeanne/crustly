@@ -209,6 +209,8 @@ impl App {
                 self.pending_approval = None;
                 self.show_approval_details = false;
                 self.mode = AppMode::Chat;
+                // Auto-scroll to show tool execution result
+                self.scroll_offset = 0;
             }
             TuiEvent::Resize(_, _) | TuiEvent::AgentProcessing => {
                 // These are handled by the render loop
@@ -394,6 +396,9 @@ impl App {
             };
             self.messages.push(user_msg);
 
+            // Auto-scroll to show the new user message
+            self.scroll_offset = 0;
+
             // Send to agent in background
             let agent_service = self.agent_service.clone();
             let session_id = session.id;
@@ -423,6 +428,8 @@ impl App {
             response.push_str(&chunk);
         } else {
             self.streaming_response = Some(chunk);
+            // Auto-scroll when response starts streaming
+            self.scroll_offset = 0;
         }
     }
 
@@ -458,6 +465,8 @@ impl App {
         self.is_processing = false;
         self.streaming_response = None;
         self.error_message = Some(error);
+        // Auto-scroll to show the error
+        self.scroll_offset = 0;
     }
 
     /// Switch to a different mode
