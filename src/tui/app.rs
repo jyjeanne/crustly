@@ -395,7 +395,7 @@ impl App {
             let event_sender = self.event_sender();
 
             tokio::spawn(async move {
-                match agent_service.send_message(session_id, content, None).await {
+                match agent_service.send_message_with_tools(session_id, content, None).await {
                     Ok(response) => {
                         let _ = event_sender.send(TuiEvent::ResponseComplete(response));
                     }
