@@ -190,6 +190,15 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
         ]));
     }
 
+    // Calculate scroll offset for ratatui
+    // app.scroll_offset represents "lines scrolled up from the bottom"
+    // 0 = at the bottom (auto-scroll, showing latest messages)
+    // N = scrolled up N lines from the bottom (showing older messages)
+    let total_lines = lines.len();
+    let visible_height = area.height.saturating_sub(2) as usize; // Subtract borders
+    let max_scroll = total_lines.saturating_sub(visible_height);
+    let actual_scroll_offset = max_scroll.saturating_sub(app.scroll_offset);
+
     let chat = Paragraph::new(lines)
         .block(
             Block::default()
@@ -203,7 +212,7 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
                 .border_style(Style::default().fg(Color::Cyan)),
         )
         .wrap(Wrap { trim: false })
-        .scroll((app.scroll_offset as u16, 0));
+        .scroll((actual_scroll_offset as u16, 0));
 
     f.render_widget(chat, area);
 }

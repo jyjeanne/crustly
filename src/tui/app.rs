@@ -282,9 +282,12 @@ impl App {
             self.input_buffer.clear();
             self.error_message = None;
         } else if keys::is_page_up(&event) {
-            self.scroll_offset = self.scroll_offset.saturating_sub(10);
-        } else if keys::is_page_down(&event) {
+            // Scroll up (away from bottom) to see older messages
             self.scroll_offset = self.scroll_offset.saturating_add(10);
+        } else if keys::is_page_down(&event) {
+            // Scroll down (toward bottom) to see newer messages
+            // When we reach 0, we're at the bottom (auto-scroll mode)
+            self.scroll_offset = self.scroll_offset.saturating_sub(10);
         } else {
             // Regular character input
             match event.code {
