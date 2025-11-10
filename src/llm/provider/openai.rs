@@ -120,6 +120,7 @@ impl OpenAIProvider {
             messages.push(OpenAIMessage {
                 role: "system".to_string(),
                 content: system,
+                tool_calls: None,
             });
         }
 
@@ -148,6 +149,7 @@ impl OpenAIProvider {
             messages.push(OpenAIMessage {
                 role: role.to_string(),
                 content,
+                tool_calls: None,
             });
         }
 
@@ -188,16 +190,48 @@ impl OpenAIProvider {
                 message: OpenAIMessage {
                     role: "assistant".to_string(),
                     content: "".to_string(),
+                    tool_calls: None,
                 },
                 finish_reason: Some("error".to_string()),
             });
 
         // Convert content to content blocks
         let mut content_blocks = Vec::new();
+
+        // Add text content if present
         if !choice.message.content.is_empty() {
             content_blocks.push(ContentBlock::Text {
                 text: choice.message.content,
             });
+        }
+
+        // Convert tool_calls to ToolUse content blocks
+        if let Some(tool_calls) = choice.message.tool_calls {
+            tracing::debug!("Converting {} tool calls from OpenAI response", tool_calls.len());
+            for tool_call in tool_calls {
+                // Parse arguments JSON string
+                let input = serde_json::from_str(&tool_call.function.arguments)
+                    .unwrap_or_else(|e| {
+                        tracing::warn!(
+                            "Failed to parse tool arguments for {}: {}",
+                            tool_call.function.name,
+                            e
+                        );
+                        serde_json::json!({})
+                    });
+
+                tracing::debug!(
+                    "Converted tool call: {} with id {}",
+                    tool_call.function.name,
+                    tool_call.id
+                );
+
+                content_blocks.push(ContentBlock::ToolUse {
+                    id: tool_call.id,
+                    name: tool_call.function.name,
+                    input,
+                });
+            }
         }
 
         // Map finish_reason to StopReason
@@ -485,6 +519,21 @@ struct OpenAIRequest {
 struct OpenAIMessage {
     role: String,
     content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<OpenAIToolCall>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenAIToolCall {
+    id: String,
+    r#type: String,
+    function: OpenAIFunctionCall,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenAIFunctionCall {
+    name: String,
+    arguments: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
