@@ -28,6 +28,7 @@ fn default_max_results() -> usize {
 // DuckDuckGo Instant Answer API response structure
 #[derive(Debug, Deserialize)]
 struct DuckDuckGoResponse {
+    #[allow(dead_code)]
     #[serde(rename = "Abstract")]
     abstract_text: String,
 
@@ -54,6 +55,7 @@ enum RelatedTopic {
         first_url: String,
     },
     TopicGroup {
+        #[allow(dead_code)]
         #[serde(rename = "Name")]
         name: String,
         #[serde(rename = "Topics")]
