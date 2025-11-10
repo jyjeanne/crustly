@@ -374,6 +374,16 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Show this help screen", Style::default().fg(Color::White)),
         ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+K       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Clear current session messages", Style::default().fg(Color::White)),
+        ]),
         Line::from(""),
         Line::from(Span::styled(
             "╭─ CHAT MODE ───────────────────────────────────────────────╮",
@@ -839,7 +849,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         format!(" [{}] Processing...", mode_text)
     } else {
         format!(
-            " [{}] Ready │ Ctrl+H: Help │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            " [{}] Ready │ Ctrl+H: Help │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
             mode_text
         )
     };

@@ -244,6 +244,11 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_clear_session(&event) {
+            self.clear_session().await?;
+            return Ok(());
+        }
+
         // Mode-specific handling
         match self.mode {
             AppMode::Splash => {
@@ -378,6 +383,24 @@ impl App {
                 offset: 0,
             })
             .await?;
+
+        Ok(())
+    }
+
+    /// Clear all messages from the current session
+    async fn clear_session(&mut self) -> Result<()> {
+        if let Some(session) = &self.current_session {
+            // Delete all messages from the database
+            self.message_service
+                .delete_messages_for_session(session.id)
+                .await?;
+
+            // Clear messages from UI
+            self.messages.clear();
+            self.scroll_offset = 0;
+            self.streaming_response = None;
+            self.error_message = None;
+        }
 
         Ok(())
     }
