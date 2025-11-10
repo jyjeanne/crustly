@@ -480,6 +480,17 @@ impl App {
         };
         self.messages.push(assistant_msg);
 
+        // Update session model if not already set
+        if let Some(session) = &mut self.current_session {
+            if session.model.is_none() {
+                session.model = Some(response.model.clone());
+                // Save the updated session to database
+                if let Err(e) = self.session_service.update_session(session).await {
+                    tracing::warn!("Failed to update session model: {}", e);
+                }
+            }
+        }
+
         // Auto-scroll to bottom
         self.scroll_offset = 0;
 
