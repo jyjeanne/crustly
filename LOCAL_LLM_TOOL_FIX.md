@@ -1,9 +1,22 @@
 # Local LLM Tool Support Fix
 
 **Date:** 2025-11-10
+**Status:** ✅ FULLY FIXED
 **Fixed:** Tools now work with local LLMs (LM Studio, Ollama, etc.)
 
-## Problem
+## ⚠️ IMPORTANT: THREE Bugs Were Fixed
+
+This document describes **THREE critical bugs** that prevented tools from working with local LLMs:
+
+1. **Bug #1 (Fixed):** Tools not sent to LLM → Tool definitions missing from requests
+2. **Bug #2 (Fixed):** Infinite loop with empty messages → Tool results not sent back to LLM
+3. **Bug #3 (Fixed):** Approval requests fail with "channel closed" → Event channels broken during initialization
+
+**All three bugs are now fixed!** Follow the testing instructions below to verify.
+
+---
+
+## Problem #1: Tools Not Sent to LLM
 
 When asking local LLMs to create files or execute commands, they would respond with:
 > "I'm currently unable to directly interact with your local files"
@@ -28,7 +41,7 @@ And the response confirmed:
 "tool_calls": []  // Empty!
 ```
 
-## Solution
+## Solution #1
 
 **Changed:** `src/tui/app.rs` line 398
 
@@ -42,6 +55,232 @@ This one-line change:
 - ✅ Enables tool execution loop
 - ✅ Shows approval dialogs for dangerous operations
 - ✅ Works with local LLMs and cloud APIs
+
+---
+
+## Problem #2: Infinite Loop with Empty Messages
+
+After fixing Bug #1, tools WERE being sent and the LLM WAS generating tool calls, BUT:
+- ❌ No approval dialog appeared
+- ❌ Files were not created
+- ❌ System entered infinite loop sending empty messages
+- ❌ Each request added 2 empty messages (assistant + user)
+- ❌ Message count grew: 3 → 5 → 7 → 9 → 11 → 13...
+
+**Root Cause:** The `to_openai_request()` function only extracted `ContentBlock::Text` and **completely ignored** `ContentBlock::ToolResult`. When the agent executed a tool and tried to send the result back to the LLM, the tool result was silently dropped, causing empty messages to be sent instead.
+
+### Evidence from Logs
+
+Your LM Studio logs showed this pattern repeating:
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Create test.txt" },
+    { "role": "assistant", "content": "", "tool_calls": [...] },  // LLM calls tool
+    { "role": "assistant", "content": "" },  // ❌ EMPTY! Should contain result
+    { "role": "user", "content": "" },       // ❌ EMPTY!
+    { "role": "assistant", "content": "", "tool_calls": [...] },  // Tries again
+    { "role": "assistant", "content": "" },  // ❌ EMPTY!
+    ...  // Infinite loop
+  ]
+}
+```
+
+## Solution #2
+
+**Changed:** `src/llm/provider/openai.rs` lines 519-215
+
+### 2.1 Updated OpenAIMessage Struct
+
+```diff
+  #[derive(Debug, Clone, Serialize, Deserialize)]
+  struct OpenAIMessage {
+      role: String,
+-     content: String,
++     #[serde(skip_serializing_if = "Option::is_none")]
++     content: Option<String>,
+      #[serde(skip_serializing_if = "Option::is_none")]
+      tool_calls: Option<Vec<OpenAIToolCall>>,
++     #[serde(skip_serializing_if = "Option::is_none")]
++     tool_call_id: Option<String>,
+  }
+```
+
+**Why:**
+- Made `content` optional (tool result messages don't always have content in the same field)
+- Added `tool_call_id` for tool result messages (OpenAI format requires this)
+
+### 2.2 Rewrote to_openai_request() Method
+
+**Before (BROKEN):** Only extracted text, ignored everything else
+```rust
+let content: String = msg.content.iter()
+    .filter_map(|block| {
+        if let ContentBlock::Text { text } = block {
+            Some(text.clone())
+        } else {
+            None  // ❌ Silently drops ToolResult!
+        }
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
+```
+
+**After (FIXED):** Handles ALL ContentBlock types properly
+```rust
+// Separate content blocks by type
+for block in msg.content {
+    match block {
+        ContentBlock::Text { text } => {
+            text_parts.push(text);
+        }
+        ContentBlock::ToolUse { id, name, input } => {
+            tool_uses.push((id, name, input));
+        }
+        ContentBlock::ToolResult { tool_use_id, content, .. } => {
+            tool_results.push((tool_use_id, content));  // ✅ Now handled!
+        }
+        ContentBlock::Image { .. } => {
+            tracing::warn!("Image content blocks not yet supported");
+        }
+    }
+}
+
+// Convert ToolResult to OpenAI "tool" role messages
+if !tool_results.is_empty() {
+    for (tool_use_id, content) in tool_results {
+        messages.push(OpenAIMessage {
+            role: "tool".to_string(),           // ✅ Correct OpenAI format
+            content: Some(content),             // ✅ Tool result content
+            tool_calls: None,
+            tool_call_id: Some(tool_use_id),    // ✅ Links to tool call
+        });
+    }
+}
+```
+
+**Impact:**
+- ✅ Tool results now properly sent back to LLM
+- ✅ Stops infinite loop with empty messages
+- ✅ Enables full tool execution flow
+- ✅ Local LLMs can now complete tool operations
+- ✅ Also handles ToolUse blocks (for when agent replies contain tool calls)
+
+---
+
+## Problem #3: Approval Requests Fail with "Channel Closed"
+
+After fixing Bugs #1 and #2, tools were being sent AND tool results were being returned properly, BUT:
+- ❌ Every tool execution failed with: `"Approval request failed: Internal error: Failed to send approval request: channel closed"`
+- ❌ No approval dialog appeared
+- ❌ Tools kept failing in an infinite loop
+- ❌ LLM kept retrying with different paths and methods
+
+**Root Cause:** The CLI initialization code had a critical architectural bug where it created the App TWICE:
+
+1. Create first App → EventHandler with channel (tx1, rx1)
+2. Get event_sender from first app → capture tx1
+3. Create approval callback that captures tx1
+4. Create new AgentService with approval callback
+5. **Create SECOND App** → NEW EventHandler with NEW channel (tx2, rx2)
+6. Run TUI listening on rx2
+
+The problem: approval callback sends to tx1, but TUI listens on rx2. When first App is dropped, rx1 is dropped → **"channel closed" error**.
+
+### Evidence from Logs
+
+Your LM Studio logs showed this pattern repeating:
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Create test.txt" },
+    {
+      "role": "assistant",
+      "tool_calls": [{
+        "id": "164782580",
+        "function": { "name": "write_file", "arguments": "..." }
+      }]
+    },
+    {
+      "role": "tool",
+      "content": "Approval request failed: Internal error: Failed to send approval request: channel closed",
+      "tool_call_id": "164782580"
+    },
+    // ✅ Tool result IS being sent (Bug #2 fixed!)
+    // ❌ BUT approval failed (Bug #3)
+
+    // LLM tries again with different path...
+    {
+      "role": "assistant",
+      "tool_calls": [{
+        "id": "874339704",
+        "function": { "name": "write_file", "arguments": "{\"path\":\"/home/yourusername/test.txt\"...}" }
+      }]
+    },
+    {
+      "role": "tool",
+      "content": "Approval request failed: Internal error: Failed to send approval request: channel closed",
+      "tool_call_id": "874339704"
+    },
+    // Loop continues...
+  ]
+}
+```
+
+## Solution #3
+
+**Changed:** `src/cli/mod.rs` line 408 and added `src/tui/app.rs` method
+
+### 3.1 Added set_agent_service() Method
+
+Added a method to update agent service WITHOUT creating a new App (which would create a new EventHandler):
+
+```rust
+// src/tui/app.rs
+impl App {
+    /// Set agent service (used to inject configured agent after app creation)
+    pub fn set_agent_service(&mut self, agent_service: Arc<AgentService>) {
+        self.agent_service = agent_service;
+    }
+}
+```
+
+### 3.2 Changed CLI to Preserve Event Channels
+
+**Before (BROKEN):** Created new App, breaking event channels
+```rust
+// Create agent service with approval callback
+let agent_service = Arc::new(
+    AgentService::new(provider.clone(), service_context.clone())
+        .with_tool_registry(Arc::new(tool_registry))
+        .with_approval_callback(Some(approval_callback)),
+);
+
+// ❌ Creates NEW App with NEW event channels!
+app = tui::App::new(agent_service, service_context.clone());
+```
+
+**After (FIXED):** Update existing App, preserving event channels
+```rust
+// Create agent service with approval callback
+let agent_service = Arc::new(
+    AgentService::new(provider.clone(), service_context.clone())
+        .with_tool_registry(Arc::new(tool_registry))
+        .with_approval_callback(Some(approval_callback)),
+);
+
+// ✅ Update agent service without recreating App!
+app.set_agent_service(agent_service);
+```
+
+**Impact:**
+- ✅ Approval callback and TUI now use the SAME event channel
+- ✅ Approval dialogs now display correctly
+- ✅ Tool execution completes successfully after approval
+- ✅ No more "channel closed" errors
+- ✅ Stops infinite loop caused by approval failures
+
+---
 
 ## Testing the Fix
 
@@ -133,7 +372,9 @@ Press `A` to approve.
 
 ## What You Should See in LM Studio Logs Now
 
-**BEFORE fix:**
+### Initial Request (After Fix #1)
+
+**BEFORE fix #1:**
 ```json
 {
   "model": "...",
@@ -143,13 +384,13 @@ Press `A` to approve.
 }
 ```
 
-**AFTER fix:**
+**AFTER fix #1:**
 ```json
 {
   "model": "...",
   "messages": [...],
   "max_tokens": 4096,
-  "tools": [
+  "tools": [  // ✅ Tools now included!
     {
       "type": "function",
       "function": {
@@ -178,15 +419,15 @@ Press `A` to approve.
 }
 ```
 
-And the LLM response might include:
+**LLM Response (calls tool):**
 ```json
 {
   "message": {
     "role": "assistant",
     "content": "",
-    "tool_calls": [
+    "tool_calls": [  // ✅ LLM now generates tool calls!
       {
-        "id": "call_123",
+        "id": "call_abc123",
         "type": "function",
         "function": {
           "name": "write_file",
@@ -194,6 +435,57 @@ And the LLM response might include:
         }
       }
     ]
+  }
+}
+```
+
+### Tool Result Sent Back (After Fix #2)
+
+**BEFORE fix #2 (BROKEN):**
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Create hello.txt" },
+    { "role": "assistant", "content": "", "tool_calls": [...] },
+    { "role": "assistant", "content": "" },  // ❌ EMPTY! Tool result lost
+    { "role": "user", "content": "" }        // ❌ EMPTY! Infinite loop
+  ]
+}
+```
+
+**AFTER fix #2 (CORRECT):**
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Create hello.txt" },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [{
+        "id": "call_abc123",
+        "type": "function",
+        "function": {
+          "name": "write_file",
+          "arguments": "{\"path\":\"hello.txt\",\"content\":\"Hello World\"}"
+        }
+      }]
+    },
+    {
+      "role": "tool",               // ✅ Correct role for tool results
+      "tool_call_id": "call_abc123", // ✅ Links to the tool call
+      "content": "File written successfully: hello.txt (12 bytes)"  // ✅ Tool result!
+    }
+  ],
+  "tools": [...]
+}
+```
+
+**Final LLM Response:**
+```json
+{
+  "message": {
+    "role": "assistant",
+    "content": "✅ I've created hello.txt with the content 'Hello World'"
   }
 }
 ```
@@ -435,23 +727,60 @@ Crustly: [Calls bash: cargo run]
 
 ## Related Files
 
-- **Fixed:** `src/tui/app.rs` (line 398)
+- **Fixed:** `src/tui/app.rs` (line 398, added set_agent_service method)
+- **Fixed:** `src/llm/provider/openai.rs` (lines 119-274)
+- **Fixed:** `src/cli/mod.rs` (line 408)
 - **Tool System:** `src/llm/tools/`
 - **Agent Service:** `src/llm/agent/service.rs`
-- **OpenAI Provider:** `src/llm/provider/openai.rs`
 
 ## Summary
 
-This fix enables **full tool support** for local LLMs by ensuring tool definitions are sent in every request. Your Qwen 2.5 Coder 7B model can now:
+### What Was Fixed
 
-- ✅ Create and modify files
-- ✅ Read project files
-- ✅ Execute shell commands
-- ✅ Generate code with context
-- ✅ Run tests and builds
+**Three critical bugs** prevented tools from working with local LLMs:
 
-All with **interactive approval** for dangerous operations and **100% local privacy**.
+1. **Bug #1 - Tools Not Sent:** `src/tui/app.rs` called wrong method
+   - Fix: Changed `send_message()` → `send_message_with_tools()`
+   - Result: Tool definitions now sent to LLM in every request
+
+2. **Bug #2 - Tool Results Lost:** `src/llm/provider/openai.rs` ignored tool results
+   - Fix: Rewrote message conversion to handle all ContentBlock types
+   - Result: Tool results properly sent back to LLM, stopping infinite loop
+
+3. **Bug #3 - Approval Channels Broken:** `src/cli/mod.rs` created App twice, breaking event channels
+   - Fix: Added `App::set_agent_service()` to update agent without recreating App
+   - Result: Approval callback and TUI use same channel, approval dialogs work
+
+### What Works Now
+
+Your Qwen 2.5 Coder 7B model (or any OpenAI-compatible local LLM) can now:
+
+- ✅ **Create and modify files** - Full write_file tool support
+- ✅ **Read project files** - Full read_file tool support
+- ✅ **Execute shell commands** - Full bash tool support
+- ✅ **Generate code with context** - Understands your codebase
+- ✅ **Run tests and builds** - Complete development workflow
+- ✅ **Interactive approval** - Security dialogs for dangerous operations
+- ✅ **100% local privacy** - All processing stays on your machine
+
+### Files Modified
+
+1. `src/tui/app.rs` - Multiple fixes:
+   - Line 398: Use send_message_with_tools() (Bug #1)
+   - Added set_agent_service() method (Bug #3)
+
+2. `src/llm/provider/openai.rs:119-274` - Handle all ContentBlock types (Bug #2)
+   - Updated OpenAIMessage struct (content optional, added tool_call_id)
+   - Rewrote to_openai_request() to convert ToolResult to role="tool"
+
+3. `src/cli/mod.rs:408` - Use set_agent_service() instead of recreating App (Bug #3)
+
+### Commits
+
+- **Fix #1:** "Fix: Convert OpenAI tool_calls to ContentBlock::ToolUse"
+- **Fix #2:** "Fix: Send tool results back to LLM to stop infinite loop"
+- **Fix #3:** "Fix: Preserve event channels when setting agent service"
 
 ---
 
-**Enjoy your now-functional AI coding assistant!** 🚀
+**Enjoy your now-fully-functional AI coding assistant!** 🚀

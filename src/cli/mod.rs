@@ -6,6 +6,40 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
 
+/// System prompt that encourages proactive tool usage for codebase exploration
+const SYSTEM_PROMPT: &str = r#"You are Crustly, an AI assistant with powerful tools to help with software development tasks.
+
+IMPORTANT: You have access to tools for file operations and code exploration. USE THEM PROACTIVELY!
+
+When asked to analyze or explore a codebase:
+1. Use 'ls' tool with recursive=true to list all directories and files
+2. Use 'glob' tool with patterns like "**/*.rs", "**/*.toml", "**/*.md" to find files
+3. Use 'grep' tool to search for patterns, functions, or keywords in code
+4. Use 'read_file' tool to read specific files you've identified
+5. Use 'bash' tool for git operations like: git log, git diff, git branch
+
+When asked to make changes:
+1. Use 'read_file' first to understand the current code
+2. Use 'edit_file' to modify existing files
+3. Use 'write_file' to create new files
+4. Use 'bash' to run tests or build commands
+
+Available tools and when to use them:
+- ls: List directory contents (use recursive=true for deep exploration)
+- glob: Find files matching patterns (e.g., "**/*.rs" for all Rust files)
+- grep: Search for text/patterns in files (use for finding functions, TODOs, etc.)
+- read_file: Read file contents
+- edit_file: Modify existing files
+- write_file: Create new files
+- bash: Run shell commands (git, cargo, npm, etc.)
+- execute_code: Test code snippets
+- web_search: Search the internet for documentation
+- http_request: Call external APIs
+- task_manager: Track multi-step work
+- session_context: Remember important facts
+
+ALWAYS explore first before answering questions about a codebase. Don't guess - use the tools!"#;
+
 /// Crustly - High-Performance Terminal AI Assistant
 #[derive(Parser, Debug)]
 #[command(name = "crustly")]
@@ -74,6 +108,12 @@ pub enum DbCommands {
     Init,
     /// Show database statistics
     Stats,
+    /// Clear all sessions and messages from database
+    Clear {
+        /// Skip confirmation prompt (use with caution)
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -246,13 +286,76 @@ async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result
                 .fetch_one(db.pool())
                 .await?;
 
-            let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tracked_files")
+            let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM files")
                 .fetch_one(db.pool())
                 .await?;
 
             println!("Sessions: {}", session_count);
             println!("Messages: {}", message_count);
-            println!("Tracked files: {}", file_count);
+            println!("Files: {}", file_count);
+
+            Ok(())
+        }
+        DbCommands::Clear { force } => {
+            let db = Database::connect(&config.database.path).await?;
+
+            // Get counts before clearing
+            let session_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
+                .fetch_one(db.pool())
+                .await?;
+
+            let message_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages")
+                .fetch_one(db.pool())
+                .await?;
+
+            let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM files")
+                .fetch_one(db.pool())
+                .await?;
+
+            if session_count == 0 && message_count == 0 && file_count == 0 {
+                println!("✨ Database is already empty");
+                return Ok(());
+            }
+
+            println!("⚠️  WARNING: This will permanently delete ALL data:\n");
+            println!("   • {} sessions", session_count);
+            println!("   • {} messages", message_count);
+            println!("   • {} files", file_count);
+            println!();
+
+            // Confirmation prompt
+            if !force {
+                use std::io::{self, Write};
+                print!("Type 'yes' to confirm deletion: ");
+                io::stdout().flush()?;
+
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+
+                if input.trim().to_lowercase() != "yes" {
+                    println!("❌ Cancelled - no data was deleted");
+                    return Ok(());
+                }
+            }
+
+            // Clear all tables
+            println!("\n🗑️  Clearing database...");
+
+            // Delete in correct order to respect foreign key constraints
+            sqlx::query("DELETE FROM messages")
+                .execute(db.pool())
+                .await?;
+
+            sqlx::query("DELETE FROM files")
+                .execute(db.pool())
+                .await?;
+
+            sqlx::query("DELETE FROM sessions")
+                .execute(db.pool())
+                .await?;
+
+            println!("✅ Successfully cleared {} sessions, {} messages, and {} files",
+                session_count, message_count, file_count);
 
             Ok(())
         }
@@ -266,7 +369,22 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         llm::{
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
-            tools::{bash::BashTool, read::ReadTool, registry::ToolRegistry, write::WriteTool},
+            tools::{
+                bash::BashTool,
+                code_exec::CodeExecTool,
+                context::ContextTool,
+                edit::EditTool,
+                glob::GlobTool,
+                grep::GrepTool,
+                http::HttpClientTool,
+                ls::LsTool,
+                notebook::NotebookEditTool,
+                read::ReadTool,
+                registry::ToolRegistry,
+                task::TaskTool,
+                web_search::WebSearchTool,
+                write::WriteTool,
+            },
         },
         services::ServiceContext,
         tui,
@@ -292,12 +410,24 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             // Local LLM (LM Studio, Ollama, etc.)
             tracing::info!("Using local LLM at: {}", base_url);
             println!("🏠 Using local LLM at: {}\n", base_url);
-            Arc::new(OpenAIProvider::local(base_url.clone()))
+            let mut provider = OpenAIProvider::local(base_url.clone());
+            if let Some(model) = &openai_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                println!("📦 Model: {}\n", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
         } else if let Some(api_key) = &openai_config.api_key {
             // Official OpenAI API
             tracing::info!("Using OpenAI provider");
             println!("🤖 Using OpenAI provider\n");
-            Arc::new(OpenAIProvider::new(api_key.clone()))
+            let mut provider = OpenAIProvider::new(api_key.clone());
+            if let Some(model) = &openai_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                println!("📦 Model: {}\n", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
         } else {
             // OpenAI configured but no credentials - fall back to Anthropic
             tracing::debug!("OpenAI configured but no credentials, falling back to Anthropic");
@@ -337,17 +467,36 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create tool registry
     tracing::debug!("Setting up tool registry");
     let mut tool_registry = ToolRegistry::new();
+    // Phase 1: Essential file operations
     tool_registry.register(Arc::new(ReadTool));
     tool_registry.register(Arc::new(WriteTool));
+    tool_registry.register(Arc::new(EditTool));
     tool_registry.register(Arc::new(BashTool));
+    tool_registry.register(Arc::new(LsTool));
+    tool_registry.register(Arc::new(GlobTool));
+    tool_registry.register(Arc::new(GrepTool));
+    // Phase 2: Advanced features
+    tool_registry.register(Arc::new(WebSearchTool));
+    tool_registry.register(Arc::new(CodeExecTool));
+    tool_registry.register(Arc::new(NotebookEditTool));
+    // Phase 3: Workflow & integration
+    tool_registry.register(Arc::new(TaskTool));
+    tool_registry.register(Arc::new(ContextTool));
+    tool_registry.register(Arc::new(HttpClientTool));
 
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
 
+    // Create agent service with system prompt
+    let agent_service = Arc::new(
+        AgentService::new(provider.clone(), service_context.clone())
+            .with_system_prompt(SYSTEM_PROMPT.to_string())
+    );
+
     // Create TUI app first (so we can get the event sender)
     tracing::debug!("Creating TUI app");
     let mut app = tui::App::new(
-        Arc::new(AgentService::new(provider.clone(), service_context.clone())),
+        agent_service,
         service_context.clone(),
     );
 
@@ -404,8 +553,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             .with_approval_callback(Some(approval_callback)),
     );
 
-    // Update app with the configured agent service
-    app = tui::App::new(agent_service, service_context.clone());
+    // Update app with the configured agent service (preserve event channels!)
+    app.set_agent_service(agent_service);
 
     // Run TUI
     tracing::debug!("Launching TUI");
@@ -428,7 +577,22 @@ async fn cmd_run(
         llm::{
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
-            tools::{bash::BashTool, read::ReadTool, registry::ToolRegistry, write::WriteTool},
+            tools::{
+                bash::BashTool,
+                code_exec::CodeExecTool,
+                context::ContextTool,
+                edit::EditTool,
+                glob::GlobTool,
+                grep::GrepTool,
+                http::HttpClientTool,
+                ls::LsTool,
+                notebook::NotebookEditTool,
+                read::ReadTool,
+                registry::ToolRegistry,
+                task::TaskTool,
+                web_search::WebSearchTool,
+                write::WriteTool,
+            },
         },
         services::{ServiceContext, SessionService},
     };
@@ -445,11 +609,21 @@ async fn cmd_run(
         if let Some(base_url) = &openai_config.base_url {
             // Local LLM (LM Studio, Ollama, etc.)
             tracing::info!("Using local LLM at: {}", base_url);
-            Arc::new(OpenAIProvider::local(base_url.clone()))
+            let mut provider = OpenAIProvider::local(base_url.clone());
+            if let Some(model) = &openai_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
         } else if let Some(api_key) = &openai_config.api_key {
             // Official OpenAI API
             tracing::info!("Using OpenAI provider");
-            Arc::new(OpenAIProvider::new(api_key.clone()))
+            let mut provider = OpenAIProvider::new(api_key.clone());
+            if let Some(model) = &openai_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
         } else {
             // Fall back to Anthropic
             let anthropic_config = config
@@ -483,14 +657,28 @@ async fn cmd_run(
 
     // Create tool registry
     let mut tool_registry = ToolRegistry::new();
+    // Phase 1: Essential file operations
     tool_registry.register(Arc::new(ReadTool));
     tool_registry.register(Arc::new(WriteTool));
+    tool_registry.register(Arc::new(EditTool));
     tool_registry.register(Arc::new(BashTool));
+    tool_registry.register(Arc::new(LsTool));
+    tool_registry.register(Arc::new(GlobTool));
+    tool_registry.register(Arc::new(GrepTool));
+    // Phase 2: Advanced features
+    tool_registry.register(Arc::new(WebSearchTool));
+    tool_registry.register(Arc::new(CodeExecTool));
+    tool_registry.register(Arc::new(NotebookEditTool));
+    // Phase 3: Workflow & integration
+    tool_registry.register(Arc::new(TaskTool));
+    tool_registry.register(Arc::new(ContextTool));
+    tool_registry.register(Arc::new(HttpClientTool));
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());
     let agent_service = AgentService::new(provider.clone(), service_context.clone())
-        .with_tool_registry(Arc::new(tool_registry));
+        .with_tool_registry(Arc::new(tool_registry))
+        .with_system_prompt(SYSTEM_PROMPT.to_string());
 
     // Create or get session
     let session_service = SessionService::new(service_context);

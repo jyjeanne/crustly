@@ -129,6 +129,11 @@ impl App {
         self.event_handler.sender()
     }
 
+    /// Set agent service (used to inject configured agent after app creation)
+    pub fn set_agent_service(&mut self, agent_service: Arc<AgentService>) {
+        self.agent_service = agent_service;
+    }
+
     /// Receive next event
     pub async fn next_event(&mut self) -> Option<TuiEvent> {
         self.event_handler.next().await
@@ -204,6 +209,8 @@ impl App {
                 self.pending_approval = None;
                 self.show_approval_details = false;
                 self.mode = AppMode::Chat;
+                // Auto-scroll to show tool execution result
+                self.scroll_offset = 0;
             }
             TuiEvent::Resize(_, _) | TuiEvent::AgentProcessing => {
                 // These are handled by the render loop
@@ -234,6 +241,11 @@ impl App {
 
         if keys::is_help(&event) {
             self.switch_mode(AppMode::Help).await?;
+            return Ok(());
+        }
+
+        if keys::is_clear_session(&event) {
+            self.clear_session().await?;
             return Ok(());
         }
 
@@ -275,9 +287,12 @@ impl App {
             self.input_buffer.clear();
             self.error_message = None;
         } else if keys::is_page_up(&event) {
-            self.scroll_offset = self.scroll_offset.saturating_sub(10);
-        } else if keys::is_page_down(&event) {
+            // Scroll up (away from bottom) to see older messages
             self.scroll_offset = self.scroll_offset.saturating_add(10);
+        } else if keys::is_page_down(&event) {
+            // Scroll down (toward bottom) to see newer messages
+            // When we reach 0, we're at the bottom (auto-scroll mode)
+            self.scroll_offset = self.scroll_offset.saturating_sub(10);
         } else {
             // Regular character input
             match event.code {
@@ -372,6 +387,24 @@ impl App {
         Ok(())
     }
 
+    /// Clear all messages from the current session
+    async fn clear_session(&mut self) -> Result<()> {
+        if let Some(session) = &self.current_session {
+            // Delete all messages from the database
+            self.message_service
+                .delete_messages_for_session(session.id)
+                .await?;
+
+            // Clear messages from UI
+            self.messages.clear();
+            self.scroll_offset = 0;
+            self.streaming_response = None;
+            self.error_message = None;
+        }
+
+        Ok(())
+    }
+
     /// Send a message to the agent
     async fn send_message(&mut self, content: String) -> Result<()> {
         if let Some(session) = &self.current_session {
@@ -388,6 +421,9 @@ impl App {
                 cost: None,
             };
             self.messages.push(user_msg);
+
+            // Auto-scroll to show the new user message
+            self.scroll_offset = 0;
 
             // Send to agent in background
             let agent_service = self.agent_service.clone();
@@ -418,6 +454,8 @@ impl App {
             response.push_str(&chunk);
         } else {
             self.streaming_response = Some(chunk);
+            // Auto-scroll when response starts streaming
+            self.scroll_offset = 0;
         }
     }
 
@@ -442,6 +480,17 @@ impl App {
         };
         self.messages.push(assistant_msg);
 
+        // Update session model if not already set
+        if let Some(session) = &mut self.current_session {
+            if session.model.is_none() {
+                session.model = Some(response.model.clone());
+                // Save the updated session to database
+                if let Err(e) = self.session_service.update_session(session).await {
+                    tracing::warn!("Failed to update session model: {}", e);
+                }
+            }
+        }
+
         // Auto-scroll to bottom
         self.scroll_offset = 0;
 
@@ -453,6 +502,8 @@ impl App {
         self.is_processing = false;
         self.streaming_response = None;
         self.error_message = Some(error);
+        // Auto-scroll to show the error
+        self.scroll_offset = 0;
     }
 
     /// Switch to a different mode

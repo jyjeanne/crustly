@@ -352,9 +352,14 @@ impl AgentService {
             }
 
             // Add tools if registry has any
-            if self.tool_registry.count() > 0 {
+            let tool_count = self.tool_registry.count();
+            tracing::debug!("Tool registry contains {} tools", tool_count);
+            if tool_count > 0 {
                 let tool_defs = self.tool_registry.get_tool_definitions();
+                tracing::debug!("Adding {} tool definitions to request", tool_defs.len());
                 request = request.with_tools(tool_defs);
+            } else {
+                tracing::warn!("No tools registered in tool registry!");
             }
 
             // Send to provider
@@ -369,6 +374,25 @@ impl AgentService {
             total_output_tokens += response.usage.output_tokens;
 
             // Check if response contains tool use
+            tracing::debug!("Response has {} content blocks", response.content.len());
+            for (i, block) in response.content.iter().enumerate() {
+                match block {
+                    ContentBlock::Text { text } => {
+                        tracing::debug!(
+                            "Block {}: Text ({}...)",
+                            i,
+                            &text.chars().take(50).collect::<String>()
+                        );
+                    }
+                    ContentBlock::ToolUse { id, name, input: _ } => {
+                        tracing::debug!("Block {}: ToolUse {{ name: {}, id: {} }}", i, name, id);
+                    }
+                    _ => {
+                        tracing::debug!("Block {}: Other content block", i);
+                    }
+                }
+            }
+
             let tool_uses: Vec<_> = response
                 .content
                 .iter()
@@ -381,8 +405,11 @@ impl AgentService {
                 })
                 .collect();
 
+            tracing::debug!("Found {} tool uses to execute", tool_uses.len());
+
             if tool_uses.is_empty() {
                 // No tool use - we're done
+                tracing::debug!("No tool uses found, completing with final response");
                 final_response = Some(response);
                 break;
             }
@@ -447,6 +474,43 @@ impl AgentService {
                                     continue;
                                 }
                                 tracing::info!("User approved tool '{}'", tool_name);
+                                // Create approved context for this tool execution
+                                let approved_tool_context = ToolExecutionContext {
+                                    session_id: tool_context.session_id,
+                                    working_directory: tool_context.working_directory.clone(),
+                                    env_vars: tool_context.env_vars.clone(),
+                                    auto_approve: true, // User approved this execution
+                                    timeout_secs: tool_context.timeout_secs,
+                                };
+
+                                // Execute the tool with approved context
+                                match self
+                                    .tool_registry
+                                    .execute(&tool_name, tool_input, &approved_tool_context)
+                                    .await
+                                {
+                                    Ok(result) => {
+                                        tool_results.push(ContentBlock::ToolResult {
+                                            tool_use_id: tool_id,
+                                            content: if result.success {
+                                                result.output
+                                            } else {
+                                                result.error.unwrap_or_else(|| {
+                                                    "Tool execution failed".to_string()
+                                                })
+                                            },
+                                            is_error: Some(!result.success),
+                                        });
+                                    }
+                                    Err(e) => {
+                                        tool_results.push(ContentBlock::ToolResult {
+                                            tool_use_id: tool_id,
+                                            content: format!("Tool execution error: {}", e),
+                                            is_error: Some(true),
+                                        });
+                                    }
+                                }
+                                continue; // Skip the normal execution path below
                             }
                             Err(e) => {
                                 tracing::error!("Approval callback error: {}", e);

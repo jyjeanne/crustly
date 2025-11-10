@@ -1,0 +1,54 @@
+# Crustly Configuration File
+# Copy this file to one of these locations:
+#   - Linux/macOS: ~/.config/crustly/config.toml or ~/crustly/config.toml
+#   - Windows: %APPDATA%\crustly\config.toml or crustly\config.toml
+
+[database]
+# Database file location (stores conversation history)
+path = "~/.crustly/crustly.db"
+
+[providers]
+# ========================================
+# OpenAI-Compatible Provider (Local LLMs)
+# ========================================
+# Use this for LM Studio, Ollama, LocalAI, etc.
+[providers.openai]
+enabled = true
+base_url = "http://localhost:1234/v1/chat/completions"  # LM Studio default
+# ⭐ IMPORTANT: Set this to match the model name loaded in LM Studio!
+# Common examples:
+#   - qwen2.5-coder-7b-instruct
+#   - codellama-7b-instruct
+#   - deepseek-coder-6.7b-instruct
+#   - llama-3.2-1b-instruct
+default_model = "qwen2.5-coder-7b-instruct"
+
+# Other local LLM servers:
+# Ollama: base_url = "http://localhost:11434/v1/chat/completions"
+# LocalAI: base_url = "http://localhost:8080/v1/chat/completions"
+
+# ========================================
+# Official OpenAI Provider
+# ========================================
+# [providers.openai]
+# enabled = true
+# api_key = "sk-..."  # Or use OPENAI_API_KEY environment variable
+# default_model = "gpt-4-turbo-preview"  # Optional: override default model
+
+# ========================================
+# Anthropic Provider (Claude)
+# ========================================
+# [providers.anthropic]
+# enabled = true
+# api_key = "sk-ant-..."  # Or use ANTHROPIC_API_KEY environment variable
+# default_model = "claude-3-5-sonnet-20240620"  # Optional: override default
+
+# ========================================
+# Tips for Using Local LLMs
+# ========================================
+# 1. Make sure LM Studio is running before starting Crustly
+# 2. Load a model in LM Studio first
+# 3. Set default_model to EXACTLY match the model name shown in LM Studio
+# 4. Increase context length in LM Studio if you get overflow errors:
+#    - Recommended: 8192 or higher
+#    - Location: LM Studio > Model Settings > Context Length

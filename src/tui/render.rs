@@ -114,12 +114,21 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
 fn render_chat(f: &mut Frame, app: &App, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
 
+    // Get the model name from the current session
+    let model_name = app
+        .current_session
+        .as_ref()
+        .and_then(|s| s.model.as_deref())
+        .unwrap_or("AI");
+
     for msg in &app.messages {
         // Add timestamp and role with better formatting
         let timestamp = msg.timestamp.format("%H:%M:%S");
+
+        // Build role text and style
         let (role_text, role_style, prefix) = if msg.role == "user" {
             (
-                "You",
+                "You".to_string(),
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
@@ -127,7 +136,7 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
             )
         } else {
             (
-                "🤖 Claude",
+                format!("🤖 {}", model_name),
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
@@ -161,7 +170,7 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
     if let Some(ref response) = app.streaming_response {
         lines.push(Line::from(vec![
             Span::styled(
-                "🤖 Claude ",
+                format!("🤖 {} ", model_name),
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
@@ -186,9 +195,21 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("Claude is thinking...", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("{} is thinking...", model_name),
+                Style::default().fg(Color::Yellow)
+            ),
         ]));
     }
+
+    // Calculate scroll offset for ratatui
+    // app.scroll_offset represents "lines scrolled up from the bottom"
+    // 0 = at the bottom (auto-scroll, showing latest messages)
+    // N = scrolled up N lines from the bottom (showing older messages)
+    let total_lines = lines.len();
+    let visible_height = area.height.saturating_sub(2) as usize; // Subtract borders
+    let max_scroll = total_lines.saturating_sub(visible_height);
+    let actual_scroll_offset = max_scroll.saturating_sub(app.scroll_offset);
 
     let chat = Paragraph::new(lines)
         .block(
@@ -203,7 +224,7 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
                 .border_style(Style::default().fg(Color::Cyan)),
         )
         .wrap(Wrap { trim: false })
-        .scroll((app.scroll_offset as u16, 0));
+        .scroll((actual_scroll_offset as u16, 0));
 
     f.render_widget(chat, area);
 }
@@ -305,7 +326,14 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
 }
 
 /// Render the help screen
-fn render_help(f: &mut Frame, _app: &App, area: Rect) {
+fn render_help(f: &mut Frame, app: &App, area: Rect) {
+    // Get the model name from the current session
+    let model_name = app
+        .current_session
+        .as_ref()
+        .and_then(|s| s.model.as_deref())
+        .unwrap_or("AI");
+
     let help_text = vec![
         Line::from(vec![
             Span::styled("🥐 ", Style::default().fg(Color::Rgb(218, 165, 32))),
@@ -365,6 +393,16 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled("Show this help screen", Style::default().fg(Color::White)),
         ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+K       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Clear current session messages", Style::default().fg(Color::White)),
+        ]),
         Line::from(""),
         Line::from(Span::styled(
             "╭─ CHAT MODE ───────────────────────────────────────────────╮",
@@ -380,7 +418,7 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
             ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                "Send your message to Claude",
+                format!("Send your message to {}", model_name),
                 Style::default().fg(Color::White),
             ),
         ]),
@@ -625,6 +663,12 @@ fn render_settings(f: &mut Frame, _app: &App, area: Rect) {
 /// Render the tool approval dialog
 fn render_approval(f: &mut Frame, app: &App, area: Rect) {
     if let Some(ref request) = app.pending_approval {
+        // Get the model name from the current session
+        let model_name = app
+            .current_session
+            .as_ref()
+            .and_then(|s| s.model.as_deref())
+            .unwrap_or("AI");
         // Center the dialog
         let dialog_chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -679,7 +723,7 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
             Line::from(""),
             Line::from(vec![
                 Span::styled(
-                    "Claude wants to use the tool: ",
+                    format!("{} wants to use the tool: ", model_name),
                     Style::default().fg(Color::White),
                 ),
                 Span::styled(
@@ -830,7 +874,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         format!(" [{}] Processing...", mode_text)
     } else {
         format!(
-            " [{}] Ready │ Ctrl+H: Help │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            " [{}] Ready │ Ctrl+H: Help │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
             mode_text
         )
     };

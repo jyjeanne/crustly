@@ -224,6 +224,11 @@ pub mod keys {
         key_matches(event, KeyCode::Char('h'), KeyModifiers::CONTROL)
     }
 
+    /// Ctrl+K - Clear current session
+    pub fn is_clear_session(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('k'), KeyModifiers::CONTROL)
+    }
+
     /// Ctrl+Enter - Submit
     pub fn is_submit(event: &KeyEvent) -> bool {
         event.code == KeyCode::Enter && event.modifiers.contains(KeyModifiers::CONTROL)

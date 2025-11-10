@@ -35,6 +35,7 @@ pub struct OpenAIProvider {
     api_key: String,
     base_url: String,
     client: Client,
+    custom_default_model: Option<String>,
 }
 
 impl OpenAIProvider {
@@ -52,6 +53,7 @@ impl OpenAIProvider {
             api_key,
             base_url: DEFAULT_OPENAI_API_URL.to_string(),
             client,
+            custom_default_model: None,
         }
     }
 
@@ -69,6 +71,7 @@ impl OpenAIProvider {
             api_key: "not-needed".to_string(),
             base_url,
             client,
+            custom_default_model: None,
         }
     }
 
@@ -86,7 +89,14 @@ impl OpenAIProvider {
             api_key,
             base_url,
             client,
+            custom_default_model: None,
         }
+    }
+
+    /// Set custom default model (useful for local LLMs with specific model names)
+    pub fn with_default_model(mut self, model: String) -> Self {
+        self.custom_default_model = Some(model);
+        self
     }
 
     /// Build request headers
@@ -119,7 +129,9 @@ impl OpenAIProvider {
         if let Some(system) = request.system {
             messages.push(OpenAIMessage {
                 role: "system".to_string(),
-                content: system,
+                content: Some(system),
+                tool_calls: None,
+                tool_call_id: None,
             });
         }
 
@@ -131,24 +143,86 @@ impl OpenAIProvider {
                 Role::System => "system",
             };
 
-            // Extract text from content blocks
-            let content: String = msg
-                .content
-                .iter()
-                .filter_map(|block| {
-                    if let ContentBlock::Text { text } = block {
-                        Some(text.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
+            // Separate content blocks by type
+            let mut text_parts = Vec::new();
+            let mut tool_uses = Vec::new();
+            let mut tool_results = Vec::new();
 
-            messages.push(OpenAIMessage {
-                role: role.to_string(),
-                content,
-            });
+            for block in msg.content {
+                match block {
+                    ContentBlock::Text { text } => {
+                        text_parts.push(text);
+                    }
+                    ContentBlock::ToolUse { id, name, input } => {
+                        tool_uses.push((id, name, input));
+                    }
+                    ContentBlock::ToolResult {
+                        tool_use_id,
+                        content,
+                        ..
+                    } => {
+                        tool_results.push((tool_use_id, content));
+                    }
+                    ContentBlock::Image { .. } => {
+                        // Skip images for now (OpenAI needs special handling)
+                        tracing::warn!("Image content blocks not yet supported for OpenAI");
+                    }
+                }
+            }
+
+            // Handle assistant messages with tool calls
+            if !tool_uses.is_empty() {
+                let openai_tool_calls = tool_uses
+                    .into_iter()
+                    .map(|(id, name, input)| OpenAIToolCall {
+                        id,
+                        r#type: "function".to_string(),
+                        function: OpenAIFunctionCall {
+                            name,
+                            arguments: serde_json::to_string(&input).unwrap_or_default(),
+                        },
+                    })
+                    .collect();
+
+                let content_str = if text_parts.is_empty() {
+                    None
+                } else {
+                    Some(text_parts.join("\n"))
+                };
+
+                messages.push(OpenAIMessage {
+                    role: role.to_string(),
+                    content: content_str,
+                    tool_calls: Some(openai_tool_calls),
+                    tool_call_id: None,
+                });
+            }
+            // Handle tool result messages
+            else if !tool_results.is_empty() {
+                for (tool_use_id, content) in tool_results {
+                    messages.push(OpenAIMessage {
+                        role: "tool".to_string(),
+                        content: Some(content),
+                        tool_calls: None,
+                        tool_call_id: Some(tool_use_id),
+                    });
+                }
+            }
+            // Handle regular text messages
+            else {
+                let content_str = if text_parts.is_empty() {
+                    Some(String::new())
+                } else {
+                    Some(text_parts.join("\n"))
+                };
+
+                messages.push(OpenAIMessage {
+                    role: role.to_string(),
+                    content: content_str,
+                    tool_calls: None,
+                    tool_call_id: None,
+                });
+            }
         }
 
         // Convert tools to OpenAI format
@@ -187,17 +261,53 @@ impl OpenAIProvider {
                 index: 0,
                 message: OpenAIMessage {
                     role: "assistant".to_string(),
-                    content: "".to_string(),
+                    content: Some(String::new()),
+                    tool_calls: None,
+                    tool_call_id: None,
                 },
                 finish_reason: Some("error".to_string()),
             });
 
         // Convert content to content blocks
         let mut content_blocks = Vec::new();
-        if !choice.message.content.is_empty() {
-            content_blocks.push(ContentBlock::Text {
-                text: choice.message.content,
-            });
+
+        // Add text content if present
+        if let Some(content) = choice.message.content {
+            if !content.is_empty() {
+                content_blocks.push(ContentBlock::Text { text: content });
+            }
+        }
+
+        // Convert tool_calls to ToolUse content blocks
+        if let Some(tool_calls) = choice.message.tool_calls {
+            tracing::debug!(
+                "Converting {} tool calls from OpenAI response",
+                tool_calls.len()
+            );
+            for tool_call in tool_calls {
+                // Parse arguments JSON string
+                let input =
+                    serde_json::from_str(&tool_call.function.arguments).unwrap_or_else(|e| {
+                        tracing::warn!(
+                            "Failed to parse tool arguments for {}: {}",
+                            tool_call.function.name,
+                            e
+                        );
+                        serde_json::json!({})
+                    });
+
+                tracing::debug!(
+                    "Converted tool call: {} with id {}",
+                    tool_call.function.name,
+                    tool_call.id
+                );
+
+                content_blocks.push(ContentBlock::ToolUse {
+                    id: tool_call.id,
+                    name: tool_call.function.name,
+                    input,
+                });
+            }
         }
 
         // Map finish_reason to StopReason
@@ -291,11 +401,18 @@ impl Provider for OpenAIProvider {
         let openai_request = self.to_openai_request(request);
         let retry_config = RetryConfig::default();
 
+        let tool_count = openai_request.tools.as_ref().map(|t| t.len()).unwrap_or(0);
         tracing::debug!(
-            "Sending OpenAI request to {} with model {}",
+            "Sending OpenAI request to {} with model {} and {} tools",
             self.base_url,
-            openai_request.model
+            openai_request.model,
+            tool_count
         );
+        if tool_count == 0 {
+            tracing::warn!(
+                "OpenAI request has NO tools - LLM won't know about file/bash operations!"
+            );
+        }
 
         // Retry the entire API call with exponential backoff
         retry_with_backoff(
@@ -416,7 +533,9 @@ impl Provider for OpenAIProvider {
     }
 
     fn default_model(&self) -> &str {
-        "gpt-4-turbo-preview"
+        self.custom_default_model
+            .as_deref()
+            .unwrap_or("gpt-4-turbo-preview")
     }
 
     fn supported_models(&self) -> Vec<String> {
@@ -479,7 +598,25 @@ struct OpenAIRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OpenAIMessage {
     role: String,
-    content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<OpenAIToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenAIToolCall {
+    id: String,
+    r#type: String,
+    function: OpenAIFunctionCall,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenAIFunctionCall {
+    name: String,
+    arguments: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
