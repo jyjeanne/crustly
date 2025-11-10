@@ -1,0 +1,18 @@
+# Crustly Configuration File
+# Save this as config.toml in your home directory or Crustly directory
+
+[database]
+# Database file location
+path = "~/.crustly/crustly.db"
+
+[providers]
+# OpenAI-compatible provider (for LM Studio, Ollama, etc.)
+[providers.openai]
+enabled = true
+base_url = "http://localhost:1234/v1/chat/completions"  # LM Studio default
+default_model = "qwen2.5-coder-7b-instruct"              # ⭐ CHANGE THIS to your loaded model name
+
+# Anthropic provider (if using Claude)
+# [providers.anthropic]
+# enabled = false
+# api_key = "your-key-here"  # Or use ANTHROPIC_API_KEY env var
