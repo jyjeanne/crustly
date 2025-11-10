@@ -153,7 +153,7 @@ impl Tool for CodeExecTool {
         // Write code to temp file
         fs::write(&temp_file, &input.code)
             .await
-            .map_err(|e| ToolError::Io(e))?;
+            .map_err(ToolError::Io)?;
 
         // Prepare command
         let mut cmd = Command::new(interpreter);
@@ -216,12 +216,12 @@ impl Tool for CodeExecTool {
         if !stdout.is_empty() {
             result_text.push_str("STDOUT:\n");
             result_text.push_str(&stdout);
-            result_text.push_str("\n");
+            result_text.push('\n');
         }
 
         if !stderr.is_empty() {
             if !stdout.is_empty() {
-                result_text.push_str("\n");
+                result_text.push('\n');
             }
             result_text.push_str("STDERR:\n");
             result_text.push_str(&stderr);

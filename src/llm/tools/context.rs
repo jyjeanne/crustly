@@ -353,7 +353,7 @@ impl Tool for ContextTool {
             }
 
             ContextOperation::Summary => {
-                let mut output = format!("Session Context Summary\n");
+                let mut output = "Session Context Summary\n".to_string();
                 output.push_str(&format!("Session ID: {}\n", store.session_id));
                 output.push_str(&format!(
                     "Created: {}\n",

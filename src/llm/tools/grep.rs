@@ -255,8 +255,8 @@ impl GrepTool {
                 // Add context before
                 if let Some(ctx) = input.context {
                     let start = line_num.saturating_sub(ctx);
-                    for i in start..line_num {
-                        result.push_str(&format!("\n  {}: {}", i + 1, lines[i]));
+                    for (i, line) in lines.iter().enumerate().skip(start).take(line_num - start) {
+                        result.push_str(&format!("\n  {}: {}", i + 1, line));
                     }
                 }
 
@@ -266,8 +266,8 @@ impl GrepTool {
                 // Add context after
                 if let Some(ctx) = input.context {
                     let end = (line_num + ctx + 1).min(lines.len());
-                    for i in (line_num + 1)..end {
-                        result.push_str(&format!("\n  {}: {}", i + 1, lines[i]));
+                    for (i, line) in lines.iter().enumerate().skip(line_num + 1).take(end - line_num - 1) {
+                        result.push_str(&format!("\n  {}: {}", i + 1, line));
                     }
                 }
 
