@@ -25,6 +25,7 @@ Cargo.lock
 *.pdb
 
 # Configuration and data
+crustly.toml
 crustly.json
 crustly.db
 crustly.db-shm
