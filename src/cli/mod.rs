@@ -335,7 +335,10 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         llm::{
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
-            tools::{bash::BashTool, read::ReadTool, registry::ToolRegistry, write::WriteTool},
+            tools::{
+                bash::BashTool, edit::EditTool, glob::GlobTool, grep::GrepTool, ls::LsTool,
+                read::ReadTool, registry::ToolRegistry, write::WriteTool,
+            },
         },
         services::ServiceContext,
         tui,
@@ -408,7 +411,11 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     let mut tool_registry = ToolRegistry::new();
     tool_registry.register(Arc::new(ReadTool));
     tool_registry.register(Arc::new(WriteTool));
+    tool_registry.register(Arc::new(EditTool));
     tool_registry.register(Arc::new(BashTool));
+    tool_registry.register(Arc::new(LsTool));
+    tool_registry.register(Arc::new(GlobTool));
+    tool_registry.register(Arc::new(GrepTool));
 
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
@@ -497,7 +504,10 @@ async fn cmd_run(
         llm::{
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
-            tools::{bash::BashTool, read::ReadTool, registry::ToolRegistry, write::WriteTool},
+            tools::{
+                bash::BashTool, edit::EditTool, glob::GlobTool, grep::GrepTool, ls::LsTool,
+                read::ReadTool, registry::ToolRegistry, write::WriteTool,
+            },
         },
         services::{ServiceContext, SessionService},
     };
@@ -554,7 +564,11 @@ async fn cmd_run(
     let mut tool_registry = ToolRegistry::new();
     tool_registry.register(Arc::new(ReadTool));
     tool_registry.register(Arc::new(WriteTool));
+    tool_registry.register(Arc::new(EditTool));
     tool_registry.register(Arc::new(BashTool));
+    tool_registry.register(Arc::new(LsTool));
+    tool_registry.register(Arc::new(GlobTool));
+    tool_registry.register(Arc::new(GrepTool));
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());

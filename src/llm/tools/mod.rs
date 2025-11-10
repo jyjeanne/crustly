@@ -11,6 +11,10 @@ mod r#trait;
 pub mod bash;
 pub mod read;
 pub mod write;
+pub mod edit;
+pub mod ls;
+pub mod glob;
+pub mod grep;
 
 // Re-exports
 pub use error::{Result, ToolError};
