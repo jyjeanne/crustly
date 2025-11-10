@@ -404,8 +404,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             .with_approval_callback(Some(approval_callback)),
     );
 
-    // Update app with the configured agent service
-    app = tui::App::new(agent_service, service_context.clone());
+    // Update app with the configured agent service (preserve event channels!)
+    app.set_agent_service(agent_service);
 
     // Run TUI
     tracing::debug!("Launching TUI");

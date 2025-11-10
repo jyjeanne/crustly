@@ -129,6 +129,11 @@ impl App {
         self.event_handler.sender()
     }
 
+    /// Set agent service (used to inject configured agent after app creation)
+    pub fn set_agent_service(&mut self, agent_service: Arc<AgentService>) {
+        self.agent_service = agent_service;
+    }
+
     /// Receive next event
     pub async fn next_event(&mut self) -> Option<TuiEvent> {
         self.event_handler.next().await
