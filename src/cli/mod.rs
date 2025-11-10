@@ -6,6 +6,40 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
 
+/// System prompt that encourages proactive tool usage for codebase exploration
+const SYSTEM_PROMPT: &str = r#"You are Crustly, an AI assistant with powerful tools to help with software development tasks.
+
+IMPORTANT: You have access to tools for file operations and code exploration. USE THEM PROACTIVELY!
+
+When asked to analyze or explore a codebase:
+1. Use 'ls' tool with recursive=true to list all directories and files
+2. Use 'glob' tool with patterns like "**/*.rs", "**/*.toml", "**/*.md" to find files
+3. Use 'grep' tool to search for patterns, functions, or keywords in code
+4. Use 'read_file' tool to read specific files you've identified
+5. Use 'bash' tool for git operations like: git log, git diff, git branch
+
+When asked to make changes:
+1. Use 'read_file' first to understand the current code
+2. Use 'edit_file' to modify existing files
+3. Use 'write_file' to create new files
+4. Use 'bash' to run tests or build commands
+
+Available tools and when to use them:
+- ls: List directory contents (use recursive=true for deep exploration)
+- glob: Find files matching patterns (e.g., "**/*.rs" for all Rust files)
+- grep: Search for text/patterns in files (use for finding functions, TODOs, etc.)
+- read_file: Read file contents
+- edit_file: Modify existing files
+- write_file: Create new files
+- bash: Run shell commands (git, cargo, npm, etc.)
+- execute_code: Test code snippets
+- web_search: Search the internet for documentation
+- http_request: Call external APIs
+- task_manager: Track multi-step work
+- session_context: Remember important facts
+
+ALWAYS explore first before answering questions about a codebase. Don't guess - use the tools!"#;
+
 /// Crustly - High-Performance Terminal AI Assistant
 #[derive(Parser, Debug)]
 #[command(name = "crustly")]
@@ -453,10 +487,16 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
 
+    // Create agent service with system prompt
+    let agent_service = Arc::new(
+        AgentService::new(provider.clone(), service_context.clone())
+            .with_system_prompt(SYSTEM_PROMPT.to_string())
+    );
+
     // Create TUI app first (so we can get the event sender)
     tracing::debug!("Creating TUI app");
     let mut app = tui::App::new(
-        Arc::new(AgentService::new(provider.clone(), service_context.clone())),
+        agent_service,
         service_context.clone(),
     );
 
@@ -637,7 +677,8 @@ async fn cmd_run(
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());
     let agent_service = AgentService::new(provider.clone(), service_context.clone())
-        .with_tool_registry(Arc::new(tool_registry));
+        .with_tool_registry(Arc::new(tool_registry))
+        .with_system_prompt(SYSTEM_PROMPT.to_string());
 
     // Create or get session
     let session_service = SessionService::new(service_context);
