@@ -384,7 +384,7 @@ impl AgentService {
                             &text.chars().take(50).collect::<String>()
                         );
                     }
-                    ContentBlock::ToolUse { id, name, input } => {
+                    ContentBlock::ToolUse { id, name, input: _ } => {
                         tracing::debug!("Block {}: ToolUse {{ name: {}, id: {} }}", i, name, id);
                     }
                     _ => {
