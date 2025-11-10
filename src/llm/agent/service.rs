@@ -378,7 +378,11 @@ impl AgentService {
             for (i, block) in response.content.iter().enumerate() {
                 match block {
                     ContentBlock::Text { text } => {
-                        tracing::debug!("Block {}: Text ({}...)", i, &text.chars().take(50).collect::<String>());
+                        tracing::debug!(
+                            "Block {}: Text ({}...)",
+                            i,
+                            &text.chars().take(50).collect::<String>()
+                        );
                     }
                     ContentBlock::ToolUse { id, name, input } => {
                         tracing::debug!("Block {}: ToolUse {{ name: {}, id: {} }}", i, name, id);
