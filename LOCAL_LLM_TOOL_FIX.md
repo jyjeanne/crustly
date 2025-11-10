@@ -4,14 +4,15 @@
 **Status:** ✅ FULLY FIXED
 **Fixed:** Tools now work with local LLMs (LM Studio, Ollama, etc.)
 
-## ⚠️ IMPORTANT: TWO Bugs Were Fixed
+## ⚠️ IMPORTANT: THREE Bugs Were Fixed
 
-This document describes **TWO critical bugs** that prevented tools from working with local LLMs:
+This document describes **THREE critical bugs** that prevented tools from working with local LLMs:
 
-1. **Bug #1 (Fixed):** Tools not sent to LLM → Tools definitions missing from requests
+1. **Bug #1 (Fixed):** Tools not sent to LLM → Tool definitions missing from requests
 2. **Bug #2 (Fixed):** Infinite loop with empty messages → Tool results not sent back to LLM
+3. **Bug #3 (Fixed):** Approval requests fail with "channel closed" → Event channels broken during initialization
 
-**Both bugs are now fixed!** Follow the testing instructions below to verify.
+**All three bugs are now fixed!** Follow the testing instructions below to verify.
 
 ---
 
@@ -164,6 +165,120 @@ if !tool_results.is_empty() {
 - ✅ Enables full tool execution flow
 - ✅ Local LLMs can now complete tool operations
 - ✅ Also handles ToolUse blocks (for when agent replies contain tool calls)
+
+---
+
+## Problem #3: Approval Requests Fail with "Channel Closed"
+
+After fixing Bugs #1 and #2, tools were being sent AND tool results were being returned properly, BUT:
+- ❌ Every tool execution failed with: `"Approval request failed: Internal error: Failed to send approval request: channel closed"`
+- ❌ No approval dialog appeared
+- ❌ Tools kept failing in an infinite loop
+- ❌ LLM kept retrying with different paths and methods
+
+**Root Cause:** The CLI initialization code had a critical architectural bug where it created the App TWICE:
+
+1. Create first App → EventHandler with channel (tx1, rx1)
+2. Get event_sender from first app → capture tx1
+3. Create approval callback that captures tx1
+4. Create new AgentService with approval callback
+5. **Create SECOND App** → NEW EventHandler with NEW channel (tx2, rx2)
+6. Run TUI listening on rx2
+
+The problem: approval callback sends to tx1, but TUI listens on rx2. When first App is dropped, rx1 is dropped → **"channel closed" error**.
+
+### Evidence from Logs
+
+Your LM Studio logs showed this pattern repeating:
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Create test.txt" },
+    {
+      "role": "assistant",
+      "tool_calls": [{
+        "id": "164782580",
+        "function": { "name": "write_file", "arguments": "..." }
+      }]
+    },
+    {
+      "role": "tool",
+      "content": "Approval request failed: Internal error: Failed to send approval request: channel closed",
+      "tool_call_id": "164782580"
+    },
+    // ✅ Tool result IS being sent (Bug #2 fixed!)
+    // ❌ BUT approval failed (Bug #3)
+
+    // LLM tries again with different path...
+    {
+      "role": "assistant",
+      "tool_calls": [{
+        "id": "874339704",
+        "function": { "name": "write_file", "arguments": "{\"path\":\"/home/yourusername/test.txt\"...}" }
+      }]
+    },
+    {
+      "role": "tool",
+      "content": "Approval request failed: Internal error: Failed to send approval request: channel closed",
+      "tool_call_id": "874339704"
+    },
+    // Loop continues...
+  ]
+}
+```
+
+## Solution #3
+
+**Changed:** `src/cli/mod.rs` line 408 and added `src/tui/app.rs` method
+
+### 3.1 Added set_agent_service() Method
+
+Added a method to update agent service WITHOUT creating a new App (which would create a new EventHandler):
+
+```rust
+// src/tui/app.rs
+impl App {
+    /// Set agent service (used to inject configured agent after app creation)
+    pub fn set_agent_service(&mut self, agent_service: Arc<AgentService>) {
+        self.agent_service = agent_service;
+    }
+}
+```
+
+### 3.2 Changed CLI to Preserve Event Channels
+
+**Before (BROKEN):** Created new App, breaking event channels
+```rust
+// Create agent service with approval callback
+let agent_service = Arc::new(
+    AgentService::new(provider.clone(), service_context.clone())
+        .with_tool_registry(Arc::new(tool_registry))
+        .with_approval_callback(Some(approval_callback)),
+);
+
+// ❌ Creates NEW App with NEW event channels!
+app = tui::App::new(agent_service, service_context.clone());
+```
+
+**After (FIXED):** Update existing App, preserving event channels
+```rust
+// Create agent service with approval callback
+let agent_service = Arc::new(
+    AgentService::new(provider.clone(), service_context.clone())
+        .with_tool_registry(Arc::new(tool_registry))
+        .with_approval_callback(Some(approval_callback)),
+);
+
+// ✅ Update agent service without recreating App!
+app.set_agent_service(agent_service);
+```
+
+**Impact:**
+- ✅ Approval callback and TUI now use the SAME event channel
+- ✅ Approval dialogs now display correctly
+- ✅ Tool execution completes successfully after approval
+- ✅ No more "channel closed" errors
+- ✅ Stops infinite loop caused by approval failures
 
 ---
 
@@ -612,16 +727,17 @@ Crustly: [Calls bash: cargo run]
 
 ## Related Files
 
-- **Fixed:** `src/tui/app.rs` (line 398)
+- **Fixed:** `src/tui/app.rs` (line 398, added set_agent_service method)
+- **Fixed:** `src/llm/provider/openai.rs` (lines 119-274)
+- **Fixed:** `src/cli/mod.rs` (line 408)
 - **Tool System:** `src/llm/tools/`
 - **Agent Service:** `src/llm/agent/service.rs`
-- **OpenAI Provider:** `src/llm/provider/openai.rs`
 
 ## Summary
 
 ### What Was Fixed
 
-**Two critical bugs** prevented tools from working with local LLMs:
+**Three critical bugs** prevented tools from working with local LLMs:
 
 1. **Bug #1 - Tools Not Sent:** `src/tui/app.rs` called wrong method
    - Fix: Changed `send_message()` → `send_message_with_tools()`
@@ -630,6 +746,10 @@ Crustly: [Calls bash: cargo run]
 2. **Bug #2 - Tool Results Lost:** `src/llm/provider/openai.rs` ignored tool results
    - Fix: Rewrote message conversion to handle all ContentBlock types
    - Result: Tool results properly sent back to LLM, stopping infinite loop
+
+3. **Bug #3 - Approval Channels Broken:** `src/cli/mod.rs` created App twice, breaking event channels
+   - Fix: Added `App::set_agent_service()` to update agent without recreating App
+   - Result: Approval callback and TUI use same channel, approval dialogs work
 
 ### What Works Now
 
@@ -645,15 +765,21 @@ Your Qwen 2.5 Coder 7B model (or any OpenAI-compatible local LLM) can now:
 
 ### Files Modified
 
-1. `src/tui/app.rs:398` - Use send_message_with_tools()
-2. `src/llm/provider/openai.rs:519-215` - Handle all ContentBlock types
+1. `src/tui/app.rs` - Multiple fixes:
+   - Line 398: Use send_message_with_tools() (Bug #1)
+   - Added set_agent_service() method (Bug #3)
+
+2. `src/llm/provider/openai.rs:119-274` - Handle all ContentBlock types (Bug #2)
    - Updated OpenAIMessage struct (content optional, added tool_call_id)
    - Rewrote to_openai_request() to convert ToolResult to role="tool"
+
+3. `src/cli/mod.rs:408` - Use set_agent_service() instead of recreating App (Bug #3)
 
 ### Commits
 
 - **Fix #1:** "Fix: Convert OpenAI tool_calls to ContentBlock::ToolUse"
 - **Fix #2:** "Fix: Send tool results back to LLM to stop infinite loop"
+- **Fix #3:** "Fix: Preserve event channels when setting agent service"
 
 ---
 
