@@ -678,6 +678,12 @@ Use: Code generation, debugging
 
 #### Problem: "Connection refused" error
 
+**Symptoms:**
+```
+Error: Connection refused at http://localhost:1234/v1/chat/completions
+Failed to connect to local LLM server
+```
+
 **Solution:**
 ```bash
 # 1. Verify LM Studio server is running
@@ -687,8 +693,242 @@ curl http://localhost:1234/v1/models
 # In LM Studio: Server tab → verify port number
 
 # 3. Make sure config.toml has correct URL
-base_url = "http://localhost:1234/v1"
+base_url = "http://localhost:1234/v1/chat/completions"  # Include full path
+
+# 4. Verify LM Studio server is actually started
+# In LM Studio: Click "Start Server" button (should show green "Running")
 ```
+
+**Common causes:**
+- LM Studio server not started (click "Start Server" in LM Studio)
+- Wrong port number in config
+- Firewall blocking localhost connections
+- LM Studio crashed or frozen
+
+---
+
+#### Problem: "Invalid model identifier" error ⚠️ COMMON
+
+**Symptoms:**
+```
+Error: Invalid model identifier 'gpt-4-turbo-preview'
+LM Studio logs: Model 'gpt-4-turbo-preview' not found
+```
+
+**Root Cause:** The `default_model` in your `crustly.toml` doesn't match the loaded model in LM Studio.
+
+**Solution:**
+
+1. **Find the EXACT model name in LM Studio:**
+   - Open LM Studio
+   - Go to **"Local Server"** tab
+   - Look at the **"Currently Loaded Model"** field
+   - Copy the model name **EXACTLY** (case-sensitive!)
+
+   **Example model names:**
+   - `qwen2.5-coder-7b-instruct` ✅
+   - `mistral-7b-instruct-v0.2.Q4_K_M.gguf` ✅
+   - `llama-3.2-1b-instruct` ✅
+
+2. **Update your `crustly.toml`:**
+   ```toml
+   [providers.openai]
+   enabled = true
+   base_url = "http://localhost:1234/v1/chat/completions"
+   default_model = "qwen2.5-coder-7b-instruct"  # ⭐ EXACT match required!
+   ```
+
+3. **Verify the fix:**
+   ```bash
+   # Check Crustly picked up the correct model
+   cargo run -- config
+
+   # Look for your model name in the output:
+   # Providers:
+   #   - openai: qwen2.5-coder-7b-instruct  <-- Should match LM Studio
+   ```
+
+4. **Test it:**
+   ```bash
+   cargo run -- run "Hello, can you introduce yourself?"
+
+   # Should work now! ✅
+   ```
+
+**Important Notes:**
+- Model name is **case-sensitive**
+- Must include version numbers and quantization if shown
+- Don't use generic names like "local-model" or "gpt-4"
+- The name in `crustly.toml` must match LM Studio **exactly**
+
+---
+
+#### Problem: Context size / Context length overflow ⚠️ VERY COMMON
+
+**Symptoms:**
+```
+Error: Context length exceeded
+Error: Maximum context size is 2048, but 3542 tokens were provided
+LM Studio shows: "Context overflow" or stops responding
+```
+
+**Root Cause:** Your conversation history + new message exceeds the model's context window.
+
+**Solution 1: Increase Context Length in LM Studio (RECOMMENDED)**
+
+This is the **best long-term solution**:
+
+1. **Open LM Studio Settings:**
+   - Click the **⚙️ Settings** icon (top-right)
+   - Or go to **"Local Server"** tab → **"Server Options"**
+
+2. **Find "Context Length" or "Max Context":**
+   - Look for a field labeled:
+     - "Context Length"
+     - "Max Context Tokens"
+     - "n_ctx"
+     - "Context Window"
+
+3. **Increase the value:**
+   ```
+   Current: 2048   ❌ Too small
+   Recommended: 8192   ✅ Good for most tasks
+   Maximum: 16384  ✅ Best (if your hardware supports it)
+   ```
+
+   **Guidelines:**
+   - **Minimum:** 4096 (for basic conversations)
+   - **Recommended:** 8192 (for development tasks)
+   - **Optimal:** 16384 or 32768 (for large codebases)
+
+4. **Apply and Restart:**
+   - Click "Apply" or "Save"
+   - **Stop and restart** the LM Studio server:
+     1. Click "Stop Server"
+     2. Wait 2 seconds
+     3. Click "Start Server"
+
+5. **Verify in Crustly:**
+   ```bash
+   cargo run
+   # Send a longer message
+   # Should work now! ✅
+   ```
+
+**Visual Guide (LM Studio):**
+```
+┌─────────────────────────────────────────┐
+│ LM Studio - Server Options             │
+├─────────────────────────────────────────┤
+│                                         │
+│ Model: qwen2.5-coder-7b-instruct       │
+│                                         │
+│ Context Length: [8192     ] ⭐         │
+│                  ▲                      │
+│              Change this!               │
+│                                         │
+│ Temperature: 0.7                        │
+│ Max Tokens: 2048                        │
+│                                         │
+│ [Apply Settings]  [Start Server]       │
+└─────────────────────────────────────────┘
+```
+
+---
+
+**Solution 2: Start a New Session in Crustly (Quick Fix)**
+
+If you can't increase context length, clear the conversation history:
+
+```bash
+# In Crustly TUI:
+# Press Ctrl+N to start a new session
+# This clears the conversation history
+
+# Or from command line:
+cargo run  # Start fresh
+```
+
+**Why this works:** New sessions have no history, so context usage is minimal.
+
+---
+
+**Solution 3: Use a Model with Larger Context**
+
+Some models have larger context windows by default:
+
+| Model | Default Context | Max Context |
+|-------|----------------|-------------|
+| Mistral-7B | 8192 | 32768 |
+| Llama-3.2 | 8192 | 131072 |
+| Qwen-2.5 | 8192 | 32768 |
+| CodeLlama | 16384 | 100000 |
+
+Download a model with a larger context window in LM Studio.
+
+---
+
+**Solution 4: Reduce Message Length**
+
+Send shorter messages:
+```
+❌ Bad: Paste 5000 lines of code and ask "explain this"
+✅ Good: "Read src/main.rs and explain the main function"
+```
+
+Let Crustly use tools to read files instead of pasting code in messages.
+
+---
+
+**Understanding Context Size:**
+
+Context includes:
+- System prompt (~200 tokens)
+- All previous messages in conversation
+- Current message
+- Tool schemas (~300 tokens per tool)
+
+**Example breakdown:**
+```
+System prompt:      200 tokens
+Previous 5 messages: 1500 tokens
+Current message:    500 tokens
+Tool schemas:       800 tokens (13 tools × ~60 tokens)
+─────────────────────────────
+Total:              3000 tokens
+
+If context limit is 2048 → Error! ❌
+If context limit is 8192 → Success! ✅
+```
+
+---
+
+**How to Monitor Context Usage:**
+
+1. **Check token count in Crustly header:**
+   ```
+   💬 Tokens: 2,847  <-- Watch this number
+   ```
+
+2. **Watch LM Studio logs:**
+   - Look for warnings about context length
+   - Shows current context usage
+
+3. **Start new sessions regularly:**
+   - Long conversations use more context
+   - Press `Ctrl+N` to start fresh when needed
+
+---
+
+**Best Practices to Avoid Context Overflow:**
+
+1. ✅ Set context length to **8192 or higher** in LM Studio
+2. ✅ Start new sessions for unrelated tasks (`Ctrl+N`)
+3. ✅ Use tools to read files instead of pasting code
+4. ✅ Keep prompts concise and specific
+5. ✅ Monitor token count in the header
+6. ❌ Don't paste huge code blocks in messages
+7. ❌ Don't let conversations go on indefinitely
 
 ---
 
@@ -703,9 +943,10 @@ base_url = "http://localhost:1234/v1"
    - Q4_K_M instead of Q8 or FP16
    - Smaller model (7B instead of 13B)
 
-3. **Reduce context length:**
+3. **Reduce max output tokens:**
    ```toml
-   [llm.providers.openai]
+   # In crustly.toml
+   [providers.openai]
    max_tokens = 512  # Reduce from default 2048
    ```
 
@@ -728,20 +969,118 @@ base_url = "http://localhost:1234/v1"
    - Lower temperature (0.7) for factual responses
    - Higher temperature (1.0) for creative responses
 
+4. **Increase context length** (see above)
+   - Models perform better with more context
+
 ---
 
 #### Problem: Out of memory errors
+
+**Symptoms:**
+```
+LM Studio: "Out of memory"
+System: Swap usage at 100%
+Crustly: Connection timeout or crashes
+```
 
 **Solutions:**
 1. **Use smaller model:**
    - 7B instead of 13B
    - Q4 instead of Q8
+   - Example: Switch from `llama-3-70b` to `llama-3-8b`
 
 2. **Enable offloading in LM Studio:**
    - Settings → GPU offloading → Adjust layers
    - Offload some layers to CPU if GPU memory limited
+   - Example: Offload 20 layers to CPU, keep 20 on GPU
 
-3. **Close browser tabs and other apps**
+3. **Reduce context length:**
+   - Instead of 32768, use 8192
+   - Reduces memory usage significantly
+
+4. **Close browser tabs and other apps:**
+   - Chrome/Firefox can use 2-4 GB RAM
+   - Close unnecessary applications
+   - Check Task Manager (Windows) or Activity Monitor (macOS)
+
+5. **Restart LM Studio:**
+   - Sometimes memory leaks accumulate
+   - Complete restart frees memory
+
+---
+
+#### Problem: LM Studio shows model loaded, but Crustly can't connect
+
+**Solution:**
+```bash
+# 1. Make sure you clicked "Start Server" in LM Studio
+#    Loading model ≠ Starting server
+
+# 2. Verify server is actually running:
+curl http://localhost:1234/v1/models
+
+# Should return JSON with model info, not connection error
+
+# 3. Check LM Studio logs for errors:
+#    Look at bottom panel in LM Studio for error messages
+
+# 4. Try restarting LM Studio completely
+```
+
+---
+
+#### Problem: "Model not found" even though model name matches
+
+**Solution:**
+
+This can happen if:
+1. Model name has special characters or spaces
+2. Model file is corrupted
+3. LM Studio cache is stale
+
+**Fix:**
+```bash
+# 1. In LM Studio, unload the model
+# 2. Click "Reload Model"
+# 3. Wait for full load (check progress bar)
+# 4. Verify model name again
+# 5. Update crustly.toml with exact name
+# 6. Test with: cargo run -- run "Hello"
+```
+
+---
+
+#### Quick Troubleshooting Checklist
+
+When things don't work, check in this order:
+
+1. ✅ **LM Studio server running?**
+   - Green "Running" indicator visible
+   - Can curl http://localhost:1234/v1/models
+
+2. ✅ **Model loaded in LM Studio?**
+   - Model name visible at top
+   - Loading progress at 100%
+
+3. ✅ **Model name matches exactly?**
+   - Run `cargo run -- config`
+   - Compare with LM Studio's "Local Server" tab
+
+4. ✅ **Context length sufficient?**
+   - Set to 8192 or higher in LM Studio
+   - Server restarted after changing
+
+5. ✅ **Config file in correct location?**
+   - `~/.config/crustly/crustly.toml` (Linux/macOS)
+   - `%APPDATA%\crustly\crustly.toml` (Windows)
+
+6. ✅ **No firewall blocking localhost?**
+   - Rare, but check if nothing else works
+
+If all checks pass and it still doesn't work:
+- Check LM Studio logs for detailed errors
+- Try a different model
+- Restart both LM Studio and Crustly
 
 ---
 
@@ -832,6 +1171,433 @@ Besides LM Studio, Crustly can work with:
 **🎉 You're now running Crustly completely locally and privately!**
 
 > 💡 **Pro Tip:** Keep LM Studio running in the background, and Crustly will automatically use your local LLM instead of cloud APIs.
+
+---
+
+## 📝 Local Configuration with crustly.toml
+
+### Understanding Configuration Options
+
+Crustly supports **two configuration methods**:
+
+1. **Environment Variables** (quick setup, temporary)
+2. **Configuration File** (`crustly.toml`) - **RECOMMENDED for local LLMs**
+
+The configuration file approach is **preferred for local LLM setups** because:
+- ✅ Persistent across sessions (no need to re-export variables)
+- ✅ More options available (custom model names, timeouts, etc.)
+- ✅ Better for Windows users (no PowerShell profile editing)
+- ✅ Version control friendly (can check in without secrets)
+
+---
+
+### Creating Your Local Configuration File
+
+#### Step 1: Copy the Example Configuration
+
+The repository includes a complete example configuration file:
+
+```bash
+# Linux/macOS
+cp config.toml.example ~/.config/crustly/crustly.toml
+
+# Windows (PowerShell)
+Copy-Item config.toml.example $env:APPDATA\crustly\crustly.toml
+
+# Alternative: Let Crustly create the directories
+cargo run -- init
+# Then manually copy config.toml.example to the location shown
+```
+
+---
+
+#### Step 2: Edit Configuration for Your Setup
+
+Open the config file in your favorite editor:
+
+```bash
+# Linux/macOS
+nano ~/.config/crustly/crustly.toml
+# or
+code ~/.config/crustly/crustly.toml
+
+# Windows
+notepad %APPDATA%\crustly\crustly.toml
+```
+
+---
+
+#### Step 3: Configure for LM Studio
+
+Here's a **complete working configuration** for LM Studio:
+
+```toml
+# ~/.config/crustly/crustly.toml (Linux/macOS)
+# or %APPDATA%\crustly\crustly.toml (Windows)
+
+[database]
+# Database file location (stores conversation history)
+path = "~/.crustly/crustly.db"  # Linux/macOS
+# path = "C:\\Users\\YourName\\.crustly\\crustly.db"  # Windows (use double backslashes)
+
+[providers]
+# ========================================
+# Local LLM Configuration (LM Studio)
+# ========================================
+[providers.openai]
+enabled = true
+base_url = "http://localhost:1234/v1/chat/completions"  # LM Studio default port
+
+# ⭐ CRITICAL: Set this to EXACTLY match the model name in LM Studio!
+# How to find the model name:
+#   1. Open LM Studio
+#   2. Look at the "Local Server" tab
+#   3. Copy the model name EXACTLY as shown (case-sensitive)
+#
+# Common examples:
+#   - "qwen2.5-coder-7b-instruct"
+#   - "mistral-7b-instruct-v0.2"
+#   - "llama-3.2-1b-instruct"
+#   - "deepseek-coder-6.7b-instruct"
+default_model = "qwen2.5-coder-7b-instruct"
+
+# Optional: Adjust timeout for slower hardware (seconds)
+# timeout = 120  # Default: 120 seconds
+
+# Optional: Set custom context length
+# max_tokens = 8192  # Match LM Studio's context length setting
+```
+
+**⚠️ IMPORTANT:** The `default_model` value must **EXACTLY** match the model name shown in LM Studio's "Local Server" tab. Case-sensitive!
+
+---
+
+### Configuration File Locations
+
+Crustly searches for `crustly.toml` in these locations (in order):
+
+1. **Current directory**: `./crustly.toml`
+2. **User config directory**:
+   - **Linux/macOS**: `~/.config/crustly/crustly.toml`
+   - **Windows**: `%APPDATA%\crustly\crustly.toml` (typically `C:\Users\YourName\AppData\Roaming\crustly\crustly.toml`)
+3. **User home directory**: `~/crustly.toml` (Linux/macOS)
+
+Environment variables **override** config file settings.
+
+---
+
+### Verify Your Configuration
+
+After creating `crustly.toml`, verify it's correctly loaded:
+
+```bash
+# Check configuration
+cargo run -- config
+
+# Expected output:
+# 🦀 Crustly Configuration
+#
+# Database: /home/user/.crustly/crustly.db
+# Log level: info
+#
+# Providers:
+#   - openai: qwen2.5-coder-7b-instruct  <-- Your model name
+#     Base URL: http://localhost:1234/v1/chat/completions
+#     API Key: [SET]
+```
+
+If you see your model name listed, **configuration is successful!** ✅
+
+---
+
+### Example Configurations for Different Setups
+
+#### Configuration 1: LM Studio (Windows)
+
+```toml
+[database]
+path = "C:\\Users\\YourName\\.crustly\\crustly.db"
+
+[providers.openai]
+enabled = true
+base_url = "http://localhost:1234/v1/chat/completions"
+default_model = "qwen2.5-coder-7b-instruct"
+```
+
+#### Configuration 2: Ollama (Linux)
+
+```toml
+[database]
+path = "~/.crustly/crustly.db"
+
+[providers.openai]
+enabled = true
+base_url = "http://localhost:11434/v1/chat/completions"
+default_model = "mistral"  # Match model name from: ollama list
+```
+
+#### Configuration 3: Cloud API (Anthropic)
+
+```toml
+[database]
+path = "~/.crustly/crustly.db"
+
+[providers.anthropic]
+enabled = true
+api_key = "sk-ant-api03-YOUR_KEY_HERE"  # Or use ANTHROPIC_API_KEY env var
+default_model = "claude-3-5-sonnet-20240620"
+```
+
+#### Configuration 4: Multiple Providers (Hybrid)
+
+```toml
+[database]
+path = "~/.crustly/crustly.db"
+
+# Local LLM for development (default)
+[providers.openai]
+enabled = true
+base_url = "http://localhost:1234/v1/chat/completions"
+default_model = "qwen2.5-coder-7b-instruct"
+
+# Cloud API for complex tasks (manual selection)
+[providers.anthropic]
+enabled = true
+api_key = "sk-ant-api03-YOUR_KEY_HERE"
+default_model = "claude-3-5-sonnet-20240620"
+```
+
+---
+
+### Configuration Tips
+
+1. **Use `crustly.toml` for local LLMs** - Much easier than environment variables
+2. **Keep secrets in environment variables** - Don't commit API keys to git
+3. **The model name is critical** - Must match LM Studio exactly
+4. **Test with `crustly config`** - Always verify before using
+5. **Windows users: use double backslashes** - `C:\\Users\\...` not `C:\Users\...`
+
+---
+
+## 💡 Best Practices for Using Crustly
+
+### Writing Effective Prompts
+
+Crustly is equipped with **powerful tools** (file operations, code execution, web search, etc.). To get the most out of it, **encourage tool usage** in your prompts.
+
+---
+
+### ✅ Sample Prompts (Recommended)
+
+These prompts **encourage Crustly to explore and use tools**:
+
+#### 1. **Codebase Exploration**
+```
+Analyze this codebase:
+1. Explore the /src directory structure
+2. Identify the main entry points
+3. Find all dependencies in Cargo.toml
+4. List the design patterns used
+5. Summarize the architecture
+
+Start by using glob to find all Rust files.
+```
+
+**Why it works:** Explicitly tells Crustly to use tools (glob, read_file)
+
+---
+
+#### 2. **Deep Code Analysis**
+```
+I need a comprehensive analysis of the authentication system:
+1. Find all files related to authentication (grep for "auth", "login", "session")
+2. Read the main authentication modules
+3. Document the flow from login to session creation
+4. Identify security best practices used
+5. Suggest improvements
+
+Use grep and read_file tools to explore the code.
+```
+
+**Why it works:** Mentions specific tools, gives clear steps
+
+---
+
+#### 3. **Bug Investigation**
+```
+I'm getting a "connection timeout" error in the API client.
+1. Find all files containing "timeout" or "connect"
+2. Read the network client implementation
+3. Check the configuration for timeout settings
+4. Explain what's causing the issue
+5. Suggest a fix
+
+Start by using grep to locate the relevant code.
+```
+
+**Why it works:** Asks Crustly to investigate systematically
+
+---
+
+#### 4. **Feature Implementation**
+```
+I need to add rate limiting to the API:
+1. Explore the current request handling code (find files with "request", "handler")
+2. Read the middleware implementation
+3. Research rate limiting strategies (use web_search if available)
+4. Create a rate limiting middleware
+5. Write tests for the new feature
+
+Begin by exploring the existing middleware architecture.
+```
+
+**Why it works:** Multi-step task encourages thorough exploration
+
+---
+
+#### 5. **Documentation Generation**
+```
+Generate comprehensive documentation for this project:
+1. Read README.md to understand current docs
+2. Explore all modules in /src (use glob for *.rs files)
+3. For each module, read and document:
+   - Purpose and functionality
+   - Public API
+   - Usage examples
+4. Create a DEVELOPER_GUIDE.md
+
+Start by listing all source files.
+```
+
+**Why it works:** Structured task with clear tool usage
+
+---
+
+#### 6. **Dependency Analysis**
+```
+I want to understand all external dependencies:
+1. Read Cargo.toml
+2. For each dependency, search the code for usage (grep)
+3. Document what each dependency is used for
+4. Identify any unused dependencies
+5. Suggest lightweight alternatives
+
+Begin by reading the Cargo.toml file.
+```
+
+**Why it works:** Specific files mentioned, clear methodology
+
+---
+
+### ❌ Ineffective Prompts (To Avoid)
+
+These prompts **don't encourage tool usage**, leading to generic responses:
+
+```
+❌ "What does this codebase do?"
+   Better: "Explore the /src directory and summarize what this codebase does"
+
+❌ "Explain how authentication works"
+   Better: "Find and read all authentication-related files, then explain the flow"
+
+❌ "Is there a bug in the code?"
+   Better: "Search for potential bugs by reading the error handling code in /src"
+
+❌ "What design patterns are used?"
+   Better: "Analyze the codebase structure (use ls -R) and identify design patterns"
+
+❌ "Improve the README"
+   Better: "Read README.md, analyze the project structure (glob *.rs), then suggest improvements"
+```
+
+---
+
+### Key Principles for Effective Prompts
+
+1. **Be Specific About Tools:**
+   - ✅ "Use glob to find all TypeScript files"
+   - ❌ "Find TypeScript files"
+
+2. **Give Step-by-Step Instructions:**
+   - ✅ "1. Read the file, 2. Analyze the code, 3. Suggest improvements"
+   - ❌ "Improve this file"
+
+3. **Mention Files/Directories Explicitly:**
+   - ✅ "Explore the /src/llm directory"
+   - ❌ "Look at the code"
+
+4. **Encourage Exploration:**
+   - ✅ "Start by listing all files, then read the main modules"
+   - ❌ "Tell me about the codebase"
+
+5. **Request Evidence:**
+   - ✅ "Read the test file and show me the test cases"
+   - ❌ "Are there tests?"
+
+---
+
+### Pro Tips for Local LLM Users
+
+When using **local models** (LM Studio, Ollama), keep these tips in mind:
+
+1. **Be Even More Explicit:**
+   - Local models may need more guidance
+   - Example: "Use the glob tool with pattern **/*.rs to find all Rust files, then use read_file to read src/main.rs"
+
+2. **Break Down Complex Tasks:**
+   - Instead of: "Analyze the entire codebase"
+   - Use: "First, list all directories. Then, for each directory, show me the key files."
+
+3. **Provide Context:**
+   - Include relevant background in your prompt
+   - Example: "This is a Rust project using Tokio for async. Analyze the async patterns used."
+
+4. **Use Examples:**
+   - Show the model what you want
+   - Example: "Find TODO comments using: grep -r 'TODO' src/"
+
+5. **Iterate:**
+   - If the first response is generic, follow up with: "Please use the glob tool to actually explore the files"
+
+---
+
+### Sample Workflow Session
+
+Here's a **real example** of an effective Crustly session:
+
+```
+User: I want to understand how this Rust project handles errors.
+      Start by using glob to find all Rust files, then grep for
+      error handling patterns like "Result<", "Error", "unwrap".
+
+Crustly: [Uses glob tool to find 92 .rs files]
+         [Uses grep to search for error patterns]
+         [Reads key error handling modules]
+
+         Based on my analysis of the codebase:
+         1. Found 156 instances of Result<T, E>
+         2. Error types defined in src/error.rs
+         3. Custom error enum with 12 variants
+         4. Comprehensive error handling in services layer
+
+         [Provides detailed summary with file references]
+
+User: Great! Now read src/error.rs and explain the error handling strategy.
+
+Crustly: [Uses read_file tool]
+         [Provides detailed explanation with code examples]
+
+User: Are there any places where errors are unwrapped unsafely?
+
+Crustly: [Uses grep to search for ".unwrap()" and ".expect()"]
+         [Reports findings with line numbers and context]
+```
+
+**Why this works:**
+- User explicitly requests tools (glob, grep, read_file)
+- Crustly uses the tools proactively
+- Follow-up questions build on previous exploration
+- Results are concrete and evidence-based
 
 ---
 
