@@ -7,7 +7,7 @@ pub mod error;
 pub mod registry;
 mod r#trait;
 
-// Tool implementations
+// Tool implementations - Phase 1: Essential File Operations
 pub mod bash;
 pub mod read;
 pub mod write;
@@ -15,6 +15,11 @@ pub mod edit;
 pub mod ls;
 pub mod glob;
 pub mod grep;
+
+// Tool implementations - Phase 2: Advanced Features
+pub mod web_search;
+pub mod code_exec;
+pub mod notebook;
 
 // Re-exports
 pub use error::{Result, ToolError};

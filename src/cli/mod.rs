@@ -336,8 +336,17 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{
-                bash::BashTool, edit::EditTool, glob::GlobTool, grep::GrepTool, ls::LsTool,
-                read::ReadTool, registry::ToolRegistry, write::WriteTool,
+                bash::BashTool,
+                code_exec::CodeExecTool,
+                edit::EditTool,
+                glob::GlobTool,
+                grep::GrepTool,
+                ls::LsTool,
+                notebook::NotebookEditTool,
+                read::ReadTool,
+                registry::ToolRegistry,
+                web_search::WebSearchTool,
+                write::WriteTool,
             },
         },
         services::ServiceContext,
@@ -409,6 +418,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create tool registry
     tracing::debug!("Setting up tool registry");
     let mut tool_registry = ToolRegistry::new();
+    // Phase 1: Essential file operations
     tool_registry.register(Arc::new(ReadTool));
     tool_registry.register(Arc::new(WriteTool));
     tool_registry.register(Arc::new(EditTool));
@@ -416,6 +426,10 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(LsTool));
     tool_registry.register(Arc::new(GlobTool));
     tool_registry.register(Arc::new(GrepTool));
+    // Phase 2: Advanced features
+    tool_registry.register(Arc::new(WebSearchTool));
+    tool_registry.register(Arc::new(CodeExecTool));
+    tool_registry.register(Arc::new(NotebookEditTool));
 
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
@@ -505,8 +519,17 @@ async fn cmd_run(
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{
-                bash::BashTool, edit::EditTool, glob::GlobTool, grep::GrepTool, ls::LsTool,
-                read::ReadTool, registry::ToolRegistry, write::WriteTool,
+                bash::BashTool,
+                code_exec::CodeExecTool,
+                edit::EditTool,
+                glob::GlobTool,
+                grep::GrepTool,
+                ls::LsTool,
+                notebook::NotebookEditTool,
+                read::ReadTool,
+                registry::ToolRegistry,
+                web_search::WebSearchTool,
+                write::WriteTool,
             },
         },
         services::{ServiceContext, SessionService},
@@ -562,6 +585,7 @@ async fn cmd_run(
 
     // Create tool registry
     let mut tool_registry = ToolRegistry::new();
+    // Phase 1: Essential file operations
     tool_registry.register(Arc::new(ReadTool));
     tool_registry.register(Arc::new(WriteTool));
     tool_registry.register(Arc::new(EditTool));
@@ -569,6 +593,10 @@ async fn cmd_run(
     tool_registry.register(Arc::new(LsTool));
     tool_registry.register(Arc::new(GlobTool));
     tool_registry.register(Arc::new(GrepTool));
+    // Phase 2: Advanced features
+    tool_registry.register(Arc::new(WebSearchTool));
+    tool_registry.register(Arc::new(CodeExecTool));
+    tool_registry.register(Arc::new(NotebookEditTool));
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());
