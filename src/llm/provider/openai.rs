@@ -291,11 +291,16 @@ impl Provider for OpenAIProvider {
         let openai_request = self.to_openai_request(request);
         let retry_config = RetryConfig::default();
 
+        let tool_count = openai_request.tools.as_ref().map(|t| t.len()).unwrap_or(0);
         tracing::debug!(
-            "Sending OpenAI request to {} with model {}",
+            "Sending OpenAI request to {} with model {} and {} tools",
             self.base_url,
-            openai_request.model
+            openai_request.model,
+            tool_count
         );
+        if tool_count == 0 {
+            tracing::warn!("OpenAI request has NO tools - LLM won't know about file/bash operations!");
+        }
 
         // Retry the entire API call with exponential backoff
         retry_with_backoff(

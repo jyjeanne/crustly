@@ -352,9 +352,14 @@ impl AgentService {
             }
 
             // Add tools if registry has any
-            if self.tool_registry.count() > 0 {
+            let tool_count = self.tool_registry.count();
+            tracing::debug!("Tool registry contains {} tools", tool_count);
+            if tool_count > 0 {
                 let tool_defs = self.tool_registry.get_tool_definitions();
+                tracing::debug!("Adding {} tool definitions to request", tool_defs.len());
                 request = request.with_tools(tool_defs);
+            } else {
+                tracing::warn!("No tools registered in tool registry!");
             }
 
             // Send to provider
