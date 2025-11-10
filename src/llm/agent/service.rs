@@ -374,6 +374,21 @@ impl AgentService {
             total_output_tokens += response.usage.output_tokens;
 
             // Check if response contains tool use
+            tracing::debug!("Response has {} content blocks", response.content.len());
+            for (i, block) in response.content.iter().enumerate() {
+                match block {
+                    ContentBlock::Text { text } => {
+                        tracing::debug!("Block {}: Text ({}...)", i, &text.chars().take(50).collect::<String>());
+                    }
+                    ContentBlock::ToolUse { id, name, input } => {
+                        tracing::debug!("Block {}: ToolUse {{ name: {}, id: {} }}", i, name, id);
+                    }
+                    _ => {
+                        tracing::debug!("Block {}: Other content block", i);
+                    }
+                }
+            }
+
             let tool_uses: Vec<_> = response
                 .content
                 .iter()
@@ -386,8 +401,11 @@ impl AgentService {
                 })
                 .collect();
 
+            tracing::debug!("Found {} tool uses to execute", tool_uses.len());
+
             if tool_uses.is_empty() {
                 // No tool use - we're done
+                tracing::debug!("No tool uses found, completing with final response");
                 final_response = Some(response);
                 break;
             }
