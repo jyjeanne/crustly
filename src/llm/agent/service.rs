@@ -474,6 +474,43 @@ impl AgentService {
                                     continue;
                                 }
                                 tracing::info!("User approved tool '{}'", tool_name);
+                                // Create approved context for this tool execution
+                                let approved_tool_context = ToolExecutionContext {
+                                    session_id: tool_context.session_id,
+                                    working_directory: tool_context.working_directory.clone(),
+                                    env_vars: tool_context.env_vars.clone(),
+                                    auto_approve: true, // User approved this execution
+                                    timeout_secs: tool_context.timeout_secs,
+                                };
+
+                                // Execute the tool with approved context
+                                match self
+                                    .tool_registry
+                                    .execute(&tool_name, tool_input, &approved_tool_context)
+                                    .await
+                                {
+                                    Ok(result) => {
+                                        tool_results.push(ContentBlock::ToolResult {
+                                            tool_use_id: tool_id,
+                                            content: if result.success {
+                                                result.output
+                                            } else {
+                                                result.error.unwrap_or_else(|| {
+                                                    "Tool execution failed".to_string()
+                                                })
+                                            },
+                                            is_error: Some(!result.success),
+                                        });
+                                    }
+                                    Err(e) => {
+                                        tool_results.push(ContentBlock::ToolResult {
+                                            tool_use_id: tool_id,
+                                            content: format!("Tool execution error: {}", e),
+                                            is_error: Some(true),
+                                        });
+                                    }
+                                }
+                                continue; // Skip the normal execution path below
                             }
                             Err(e) => {
                                 tracing::error!("Approval callback error: {}", e);
