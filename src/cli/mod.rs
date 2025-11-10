@@ -338,13 +338,16 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             tools::{
                 bash::BashTool,
                 code_exec::CodeExecTool,
+                context::ContextTool,
                 edit::EditTool,
                 glob::GlobTool,
                 grep::GrepTool,
+                http::HttpClientTool,
                 ls::LsTool,
                 notebook::NotebookEditTool,
                 read::ReadTool,
                 registry::ToolRegistry,
+                task::TaskTool,
                 web_search::WebSearchTool,
                 write::WriteTool,
             },
@@ -430,6 +433,10 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(WebSearchTool));
     tool_registry.register(Arc::new(CodeExecTool));
     tool_registry.register(Arc::new(NotebookEditTool));
+    // Phase 3: Workflow & integration
+    tool_registry.register(Arc::new(TaskTool));
+    tool_registry.register(Arc::new(ContextTool));
+    tool_registry.register(Arc::new(HttpClientTool));
 
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
@@ -521,13 +528,16 @@ async fn cmd_run(
             tools::{
                 bash::BashTool,
                 code_exec::CodeExecTool,
+                context::ContextTool,
                 edit::EditTool,
                 glob::GlobTool,
                 grep::GrepTool,
+                http::HttpClientTool,
                 ls::LsTool,
                 notebook::NotebookEditTool,
                 read::ReadTool,
                 registry::ToolRegistry,
+                task::TaskTool,
                 web_search::WebSearchTool,
                 write::WriteTool,
             },
@@ -597,6 +607,10 @@ async fn cmd_run(
     tool_registry.register(Arc::new(WebSearchTool));
     tool_registry.register(Arc::new(CodeExecTool));
     tool_registry.register(Arc::new(NotebookEditTool));
+    // Phase 3: Workflow & integration
+    tool_registry.register(Arc::new(TaskTool));
+    tool_registry.register(Arc::new(ContextTool));
+    tool_registry.register(Arc::new(HttpClientTool));
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());

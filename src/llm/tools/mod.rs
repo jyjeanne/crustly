@@ -21,6 +21,11 @@ pub mod web_search;
 pub mod code_exec;
 pub mod notebook;
 
+// Tool implementations - Phase 3: Workflow & Integration
+pub mod task;
+pub mod context;
+pub mod http;
+
 // Re-exports
 pub use error::{Result, ToolError};
 pub use r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
