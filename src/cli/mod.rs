@@ -74,6 +74,12 @@ pub enum DbCommands {
     Init,
     /// Show database statistics
     Stats,
+    /// Clear all sessions and messages from database
+    Clear {
+        /// Skip confirmation prompt (use with caution)
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -246,13 +252,76 @@ async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result
                 .fetch_one(db.pool())
                 .await?;
 
-            let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tracked_files")
+            let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM files")
                 .fetch_one(db.pool())
                 .await?;
 
             println!("Sessions: {}", session_count);
             println!("Messages: {}", message_count);
-            println!("Tracked files: {}", file_count);
+            println!("Files: {}", file_count);
+
+            Ok(())
+        }
+        DbCommands::Clear { force } => {
+            let db = Database::connect(&config.database.path).await?;
+
+            // Get counts before clearing
+            let session_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
+                .fetch_one(db.pool())
+                .await?;
+
+            let message_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages")
+                .fetch_one(db.pool())
+                .await?;
+
+            let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM files")
+                .fetch_one(db.pool())
+                .await?;
+
+            if session_count == 0 && message_count == 0 && file_count == 0 {
+                println!("✨ Database is already empty");
+                return Ok(());
+            }
+
+            println!("⚠️  WARNING: This will permanently delete ALL data:\n");
+            println!("   • {} sessions", session_count);
+            println!("   • {} messages", message_count);
+            println!("   • {} files", file_count);
+            println!();
+
+            // Confirmation prompt
+            if !force {
+                use std::io::{self, Write};
+                print!("Type 'yes' to confirm deletion: ");
+                io::stdout().flush()?;
+
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+
+                if input.trim().to_lowercase() != "yes" {
+                    println!("❌ Cancelled - no data was deleted");
+                    return Ok(());
+                }
+            }
+
+            // Clear all tables
+            println!("\n🗑️  Clearing database...");
+
+            // Delete in correct order to respect foreign key constraints
+            sqlx::query("DELETE FROM messages")
+                .execute(db.pool())
+                .await?;
+
+            sqlx::query("DELETE FROM files")
+                .execute(db.pool())
+                .await?;
+
+            sqlx::query("DELETE FROM sessions")
+                .execute(db.pool())
+                .await?;
+
+            println!("✅ Successfully cleared {} sessions, {} messages, and {} files",
+                session_count, message_count, file_count);
 
             Ok(())
         }
