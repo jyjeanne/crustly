@@ -35,6 +35,7 @@ pub struct OpenAIProvider {
     api_key: String,
     base_url: String,
     client: Client,
+    custom_default_model: Option<String>,
 }
 
 impl OpenAIProvider {
@@ -52,6 +53,7 @@ impl OpenAIProvider {
             api_key,
             base_url: DEFAULT_OPENAI_API_URL.to_string(),
             client,
+            custom_default_model: None,
         }
     }
 
@@ -69,6 +71,7 @@ impl OpenAIProvider {
             api_key: "not-needed".to_string(),
             base_url,
             client,
+            custom_default_model: None,
         }
     }
 
@@ -86,7 +89,14 @@ impl OpenAIProvider {
             api_key,
             base_url,
             client,
+            custom_default_model: None,
         }
+    }
+
+    /// Set custom default model (useful for local LLMs with specific model names)
+    pub fn with_default_model(mut self, model: String) -> Self {
+        self.custom_default_model = Some(model);
+        self
     }
 
     /// Build request headers
@@ -523,7 +533,9 @@ impl Provider for OpenAIProvider {
     }
 
     fn default_model(&self) -> &str {
-        "gpt-4-turbo-preview"
+        self.custom_default_model
+            .as_deref()
+            .unwrap_or("gpt-4-turbo-preview")
     }
 
     fn supported_models(&self) -> Vec<String> {

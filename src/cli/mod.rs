@@ -376,12 +376,24 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             // Local LLM (LM Studio, Ollama, etc.)
             tracing::info!("Using local LLM at: {}", base_url);
             println!("🏠 Using local LLM at: {}\n", base_url);
-            Arc::new(OpenAIProvider::local(base_url.clone()))
+            let mut provider = OpenAIProvider::local(base_url.clone());
+            if let Some(model) = &openai_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                println!("📦 Model: {}\n", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
         } else if let Some(api_key) = &openai_config.api_key {
             // Official OpenAI API
             tracing::info!("Using OpenAI provider");
             println!("🤖 Using OpenAI provider\n");
-            Arc::new(OpenAIProvider::new(api_key.clone()))
+            let mut provider = OpenAIProvider::new(api_key.clone());
+            if let Some(model) = &openai_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                println!("📦 Model: {}\n", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
         } else {
             // OpenAI configured but no credentials - fall back to Anthropic
             tracing::debug!("OpenAI configured but no credentials, falling back to Anthropic");
@@ -557,11 +569,21 @@ async fn cmd_run(
         if let Some(base_url) = &openai_config.base_url {
             // Local LLM (LM Studio, Ollama, etc.)
             tracing::info!("Using local LLM at: {}", base_url);
-            Arc::new(OpenAIProvider::local(base_url.clone()))
+            let mut provider = OpenAIProvider::local(base_url.clone());
+            if let Some(model) = &openai_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
         } else if let Some(api_key) = &openai_config.api_key {
             // Official OpenAI API
             tracing::info!("Using OpenAI provider");
-            Arc::new(OpenAIProvider::new(api_key.clone()))
+            let mut provider = OpenAIProvider::new(api_key.clone());
+            if let Some(model) = &openai_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
         } else {
             // Fall back to Anthropic
             let anthropic_config = config
