@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::path::Path;
 
 /// Plan management tool
 pub struct PlanTool;
@@ -54,6 +55,65 @@ enum PlanOperation {
 
 fn default_complexity() -> u8 {
     3
+}
+
+/// Validate plan file path for security
+/// Prevents symlink attacks and path traversal
+fn validate_plan_file_path(path: &Path, working_dir: &Path) -> Result<()> {
+    // Check if path is absolute and within working directory
+    if !path.starts_with(working_dir) {
+        return Err(ToolError::InvalidInput(
+            "Plan file must be within working directory".to_string(),
+        ));
+    }
+
+    // Check for symlinks (security risk)
+    if path.exists() {
+        let metadata = std::fs::symlink_metadata(path).map_err(ToolError::Io)?;
+        if metadata.is_symlink() {
+            return Err(ToolError::InvalidInput(
+                "Plan file cannot be a symlink (security restriction)".to_string(),
+            ));
+        }
+    }
+
+    // Verify filename is exactly .crustly_plan.json (no traversal)
+    if path.file_name() != Some(std::ffi::OsStr::new(".crustly_plan.json")) {
+        return Err(ToolError::InvalidInput(
+            "Invalid plan filename".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Maximum plan file size (10MB)
+const MAX_PLAN_FILE_SIZE: u64 = 10 * 1024 * 1024;
+
+/// Input validation limits
+const MAX_TITLE_LENGTH: usize = 200;
+const MAX_DESCRIPTION_LENGTH: usize = 5000;
+const MAX_CONTEXT_LENGTH: usize = 5000;
+
+/// Validate string input
+fn validate_string(s: &str, max_len: usize, field_name: &str) -> Result<()> {
+    if s.is_empty() || s.trim().is_empty() {
+        return Err(ToolError::InvalidInput(format!(
+            "{} cannot be empty",
+            field_name
+        )));
+    }
+
+    if s.len() > max_len {
+        return Err(ToolError::InvalidInput(format!(
+            "{} exceeds maximum length of {} characters (got {})",
+            field_name,
+            max_len,
+            s.len()
+        )));
+    }
+
+    Ok(())
 }
 
 #[async_trait]
@@ -133,13 +193,30 @@ impl Tool for PlanTool {
         let operation: PlanOperation = serde_json::from_value(input)?;
 
         // Load or create plan state from context
-        // For now, we'll store plan in a JSON file in the working directory
         let plan_file = context.working_directory.join(".crustly_plan.json");
 
+        // Security: Validate plan file path
+        validate_plan_file_path(&plan_file, &context.working_directory)?;
+
+        // Load existing plan with security checks
         let mut plan: Option<PlanDocument> = if plan_file.exists() {
+            // Security: Check file size before reading
+            let metadata = tokio::fs::metadata(&plan_file)
+                .await
+                .map_err(ToolError::Io)?;
+
+            if metadata.len() > MAX_PLAN_FILE_SIZE {
+                return Err(ToolError::InvalidInput(format!(
+                    "Plan file too large: {} bytes (max: {} bytes)",
+                    metadata.len(),
+                    MAX_PLAN_FILE_SIZE
+                )));
+            }
+
             let content = tokio::fs::read_to_string(&plan_file)
                 .await
                 .map_err(ToolError::Io)?;
+
             Some(serde_json::from_str(&content).map_err(|e| {
                 ToolError::InvalidInput(format!("Failed to parse plan file: {}", e))
             })?)
@@ -154,6 +231,13 @@ impl Tool for PlanTool {
                 context: ctx,
                 risks,
             } => {
+                // Validate inputs
+                validate_string(&title, MAX_TITLE_LENGTH, "Plan title")?;
+                validate_string(&description, MAX_DESCRIPTION_LENGTH, "Plan description")?;
+                if !ctx.is_empty() {
+                    validate_string(&ctx, MAX_CONTEXT_LENGTH, "Plan context")?;
+                }
+
                 if plan.is_some() {
                     return Ok(ToolResult::error(
                         "A plan already exists. Use 'update_plan' to modify it or 'finalize' to complete it."
@@ -184,6 +268,10 @@ impl Tool for PlanTool {
                 dependencies,
                 complexity,
             } => {
+                // Validate inputs
+                validate_string(&title, MAX_TITLE_LENGTH, "Task title")?;
+                validate_string(&description, MAX_DESCRIPTION_LENGTH, "Task description")?;
+
                 let current_plan = plan.as_mut().ok_or_else(|| {
                     ToolError::InvalidInput(
                         "No active plan. Create a plan first with 'create' operation.".to_string(),
@@ -209,13 +297,28 @@ impl Tool for PlanTool {
                     PlanTask::new(task_order, title.clone(), description, parsed_type.clone());
                 task.complexity = complexity.clamp(1, 5);
 
-                // Convert dependency order numbers to task IDs
+                // Validate and convert dependency order numbers to task IDs
                 for dep_order in dependencies {
-                    if dep_order > 0 && dep_order < task_order {
-                        if let Some(dep_task) = current_plan.tasks.get(dep_order - 1) {
-                            task.dependencies.push(dep_task.id);
-                        }
+                    if dep_order == 0 {
+                        return Err(ToolError::InvalidInput(
+                            "Task numbers start at 1, not 0".to_string(),
+                        ));
                     }
+                    if dep_order >= task_order {
+                        return Err(ToolError::InvalidInput(format!(
+                            "Task {} cannot depend on task {} (not yet created or would create a cycle)",
+                            task_order, dep_order
+                        )));
+                    }
+
+                    let dep_task = current_plan.tasks.get(dep_order - 1).ok_or_else(|| {
+                        ToolError::InvalidInput(format!(
+                            "Invalid dependency: task {} does not exist",
+                            dep_order
+                        ))
+                    })?;
+
+                    task.dependencies.push(dep_task.id);
                 }
 
                 current_plan.add_task(task);
@@ -312,11 +415,21 @@ impl Tool for PlanTool {
             }
         };
 
-        // Save plan to file
+        // Save plan to file with atomic write
         if let Some(ref current_plan) = plan {
             let json = serde_json::to_string_pretty(current_plan)
                 .map_err(|e| ToolError::InvalidInput(format!("Failed to serialize plan: {}", e)))?;
-            tokio::fs::write(&plan_file, json)
+
+            // Atomic write: write to temp file, then rename
+            let temp_file = plan_file.with_extension("tmp");
+
+            // Write to temp file
+            tokio::fs::write(&temp_file, &json)
+                .await
+                .map_err(ToolError::Io)?;
+
+            // Atomic rename (ensures consistency even if interrupted)
+            tokio::fs::rename(&temp_file, &plan_file)
                 .await
                 .map_err(ToolError::Io)?;
         }

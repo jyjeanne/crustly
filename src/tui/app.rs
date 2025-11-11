@@ -554,6 +554,13 @@ impl App {
         self.is_processing = false;
         self.streaming_response = None;
 
+        // Check task completion FIRST (before moving response.content)
+        let task_failed = if self.executing_plan {
+            self.check_task_completion(&response.content).await?
+        } else {
+            false
+        };
+
         // Add assistant message to UI
         let assistant_msg = DisplayMessage {
             id: response.message_id,
@@ -581,22 +588,27 @@ impl App {
         // Auto-scroll to bottom
         self.scroll_offset = 0;
 
-        // If executing a plan, mark current task as completed and move to next
+        // Handle plan execution
         if self.executing_plan {
-            if let Some(plan) = &mut self.current_plan {
-                // Find the in-progress task and mark it completed
-                if let Some(task) = plan
-                    .tasks
-                    .iter_mut()
-                    .find(|t| matches!(t.status, crate::tui::plan::TaskStatus::InProgress))
-                {
-                    task.status = crate::tui::plan::TaskStatus::Completed;
-                    task.completed_at = Some(chrono::Utc::now());
-                }
-                self.save_plan().await?;
+
+            if task_failed {
+                // Stop execution on failure
+                self.executing_plan = false;
+                let error_msg = DisplayMessage {
+                    id: uuid::Uuid::new_v4(),
+                    role: "system".to_string(),
+                    content: "⚠️ Plan execution stopped due to task failure. \
+                             Review the error above and decide how to proceed."
+                        .to_string(),
+                    timestamp: chrono::Utc::now(),
+                    token_count: None,
+                    cost: None,
+                };
+                self.messages.push(error_msg);
+            } else {
+                // Execute next task if current one succeeded
+                self.execute_next_plan_task().await?;
             }
-            // Execute next task
-            self.execute_next_plan_task().await?;
         } else {
             // Check if a plan was created/finalized
             self.check_and_load_plan().await?;
@@ -605,20 +617,75 @@ impl App {
         Ok(())
     }
 
+    /// Check if the current task completed successfully or failed
+    /// Returns true if task failed, false if succeeded
+    async fn check_task_completion(&mut self, response_content: &str) -> Result<bool> {
+        let Some(plan) = &mut self.current_plan else {
+            return Ok(false);
+        };
+
+        // Find the in-progress task
+        let task_result = plan
+            .tasks
+            .iter_mut()
+            .find(|t| matches!(t.status, crate::tui::plan::TaskStatus::InProgress))
+            .map(|task| {
+                // Check for error indicators in the response
+                let response_lower = response_content.to_lowercase();
+                let has_error = response_lower.contains("error:")
+                    || response_lower.contains("failed to")
+                    || response_lower.contains("cannot")
+                    || response_lower.contains("unable to")
+                    || response_lower.contains("fatal:")
+                    || (response_lower.contains("error") && response_lower.contains("executing"))
+                    || response_lower.contains("compilation error")
+                    || response_lower.contains("build failed");
+
+                if has_error {
+                    // Mark task as failed
+                    task.status = crate::tui::plan::TaskStatus::Failed;
+                    task.notes =
+                        Some("Task failed during execution. Error detected in response.".to_string());
+                    true // Task failed
+                } else {
+                    // Mark task as completed successfully
+                    task.status = crate::tui::plan::TaskStatus::Completed;
+                    task.completed_at = Some(chrono::Utc::now());
+                    task.notes = Some("Task completed successfully".to_string());
+                    false // Task succeeded
+                }
+            });
+
+        // Save updated plan
+        self.save_plan().await?;
+
+        Ok(task_result.unwrap_or(false))
+    }
+
     /// Check for and load a plan if one was created
+    /// Fixed: TOCTOU race condition by attempting read directly
     async fn check_and_load_plan(&mut self) -> Result<()> {
         let plan_file = std::env::current_dir()?.join(".crustly_plan.json");
 
-        if plan_file.exists() {
-            let content = tokio::fs::read_to_string(&plan_file).await?;
-            if let Ok(plan) = serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
-                // Only load if plan is pending approval
-                if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
-                    self.current_plan = Some(plan);
-                    self.mode = AppMode::Plan;
-                    self.plan_scroll_offset = 0;
-                    self.selected_task_index = None;
+        // Fix TOCTOU: Read directly instead of checking existence first
+        match tokio::fs::read_to_string(&plan_file).await {
+            Ok(content) => {
+                if let Ok(plan) = serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
+                    // Only load if plan is pending approval
+                    if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                        self.current_plan = Some(plan);
+                        self.mode = AppMode::Plan;
+                        self.plan_scroll_offset = 0;
+                        self.selected_task_index = None;
+                    }
                 }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // File doesn't exist - this is normal, not an error
+            }
+            Err(e) => {
+                // Other errors (permissions, etc.) should be logged
+                tracing::warn!("Failed to read plan file: {}", e);
             }
         }
 
@@ -626,11 +693,20 @@ impl App {
     }
 
     /// Save the current plan to file
+    /// Fixed: Uses atomic write (write to temp, then rename) to prevent corruption
     async fn save_plan(&self) -> Result<()> {
         if let Some(plan) = &self.current_plan {
             let plan_file = std::env::current_dir()?.join(".crustly_plan.json");
             let json = serde_json::to_string_pretty(plan)?;
-            tokio::fs::write(&plan_file, json).await?;
+
+            // Atomic write: write to temp file, then rename
+            let temp_file = plan_file.with_extension("tmp");
+
+            // Write to temp file
+            tokio::fs::write(&temp_file, &json).await?;
+
+            // Atomic rename (ensures consistency even if interrupted)
+            tokio::fs::rename(&temp_file, &plan_file).await?;
         }
         Ok(())
     }
