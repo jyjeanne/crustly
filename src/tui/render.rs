@@ -45,6 +45,8 @@ pub fn render(f: &mut Frame, app: &App) {
         }
         AppMode::Plan => {
             render_plan(f, app, chunks[1]);
+            // Clear the input area (render help text instead)
+            render_plan_help(f, chunks[2]);
         }
         AppMode::Sessions => {
             render_sessions(f, app, chunks[1]);
@@ -758,6 +760,36 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
         .alignment(Alignment::Left);
 
     f.render_widget(help, area);
+}
+
+/// Render help text in the input area during Plan Mode
+fn render_plan_help(f: &mut Frame, area: Rect) {
+    let help_text = vec![
+        Line::from(vec![
+            Span::styled("[Ctrl+A] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled("Approve & Execute  ", Style::default().fg(Color::White)),
+            Span::styled("[Ctrl+R] ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("Reject  ", Style::default().fg(Color::White)),
+            Span::styled("[Esc] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled("Cancel  ", Style::default().fg(Color::White)),
+            Span::styled("[Ctrl+P] ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("Back to Chat", Style::default().fg(Color::White)),
+        ]),
+    ];
+
+    let paragraph = Paragraph::new(help_text)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Plan Mode - Review & Approve ",
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                )),
+        )
+        .alignment(Alignment::Center);
+
+    f.render_widget(paragraph, area);
 }
 
 /// Render the plan mode view
