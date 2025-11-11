@@ -22,24 +22,20 @@
 ## 📸 Screenshots
 
 ### Main Interface
-![Crustly Main Interface](doc/screenshots/main-interface.png)
+![Crustly Main Interface](docs/screenshots/main-screen.png)
 *Interactive chat interface with syntax highlighting and real-time streaming*
 
-### Code Analysis & Tools
-![Code Analysis](doc/screenshots/code-analysis.png)
-*Built-in tools for reading, writing, and executing code*
+### Deep Code Analysis
+![Deep Code Analysis](docs/screenshots/deeply-analyse.png)
+*Comprehensive code analysis with detailed insights and suggestions*
 
-### Interactive Approval System
-![Approval Dialog](doc/screenshots/approval-dialog.png)
-*Permission dialogs for dangerous operations - you stay in control*
+### AI Thinking Mode
+![AI Thinking Mode](docs/screenshots/thinking-mode.png)
+*Watch the AI reasoning process in real-time as it analyzes your code*
 
-### Session Management
-![Session List](doc/screenshots/session-list.png)
-*Manage multiple conversation sessions with persistent context*
-
-### Syntax Highlighting
-![Syntax Highlighting](doc/screenshots/syntax-highlighting.png)
-*Beautiful code display with support for 100+ languages*
+### Help & Commands
+![Help Screen](docs/screenshots/help-screnn.png)
+*Built-in help system and keyboard shortcuts for efficient navigation*
 
 ---
 
