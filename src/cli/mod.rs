@@ -37,6 +37,13 @@ Available tools and when to use them:
 - http_request: Call external APIs
 - task_manager: Track multi-step work
 - session_context: Remember important facts
+- plan: Create structured plans for complex tasks (use when user requests require multiple coordinated steps)
+
+When a user makes a complex request that requires multiple steps:
+1. Use the 'plan' tool with operation='create' to create a new plan
+2. Break down the request into discrete tasks using operation='add_task'
+3. Finalize the plan with operation='finalize' to present it for user approval
+4. After approval, execute tasks in dependency order
 
 ALWAYS explore first before answering questions about a codebase. Don't guess - use the tools!"#;
 
@@ -372,8 +379,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             tools::{
                 bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
                 glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
-                notebook::NotebookEditTool, read::ReadTool, registry::ToolRegistry, task::TaskTool,
-                web_search::WebSearchTool, write::WriteTool,
+                notebook::NotebookEditTool, plan_tool::PlanTool, read::ReadTool,
+                registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::ServiceContext,
@@ -473,6 +480,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));
     tool_registry.register(Arc::new(HttpClientTool));
+    tool_registry.register(Arc::new(PlanTool));
 
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
@@ -567,8 +575,8 @@ async fn cmd_run(
             tools::{
                 bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
                 glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
-                notebook::NotebookEditTool, read::ReadTool, registry::ToolRegistry, task::TaskTool,
-                web_search::WebSearchTool, write::WriteTool,
+                notebook::NotebookEditTool, plan_tool::PlanTool, read::ReadTool,
+                registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::{ServiceContext, SessionService},
@@ -650,6 +658,7 @@ async fn cmd_run(
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));
     tool_registry.register(Arc::new(HttpClientTool));
+    tool_registry.register(Arc::new(PlanTool));
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());

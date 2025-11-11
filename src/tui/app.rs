@@ -369,6 +369,8 @@ impl App {
             if let Some(plan) = &mut self.current_plan {
                 plan.approve();
                 plan.start_execution();
+                // Save plan to file
+                self.save_plan().await?;
                 self.switch_mode(AppMode::Chat).await?;
             }
             return Ok(());
@@ -378,7 +380,11 @@ impl App {
         if event.code == KeyCode::Char('r') && event.modifiers.contains(KeyModifiers::CONTROL) {
             if let Some(plan) = &mut self.current_plan {
                 plan.reject();
-                // TODO: Add message to ask for revisions
+                // Save plan to file
+                self.save_plan().await?;
+                // Clear the plan from memory and return to chat
+                self.current_plan = None;
+                self.switch_mode(AppMode::Chat).await?;
             }
             return Ok(());
         }
@@ -571,6 +577,39 @@ impl App {
         // Auto-scroll to bottom
         self.scroll_offset = 0;
 
+        // Check if a plan was created/finalized
+        self.check_and_load_plan().await?;
+
+        Ok(())
+    }
+
+    /// Check for and load a plan if one was created
+    async fn check_and_load_plan(&mut self) -> Result<()> {
+        let plan_file = std::env::current_dir()?.join(".crustly_plan.json");
+
+        if plan_file.exists() {
+            let content = tokio::fs::read_to_string(&plan_file).await?;
+            if let Ok(plan) = serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
+                // Only load if plan is pending approval
+                if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                    self.current_plan = Some(plan);
+                    self.mode = AppMode::Plan;
+                    self.plan_scroll_offset = 0;
+                    self.selected_task_index = None;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Save the current plan to file
+    async fn save_plan(&self) -> Result<()> {
+        if let Some(plan) = &self.current_plan {
+            let plan_file = std::env::current_dir()?.join(".crustly_plan.json");
+            let json = serde_json::to_string_pretty(plan)?;
+            tokio::fs::write(&plan_file, json).await?;
+        }
         Ok(())
     }
 

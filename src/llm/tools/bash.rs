@@ -93,7 +93,7 @@ fn is_read_only_command(command: &str) -> bool {
         .iter()
         .any(|&safe| first_cmd.starts_with(safe))
         // Also allow the command name if it's in the list
-        || safe_commands.iter().any(|&safe| cmd_name == safe)
+        || safe_commands.contains(&cmd_name)
 }
 
 #[async_trait]

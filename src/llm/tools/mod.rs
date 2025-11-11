@@ -24,6 +24,7 @@ pub mod web_search;
 // Tool implementations - Phase 3: Workflow & Integration
 pub mod context;
 pub mod http;
+pub mod plan_tool;
 pub mod task;
 
 // Re-exports

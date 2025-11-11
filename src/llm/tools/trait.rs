@@ -123,6 +123,8 @@ pub enum ToolCapability {
     Network,
     /// Can modify system state
     SystemModification,
+    /// Can manage plans and tasks
+    PlanManagement,
 }
 
 /// Tool trait - defines an executable tool

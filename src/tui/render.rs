@@ -642,6 +642,7 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
 }
 
 /// Render the plan mode view
+#[allow(clippy::vec_init_then_push)]
 fn render_plan(f: &mut Frame, app: &App, area: Rect) {
     if let Some(plan) = &app.current_plan {
         // Render the plan document
