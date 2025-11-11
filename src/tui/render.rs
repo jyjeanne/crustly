@@ -58,6 +58,9 @@ pub fn render(f: &mut Frame, app: &App) {
         AppMode::ToolApproval => {
             render_approval(f, app, chunks[1]);
         }
+        AppMode::FilePicker => {
+            render_file_picker(f, app, chunks[1]);
+        }
     }
 
     render_status_bar(f, app, chunks[3]);
@@ -1061,6 +1064,110 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
     }
 }
 
+/// Render the file picker
+fn render_file_picker(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Header
+    lines.push(Line::from(vec![
+        Span::styled(
+            "📁 File Picker",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            app.file_picker_current_dir.to_string_lossy().to_string(),
+            Style::default().fg(Color::Yellow),
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // Calculate visible range
+    let visible_items = (area.height as usize).saturating_sub(6); // Leave space for header and help
+    let start = app.file_picker_scroll_offset;
+    let end = (start + visible_items).min(app.file_picker_files.len());
+
+    // Render file list
+    for (idx, path) in app.file_picker_files.iter().enumerate().skip(start).take(end - start) {
+        let is_selected = idx == app.file_picker_selected;
+        let is_dir = path.is_dir();
+
+        let icon = if path.ends_with("..") {
+            "📂 .."
+        } else if is_dir {
+            "📂"
+        } else {
+            "📄"
+        };
+
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("?");
+
+        let style = if is_selected {
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else if is_dir {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        let prefix = if is_selected { "▶ " } else { "  " };
+
+        lines.push(Line::from(vec![
+            Span::styled(prefix, style),
+            Span::styled(format!("{} {}", icon, filename), style),
+        ]));
+    }
+
+    // Add scroll indicator if needed
+    if app.file_picker_files.len() > visible_items {
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![Span::styled(
+            format!(
+                "Showing {}-{} of {} files",
+                start + 1,
+                end,
+                app.file_picker_files.len()
+            ),
+            Style::default().fg(Color::DarkGray),
+        )]));
+    }
+
+    // Help text
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("[↑↓]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(" Navigate  ", Style::default().fg(Color::White)),
+        Span::styled("[Enter]", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        Span::styled(" Select  ", Style::default().fg(Color::White)),
+        Span::styled("[Esc]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        Span::styled(" Cancel", Style::default().fg(Color::White)),
+    ]));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Select a file ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
 /// Render the status bar
 fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let mode_text = match app.mode {
@@ -1071,6 +1178,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::Help => "HELP",
         AppMode::Settings => "SETTINGS",
         AppMode::ToolApproval => "PERMISSION",
+        AppMode::FilePicker => "FILE PICKER",
     };
 
     let status = if let Some(ref error) = app.error_message {
