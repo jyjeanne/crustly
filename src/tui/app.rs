@@ -258,6 +258,16 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_toggle_plan(&event) {
+            // Toggle between Chat and Plan modes
+            match self.mode {
+                AppMode::Chat => self.switch_mode(AppMode::Plan).await?,
+                AppMode::Plan => self.switch_mode(AppMode::Chat).await?,
+                _ => {} // Do nothing in other modes
+            }
+            return Ok(());
+        }
+
         // Mode-specific handling
         match self.mode {
             AppMode::Splash => {
@@ -495,10 +505,11 @@ impl App {
             let agent_service = self.agent_service.clone();
             let session_id = session.id;
             let event_sender = self.event_sender();
+            let read_only_mode = self.mode == AppMode::Plan;
 
             tokio::spawn(async move {
                 match agent_service
-                    .send_message_with_tools(session_id, content, None)
+                    .send_message_with_tools_and_mode(session_id, content, None, read_only_mode)
                     .await
                 {
                     Ok(response) => {

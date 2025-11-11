@@ -231,6 +231,11 @@ pub mod keys {
         key_matches(event, KeyCode::Char('k'), KeyModifiers::CONTROL)
     }
 
+    /// Ctrl+P - Toggle Plan mode
+    pub fn is_toggle_plan(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('p'), KeyModifiers::CONTROL)
+    }
+
     /// Ctrl+Enter - Submit
     pub fn is_submit(event: &KeyEvent) -> bool {
         event.code == KeyCode::Enter && event.modifiers.contains(KeyModifiers::CONTROL)

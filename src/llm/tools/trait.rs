@@ -23,6 +23,9 @@ pub struct ToolExecutionContext {
 
     /// Maximum execution timeout in seconds
     pub timeout_secs: u64,
+
+    /// Whether in read-only mode (Plan mode) - restricts write operations
+    pub read_only_mode: bool,
 }
 
 impl ToolExecutionContext {
@@ -34,6 +37,7 @@ impl ToolExecutionContext {
             env_vars: HashMap::new(),
             auto_approve: false,
             timeout_secs: 30,
+            read_only_mode: false,
         }
     }
 
@@ -52,6 +56,12 @@ impl ToolExecutionContext {
     /// Set timeout
     pub fn with_timeout(mut self, timeout_secs: u64) -> Self {
         self.timeout_secs = timeout_secs;
+        self
+    }
+
+    /// Set read-only mode (for Plan mode)
+    pub fn with_read_only_mode(mut self, read_only: bool) -> Self {
+        self.read_only_mode = read_only;
         self
     }
 }

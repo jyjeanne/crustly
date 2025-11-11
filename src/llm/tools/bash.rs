@@ -23,6 +23,79 @@ struct BashInput {
     working_dir: Option<String>,
 }
 
+/// Check if a bash command is safe for read-only mode (Plan mode)
+fn is_read_only_command(command: &str) -> bool {
+    let cmd_lower = command.trim().to_lowercase();
+
+    // Check for output redirection (dangerous in read-only mode)
+    if cmd_lower.contains('>') || cmd_lower.contains(">>") {
+        return false;
+    }
+
+    // Check for dangerous pipe patterns (piping to tee, writing to files)
+    if cmd_lower.contains("| tee") || cmd_lower.contains("|tee") {
+        return false;
+    }
+
+    // Get the first command (before pipes or &&)
+    let first_cmd = cmd_lower
+        .split('|')
+        .next()
+        .unwrap_or(&cmd_lower)
+        .split("&&")
+        .next()
+        .unwrap_or(&cmd_lower)
+        .trim();
+
+    // Get the command name (first word)
+    let cmd_name = first_cmd.split_whitespace().next().unwrap_or("");
+
+    // List of safe read-only commands
+    let safe_commands = [
+        // Git read-only commands
+        "git status",
+        "git log",
+        "git diff",
+        "git branch",
+        "git show",
+        "git remote",
+        // File reading commands
+        "ls",
+        "cat",
+        "head",
+        "tail",
+        "less",
+        "more",
+        "grep",
+        "find",
+        "tree",
+        "file",
+        // Info commands
+        "pwd",
+        "whoami",
+        "hostname",
+        "date",
+        "echo",
+        "which",
+        "type",
+        "env",
+        "printenv",
+        "df",
+        "du",
+        "wc",
+        // Other safe commands
+        "curl",
+        "wget",
+    ];
+
+    // Check if command starts with any safe command
+    safe_commands
+        .iter()
+        .any(|&safe| first_cmd.starts_with(safe))
+        // Also allow the command name if it's in the list
+        || safe_commands.iter().any(|&safe| cmd_name == safe)
+}
+
 #[async_trait]
 impl Tool for BashTool {
     fn name(&self) -> &str {
@@ -77,6 +150,16 @@ impl Tool for BashTool {
 
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: BashInput = serde_json::from_value(input)?;
+
+        // Check if in read-only mode and validate command safety
+        if context.read_only_mode && !is_read_only_command(&input.command) {
+            return Ok(ToolResult::error(format!(
+                "Command '{}' is not allowed in Plan mode (read-only). \
+                 Only safe read-only commands are permitted (git status, ls, cat, grep, etc.). \
+                 Please approve the plan and switch to execution mode (Ctrl+A) to run write commands.",
+                input.command
+            )));
+        }
 
         // Determine working directory
         let working_dir = if let Some(ref dir) = input.working_dir {
