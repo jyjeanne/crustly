@@ -665,7 +665,17 @@ impl App {
     /// Check for and load a plan if one was created
     /// Fixed: TOCTOU race condition by attempting read directly
     async fn check_and_load_plan(&mut self) -> Result<()> {
-        let plan_file = std::env::current_dir()?.join(".crustly_plan.json");
+        // Get session ID for session-scoped plan file
+        let session_id = match &self.current_session {
+            Some(session) => session.id,
+            None => {
+                tracing::debug!("No current session, skipping plan load");
+                return Ok(());
+            }
+        };
+
+        let plan_filename = format!(".crustly_plan_{}.json", session_id);
+        let plan_file = std::env::current_dir()?.join(&plan_filename);
 
         // Fix TOCTOU: Read directly instead of checking existence first
         match tokio::fs::read_to_string(&plan_file).await {
@@ -696,7 +706,17 @@ impl App {
     /// Fixed: Uses atomic write (write to temp, then rename) to prevent corruption
     async fn save_plan(&self) -> Result<()> {
         if let Some(plan) = &self.current_plan {
-            let plan_file = std::env::current_dir()?.join(".crustly_plan.json");
+            // Get session ID for session-scoped plan file
+            let session_id = match &self.current_session {
+                Some(session) => &session.id,
+                None => {
+                    tracing::warn!("Cannot save plan: no current session");
+                    return Ok(());
+                }
+            };
+
+            let plan_filename = format!(".crustly_plan_{}.json", session_id);
+            let plan_file = std::env::current_dir()?.join(&plan_filename);
             let json = serde_json::to_string_pretty(plan)?;
 
             // Atomic write: write to temp file, then rename

@@ -77,12 +77,23 @@ fn validate_plan_file_path(path: &Path, working_dir: &Path) -> Result<()> {
         }
     }
 
-    // Verify filename is exactly .crustly_plan.json (no traversal)
-    if path.file_name() != Some(std::ffi::OsStr::new(".crustly_plan.json")) {
+    // Verify filename matches pattern .crustly_plan_{uuid}.json (no traversal)
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| ToolError::InvalidInput("Invalid plan filename".to_string()))?;
+
+    if !file_name.starts_with(".crustly_plan_") || !file_name.ends_with(".json") {
         return Err(ToolError::InvalidInput(
-            "Invalid plan filename".to_string(),
+            "Plan filename must match pattern .crustly_plan_{session_id}.json".to_string(),
         ));
     }
+
+    // Extract and validate UUID portion
+    let uuid_part = &file_name[14..file_name.len() - 5]; // Remove ".crustly_plan_" and ".json"
+    uuid::Uuid::parse_str(uuid_part).map_err(|_| {
+        ToolError::InvalidInput("Plan filename must contain a valid UUID".to_string())
+    })?;
 
     Ok(())
 }
@@ -192,8 +203,9 @@ impl Tool for PlanTool {
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let operation: PlanOperation = serde_json::from_value(input)?;
 
-        // Load or create plan state from context
-        let plan_file = context.working_directory.join(".crustly_plan.json");
+        // Load or create plan state from context (session-scoped)
+        let plan_filename = format!(".crustly_plan_{}.json", context.session_id);
+        let plan_file = context.working_directory.join(&plan_filename);
 
         // Security: Validate plan file path
         validate_plan_file_path(&plan_file, &context.working_directory)?;
