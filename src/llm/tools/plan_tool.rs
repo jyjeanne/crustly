@@ -51,6 +51,11 @@ enum PlanOperation {
     Finalize,
     /// Get current plan status
     Status,
+    /// Export plan to markdown file
+    ExportMarkdown {
+        #[serde(default)]
+        filename: Option<String>,
+    },
 }
 
 fn default_complexity() -> u8 {
@@ -144,7 +149,7 @@ impl Tool for PlanTool {
             "properties": {
                 "operation": {
                     "type": "string",
-                    "enum": ["create", "add_task", "update_plan", "finalize", "status"],
+                    "enum": ["create", "add_task", "update_plan", "finalize", "status", "export_markdown"],
                     "description": "Operation to perform"
                 },
                 "title": {
@@ -180,6 +185,10 @@ impl Tool for PlanTool {
                     "maximum": 5,
                     "default": 3,
                     "description": "Task complexity from 1 (simple) to 5 (very complex)"
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "Output filename for export_markdown (optional, defaults to PLAN.md)"
                 }
             },
             "required": ["operation"]
@@ -424,6 +433,88 @@ impl Tool for PlanTool {
                 } else {
                     "No active plan. Create one with 'create' operation.".to_string()
                 }
+            }
+
+            PlanOperation::ExportMarkdown { filename } => {
+                let current_plan = plan.as_ref().ok_or_else(|| {
+                    ToolError::InvalidInput("No active plan to export.".to_string())
+                })?;
+
+                // Generate markdown content
+                let mut markdown = String::new();
+                markdown.push_str(&format!("# {}\n\n", current_plan.title));
+                markdown.push_str(&format!("{}\n\n", current_plan.description));
+
+                if !current_plan.context.is_empty() {
+                    markdown.push_str("## Context\n\n");
+                    markdown.push_str(&format!("{}\n\n", current_plan.context));
+                }
+
+                if !current_plan.risks.is_empty() {
+                    markdown.push_str("## Risks & Considerations\n\n");
+                    for risk in &current_plan.risks {
+                        markdown.push_str(&format!("- {}\n", risk));
+                    }
+                    markdown.push_str("\n");
+                }
+
+                markdown.push_str("## Tasks\n\n");
+
+                for task in &current_plan.tasks {
+                    markdown.push_str(&format!("### Task {}: {}\n\n", task.order, task.title));
+                    markdown.push_str(&format!("**Type:** {:?} | **Complexity:** {}★\n\n", task.task_type, task.complexity));
+
+                    if !task.dependencies.is_empty() {
+                        let dep_orders: Vec<String> = task.dependencies
+                            .iter()
+                            .filter_map(|dep_id| {
+                                current_plan.tasks.iter()
+                                    .find(|t| &t.id == dep_id)
+                                    .map(|t| t.order.to_string())
+                            })
+                            .collect();
+                        markdown.push_str(&format!("**Dependencies:** Task(s) {}\n\n", dep_orders.join(", ")));
+                    }
+
+                    markdown.push_str("**Implementation Steps:**\n\n");
+                    markdown.push_str(&format!("{}\n\n", task.description));
+                    markdown.push_str("---\n\n");
+                }
+
+                markdown.push_str(&format!("\n*Plan created: {}*\n", current_plan.created_at.format("%Y-%m-%d %H:%M:%S")));
+                markdown.push_str(&format!("*Last updated: {}*\n", current_plan.updated_at.format("%Y-%m-%d %H:%M:%S")));
+
+                // Determine output filename
+                let output_filename = filename.as_deref().unwrap_or("PLAN.md");
+                let output_path = context.working_directory.join(output_filename);
+
+                // Validate output path (security check)
+                if !output_path.starts_with(&context.working_directory) {
+                    return Err(ToolError::InvalidInput(
+                        "Output file must be within working directory".to_string(),
+                    ));
+                }
+
+                // Check if file already exists
+                if output_path.exists() {
+                    return Err(ToolError::InvalidInput(
+                        format!("File '{}' already exists. Please choose a different filename or delete the existing file first.", output_filename)
+                    ));
+                }
+
+                // Write markdown file
+                tokio::fs::write(&output_path, markdown)
+                    .await
+                    .map_err(ToolError::Io)?;
+
+                format!(
+                    "✓ Plan exported to '{}'!\n\n\
+                     📄 {} tasks documented in detail\n\n\
+                     Review the file to see all implementation steps.\n\
+                     Use this as a reference when executing the plan.",
+                    output_filename,
+                    current_plan.tasks.len()
+                )
             }
         };
 

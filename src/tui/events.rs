@@ -124,6 +124,8 @@ pub enum AppMode {
     Settings,
     /// Tool approval dialog
     ToolApproval,
+    /// File picker dialog (triggered by @)
+    FilePicker,
 }
 
 /// Event handler for the TUI

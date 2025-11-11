@@ -70,6 +70,15 @@ pub struct App {
     pub selected_task_index: Option<usize>,
     pub executing_plan: bool,
 
+    // File picker state
+    pub file_picker_files: Vec<std::path::PathBuf>,
+    pub file_picker_selected: usize,
+    pub file_picker_scroll_offset: usize,
+    pub file_picker_current_dir: std::path::PathBuf,
+
+    // Working directory
+    pub working_directory: std::path::PathBuf,
+
     // Services
     agent_service: Arc<AgentService>,
     session_service: SessionService,
@@ -103,6 +112,11 @@ impl App {
             plan_scroll_offset: 0,
             selected_task_index: None,
             executing_plan: false,
+            file_picker_files: Vec::new(),
+            file_picker_selected: 0,
+            file_picker_scroll_offset: 0,
+            file_picker_current_dir: std::env::current_dir().unwrap_or_default(),
+            working_directory: std::env::current_dir().unwrap_or_default(),
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
             plan_service: PlanService::new(context),
@@ -288,6 +302,7 @@ impl App {
             AppMode::Plan => self.handle_plan_key(event).await?,
             AppMode::Sessions => self.handle_sessions_key(event).await?,
             AppMode::ToolApproval => self.handle_approval_key(event).await?,
+            AppMode::FilePicker => self.handle_file_picker_key(event).await?,
             AppMode::Help | AppMode::Settings => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
@@ -320,6 +335,10 @@ impl App {
         } else {
             // Regular character input
             match event.code {
+                KeyCode::Char('@') => {
+                    // Trigger file picker mode
+                    self.open_file_picker().await?;
+                }
                 KeyCode::Char(c) => {
                     self.input_buffer.push(c);
                 }
@@ -373,6 +392,10 @@ impl App {
             if let Some(plan) = &mut self.current_plan {
                 plan.approve();
                 plan.start_execution();
+
+                // Export plan to markdown file
+                self.export_plan_to_markdown("PLAN.md").await?;
+
                 // Save plan to file
                 self.save_plan().await?;
                 self.switch_mode(AppMode::Chat).await?;
@@ -732,6 +755,67 @@ impl App {
 
     /// Save the current plan
     /// Dual-write: database as primary, JSON as backup
+    /// Export plan to markdown file
+    async fn export_plan_to_markdown(&self, filename: &str) -> Result<()> {
+        if let Some(plan) = &self.current_plan {
+            // Generate markdown content
+            let mut markdown = String::new();
+            markdown.push_str(&format!("# {}\n\n", plan.title));
+            markdown.push_str(&format!("{}\n\n", plan.description));
+
+            if !plan.context.is_empty() {
+                markdown.push_str("## Context\n\n");
+                markdown.push_str(&format!("{}\n\n", plan.context));
+            }
+
+            if !plan.risks.is_empty() {
+                markdown.push_str("## Risks & Considerations\n\n");
+                for risk in &plan.risks {
+                    markdown.push_str(&format!("- {}\n", risk));
+                }
+                markdown.push_str("\n");
+            }
+
+            markdown.push_str("## Tasks\n\n");
+
+            for task in &plan.tasks {
+                markdown.push_str(&format!("### Task {}: {}\n\n", task.order, task.title));
+                markdown.push_str(&format!("**Type:** {:?} | **Complexity:** {}★\n\n", task.task_type, task.complexity));
+
+                if !task.dependencies.is_empty() {
+                    let dep_orders: Vec<String> = task.dependencies
+                        .iter()
+                        .filter_map(|dep_id| {
+                            plan.tasks.iter()
+                                .find(|t| &t.id == dep_id)
+                                .map(|t| t.order.to_string())
+                        })
+                        .collect();
+                    markdown.push_str(&format!("**Dependencies:** Task(s) {}\n\n", dep_orders.join(", ")));
+                }
+
+                markdown.push_str("**Implementation Steps:**\n\n");
+                markdown.push_str(&format!("{}\n\n", task.description));
+                markdown.push_str("---\n\n");
+            }
+
+            markdown.push_str(&format!("\n*Plan created: {}*\n", plan.created_at.format("%Y-%m-%d %H:%M:%S")));
+            markdown.push_str(&format!("*Last updated: {}*\n", plan.updated_at.format("%Y-%m-%d %H:%M:%S")));
+
+            // Write markdown file to working directory
+            let output_path = self.working_directory.join(filename);
+
+            // Write markdown file (overwrite if exists)
+            tokio::fs::write(&output_path, markdown)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to write markdown file: {}", e))?;
+
+            tracing::info!("Exported plan to {}", output_path.display());
+        }
+
+        Ok(())
+    }
+
     async fn save_plan(&self) -> Result<()> {
         if let Some(plan) = &self.current_plan {
             // Get session ID for session-scoped operations
@@ -950,6 +1034,96 @@ impl App {
             } else if keys::is_view_details(&event) {
                 // Toggle details view
                 self.show_approval_details = !self.show_approval_details;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Open file picker and populate file list
+    async fn open_file_picker(&mut self) -> Result<()> {
+        // Get list of files in current directory
+        let mut files = Vec::new();
+
+        // Add parent directory option if not at root
+        if self.file_picker_current_dir.parent().is_some() {
+            files.push(self.file_picker_current_dir.join(".."));
+        }
+
+        // Read directory entries
+        if let Ok(entries) = std::fs::read_dir(&self.file_picker_current_dir) {
+            for entry in entries.flatten() {
+                files.push(entry.path());
+            }
+        }
+
+        // Sort: directories first, then files, alphabetically
+        files.sort_by(|a, b| {
+            let a_is_dir = a.is_dir();
+            let b_is_dir = b.is_dir();
+            match (a_is_dir, b_is_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.file_name().cmp(&b.file_name()),
+            }
+        });
+
+        self.file_picker_files = files;
+        self.file_picker_selected = 0;
+        self.file_picker_scroll_offset = 0;
+        self.switch_mode(AppMode::FilePicker).await?;
+
+        Ok(())
+    }
+
+    /// Handle keys in file picker mode
+    async fn handle_file_picker_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+        use crossterm::event::KeyCode;
+
+        if keys::is_cancel(&event) {
+            // Cancel file picker and return to chat
+            self.switch_mode(AppMode::Chat).await?;
+        } else if keys::is_up(&event) {
+            // Move selection up
+            self.file_picker_selected = self.file_picker_selected.saturating_sub(1);
+
+            // Adjust scroll offset if needed
+            if self.file_picker_selected < self.file_picker_scroll_offset {
+                self.file_picker_scroll_offset = self.file_picker_selected;
+            }
+        } else if keys::is_down(&event) {
+            // Move selection down
+            if self.file_picker_selected + 1 < self.file_picker_files.len() {
+                self.file_picker_selected += 1;
+
+                // Adjust scroll offset if needed (assuming 20 visible items)
+                let visible_items = 20;
+                if self.file_picker_selected >= self.file_picker_scroll_offset + visible_items {
+                    self.file_picker_scroll_offset = self.file_picker_selected - visible_items + 1;
+                }
+            }
+        } else if keys::is_enter(&event) || event.code == KeyCode::Char(' ') {
+            // Select file or navigate into directory
+            if let Some(selected_path) = self.file_picker_files.get(self.file_picker_selected) {
+                if selected_path.is_dir() {
+                    // Navigate into directory
+                    if selected_path.ends_with("..") {
+                        // Go to parent directory
+                        if let Some(parent) = self.file_picker_current_dir.parent() {
+                            self.file_picker_current_dir = parent.to_path_buf();
+                        }
+                    } else {
+                        self.file_picker_current_dir = selected_path.clone();
+                    }
+                    // Refresh file list
+                    self.open_file_picker().await?;
+                } else {
+                    // Insert file path into input buffer
+                    let path_str = selected_path.to_string_lossy().to_string();
+                    self.input_buffer.push_str(&path_str);
+                    self.switch_mode(AppMode::Chat).await?;
+                }
             }
         }
 

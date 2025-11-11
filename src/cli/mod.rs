@@ -39,11 +39,39 @@ Available tools and when to use them:
 - session_context: Remember important facts
 - plan: Create structured plans for complex tasks (use when user requests require multiple coordinated steps)
 
-When a user makes a complex request that requires multiple steps:
-1. Use the 'plan' tool with operation='create' to create a new plan
-2. Break down the request into discrete tasks using operation='add_task'
-3. Finalize the plan with operation='finalize' to present it for user approval
-4. After approval, execute tasks in dependency order
+CRITICAL: PLAN TOOL USAGE
+When a user says "create a plan", "make a plan", or describes a complex multi-step task, you MUST use the plan tool immediately.
+DO NOT write a text description of a plan. DO NOT explain what should be done. CALL THE TOOL.
+
+Mandatory steps for plan creation:
+1. IMMEDIATELY call plan tool with operation='create' to create a new plan
+2. Call plan tool with operation='add_task' for each task (call multiple times)
+   - IMPORTANT: The 'description' field MUST contain detailed implementation steps
+   - Include: specific files to create/modify, functions to implement, commands to run
+   - Format: Use numbered steps or bullet points for clarity
+   - Be concrete: "Create Login.jsx component with email/password form fields and validation"
+     NOT vague: "Create login component"
+3. Call plan tool with operation='finalize' to present the plan for user approval
+4. AFTER finalization, call plan tool with operation='export_markdown' to create a detailed markdown file
+5. ASK the user: "Would you like me to execute this plan and create the project files?"
+6. ONLY proceed with execution if user explicitly confirms (yes/approve/execute/etc.)
+
+Example: If user says "create a plan to implement a login page"
+- FIRST TOOL CALL: plan(operation="create", title="Implement Login Page", description="Build a React login page with email/password authentication", context="React app needs user authentication. Backend API endpoint /auth/login exists.", complexity=3)
+- NEXT TOOL CALL: plan(operation="add_task", title="Create Login Component", description="1. Create src/components/Login.jsx file\n2. Add email input field with type='email' validation\n3. Add password input field with type='password'\n4. Add submit button that calls handleSubmit()\n5. Import useState for form state management\n6. Add basic CSS styling for form layout", task_type="create", complexity=2)
+- NEXT TOOL CALL: plan(operation="add_task", title="Implement Authentication Logic", description="1. Create handleSubmit() function in Login.jsx\n2. Validate email format using regex\n3. Make POST request to /auth/login endpoint\n4. Include email/password in request body\n5. Handle success response - store JWT token in localStorage\n6. Handle error response - display error message to user\n7. Redirect to dashboard on successful login", task_type="edit", complexity=3, dependencies=[1])
+- TOOL CALL: plan(operation="finalize")
+- TOOL CALL: plan(operation="export_markdown", filename="LOGIN_PLAN.md")
+- THEN ASK: "The plan has been created and exported to LOGIN_PLAN.md. Would you like me to execute this plan and create the project files?"
+
+TASK DESCRIPTION QUALITY REQUIREMENTS:
+- Each task description MUST be detailed enough to execute without further clarification
+- Include specific file paths, function names, and concrete implementation steps
+- Mention required libraries, APIs, or dependencies
+- Specify error handling and edge cases
+- Add configuration or setup requirements
+
+NEVER generate text plans. ALWAYS use the plan tool for planning requests.
 
 ALWAYS explore first before answering questions about a codebase. Don't guess - use the tools!"#;
 
@@ -489,7 +517,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create agent service with system prompt
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
-            .with_system_prompt(SYSTEM_PROMPT.to_string()),
+            .with_system_prompt(SYSTEM_PROMPT.to_string())
+            .with_max_tool_iterations(20),
     );
 
     // Create TUI app first (so we can get the event sender)
@@ -545,8 +574,10 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tracing::debug!("Creating agent service with approval callback");
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
+            .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_tool_registry(Arc::new(tool_registry))
-            .with_approval_callback(Some(approval_callback)),
+            .with_approval_callback(Some(approval_callback))
+            .with_max_tool_iterations(20),
     );
 
     // Update app with the configured agent service (preserve event channels!)
@@ -666,7 +697,8 @@ async fn cmd_run(
     let service_context = ServiceContext::new(db.pool().clone());
     let agent_service = AgentService::new(provider.clone(), service_context.clone())
         .with_tool_registry(Arc::new(tool_registry))
-        .with_system_prompt(SYSTEM_PROMPT.to_string());
+        .with_system_prompt(SYSTEM_PROMPT.to_string())
+        .with_max_tool_iterations(20);
 
     // Create or get session
     let session_service = SessionService::new(service_context);
