@@ -6,7 +6,7 @@ use super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResp
 use super::plan::PlanDocument;
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
-use crate::services::{MessageService, ServiceContext, SessionService};
+use crate::services::{MessageService, PlanService, ServiceContext, SessionService};
 use anyhow::Result;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -74,6 +74,7 @@ pub struct App {
     agent_service: Arc<AgentService>,
     session_service: SessionService,
     message_service: MessageService,
+    plan_service: PlanService,
 
     // Events
     event_handler: EventHandler,
@@ -103,7 +104,8 @@ impl App {
             selected_task_index: None,
             executing_plan: false,
             session_service: SessionService::new(context.clone()),
-            message_service: MessageService::new(context),
+            message_service: MessageService::new(context.clone()),
+            plan_service: PlanService::new(context),
             agent_service,
             event_handler: EventHandler::new(),
         }
@@ -663,9 +665,9 @@ impl App {
     }
 
     /// Check for and load a plan if one was created
-    /// Fixed: TOCTOU race condition by attempting read directly
+    /// Loads from database first, with JSON fallback for migration
     async fn check_and_load_plan(&mut self) -> Result<()> {
-        // Get session ID for session-scoped plan file
+        // Get session ID for session-scoped operations
         let session_id = match &self.current_session {
             Some(session) => session.id,
             None => {
@@ -674,15 +676,41 @@ impl App {
             }
         };
 
+        // Try loading from database first
+        match self.plan_service.get_most_recent_plan(session_id).await {
+            Ok(Some(plan)) => {
+                // Only load if plan is pending approval
+                if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                    tracing::debug!("Loaded plan from database: {}", plan.id);
+                    self.current_plan = Some(plan);
+                    self.mode = AppMode::Plan;
+                    self.plan_scroll_offset = 0;
+                    self.selected_task_index = None;
+                }
+                return Ok(());
+            }
+            Ok(None) => {
+                tracing::debug!("No pending plan found in database");
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load plan from database: {}", e);
+            }
+        }
+
+        // Fallback to JSON file for backward compatibility / migration
         let plan_filename = format!(".crustly_plan_{}.json", session_id);
         let plan_file = std::env::current_dir()?.join(&plan_filename);
 
-        // Fix TOCTOU: Read directly instead of checking existence first
         match tokio::fs::read_to_string(&plan_file).await {
             Ok(content) => {
                 if let Ok(plan) = serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
                     // Only load if plan is pending approval
                     if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                        tracing::info!("Loaded plan from JSON file, migrating to database");
+                        // Migrate to database
+                        if let Err(e) = self.plan_service.create(&plan).await {
+                            tracing::warn!("Failed to migrate plan to database: {}", e);
+                        }
                         self.current_plan = Some(plan);
                         self.mode = AppMode::Plan;
                         self.plan_scroll_offset = 0;
@@ -695,38 +723,50 @@ impl App {
             }
             Err(e) => {
                 // Other errors (permissions, etc.) should be logged
-                tracing::warn!("Failed to read plan file: {}", e);
+                tracing::warn!("Failed to read plan JSON file: {}", e);
             }
         }
 
         Ok(())
     }
 
-    /// Save the current plan to file
-    /// Fixed: Uses atomic write (write to temp, then rename) to prevent corruption
+    /// Save the current plan
+    /// Dual-write: database as primary, JSON as backup
     async fn save_plan(&self) -> Result<()> {
         if let Some(plan) = &self.current_plan {
-            // Get session ID for session-scoped plan file
+            // Get session ID for session-scoped operations
             let session_id = match &self.current_session {
-                Some(session) => &session.id,
+                Some(session) => session.id,
                 None => {
                     tracing::warn!("Cannot save plan: no current session");
                     return Ok(());
                 }
             };
 
+            // Primary: Save to database
+            // Try to update first (plan may already exist)
+            match self.plan_service.update(plan).await {
+                Ok(_) => {
+                    tracing::debug!("Updated plan in database: {}", plan.id);
+                }
+                Err(_) => {
+                    // If update fails, try creating (plan doesn't exist yet)
+                    if let Err(e) = self.plan_service.create(plan).await {
+                        tracing::error!("Failed to save plan to database: {}", e);
+                        // Continue to JSON backup even if database fails
+                    } else {
+                        tracing::debug!("Created plan in database: {}", plan.id);
+                    }
+                }
+            }
+
+            // Backup: Save to JSON file (for backward compatibility and backup)
             let plan_filename = format!(".crustly_plan_{}.json", session_id);
             let plan_file = std::env::current_dir()?.join(&plan_filename);
-            let json = serde_json::to_string_pretty(plan)?;
 
-            // Atomic write: write to temp file, then rename
-            let temp_file = plan_file.with_extension("tmp");
-
-            // Write to temp file
-            tokio::fs::write(&temp_file, &json).await?;
-
-            // Atomic rename (ensures consistency even if interrupted)
-            tokio::fs::rename(&temp_file, &plan_file).await?;
+            if let Err(e) = self.plan_service.export_to_json(plan, &plan_file).await {
+                tracing::warn!("Failed to save plan JSON backup: {}", e);
+            }
         }
         Ok(())
     }
