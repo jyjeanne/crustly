@@ -574,6 +574,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tracing::debug!("Creating agent service with approval callback");
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
+            .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_tool_registry(Arc::new(tool_registry))
             .with_approval_callback(Some(approval_callback))
             .with_max_tool_iterations(20),

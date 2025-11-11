@@ -392,6 +392,10 @@ impl App {
             if let Some(plan) = &mut self.current_plan {
                 plan.approve();
                 plan.start_execution();
+
+                // Export plan to markdown file
+                self.export_plan_to_markdown("PLAN.md").await?;
+
                 // Save plan to file
                 self.save_plan().await?;
                 self.switch_mode(AppMode::Chat).await?;
@@ -751,6 +755,67 @@ impl App {
 
     /// Save the current plan
     /// Dual-write: database as primary, JSON as backup
+    /// Export plan to markdown file
+    async fn export_plan_to_markdown(&self, filename: &str) -> Result<()> {
+        if let Some(plan) = &self.current_plan {
+            // Generate markdown content
+            let mut markdown = String::new();
+            markdown.push_str(&format!("# {}\n\n", plan.title));
+            markdown.push_str(&format!("{}\n\n", plan.description));
+
+            if !plan.context.is_empty() {
+                markdown.push_str("## Context\n\n");
+                markdown.push_str(&format!("{}\n\n", plan.context));
+            }
+
+            if !plan.risks.is_empty() {
+                markdown.push_str("## Risks & Considerations\n\n");
+                for risk in &plan.risks {
+                    markdown.push_str(&format!("- {}\n", risk));
+                }
+                markdown.push_str("\n");
+            }
+
+            markdown.push_str("## Tasks\n\n");
+
+            for task in &plan.tasks {
+                markdown.push_str(&format!("### Task {}: {}\n\n", task.order, task.title));
+                markdown.push_str(&format!("**Type:** {:?} | **Complexity:** {}★\n\n", task.task_type, task.complexity));
+
+                if !task.dependencies.is_empty() {
+                    let dep_orders: Vec<String> = task.dependencies
+                        .iter()
+                        .filter_map(|dep_id| {
+                            plan.tasks.iter()
+                                .find(|t| &t.id == dep_id)
+                                .map(|t| t.order.to_string())
+                        })
+                        .collect();
+                    markdown.push_str(&format!("**Dependencies:** Task(s) {}\n\n", dep_orders.join(", ")));
+                }
+
+                markdown.push_str("**Implementation Steps:**\n\n");
+                markdown.push_str(&format!("{}\n\n", task.description));
+                markdown.push_str("---\n\n");
+            }
+
+            markdown.push_str(&format!("\n*Plan created: {}*\n", plan.created_at.format("%Y-%m-%d %H:%M:%S")));
+            markdown.push_str(&format!("*Last updated: {}*\n", plan.updated_at.format("%Y-%m-%d %H:%M:%S")));
+
+            // Write markdown file to working directory
+            let output_path = self.working_directory.join(filename);
+
+            // Write markdown file (overwrite if exists)
+            tokio::fs::write(&output_path, markdown)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to write markdown file: {}", e))?;
+
+            tracing::info!("Exported plan to {}", output_path.display());
+        }
+
+        Ok(())
+    }
+
     async fn save_plan(&self) -> Result<()> {
         if let Some(plan) = &self.current_plan {
             // Get session ID for session-scoped operations
