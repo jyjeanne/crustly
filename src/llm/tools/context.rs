@@ -93,14 +93,10 @@ enum ContextOperation {
     },
 
     #[serde(rename = "get")]
-    Get {
-        key: String,
-    },
+    Get { key: String },
 
     #[serde(rename = "delete")]
-    Delete {
-        key: String,
-    },
+    Delete { key: String },
 
     #[serde(rename = "list")]
     List {
@@ -109,14 +105,10 @@ enum ContextOperation {
     },
 
     #[serde(rename = "add_fact")]
-    AddFact {
-        fact: String,
-    },
+    AddFact { fact: String },
 
     #[serde(rename = "add_decision")]
-    AddDecision {
-        decision: String,
-    },
+    AddDecision { decision: String },
 
     #[serde(rename = "summary")]
     Summary,
@@ -202,10 +194,7 @@ impl Tool for ContextTool {
     }
 
     fn capabilities(&self) -> Vec<ToolCapability> {
-        vec![
-            ToolCapability::ReadFiles,
-            ToolCapability::WriteFiles,
-        ]
+        vec![ToolCapability::ReadFiles, ToolCapability::WriteFiles]
     }
 
     fn requires_approval(&self) -> bool {

@@ -120,7 +120,9 @@ impl Tool for GrepTool {
             .map_err(|e| ToolError::InvalidInput(format!("Invalid input: {}", e)))?;
 
         if input.pattern.trim().is_empty() {
-            return Err(ToolError::InvalidInput("Pattern cannot be empty".to_string()));
+            return Err(ToolError::InvalidInput(
+                "Pattern cannot be empty".to_string(),
+            ));
         }
 
         Ok(())
@@ -167,8 +169,14 @@ impl Tool for GrepTool {
         let mut total_matches = 0;
 
         if search_path.is_file() {
-            self.search_file(&search_path, &regex, &input, &mut matches, &mut total_matches)
-                .await?;
+            self.search_file(
+                &search_path,
+                &regex,
+                &input,
+                &mut matches,
+                &mut total_matches,
+            )
+            .await?;
         } else {
             self.search_directory(
                 &search_path,
@@ -266,7 +274,12 @@ impl GrepTool {
                 // Add context after
                 if let Some(ctx) = input.context {
                     let end = (line_num + ctx + 1).min(lines.len());
-                    for (i, line) in lines.iter().enumerate().skip(line_num + 1).take(end - line_num - 1) {
+                    for (i, line) in lines
+                        .iter()
+                        .enumerate()
+                        .skip(line_num + 1)
+                        .take(end - line_num - 1)
+                    {
                         result.push_str(&format!("\n  {}: {}", i + 1, line));
                     }
                 }

@@ -80,7 +80,9 @@ impl Tool for GlobTool {
             .map_err(|e| ToolError::InvalidInput(format!("Invalid input: {}", e)))?;
 
         if input.pattern.trim().is_empty() {
-            return Err(ToolError::InvalidInput("Pattern cannot be empty".to_string()));
+            return Err(ToolError::InvalidInput(
+                "Pattern cannot be empty".to_string(),
+            ));
         }
 
         Ok(())
@@ -161,7 +163,11 @@ impl Tool for GlobTool {
         matches.sort();
 
         // Format output
-        let mut output = format!("Found {} files matching '{}':\n\n", matches.len(), input.pattern);
+        let mut output = format!(
+            "Found {} files matching '{}':\n\n",
+            matches.len(),
+            input.pattern
+        );
 
         for path in &matches {
             // Make path relative to base_dir for cleaner output

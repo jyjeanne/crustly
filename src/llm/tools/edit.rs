@@ -38,7 +38,10 @@ enum EditOperation {
 
     /// Regex replace
     #[serde(rename = "regex_replace")]
-    RegexReplace { pattern: String, replacement: String },
+    RegexReplace {
+        pattern: String,
+        replacement: String,
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -177,9 +180,7 @@ impl Tool for EditTool {
         if input.create_backup {
             let backup_path = path.with_extension(format!(
                 "{}.backup",
-                path.extension()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("txt")
+                path.extension().and_then(|s| s.to_str()).unwrap_or("txt")
             ));
             fs::write(&backup_path, &content)
                 .await
@@ -285,7 +286,9 @@ impl Tool for EditTool {
                     )));
                 }
 
-                regex.replace_all(&content, replacement.as_str()).to_string()
+                regex
+                    .replace_all(&content, replacement.as_str())
+                    .to_string()
             }
         };
 

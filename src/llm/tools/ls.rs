@@ -140,12 +140,7 @@ impl LsTool {
         }
 
         // Sort entries
-        entries.sort_by_key(|entry| {
-            entry
-                .file_name()
-                .into_string()
-                .unwrap_or_default()
-        });
+        entries.sort_by_key(|entry| entry.file_name().into_string().unwrap_or_default());
 
         let mut dirs = Vec::new();
         let mut files = Vec::new();
@@ -243,8 +238,7 @@ impl LsTool {
                 if is_dir {
                     output.push_str(&format!("{}{}/\n", indent, file_name));
                     let subdir = entry.path();
-                    Self::list_recursive(&subdir, input, output, depth + 1)
-                        .await?;
+                    Self::list_recursive(&subdir, input, output, depth + 1).await?;
                 } else {
                     output.push_str(&format!("{}{}\n", indent, file_name));
                 }

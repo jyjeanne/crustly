@@ -9,22 +9,22 @@ mod r#trait;
 
 // Tool implementations - Phase 1: Essential File Operations
 pub mod bash;
-pub mod read;
-pub mod write;
 pub mod edit;
-pub mod ls;
 pub mod glob;
 pub mod grep;
+pub mod ls;
+pub mod read;
+pub mod write;
 
 // Tool implementations - Phase 2: Advanced Features
-pub mod web_search;
 pub mod code_exec;
 pub mod notebook;
+pub mod web_search;
 
 // Tool implementations - Phase 3: Workflow & Integration
-pub mod task;
 pub mod context;
 pub mod http;
+pub mod task;
 
 // Re-exports
 pub use error::{Result, ToolError};
