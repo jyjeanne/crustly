@@ -112,8 +112,10 @@ pub struct ToolApprovalResponse {
 pub enum AppMode {
     /// Splash screen
     Splash,
-    /// Main chat interface
+    /// Main chat interface (full execution)
     Chat,
+    /// Plan mode (read-only, planning phase)
+    Plan,
     /// Session list/management
     Sessions,
     /// Help screen

@@ -3,6 +3,7 @@
 //! Core state management for the terminal user interface.
 
 use super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResponse, TuiEvent};
+use super::plan::PlanDocument;
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
 use crate::services::{MessageService, ServiceContext, SessionService};
@@ -63,6 +64,11 @@ pub struct App {
     pub pending_approval: Option<ToolApprovalRequest>,
     pub show_approval_details: bool,
 
+    // Plan mode state
+    pub current_plan: Option<PlanDocument>,
+    pub plan_scroll_offset: usize,
+    pub selected_task_index: Option<usize>,
+
     // Services
     agent_service: Arc<AgentService>,
     session_service: SessionService,
@@ -91,6 +97,9 @@ impl App {
             splash_shown_at: Some(std::time::Instant::now()),
             pending_approval: None,
             show_approval_details: false,
+            current_plan: None,
+            plan_scroll_offset: 0,
+            selected_task_index: None,
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context),
             agent_service,
@@ -262,6 +271,7 @@ impl App {
                 }
             }
             AppMode::Chat => self.handle_chat_key(event).await?,
+            AppMode::Plan => self.handle_plan_key(event).await?,
             AppMode::Sessions => self.handle_sessions_key(event).await?,
             AppMode::ToolApproval => self.handle_approval_key(event).await?,
             AppMode::Help | AppMode::Settings => {
@@ -328,6 +338,62 @@ impl App {
                 self.load_session(session.id).await?;
                 self.switch_mode(AppMode::Chat).await?;
             }
+        }
+
+        Ok(())
+    }
+
+    /// Handle keys in plan mode
+    async fn handle_plan_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+        use crossterm::event::{KeyCode, KeyModifiers};
+
+        // Cancel/Escape - return to chat
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+            return Ok(());
+        }
+
+        // Ctrl+A - Approve plan
+        if event.code == KeyCode::Char('a') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            if let Some(plan) = &mut self.current_plan {
+                plan.approve();
+                plan.start_execution();
+                self.switch_mode(AppMode::Chat).await?;
+            }
+            return Ok(());
+        }
+
+        // Ctrl+R - Reject plan
+        if event.code == KeyCode::Char('r') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            if let Some(plan) = &mut self.current_plan {
+                plan.reject();
+                // TODO: Add message to ask for revisions
+            }
+            return Ok(());
+        }
+
+        // Arrow keys for scrolling tasks
+        match event.code {
+            KeyCode::Up => {
+                self.plan_scroll_offset = self.plan_scroll_offset.saturating_sub(1);
+            }
+            KeyCode::Down => {
+                if let Some(plan) = &self.current_plan {
+                    let max_scroll = plan.tasks.len().saturating_sub(1);
+                    self.plan_scroll_offset = (self.plan_scroll_offset + 1).min(max_scroll);
+                }
+            }
+            KeyCode::PageUp => {
+                self.plan_scroll_offset = self.plan_scroll_offset.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                if let Some(plan) = &self.current_plan {
+                    let max_scroll = plan.tasks.len().saturating_sub(1);
+                    self.plan_scroll_offset = (self.plan_scroll_offset + 10).min(max_scroll);
+                }
+            }
+            _ => {}
         }
 
         Ok(())
