@@ -449,3 +449,7 @@ impl Tool for PlanTool {
         Ok(ToolResult::success(result))
     }
 }
+
+#[cfg(test)]
+#[path = "plan_tool_security_tests.rs"]
+mod plan_tool_security_tests;
