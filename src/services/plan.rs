@@ -87,7 +87,6 @@ mod tests {
     use crate::db::repository::session::SessionRepository;
     use crate::db::Database;
     use crate::tui::plan::{PlanStatus, PlanTask, TaskStatus, TaskType};
-    use chrono::Utc;
     use tempfile::TempDir;
 
     /// Helper to create test database and service
