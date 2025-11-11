@@ -19,6 +19,26 @@
 
 ---
 
+## 📸 Screenshots
+
+### Main Interface
+![Crustly Main Interface](docs/screenshots/main-screen.png)
+*Interactive chat interface with syntax highlighting and real-time streaming*
+
+### Deep Code Analysis
+![Deep Code Analysis](docs/screenshots/deeply-analyse.png)
+*Comprehensive code analysis with detailed insights and suggestions*
+
+### AI Thinking Mode
+![AI Thinking Mode](docs/screenshots/thinking-mode.png)
+*Watch the AI reasoning process in real-time as it analyzes your code*
+
+### Help & Commands
+![Help Screen](docs/screenshots/help-screnn.png)
+*Built-in help system and keyboard shortcuts for efficient navigation*
+
+---
+
 ## 🎯 Main Coding Features
 
 **Your AI coding assistant that lives in your terminal.**
