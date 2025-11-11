@@ -104,7 +104,16 @@ impl Tool for CodeExecTool {
             ));
         }
 
-        let valid_languages = ["python", "python3", "javascript", "js", "node", "rust", "sh", "bash"];
+        let valid_languages = [
+            "python",
+            "python3",
+            "javascript",
+            "js",
+            "node",
+            "rust",
+            "sh",
+            "bash",
+        ];
         if !valid_languages.contains(&input.language.as_str()) {
             return Err(ToolError::InvalidInput(format!(
                 "Unsupported language: {}. Supported: {}",
@@ -123,7 +132,11 @@ impl Tool for CodeExecTool {
         let (interpreter, extension, extra_args) = match input.language.as_str() {
             "python" | "python3" => ("python3", "py", vec![]),
             "javascript" | "js" | "node" => ("node", "js", vec![]),
-            "rust" => ("rustc", "rs", vec!["--out-dir".to_string(), "/tmp".to_string()]),
+            "rust" => (
+                "rustc",
+                "rs",
+                vec!["--out-dir".to_string(), "/tmp".to_string()],
+            ),
             "sh" | "bash" => ("bash", "sh", vec![]),
             _ => {
                 return Ok(ToolResult::error(format!(
@@ -153,7 +166,7 @@ impl Tool for CodeExecTool {
         // Write code to temp file
         fs::write(&temp_file, &input.code)
             .await
-            .map_err(|e| ToolError::Io(e))?;
+            .map_err(ToolError::Io)?;
 
         // Prepare command
         let mut cmd = Command::new(interpreter);
@@ -181,10 +194,7 @@ impl Tool for CodeExecTool {
             Ok(Err(e)) => {
                 // Clean up temp file
                 let _ = fs::remove_file(&temp_file).await;
-                return Ok(ToolResult::error(format!(
-                    "Code execution failed: {}",
-                    e
-                )));
+                return Ok(ToolResult::error(format!("Code execution failed: {}", e)));
             }
             Err(_) => {
                 // Clean up temp file
@@ -208,20 +218,17 @@ impl Tool for CodeExecTool {
         let exit_code = output.status.code().unwrap_or(-1);
 
         // Build output message
-        let mut result_text = format!(
-            "Language: {}\nExit Code: {}\n\n",
-            input.language, exit_code
-        );
+        let mut result_text = format!("Language: {}\nExit Code: {}\n\n", input.language, exit_code);
 
         if !stdout.is_empty() {
             result_text.push_str("STDOUT:\n");
             result_text.push_str(&stdout);
-            result_text.push_str("\n");
+            result_text.push('\n');
         }
 
         if !stderr.is_empty() {
             if !stdout.is_empty() {
-                result_text.push_str("\n");
+                result_text.push('\n');
             }
             result_text.push_str("STDERR:\n");
             result_text.push_str(&stderr);
@@ -238,8 +245,12 @@ impl Tool for CodeExecTool {
             ToolResult::error(result_text)
         };
 
-        tool_result.metadata.insert("exit_code".to_string(), exit_code.to_string());
-        tool_result.metadata.insert("language".to_string(), input.language);
+        tool_result
+            .metadata
+            .insert("exit_code".to_string(), exit_code.to_string());
+        tool_result
+            .metadata
+            .insert("language".to_string(), input.language);
 
         Ok(tool_result)
     }

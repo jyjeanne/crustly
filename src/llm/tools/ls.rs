@@ -116,7 +116,7 @@ impl Tool for LsTool {
         let mut output = String::new();
 
         if input.recursive {
-            self.list_recursive(&path, &input, &mut output, 0).await?;
+            Self::list_recursive(&path, &input, &mut output, 0).await?;
         } else {
             self.list_directory(&path, &input, &mut output).await?;
         }
@@ -140,12 +140,7 @@ impl LsTool {
         }
 
         // Sort entries
-        entries.sort_by_key(|entry| {
-            entry
-                .file_name()
-                .into_string()
-                .unwrap_or_default()
-        });
+        entries.sort_by_key(|entry| entry.file_name().into_string().unwrap_or_default());
 
         let mut dirs = Vec::new();
         let mut files = Vec::new();
@@ -182,12 +177,10 @@ impl LsTool {
                 } else {
                     format!("{:>10}  {}  {}", size, modified_time, file_name)
                 }
+            } else if is_dir {
+                format!("{}/", file_name)
             } else {
-                if is_dir {
-                    format!("{}/", file_name)
-                } else {
-                    file_name.clone()
-                }
+                file_name.clone()
             };
 
             if is_dir {
@@ -211,7 +204,6 @@ impl LsTool {
     }
 
     fn list_recursive<'a>(
-        &'a self,
         path: &'a PathBuf,
         input: &'a LsInput,
         output: &'a mut String,
@@ -246,8 +238,7 @@ impl LsTool {
                 if is_dir {
                     output.push_str(&format!("{}{}/\n", indent, file_name));
                     let subdir = entry.path();
-                    self.list_recursive(&subdir, input, output, depth + 1)
-                        .await?;
+                    Self::list_recursive(&subdir, input, output, depth + 1).await?;
                 } else {
                     output.push_str(&format!("{}{}\n", indent, file_name));
                 }

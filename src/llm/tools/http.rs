@@ -191,12 +191,12 @@ impl Tool for HttpClientTool {
         if !input.headers.is_empty() {
             let mut header_map = HeaderMap::new();
             for (key, value) in &input.headers {
-                let header_name: reqwest::header::HeaderName = key
-                    .parse()
-                    .map_err(|e| ToolError::InvalidInput(format!("Invalid header name '{}': {}", key, e)))?;
-                let header_value: reqwest::header::HeaderValue = value
-                    .parse()
-                    .map_err(|e| ToolError::InvalidInput(format!("Invalid header value for '{}': {}", key, e)))?;
+                let header_name: reqwest::header::HeaderName = key.parse().map_err(|e| {
+                    ToolError::InvalidInput(format!("Invalid header name '{}': {}", key, e))
+                })?;
+                let header_value: reqwest::header::HeaderValue = value.parse().map_err(|e| {
+                    ToolError::InvalidInput(format!("Invalid header value for '{}': {}", key, e))
+                })?;
                 header_map.insert(header_name, header_value);
             }
             request = request.headers(header_map);
@@ -308,9 +308,7 @@ impl Tool for HttpClientTool {
         tool_result
             .metadata
             .insert("method".to_string(), input.method.to_uppercase());
-        tool_result
-            .metadata
-            .insert("url".to_string(), input.url);
+        tool_result.metadata.insert("url".to_string(), input.url);
 
         Ok(tool_result)
     }

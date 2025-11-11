@@ -346,16 +346,16 @@ async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result
                 .execute(db.pool())
                 .await?;
 
-            sqlx::query("DELETE FROM files")
-                .execute(db.pool())
-                .await?;
+            sqlx::query("DELETE FROM files").execute(db.pool()).await?;
 
             sqlx::query("DELETE FROM sessions")
                 .execute(db.pool())
                 .await?;
 
-            println!("✅ Successfully cleared {} sessions, {} messages, and {} files",
-                session_count, message_count, file_count);
+            println!(
+                "✅ Successfully cleared {} sessions, {} messages, and {} files",
+                session_count, message_count, file_count
+            );
 
             Ok(())
         }
@@ -370,20 +370,10 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{
-                bash::BashTool,
-                code_exec::CodeExecTool,
-                context::ContextTool,
-                edit::EditTool,
-                glob::GlobTool,
-                grep::GrepTool,
-                http::HttpClientTool,
-                ls::LsTool,
-                notebook::NotebookEditTool,
-                read::ReadTool,
-                registry::ToolRegistry,
-                task::TaskTool,
-                web_search::WebSearchTool,
-                write::WriteTool,
+                bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
+                glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
+                notebook::NotebookEditTool, read::ReadTool, registry::ToolRegistry, task::TaskTool,
+                web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::ServiceContext,
@@ -490,15 +480,12 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create agent service with system prompt
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
-            .with_system_prompt(SYSTEM_PROMPT.to_string())
+            .with_system_prompt(SYSTEM_PROMPT.to_string()),
     );
 
     // Create TUI app first (so we can get the event sender)
     tracing::debug!("Creating TUI app");
-    let mut app = tui::App::new(
-        agent_service,
-        service_context.clone(),
-    );
+    let mut app = tui::App::new(agent_service, service_context.clone());
 
     // Get event sender from app
     let event_sender = app.event_sender();
@@ -578,20 +565,10 @@ async fn cmd_run(
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{
-                bash::BashTool,
-                code_exec::CodeExecTool,
-                context::ContextTool,
-                edit::EditTool,
-                glob::GlobTool,
-                grep::GrepTool,
-                http::HttpClientTool,
-                ls::LsTool,
-                notebook::NotebookEditTool,
-                read::ReadTool,
-                registry::ToolRegistry,
-                task::TaskTool,
-                web_search::WebSearchTool,
-                write::WriteTool,
+                bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
+                glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
+                notebook::NotebookEditTool, read::ReadTool, registry::ToolRegistry, task::TaskTool,
+                web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::{ServiceContext, SessionService},

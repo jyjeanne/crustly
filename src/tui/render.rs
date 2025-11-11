@@ -197,7 +197,7 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
             ),
             Span::styled(
                 format!("{} is thinking...", model_name),
-                Style::default().fg(Color::Yellow)
+                Style::default().fg(Color::Yellow),
             ),
         ]));
     }
@@ -401,7 +401,10 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Clear current session messages", Style::default().fg(Color::White)),
+            Span::styled(
+                "Clear current session messages",
+                Style::default().fg(Color::White),
+            ),
         ]),
         Line::from(""),
         Line::from(Span::styled(

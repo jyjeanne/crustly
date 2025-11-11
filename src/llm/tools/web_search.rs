@@ -198,7 +198,11 @@ impl Tool for WebSearchTool {
                             if result_count >= input.max_results {
                                 break;
                             }
-                            output.push_str(&format!("{}. {}\n", result_count + 1, topic_item.text));
+                            output.push_str(&format!(
+                                "{}. {}\n",
+                                result_count + 1,
+                                topic_item.text
+                            ));
                             output.push_str(&format!("   🔗 {}\n\n", topic_item.first_url));
                             result_count += 1;
                         }

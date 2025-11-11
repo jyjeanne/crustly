@@ -262,7 +262,10 @@ impl Tool for NotebookEditTool {
                     notebook.cells[index].execution_count = Some(Value::Null);
                 }
 
-                format!("Edited cell {} ({})", index, notebook.cells[index].cell_type)
+                format!(
+                    "Edited cell {} ({})",
+                    index, notebook.cells[index].cell_type
+                )
             }
 
             NotebookOperation::DeleteCell { index } => {
@@ -300,9 +303,7 @@ impl Tool for NotebookEditTool {
         let new_content = serde_json::to_string_pretty(&notebook)
             .map_err(|e| ToolError::Execution(format!("Failed to serialize notebook: {}", e)))?;
 
-        fs::write(&path, new_content)
-            .await
-            .map_err(ToolError::Io)?;
+        fs::write(&path, new_content).await.map_err(ToolError::Io)?;
 
         Ok(ToolResult::success(format!(
             "{}. Notebook saved: {}",

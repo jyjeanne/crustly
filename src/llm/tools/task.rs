@@ -68,9 +68,8 @@ impl TaskStore {
     async fn load(path: &PathBuf) -> Result<Self> {
         if path.exists() {
             let content = fs::read_to_string(path).await.map_err(ToolError::Io)?;
-            serde_json::from_str(&content).map_err(|e| {
-                ToolError::Execution(format!("Failed to parse task store: {}", e))
-            })
+            serde_json::from_str(&content)
+                .map_err(|e| ToolError::Execution(format!("Failed to parse task store: {}", e)))
         } else {
             Ok(Self::new())
         }
@@ -245,10 +244,7 @@ impl Tool for TaskTool {
     }
 
     fn capabilities(&self) -> Vec<ToolCapability> {
-        vec![
-            ToolCapability::ReadFiles,
-            ToolCapability::WriteFiles,
-        ]
+        vec![ToolCapability::ReadFiles, ToolCapability::WriteFiles]
     }
 
     fn requires_approval(&self) -> bool {
@@ -321,7 +317,10 @@ impl Tool for TaskTool {
             } => {
                 // Check if task exists first
                 if !store.tasks.contains_key(&task_id) {
-                    return Err(ToolError::InvalidInput(format!("Task not found: {}", task_id)));
+                    return Err(ToolError::InvalidInput(format!(
+                        "Task not found: {}",
+                        task_id
+                    )));
                 }
 
                 let mut updates = Vec::new();
@@ -331,7 +330,10 @@ impl Tool for TaskTool {
                     let parsed_status = parse_status(new_status)?;
 
                     // Check dependencies before moving to in_progress or completed
-                    if matches!(parsed_status, TaskStatus::InProgress | TaskStatus::Completed) {
+                    if matches!(
+                        parsed_status,
+                        TaskStatus::InProgress | TaskStatus::Completed
+                    ) {
                         let task_deps = store.tasks.get(&task_id).unwrap().dependencies.clone();
                         for dep_id in &task_deps {
                             if let Some(dep_task) = store.tasks.get(dep_id) {
@@ -377,11 +379,7 @@ impl Tool for TaskTool {
                 task.updated_at = Utc::now();
                 store.save(&store_path).await?;
 
-                format!(
-                    "Updated task {}\nChanges: {}",
-                    task_id,
-                    updates.join(", ")
-                )
+                format!("Updated task {}\nChanges: {}", task_id, updates.join(", "))
             }
 
             TaskOperation::List {
@@ -483,10 +481,9 @@ impl Tool for TaskTool {
                     )));
                 }
 
-                let task = store
-                    .tasks
-                    .remove(&task_id)
-                    .ok_or_else(|| ToolError::InvalidInput(format!("Task not found: {}", task_id)))?;
+                let task = store.tasks.remove(&task_id).ok_or_else(|| {
+                    ToolError::InvalidInput(format!("Task not found: {}", task_id))
+                })?;
 
                 store.save(&store_path).await?;
 
@@ -497,20 +494,28 @@ impl Tool for TaskTool {
             }
 
             TaskOperation::Get { task_id } => {
-                let task = store
-                    .tasks
-                    .get(&task_id)
-                    .ok_or_else(|| ToolError::InvalidInput(format!("Task not found: {}", task_id)))?;
+                let task = store.tasks.get(&task_id).ok_or_else(|| {
+                    ToolError::InvalidInput(format!("Task not found: {}", task_id))
+                })?;
 
                 let mut output = format!("Task: {}\n", task.id);
                 output.push_str(&format!("Description: {}\n", task.description));
                 output.push_str(&format!("Status: {:?}\n", task.status));
                 output.push_str(&format!("Priority: {:?}\n", task.priority));
-                output.push_str(&format!("Created: {}\n", task.created_at.format("%Y-%m-%d %H:%M:%S")));
-                output.push_str(&format!("Updated: {}\n", task.updated_at.format("%Y-%m-%d %H:%M:%S")));
+                output.push_str(&format!(
+                    "Created: {}\n",
+                    task.created_at.format("%Y-%m-%d %H:%M:%S")
+                ));
+                output.push_str(&format!(
+                    "Updated: {}\n",
+                    task.updated_at.format("%Y-%m-%d %H:%M:%S")
+                ));
 
                 if let Some(completed) = task.completed_at {
-                    output.push_str(&format!("Completed: {}\n", completed.format("%Y-%m-%d %H:%M:%S")));
+                    output.push_str(&format!(
+                        "Completed: {}\n",
+                        completed.format("%Y-%m-%d %H:%M:%S")
+                    ));
                 }
 
                 if !task.tags.is_empty() {
@@ -518,10 +523,7 @@ impl Tool for TaskTool {
                 }
 
                 if !task.dependencies.is_empty() {
-                    output.push_str(&format!(
-                        "Dependencies: {}\n",
-                        task.dependencies.join(", ")
-                    ));
+                    output.push_str(&format!("Dependencies: {}\n", task.dependencies.join(", ")));
                 }
 
                 if let Some(reason) = &task.blocked_reason {
@@ -538,9 +540,7 @@ impl Tool for TaskTool {
                     .filter(|(_, t)| t.status == TaskStatus::Completed)
                     .count();
 
-                store
-                    .tasks
-                    .retain(|_, t| t.status != TaskStatus::Completed);
+                store.tasks.retain(|_, t| t.status != TaskStatus::Completed);
 
                 store.save(&store_path).await?;
 

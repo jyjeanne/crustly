@@ -5,7 +5,7 @@ use crustly::cli;
 async fn main() -> Result<()> {
     // Initialize logging to file to avoid interfering with TUI
     let log_dir = dirs::data_local_dir()
-        .unwrap_or_else(|| std::env::temp_dir())
+        .unwrap_or_else(std::env::temp_dir)
         .join("crustly")
         .join("logs");
 
