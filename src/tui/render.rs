@@ -138,6 +138,33 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
 fn render_chat(f: &mut Frame, app: &App, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
 
+    // Show banner if there's a pending plan
+    if let Some(ref plan) = app.current_plan {
+        if matches!(plan.status, crate::tui::plan::PlanStatus::PendingApproval) {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("  ⚠️  ", Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    "Plan Pending Approval",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled("Press ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Ctrl+P", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(" to review the plan, or switch to Plan Mode to approve/reject.", Style::default().fg(Color::DarkGray)),
+            ]));
+            lines.push(Line::from(Span::styled(
+                "  ─".repeat(30),
+                Style::default().fg(Color::Yellow),
+            )));
+            lines.push(Line::from(""));
+        }
+    }
+
     // Get the model name from the current session
     let model_name = app
         .current_session

@@ -52,17 +52,29 @@ Mandatory steps for plan creation:
    - Be concrete: "Create Login.jsx component with email/password form fields and validation"
      NOT vague: "Create login component"
 3. Call plan tool with operation='finalize' to present the plan for user approval
-4. AFTER finalization, call plan tool with operation='export_markdown' to create a detailed markdown file
-5. ASK the user: "Would you like me to execute this plan and create the project files?"
-6. ONLY proceed with execution if user explicitly confirms (yes/approve/execute/etc.)
+4. INFORM the user that the plan is ready for review:
+   "✅ Plan finalized! The plan is now displayed in Plan Mode for your review.
+
+   To proceed:
+   • Press Ctrl+A to approve and execute the plan
+   • Press Ctrl+R to reject and revise the plan
+   • Press Esc to cancel and return to chat
+
+   When you approve, the plan will be automatically exported to PLAN.md and execution will begin."
+5. WAIT for the user to approve the plan via Ctrl+A before execution begins
+   - The TUI will automatically switch to Plan Mode and display the plan
+   - User controls the approval through keyboard shortcuts, not text responses
+   - DO NOT call any more tools after finalize - wait for user action
+
+IMPORTANT: Do NOT call plan tool with operation='export_markdown' after finalize.
+The markdown export happens automatically when the user presses Ctrl+A to approve the plan.
 
 Example: If user says "create a plan to implement a login page"
-- FIRST TOOL CALL: plan(operation="create", title="Implement Login Page", description="Build a React login page with email/password authentication", context="React app needs user authentication. Backend API endpoint /auth/login exists.", complexity=3)
+- FIRST TOOL CALL: plan(operation="create", title="Implement Login Page", description="Build a React login page with email/password authentication", context="React app needs user authentication. Backend API endpoint /auth/login exists.")
 - NEXT TOOL CALL: plan(operation="add_task", title="Create Login Component", description="1. Create src/components/Login.jsx file\n2. Add email input field with type='email' validation\n3. Add password input field with type='password'\n4. Add submit button that calls handleSubmit()\n5. Import useState for form state management\n6. Add basic CSS styling for form layout", task_type="create", complexity=2)
 - NEXT TOOL CALL: plan(operation="add_task", title="Implement Authentication Logic", description="1. Create handleSubmit() function in Login.jsx\n2. Validate email format using regex\n3. Make POST request to /auth/login endpoint\n4. Include email/password in request body\n5. Handle success response - store JWT token in localStorage\n6. Handle error response - display error message to user\n7. Redirect to dashboard on successful login", task_type="edit", complexity=3, dependencies=[1])
 - TOOL CALL: plan(operation="finalize")
-- TOOL CALL: plan(operation="export_markdown", filename="LOGIN_PLAN.md")
-- THEN ASK: "The plan has been created and exported to LOGIN_PLAN.md. Would you like me to execute this plan and create the project files?"
+- THEN SAY: "✅ Plan finalized! The plan is now displayed in Plan Mode. Press Ctrl+A to approve and execute, Ctrl+R to reject, or Esc to cancel. The plan will be exported to PLAN.md when you approve it."
 
 TASK DESCRIPTION QUALITY REQUIREMENTS:
 - Each task description MUST be detailed enough to execute without further clarification
