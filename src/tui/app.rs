@@ -871,7 +871,7 @@ impl App {
 
             // Backup: Save to JSON file (for backward compatibility and backup)
             let plan_filename = format!(".crustly_plan_{}.json", session_id);
-            let plan_file = std::env::current_dir()?.join(&plan_filename);
+            let plan_file = self.working_directory.join(&plan_filename);
 
             if let Err(e) = self.plan_service.export_to_json(plan, &plan_file).await {
                 tracing::warn!("Failed to save plan JSON backup: {}", e);
