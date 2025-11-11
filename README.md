@@ -19,6 +19,30 @@
 
 ---
 
+## 📸 Screenshots
+
+### Main Interface
+![Crustly Main Interface](doc/screenshots/main-interface.png)
+*Interactive chat interface with syntax highlighting and real-time streaming*
+
+### Code Analysis & Tools
+![Code Analysis](doc/screenshots/code-analysis.png)
+*Built-in tools for reading, writing, and executing code*
+
+### Interactive Approval System
+![Approval Dialog](doc/screenshots/approval-dialog.png)
+*Permission dialogs for dangerous operations - you stay in control*
+
+### Session Management
+![Session List](doc/screenshots/session-list.png)
+*Manage multiple conversation sessions with persistent context*
+
+### Syntax Highlighting
+![Syntax Highlighting](doc/screenshots/syntax-highlighting.png)
+*Beautiful code display with support for 100+ languages*
+
+---
+
 ## 🎯 Main Coding Features
 
 **Your AI coding assistant that lives in your terminal.**
