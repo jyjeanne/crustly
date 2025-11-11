@@ -68,13 +68,63 @@ impl PlanDocument {
         self.updated_at = Utc::now();
     }
 
-    /// Get tasks in dependency order
-    pub fn tasks_in_order(&self) -> Vec<&PlanTask> {
-        // Simple ordering by task order field
-        // TODO: Implement proper topological sort for dependencies
-        let mut tasks: Vec<_> = self.tasks.iter().collect();
-        tasks.sort_by_key(|t| t.order);
-        tasks
+    /// Get tasks in dependency order using topological sort
+    /// Returns None if there are circular dependencies
+    pub fn tasks_in_order(&self) -> Option<Vec<&PlanTask>> {
+        use std::collections::{HashMap, VecDeque};
+
+        // Build dependency graph
+        let mut in_degree: HashMap<Uuid, usize> = HashMap::new();
+        let mut dependents: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+
+        // Initialize in-degree for all tasks
+        for task in &self.tasks {
+            in_degree.insert(task.id, task.dependencies.len());
+
+            // Build reverse dependency map
+            for &dep_id in &task.dependencies {
+                dependents.entry(dep_id).or_default().push(task.id);
+            }
+        }
+
+        // Kahn's algorithm for topological sort
+        let mut queue: VecDeque<Uuid> = VecDeque::new();
+
+        // Start with tasks that have no dependencies
+        for task in &self.tasks {
+            if task.dependencies.is_empty() {
+                queue.push_back(task.id);
+            }
+        }
+
+        let mut sorted_ids = Vec::new();
+
+        while let Some(task_id) = queue.pop_front() {
+            sorted_ids.push(task_id);
+
+            // Process tasks that depend on this one
+            if let Some(deps) = dependents.get(&task_id) {
+                for &dependent_id in deps {
+                    if let Some(degree) = in_degree.get_mut(&dependent_id) {
+                        *degree -= 1;
+                        if *degree == 0 {
+                            queue.push_back(dependent_id);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check for cycles - if we didn't process all tasks, there's a cycle
+        if sorted_ids.len() != self.tasks.len() {
+            return None; // Circular dependency detected
+        }
+
+        // Convert sorted IDs back to task references
+        let task_map: HashMap<Uuid, &PlanTask> =
+            self.tasks.iter().map(|t| (t.id, t)).collect();
+
+        Some(sorted_ids.iter().filter_map(|id| task_map.get(id).copied()).collect())
     }
 
     /// Get task by ID
@@ -133,6 +183,32 @@ impl PlanDocument {
     pub fn complete(&mut self) {
         self.status = PlanStatus::Completed;
         self.updated_at = Utc::now();
+    }
+
+    /// Validate task dependencies
+    /// Returns Ok(()) if all dependencies are valid, or Err with description of issues
+    pub fn validate_dependencies(&self) -> Result<(), String> {
+        let task_ids: std::collections::HashSet<Uuid> =
+            self.tasks.iter().map(|t| t.id).collect();
+
+        // Check for invalid task references
+        for task in &self.tasks {
+            for &dep_id in &task.dependencies {
+                if !task_ids.contains(&dep_id) {
+                    return Err(format!(
+                        "Task '{}' has invalid dependency: task ID {} not found",
+                        task.title, dep_id
+                    ));
+                }
+            }
+        }
+
+        // Check for circular dependencies using topological sort
+        if self.tasks_in_order().is_none() {
+            return Err("Circular dependency detected in task graph".to_string());
+        }
+
+        Ok(())
     }
 }
 

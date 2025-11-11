@@ -268,6 +268,15 @@ impl Tool for PlanTool {
                     ));
                 }
 
+                // Validate dependencies before finalizing
+                if let Err(e) = current_plan.validate_dependencies() {
+                    return Ok(ToolResult::error(format!(
+                        "Cannot finalize plan: {}\n\n\
+                         Please fix the dependency issues before finalizing.",
+                        e
+                    )));
+                }
+
                 current_plan.status = PlanStatus::PendingApproval;
                 current_plan.updated_at = Utc::now();
 
