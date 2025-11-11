@@ -329,14 +329,7 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
 }
 
 /// Render the help screen
-fn render_help(f: &mut Frame, app: &App, area: Rect) {
-    // Get the model name from the current session
-    let model_name = app
-        .current_session
-        .as_ref()
-        .and_then(|s| s.model.as_deref())
-        .unwrap_or("AI");
-
+fn render_help(f: &mut Frame, _app: &App, area: Rect) {
     let help_text = vec![
         Line::from(vec![
             Span::styled("🥐 ", Style::default().fg(Color::Rgb(218, 165, 32))),
@@ -423,10 +416,7 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("Send your message to {}", model_name),
-                Style::default().fg(Color::White),
-            ),
+            Span::styled("Send message to LLM", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
             Span::styled(
@@ -525,6 +515,74 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(""),
         Line::from(Span::styled(
+            "╭─ PLAN MODE ───────────────────────────────────────────────╮",
+            Style::default().fg(Color::Cyan),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+P       ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Toggle Plan Mode view", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+A       ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Approve plan and start execution",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+R       ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Reject plan and return to chat",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  ↑/↓          ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Scroll through plan tasks",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Page Up/Down ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Scroll plan tasks faster",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
             "╭─ FEATURES ────────────────────────────────────────────────╮",
             Style::default().fg(Color::Cyan),
         )),
@@ -604,6 +662,19 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
             ),
             Span::styled(
                 " - Monitor usage in real-time",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
+            Span::styled(
+                "Plan Mode",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " - Structured task planning with approval",
                 Style::default().fg(Color::DarkGray),
             ),
         ]),
