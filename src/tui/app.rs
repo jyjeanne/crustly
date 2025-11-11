@@ -745,6 +745,10 @@ impl App {
 
         tracing::debug!("Looking for plan file at: {}", plan_file.display());
 
+        // Check if file exists before trying to read
+        let file_exists = plan_file.exists();
+        tracing::debug!("Plan file exists: {}", file_exists);
+
         match tokio::fs::read_to_string(&plan_file).await {
             Ok(content) => {
                 tracing::debug!("Found plan JSON file, parsing...");
