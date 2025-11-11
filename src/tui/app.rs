@@ -68,6 +68,7 @@ pub struct App {
     pub current_plan: Option<PlanDocument>,
     pub plan_scroll_offset: usize,
     pub selected_task_index: Option<usize>,
+    pub executing_plan: bool,
 
     // Services
     agent_service: Arc<AgentService>,
@@ -100,6 +101,7 @@ impl App {
             current_plan: None,
             plan_scroll_offset: 0,
             selected_task_index: None,
+            executing_plan: false,
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context),
             agent_service,
@@ -372,6 +374,8 @@ impl App {
                 // Save plan to file
                 self.save_plan().await?;
                 self.switch_mode(AppMode::Chat).await?;
+                // Start executing tasks sequentially
+                self.execute_plan_tasks().await?;
             }
             return Ok(());
         }
@@ -577,8 +581,26 @@ impl App {
         // Auto-scroll to bottom
         self.scroll_offset = 0;
 
-        // Check if a plan was created/finalized
-        self.check_and_load_plan().await?;
+        // If executing a plan, mark current task as completed and move to next
+        if self.executing_plan {
+            if let Some(plan) = &mut self.current_plan {
+                // Find the in-progress task and mark it completed
+                if let Some(task) = plan
+                    .tasks
+                    .iter_mut()
+                    .find(|t| matches!(t.status, crate::tui::plan::TaskStatus::InProgress))
+                {
+                    task.status = crate::tui::plan::TaskStatus::Completed;
+                    task.completed_at = Some(chrono::Utc::now());
+                }
+                self.save_plan().await?;
+            }
+            // Execute next task
+            self.execute_next_plan_task().await?;
+        } else {
+            // Check if a plan was created/finalized
+            self.check_and_load_plan().await?;
+        }
 
         Ok(())
     }
@@ -610,6 +632,96 @@ impl App {
             let json = serde_json::to_string_pretty(plan)?;
             tokio::fs::write(&plan_file, json).await?;
         }
+        Ok(())
+    }
+
+    /// Execute plan tasks sequentially
+    async fn execute_plan_tasks(&mut self) -> Result<()> {
+        self.executing_plan = true;
+        self.execute_next_plan_task().await
+    }
+
+    /// Execute the next pending task in the plan
+    async fn execute_next_plan_task(&mut self) -> Result<()> {
+        // Collect necessary data from plan first to avoid borrow issues
+        let (task_message, completion_data) = {
+            let Some(plan) = &mut self.current_plan else {
+                self.executing_plan = false;
+                return Ok(());
+            };
+
+            // Get tasks in dependency order
+            let Some(ordered_tasks) = plan.tasks_in_order() else {
+                self.executing_plan = false;
+                self.show_error("Cannot execute plan: circular dependency detected".to_string());
+                return Ok(());
+            };
+
+            // Find the next pending task and extract its data
+            let next_task_data = ordered_tasks
+                .iter()
+                .find(|task| matches!(task.status, crate::tui::plan::TaskStatus::Pending))
+                .map(|task| (task.id, task.order, task.title.clone(), task.description.clone()));
+
+            let total_tasks = plan.tasks.len();
+
+            // Drop the immutable borrow of ordered_tasks
+            drop(ordered_tasks);
+
+            match next_task_data {
+                Some((task_id, order, title, description)) => {
+                    // Mark task as in progress
+                    if let Some(task_mut) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
+                        task_mut.status = crate::tui::plan::TaskStatus::InProgress;
+                    }
+
+                    // Prepare task message
+                    let message = format!(
+                        "📋 Executing Plan Task #{}/{}\n\n\
+                         **{}**\n\n\
+                         {}\n\n\
+                         Please complete this task.",
+                        order, total_tasks, title, description
+                    );
+
+                    (Some(message), None)
+                }
+                None => {
+                    // No more pending tasks - plan is complete
+                    let title = plan.title.clone();
+                    let task_count = plan.tasks.len();
+                    plan.complete();
+                    self.executing_plan = false;
+
+                    (None, Some((title, task_count)))
+                }
+            }
+        };
+
+        // Save plan after releasing borrow
+        self.save_plan().await?;
+
+        // Handle results
+        if let Some((title, task_count)) = completion_data {
+            // Add completion message
+            let completion_msg = DisplayMessage {
+                id: uuid::Uuid::new_v4(),
+                role: "system".to_string(),
+                content: format!(
+                    "✅ Plan '{}' completed successfully!\n\
+                     All {} tasks have been executed.",
+                    title, task_count
+                ),
+                timestamp: chrono::Utc::now(),
+                token_count: None,
+                cost: None,
+            };
+            self.messages.push(completion_msg);
+        } else if let Some(message) = task_message {
+            // Send task message to agent
+            self.send_message(message).await?;
+        }
+
         Ok(())
     }
 
