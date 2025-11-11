@@ -489,7 +489,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create agent service with system prompt
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
-            .with_system_prompt(SYSTEM_PROMPT.to_string()),
+            .with_system_prompt(SYSTEM_PROMPT.to_string())
+            .with_max_tool_iterations(20),
     );
 
     // Create TUI app first (so we can get the event sender)
@@ -546,7 +547,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
             .with_tool_registry(Arc::new(tool_registry))
-            .with_approval_callback(Some(approval_callback)),
+            .with_approval_callback(Some(approval_callback))
+            .with_max_tool_iterations(20),
     );
 
     // Update app with the configured agent service (preserve event channels!)
@@ -666,7 +668,8 @@ async fn cmd_run(
     let service_context = ServiceContext::new(db.pool().clone());
     let agent_service = AgentService::new(provider.clone(), service_context.clone())
         .with_tool_registry(Arc::new(tool_registry))
-        .with_system_prompt(SYSTEM_PROMPT.to_string());
+        .with_system_prompt(SYSTEM_PROMPT.to_string())
+        .with_max_tool_iterations(20);
 
     // Create or get session
     let session_service = SessionService::new(service_context);
