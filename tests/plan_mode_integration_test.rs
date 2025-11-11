@@ -208,11 +208,20 @@ async fn test_multiple_concurrent_plans_for_same_session() {
     let plan2 = create_multi_task_plan(session.id);
     let plan3 = create_multi_task_plan(session.id);
 
-    plan_service.create(&plan1).await.expect("Failed to create plan1");
+    plan_service
+        .create(&plan1)
+        .await
+        .expect("Failed to create plan1");
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    plan_service.create(&plan2).await.expect("Failed to create plan2");
+    plan_service
+        .create(&plan2)
+        .await
+        .expect("Failed to create plan2");
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    plan_service.create(&plan3).await.expect("Failed to create plan3");
+    plan_service
+        .create(&plan3)
+        .await
+        .expect("Failed to create plan3");
 
     // Retrieve all plans for the session
     let plans = plan_service
@@ -253,8 +262,14 @@ async fn test_multiple_sessions_with_separate_plans() {
     let plan1 = create_multi_task_plan(session1.id);
     let plan2 = create_multi_task_plan(session2.id);
 
-    plan_service.create(&plan1).await.expect("Failed to create plan1");
-    plan_service.create(&plan2).await.expect("Failed to create plan2");
+    plan_service
+        .create(&plan1)
+        .await
+        .expect("Failed to create plan1");
+    plan_service
+        .create(&plan2)
+        .await
+        .expect("Failed to create plan2");
 
     // Verify session1 has only its plan
     let session1_plans = plan_service
@@ -289,7 +304,10 @@ async fn test_plan_deletion_with_cascade() {
     assert_eq!(found.unwrap().tasks.len(), 3);
 
     // Delete plan
-    plan_service.delete(plan_id).await.expect("Failed to delete");
+    plan_service
+        .delete(plan_id)
+        .await
+        .expect("Failed to delete");
 
     // Verify plan and all tasks are deleted
     let not_found = plan_service.find_by_id(plan_id).await.unwrap();

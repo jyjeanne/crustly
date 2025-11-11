@@ -121,10 +121,14 @@ impl PlanDocument {
         }
 
         // Convert sorted IDs back to task references
-        let task_map: HashMap<Uuid, &PlanTask> =
-            self.tasks.iter().map(|t| (t.id, t)).collect();
+        let task_map: HashMap<Uuid, &PlanTask> = self.tasks.iter().map(|t| (t.id, t)).collect();
 
-        Some(sorted_ids.iter().filter_map(|id| task_map.get(id).copied()).collect())
+        Some(
+            sorted_ids
+                .iter()
+                .filter_map(|id| task_map.get(id).copied())
+                .collect(),
+        )
     }
 
     /// Get task by ID
@@ -155,9 +159,10 @@ impl PlanDocument {
     /// Check if all tasks are completed
     pub fn is_complete(&self) -> bool {
         !self.tasks.is_empty()
-            && self.tasks.iter().all(|t| {
-                matches!(t.status, TaskStatus::Completed | TaskStatus::Skipped)
-            })
+            && self
+                .tasks
+                .iter()
+                .all(|t| matches!(t.status, TaskStatus::Completed | TaskStatus::Skipped))
     }
 
     /// Approve the plan
@@ -188,8 +193,7 @@ impl PlanDocument {
     /// Validate task dependencies
     /// Returns Ok(()) if all dependencies are valid, or Err with description of issues
     pub fn validate_dependencies(&self) -> Result<(), String> {
-        let task_ids: std::collections::HashSet<Uuid> =
-            self.tasks.iter().map(|t| t.id).collect();
+        let task_ids: std::collections::HashSet<Uuid> = self.tasks.iter().map(|t| t.id).collect();
 
         // Check for invalid task references
         for task in &self.tasks {

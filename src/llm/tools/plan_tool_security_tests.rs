@@ -77,10 +77,7 @@ mod tests {
 
         let result = validate_plan_file_path(&plan_file, working_dir);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("valid UUID"));
+        assert!(result.unwrap_err().to_string().contains("valid UUID"));
     }
 
     #[test]

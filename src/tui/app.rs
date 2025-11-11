@@ -592,7 +592,6 @@ impl App {
 
         // Handle plan execution
         if self.executing_plan {
-
             if task_failed {
                 // Stop execution on failure
                 self.executing_plan = false;
@@ -646,8 +645,9 @@ impl App {
                 if has_error {
                     // Mark task as failed
                     task.status = crate::tui::plan::TaskStatus::Failed;
-                    task.notes =
-                        Some("Task failed during execution. Error detected in response.".to_string());
+                    task.notes = Some(
+                        "Task failed during execution. Error detected in response.".to_string(),
+                    );
                     true // Task failed
                 } else {
                     // Mark task as completed successfully
@@ -804,7 +804,14 @@ impl App {
             let next_task_data = ordered_tasks
                 .iter()
                 .find(|task| matches!(task.status, crate::tui::plan::TaskStatus::Pending))
-                .map(|task| (task.id, task.order, task.title.clone(), task.description.clone()));
+                .map(|task| {
+                    (
+                        task.id,
+                        task.order,
+                        task.title.clone(),
+                        task.description.clone(),
+                    )
+                });
 
             let total_tasks = plan.tasks.len();
 

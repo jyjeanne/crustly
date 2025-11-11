@@ -56,7 +56,11 @@ impl PlanService {
 
     /// Save plan to JSON file as backup
     /// This is a fallback/export mechanism
-    pub async fn export_to_json(&self, plan: &PlanDocument, file_path: &std::path::Path) -> Result<()> {
+    pub async fn export_to_json(
+        &self,
+        plan: &PlanDocument,
+        file_path: &std::path::Path,
+    ) -> Result<()> {
         let json = serde_json::to_string_pretty(plan)?;
 
         // Atomic write: write to temp file, then rename
@@ -190,7 +194,10 @@ mod tests {
         service.create(&plan).await.expect("Failed to create plan");
 
         // Delete
-        service.delete(plan.id).await.expect("Failed to delete plan");
+        service
+            .delete(plan.id)
+            .await
+            .expect("Failed to delete plan");
 
         // Verify deletion
         let found = service.find_by_id(plan.id).await.expect("Failed to query");
@@ -205,9 +212,15 @@ mod tests {
         let plan1 = create_test_plan(session.id);
         let plan2 = create_test_plan(session.id);
 
-        service.create(&plan1).await.expect("Failed to create plan1");
+        service
+            .create(&plan1)
+            .await
+            .expect("Failed to create plan1");
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await; // Ensure different timestamps
-        service.create(&plan2).await.expect("Failed to create plan2");
+        service
+            .create(&plan2)
+            .await
+            .expect("Failed to create plan2");
 
         // Find all plans for session
         let plans = service
@@ -231,7 +244,10 @@ mod tests {
         // Create first plan
         let plan1 = create_test_plan(session.id);
         let plan1_id = plan1.id;
-        service.create(&plan1).await.expect("Failed to create plan1");
+        service
+            .create(&plan1)
+            .await
+            .expect("Failed to create plan1");
 
         let recent = service
             .get_most_recent_plan(session.id)
@@ -243,7 +259,10 @@ mod tests {
         // Create second plan
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         let plan2 = create_test_plan(session.id);
-        service.create(&plan2).await.expect("Failed to create plan2");
+        service
+            .create(&plan2)
+            .await
+            .expect("Failed to create plan2");
 
         // Should return one of the plans (order tested in repository layer)
         let recent = service
@@ -335,7 +354,9 @@ mod tests {
         assert_eq!(imported_plan.status, original_plan.status);
         assert_eq!(imported_plan.tasks.len(), original_plan.tasks.len());
 
-        if let (Some(orig_task), Some(imp_task)) = (imported_plan.tasks.first(), original_plan.tasks.first()) {
+        if let (Some(orig_task), Some(imp_task)) =
+            (imported_plan.tasks.first(), original_plan.tasks.first())
+        {
             assert_eq!(orig_task.id, imp_task.id);
             assert_eq!(orig_task.title, imp_task.title);
             assert_eq!(orig_task.task_type, imp_task.task_type);

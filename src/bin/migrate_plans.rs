@@ -48,9 +48,7 @@ async fn main() -> Result<()> {
     let db = Database::connect(&db_path).await?;
     db.run_migrations().await?;
 
-    let plan_service = PlanService::new(crustly::services::ServiceContext::new(
-        db.pool().clone(),
-    ));
+    let plan_service = PlanService::new(crustly::services::ServiceContext::new(db.pool().clone()));
 
     // Find all .crustly_plan_*.json files in the working directory
     let pattern = args

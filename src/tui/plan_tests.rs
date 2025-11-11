@@ -457,7 +457,10 @@ mod tests {
     #[test]
     fn test_plan_status_display() {
         assert_eq!(format!("{}", PlanStatus::Draft), "Draft");
-        assert_eq!(format!("{}", PlanStatus::PendingApproval), "Pending Approval");
+        assert_eq!(
+            format!("{}", PlanStatus::PendingApproval),
+            "Pending Approval"
+        );
         assert_eq!(format!("{}", PlanStatus::Approved), "Approved");
         assert_eq!(format!("{}", PlanStatus::Rejected), "Rejected");
         assert_eq!(format!("{}", PlanStatus::InProgress), "In Progress");

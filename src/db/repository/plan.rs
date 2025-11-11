@@ -212,8 +212,8 @@ impl PlanRepository {
 
     /// Convert database models to domain model
     fn plan_from_db(&self, db_plan: Plan, db_tasks: Vec<PlanTask>) -> Result<PlanDocument> {
-        let risks: Vec<String> = serde_json::from_str(&db_plan.risks)
-            .context("Failed to parse risks JSON")?;
+        let risks: Vec<String> =
+            serde_json::from_str(&db_plan.risks).context("Failed to parse risks JSON")?;
 
         let status = self.parse_plan_status(&db_plan.status)?;
 
@@ -261,8 +261,7 @@ impl PlanRepository {
 
     /// Convert domain model to database models
     fn plan_to_db(&self, plan: &PlanDocument) -> Result<(Plan, Vec<PlanTask>)> {
-        let risks = serde_json::to_string(&plan.risks)
-            .context("Failed to serialize risks")?;
+        let risks = serde_json::to_string(&plan.risks).context("Failed to serialize risks")?;
 
         let db_plan = Plan {
             id: plan.id,
@@ -478,7 +477,10 @@ mod tests {
         let plan = create_test_plan(session.id);
         let plan_id = plan.id;
 
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         // Verify plan was created
         let found = plan_repo
@@ -496,7 +498,10 @@ mod tests {
         let (_db, _session_repo, plan_repo, session) = setup_test_db().await;
 
         let plan = create_test_plan(session.id);
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         // Find existing plan
         let found = plan_repo
@@ -521,8 +526,14 @@ mod tests {
         let plan1 = create_test_plan(session.id);
         let plan2 = create_test_plan(session.id);
 
-        plan_repo.create(&plan1).await.expect("Failed to create plan1");
-        plan_repo.create(&plan2).await.expect("Failed to create plan2");
+        plan_repo
+            .create(&plan1)
+            .await
+            .expect("Failed to create plan1");
+        plan_repo
+            .create(&plan2)
+            .await
+            .expect("Failed to create plan2");
 
         // Find all plans for session
         let plans = plan_repo
@@ -541,7 +552,10 @@ mod tests {
         let (_db, _session_repo, plan_repo, session) = setup_test_db().await;
 
         let mut plan = create_test_plan(session.id);
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         // Update plan
         plan.title = "Updated Plan Title".to_string();
@@ -563,7 +577,10 @@ mod tests {
         };
         plan.add_task(task3);
 
-        plan_repo.update(&plan).await.expect("Failed to update plan");
+        plan_repo
+            .update(&plan)
+            .await
+            .expect("Failed to update plan");
 
         // Verify updates
         let found = plan_repo
@@ -582,14 +599,20 @@ mod tests {
         let (_db, _session_repo, plan_repo, session) = setup_test_db().await;
 
         let plan = create_test_plan(session.id);
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         // Verify plan exists
         let found = plan_repo.find_by_id(plan.id).await.expect("Failed to find");
         assert!(found.is_some());
 
         // Delete plan
-        plan_repo.delete(plan.id).await.expect("Failed to delete plan");
+        plan_repo
+            .delete(plan.id)
+            .await
+            .expect("Failed to delete plan");
 
         // Verify plan is deleted
         let not_found = plan_repo
@@ -606,7 +629,10 @@ mod tests {
         let plan = create_test_plan(session.id);
         let plan_id = plan.id;
 
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         // Verify tasks exist
         let found = plan_repo
@@ -645,7 +671,10 @@ mod tests {
             let mut plan = create_test_plan(session.id);
             plan.status = status.clone();
 
-            plan_repo.create(&plan).await.expect("Failed to create plan");
+            plan_repo
+                .create(&plan)
+                .await
+                .expect("Failed to create plan");
 
             let found = plan_repo
                 .find_by_id(plan.id)
@@ -680,7 +709,10 @@ mod tests {
             let mut plan = create_test_plan(session.id);
             plan.tasks[0].task_type = task_type.clone();
 
-            plan_repo.create(&plan).await.expect("Failed to create plan");
+            plan_repo
+                .create(&plan)
+                .await
+                .expect("Failed to create plan");
 
             let found = plan_repo
                 .find_by_id(plan.id)
@@ -711,7 +743,10 @@ mod tests {
             let mut plan = create_test_plan(session.id);
             plan.tasks[0].status = task_status.clone();
 
-            plan_repo.create(&plan).await.expect("Failed to create plan");
+            plan_repo
+                .create(&plan)
+                .await
+                .expect("Failed to create plan");
 
             let found = plan_repo
                 .find_by_id(plan.id)
@@ -732,7 +767,10 @@ mod tests {
         let plan = create_test_plan(session.id);
         let task1_id = plan.tasks[0].id;
 
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         let found = plan_repo
             .find_by_id(plan.id)
@@ -753,7 +791,10 @@ mod tests {
         let (_db, _session_repo, plan_repo, session) = setup_test_db().await;
 
         let plan = create_test_plan(session.id);
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         let found = plan_repo
             .find_by_id(plan.id)
@@ -777,7 +818,10 @@ mod tests {
         );
         plan.risks = vec![];
 
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         let found = plan_repo
             .find_by_id(plan.id)
@@ -794,7 +838,10 @@ mod tests {
         let (_db, _session_repo, plan_repo, session) = setup_test_db().await;
 
         let mut plan = create_test_plan(session.id);
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         // Update task statuses
         let task0_id = plan.tasks[0].id;
@@ -809,7 +856,10 @@ mod tests {
             task.status = TaskStatus::InProgress;
         }
 
-        plan_repo.update(&plan).await.expect("Failed to update plan");
+        plan_repo
+            .update(&plan)
+            .await
+            .expect("Failed to update plan");
 
         let found = plan_repo
             .find_by_id(plan.id)
@@ -837,11 +887,11 @@ mod tests {
 
         for (i, &task_id) in task_ids.iter().enumerate() {
             let dependencies = match i {
-                0 => vec![],           // No dependencies
-                1 => vec![task_ids[0]], // Depends on task 0
-                2 => vec![task_ids[0]], // Depends on task 0
+                0 => vec![],                         // No dependencies
+                1 => vec![task_ids[0]],              // Depends on task 0
+                2 => vec![task_ids[0]],              // Depends on task 0
                 3 => vec![task_ids[1], task_ids[2]], // Depends on tasks 1 and 2
-                4 => vec![task_ids[3]], // Depends on task 3
+                4 => vec![task_ids[3]],              // Depends on task 3
                 _ => vec![],
             };
 
@@ -860,7 +910,10 @@ mod tests {
             plan.add_task(task);
         }
 
-        plan_repo.create(&plan).await.expect("Failed to create plan");
+        plan_repo
+            .create(&plan)
+            .await
+            .expect("Failed to create plan");
 
         let found = plan_repo
             .find_by_id(plan.id)

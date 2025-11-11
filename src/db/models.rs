@@ -79,8 +79,8 @@ pub struct Plan {
     pub title: String,
     pub description: String,
     pub context: String,
-    pub risks: String,        // JSON array of strings
-    pub status: String,       // Draft, PendingApproval, Approved, Rejected, InProgress, Completed, Cancelled
+    pub risks: String,  // JSON array of strings
+    pub status: String, // Draft, PendingApproval, Approved, Rejected, InProgress, Completed, Cancelled
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub approved_at: Option<DateTime<Utc>>,
@@ -94,10 +94,10 @@ pub struct PlanTask {
     pub task_order: i32,
     pub title: String,
     pub description: String,
-    pub task_type: String,    // Research, Edit, Create, Delete, Test, Refactor, Documentation, Configuration, Build, Other
+    pub task_type: String, // Research, Edit, Create, Delete, Test, Refactor, Documentation, Configuration, Build, Other
     pub dependencies: String, // JSON array of task IDs
-    pub complexity: i32,      // 1-5 scale
-    pub status: String,       // Pending, InProgress, Completed, Skipped, Failed, Blocked
+    pub complexity: i32,   // 1-5 scale
+    pub status: String,    // Pending, InProgress, Completed, Skipped, Failed, Blocked
     pub notes: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
 }

@@ -664,10 +664,7 @@ fn render_plan(f: &mut Frame, app: &App, area: Rect) {
         // Status
         lines.push(Line::from(vec![
             Span::styled("Status: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                plan.status.to_string(),
-                Style::default().fg(Color::Yellow),
-            ),
+            Span::styled(plan.status.to_string(), Style::default().fg(Color::Yellow)),
         ]));
 
         lines.push(Line::from(""));
@@ -699,34 +696,22 @@ fn render_plan(f: &mut Frame, app: &App, area: Rect) {
         for (idx, task) in plan.tasks.iter().enumerate() {
             // Task line
             lines.push(Line::from(vec![
-                Span::styled(
-                    format!(" {} ", task.status.icon()),
-                    Style::default(),
-                ),
+                Span::styled(format!(" {} ", task.status.icon()), Style::default()),
                 Span::styled(
                     format!("{}. ", idx + 1),
                     Style::default().fg(Color::DarkGray),
                 ),
-                Span::styled(
-                    &task.title,
-                    Style::default().fg(Color::White),
-                ),
+                Span::styled(&task.title, Style::default().fg(Color::White)),
             ]));
 
             // Task details (type and complexity)
             lines.push(Line::from(vec![
                 Span::styled("    ", Style::default()),
                 Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    task.task_type.to_string(),
-                    Style::default().fg(Color::Cyan),
-                ),
+                Span::styled(task.task_type.to_string(), Style::default().fg(Color::Cyan)),
                 Span::styled("  |  ", Style::default().fg(Color::DarkGray)),
                 Span::styled("Complexity: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    task.complexity_stars(),
-                    Style::default().fg(Color::Yellow),
-                ),
+                Span::styled(task.complexity_stars(), Style::default().fg(Color::Yellow)),
             ]));
 
             lines.push(Line::from(""));
