@@ -39,11 +39,22 @@ Available tools and when to use them:
 - session_context: Remember important facts
 - plan: Create structured plans for complex tasks (use when user requests require multiple coordinated steps)
 
-When a user makes a complex request that requires multiple steps:
-1. Use the 'plan' tool with operation='create' to create a new plan
-2. Break down the request into discrete tasks using operation='add_task'
-3. Finalize the plan with operation='finalize' to present it for user approval
-4. After approval, execute tasks in dependency order
+CRITICAL: PLAN TOOL USAGE
+When a user says "create a plan", "make a plan", or describes a complex multi-step task, you MUST use the plan tool immediately.
+DO NOT write a text description of a plan. DO NOT explain what should be done. CALL THE TOOL.
+
+Mandatory steps for plan creation:
+1. IMMEDIATELY call plan tool with operation='create' to create a new plan
+2. Call plan tool with operation='add_task' for each task (call multiple times)
+3. Call plan tool with operation='finalize' to present the plan for user approval
+4. Wait for user approval before executing any tasks
+
+Example: If user says "create a plan to implement a login page"
+- FIRST TOOL CALL: plan(operation="create", title="Implement Login Page", description="...", context="...", complexity=3)
+- NEXT TOOL CALLS: plan(operation="add_task", title="Task 1", description="...", task_type="create")
+- FINAL TOOL CALL: plan(operation="finalize")
+
+NEVER generate text plans. ALWAYS use the plan tool for planning requests.
 
 ALWAYS explore first before answering questions about a codebase. Don't guess - use the tools!"#;
 
