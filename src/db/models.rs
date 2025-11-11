@@ -71,6 +71,37 @@ pub struct ToolExecution {
     pub created_at: DateTime<Utc>,
 }
 
+/// Plan model
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Plan {
+    pub id: Uuid,
+    pub session_id: Uuid,
+    pub title: String,
+    pub description: String,
+    pub context: String,
+    pub risks: String,        // JSON array of strings
+    pub status: String,       // Draft, PendingApproval, Approved, Rejected, InProgress, Completed, Cancelled
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub approved_at: Option<DateTime<Utc>>,
+}
+
+/// Plan task model
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanTask {
+    pub id: Uuid,
+    pub plan_id: Uuid,
+    pub task_order: i32,
+    pub title: String,
+    pub description: String,
+    pub task_type: String,    // Research, Edit, Create, Delete, Test, Refactor, Documentation, Configuration, Build, Other
+    pub dependencies: String, // JSON array of task IDs
+    pub complexity: i32,      // 1-5 scale
+    pub status: String,       // Pending, InProgress, Completed, Skipped, Failed, Blocked
+    pub notes: Option<String>,
+    pub completed_at: Option<DateTime<Utc>>,
+}
+
 impl Session {
     /// Create a new session
     pub fn new(title: Option<String>, model: Option<String>) -> Self {
@@ -182,6 +213,55 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for File {
                 .ok_or_else(|| sqlx::Error::Decode("Invalid timestamp for created_at".into()))?,
             updated_at: DateTime::from_timestamp(row.try_get("updated_at")?, 0)
                 .ok_or_else(|| sqlx::Error::Decode("Invalid timestamp for updated_at".into()))?,
+        })
+    }
+}
+
+impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for Plan {
+    fn from_row(row: &'r sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+
+        Ok(Plan {
+            id: Uuid::parse_str(row.try_get("id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            session_id: Uuid::parse_str(row.try_get("session_id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            title: row.try_get("title")?,
+            description: row.try_get("description")?,
+            context: row.try_get("context")?,
+            risks: row.try_get("risks")?,
+            status: row.try_get("status")?,
+            created_at: DateTime::from_timestamp(row.try_get("created_at")?, 0)
+                .ok_or_else(|| sqlx::Error::Decode("Invalid timestamp for created_at".into()))?,
+            updated_at: DateTime::from_timestamp(row.try_get("updated_at")?, 0)
+                .ok_or_else(|| sqlx::Error::Decode("Invalid timestamp for updated_at".into()))?,
+            approved_at: row
+                .try_get::<Option<i64>, _>("approved_at")?
+                .and_then(|ts| DateTime::from_timestamp(ts, 0)),
+        })
+    }
+}
+
+impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for PlanTask {
+    fn from_row(row: &'r sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+
+        Ok(PlanTask {
+            id: Uuid::parse_str(row.try_get("id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            plan_id: Uuid::parse_str(row.try_get("plan_id")?)
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            task_order: row.try_get("task_order")?,
+            title: row.try_get("title")?,
+            description: row.try_get("description")?,
+            task_type: row.try_get("task_type")?,
+            dependencies: row.try_get("dependencies")?,
+            complexity: row.try_get("complexity")?,
+            status: row.try_get("status")?,
+            notes: row.try_get("notes")?,
+            completed_at: row
+                .try_get::<Option<i64>, _>("completed_at")?
+                .and_then(|ts| DateTime::from_timestamp(ts, 0)),
         })
     }
 }
