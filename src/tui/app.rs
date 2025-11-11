@@ -76,6 +76,9 @@ pub struct App {
     pub file_picker_scroll_offset: usize,
     pub file_picker_current_dir: std::path::PathBuf,
 
+    // Working directory
+    pub working_directory: std::path::PathBuf,
+
     // Services
     agent_service: Arc<AgentService>,
     session_service: SessionService,
@@ -113,6 +116,7 @@ impl App {
             file_picker_selected: 0,
             file_picker_scroll_offset: 0,
             file_picker_current_dir: std::env::current_dir().unwrap_or_default(),
+            working_directory: std::env::current_dir().unwrap_or_default(),
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
             plan_service: PlanService::new(context),

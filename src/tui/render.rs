@@ -25,7 +25,7 @@ pub fn render(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Header
+            Constraint::Length(4), // Header (now has 2 lines)
             Constraint::Min(10),   // Main content
             Constraint::Length(5), // Input
             Constraint::Length(1), // Status bar
@@ -82,7 +82,15 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let tokens = app.total_tokens();
     let cost = app.total_cost();
 
-    let header_line = Line::from(vec![
+    // Format working directory - show relative or full path
+    let working_dir = app.working_directory.to_string_lossy().to_string();
+    let display_dir = if working_dir.len() > 60 {
+        format!("...{}", &working_dir[working_dir.len() - 57..])
+    } else {
+        working_dir
+    };
+
+    let header_line1 = Line::from(vec![
         Span::styled(" 📝 Session: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             session_name,
@@ -101,7 +109,17 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         Span::styled(format!("{:.4}", cost), Style::default().fg(Color::Magenta)),
     ]);
 
-    let header = Paragraph::new(header_line).block(
+    let header_line2 = Line::from(vec![
+        Span::styled(" 📁 Working Directory: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            display_dir,
+            Style::default()
+                .fg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]);
+
+    let header = Paragraph::new(vec![header_line1, header_line2]).block(
         Block::default()
             .borders(Borders::ALL)
             .title(Span::styled(
