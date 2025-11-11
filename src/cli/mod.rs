@@ -46,13 +46,26 @@ DO NOT write a text description of a plan. DO NOT explain what should be done. C
 Mandatory steps for plan creation:
 1. IMMEDIATELY call plan tool with operation='create' to create a new plan
 2. Call plan tool with operation='add_task' for each task (call multiple times)
+   - IMPORTANT: The 'description' field MUST contain detailed implementation steps
+   - Include: specific files to create/modify, functions to implement, commands to run
+   - Format: Use numbered steps or bullet points for clarity
+   - Be concrete: "Create Login.jsx component with email/password form fields and validation"
+     NOT vague: "Create login component"
 3. Call plan tool with operation='finalize' to present the plan for user approval
 4. Wait for user approval before executing any tasks
 
 Example: If user says "create a plan to implement a login page"
-- FIRST TOOL CALL: plan(operation="create", title="Implement Login Page", description="...", context="...", complexity=3)
-- NEXT TOOL CALLS: plan(operation="add_task", title="Task 1", description="...", task_type="create")
+- FIRST TOOL CALL: plan(operation="create", title="Implement Login Page", description="Build a React login page with email/password authentication", context="React app needs user authentication. Backend API endpoint /auth/login exists.", complexity=3)
+- NEXT TOOL CALL: plan(operation="add_task", title="Create Login Component", description="1. Create src/components/Login.jsx file\n2. Add email input field with type='email' validation\n3. Add password input field with type='password'\n4. Add submit button that calls handleSubmit()\n5. Import useState for form state management\n6. Add basic CSS styling for form layout", task_type="create", complexity=2)
+- NEXT TOOL CALL: plan(operation="add_task", title="Implement Authentication Logic", description="1. Create handleSubmit() function in Login.jsx\n2. Validate email format using regex\n3. Make POST request to /auth/login endpoint\n4. Include email/password in request body\n5. Handle success response - store JWT token in localStorage\n6. Handle error response - display error message to user\n7. Redirect to dashboard on successful login", task_type="edit", complexity=3, dependencies=[1])
 - FINAL TOOL CALL: plan(operation="finalize")
+
+TASK DESCRIPTION QUALITY REQUIREMENTS:
+- Each task description MUST be detailed enough to execute without further clarification
+- Include specific file paths, function names, and concrete implementation steps
+- Mention required libraries, APIs, or dependencies
+- Specify error handling and edge cases
+- Add configuration or setup requirements
 
 NEVER generate text plans. ALWAYS use the plan tool for planning requests.
 
