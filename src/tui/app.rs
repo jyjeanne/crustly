@@ -699,12 +699,19 @@ impl App {
             }
         };
 
+        tracing::debug!("Checking for pending plan (session: {})", session_id);
+
         // Try loading from database first
         match self.plan_service.get_most_recent_plan(session_id).await {
             Ok(Some(plan)) => {
+                tracing::debug!(
+                    "Found plan in database: id={}, status={:?}",
+                    plan.id,
+                    plan.status
+                );
                 // Only load if plan is pending approval
                 if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
-                    tracing::debug!("Loaded plan from database: {}", plan.id);
+                    tracing::info!("✅ Loading plan from database and switching to Plan Mode");
                     self.current_plan = Some(plan);
                     self.mode = AppMode::Plan;
                     self.plan_scroll_offset = 0;
@@ -713,7 +720,7 @@ impl App {
                 return Ok(());
             }
             Ok(None) => {
-                tracing::debug!("No pending plan found in database");
+                tracing::debug!("No pending plan found in database, checking JSON file");
             }
             Err(e) => {
                 tracing::warn!("Failed to load plan from database: {}", e);
@@ -722,30 +729,48 @@ impl App {
 
         // Fallback to JSON file for backward compatibility / migration
         let plan_filename = format!(".crustly_plan_{}.json", session_id);
-        let plan_file = std::env::current_dir()?.join(&plan_filename);
+        let plan_file = self.working_directory.join(&plan_filename);
+
+        tracing::debug!("Looking for plan file at: {}", plan_file.display());
 
         match tokio::fs::read_to_string(&plan_file).await {
             Ok(content) => {
-                if let Ok(plan) = serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
-                    // Only load if plan is pending approval
-                    if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
-                        tracing::info!("Loaded plan from JSON file, migrating to database");
-                        // Migrate to database
-                        if let Err(e) = self.plan_service.create(&plan).await {
-                            tracing::warn!("Failed to migrate plan to database: {}", e);
+                tracing::debug!("Found plan JSON file, parsing...");
+                match serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
+                    Ok(plan) => {
+                        tracing::debug!(
+                            "Parsed plan: id={}, status={:?}, tasks={}",
+                            plan.id,
+                            plan.status,
+                            plan.tasks.len()
+                        );
+                        // Only load if plan is pending approval
+                        if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                            tracing::info!("✅ Loading plan from JSON file and switching to Plan Mode");
+                            // Migrate to database
+                            if let Err(e) = self.plan_service.create(&plan).await {
+                                tracing::warn!("Failed to migrate plan to database: {}", e);
+                            }
+                            self.current_plan = Some(plan);
+                            self.mode = AppMode::Plan;
+                            self.plan_scroll_offset = 0;
+                            self.selected_task_index = None;
+                        } else {
+                            tracing::debug!(
+                                "Plan status is {:?}, not PendingApproval - skipping",
+                                plan.status
+                            );
                         }
-                        self.current_plan = Some(plan);
-                        self.mode = AppMode::Plan;
-                        self.plan_scroll_offset = 0;
-                        self.selected_task_index = None;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse plan JSON: {}", e);
                     }
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                // File doesn't exist - this is normal, not an error
+                tracing::debug!("Plan file not found (this is normal if no plan was created)");
             }
             Err(e) => {
-                // Other errors (permissions, etc.) should be logged
                 tracing::warn!("Failed to read plan JSON file: {}", e);
             }
         }
