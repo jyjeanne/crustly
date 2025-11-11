@@ -4,10 +4,12 @@
 
 pub mod file;
 pub mod message;
+pub mod plan;
 pub mod session;
 
 pub use file::FileRepository;
 pub use message::MessageRepository;
+pub use plan::PlanRepository;
 pub use session::{SessionListOptions, SessionRepository};
 
 use anyhow::Result;

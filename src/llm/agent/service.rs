@@ -293,6 +293,18 @@ impl AgentService {
         user_message: String,
         model: Option<String>,
     ) -> Result<AgentResponse> {
+        self.send_message_with_tools_and_mode(session_id, user_message, model, false)
+            .await
+    }
+
+    /// Send a message with automatic tool execution and explicit read-only mode control
+    pub async fn send_message_with_tools_and_mode(
+        &self,
+        session_id: Uuid,
+        user_message: String,
+        model: Option<String>,
+        read_only_mode: bool,
+    ) -> Result<AgentResponse> {
         // Get or create session
         let session_service = SessionService::new(self.context.clone());
         let _session = session_service
@@ -332,7 +344,8 @@ impl AgentService {
         // Create tool execution context
         let tool_context = ToolExecutionContext::new(session_id)
             .with_auto_approve(self.auto_approve_tools)
-            .with_working_directory(std::env::current_dir().unwrap_or_default());
+            .with_working_directory(std::env::current_dir().unwrap_or_default())
+            .with_read_only_mode(read_only_mode);
 
         // Tool execution loop
         let mut iteration = 0;
@@ -481,6 +494,7 @@ impl AgentService {
                                     env_vars: tool_context.env_vars.clone(),
                                     auto_approve: true, // User approved this execution
                                     timeout_secs: tool_context.timeout_secs,
+                                    read_only_mode: tool_context.read_only_mode,
                                 };
 
                                 // Execute the tool with approved context

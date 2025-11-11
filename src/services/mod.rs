@@ -5,10 +5,12 @@
 
 pub mod file;
 pub mod message;
+pub mod plan;
 pub mod session;
 
 pub use file::FileService;
 pub use message::MessageService;
+pub use plan::PlanService;
 pub use session::SessionService;
 
 use crate::db::Pool;
@@ -41,6 +43,7 @@ pub struct ServiceManager {
     session_service: SessionService,
     message_service: MessageService,
     file_service: FileService,
+    plan_service: PlanService,
 }
 
 impl ServiceManager {
@@ -52,6 +55,7 @@ impl ServiceManager {
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
             file_service: FileService::new(context.clone()),
+            plan_service: PlanService::new(context.clone()),
             context,
         }
     }
@@ -69,6 +73,11 @@ impl ServiceManager {
     /// Get the file service
     pub fn files(&self) -> &FileService {
         &self.file_service
+    }
+
+    /// Get the plan service
+    pub fn plans(&self) -> &PlanService {
+        &self.plan_service
     }
 
     /// Get the service context

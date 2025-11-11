@@ -43,6 +43,9 @@ pub fn render(f: &mut Frame, app: &App) {
             render_chat(f, app, chunks[1]);
             render_input(f, app, chunks[2]);
         }
+        AppMode::Plan => {
+            render_plan(f, app, chunks[1]);
+        }
         AppMode::Sessions => {
             render_sessions(f, app, chunks[1]);
         }
@@ -326,14 +329,7 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
 }
 
 /// Render the help screen
-fn render_help(f: &mut Frame, app: &App, area: Rect) {
-    // Get the model name from the current session
-    let model_name = app
-        .current_session
-        .as_ref()
-        .and_then(|s| s.model.as_deref())
-        .unwrap_or("AI");
-
+fn render_help(f: &mut Frame, _app: &App, area: Rect) {
     let help_text = vec![
         Line::from(vec![
             Span::styled("🥐 ", Style::default().fg(Color::Rgb(218, 165, 32))),
@@ -420,10 +416,7 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("Send your message to {}", model_name),
-                Style::default().fg(Color::White),
-            ),
+            Span::styled("Send message to LLM", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
             Span::styled(
@@ -522,6 +515,74 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(""),
         Line::from(Span::styled(
+            "╭─ PLAN MODE ───────────────────────────────────────────────╮",
+            Style::default().fg(Color::Cyan),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+P       ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Toggle Plan Mode view", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+A       ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Approve plan and start execution",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+R       ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Reject plan and return to chat",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  ↑/↓          ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Scroll through plan tasks",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Page Up/Down ",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Scroll plan tasks faster",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
             "╭─ FEATURES ────────────────────────────────────────────────╮",
             Style::default().fg(Color::Cyan),
         )),
@@ -604,6 +665,19 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::DarkGray),
             ),
         ]),
+        Line::from(vec![
+            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
+            Span::styled(
+                "Plan Mode",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " - Structured task planning with approval",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
         Line::from(""),
         Line::from(""),
         Line::from(vec![
@@ -636,6 +710,133 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
         .alignment(Alignment::Left);
 
     f.render_widget(help, area);
+}
+
+/// Render the plan mode view
+#[allow(clippy::vec_init_then_push)]
+fn render_plan(f: &mut Frame, app: &App, area: Rect) {
+    if let Some(plan) = &app.current_plan {
+        // Render the plan document
+        let mut lines = vec![];
+
+        // Plan header
+        lines.push(Line::from(vec![
+            Span::styled("📋 ", Style::default().fg(Color::Cyan)),
+            Span::styled(
+                &plan.title,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+
+        lines.push(Line::from(""));
+
+        // Status
+        lines.push(Line::from(vec![
+            Span::styled("Status: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(plan.status.to_string(), Style::default().fg(Color::Yellow)),
+        ]));
+
+        lines.push(Line::from(""));
+
+        // Description
+        if !plan.description.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "📝 Description:",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::styled(
+                &plan.description,
+                Style::default().fg(Color::White),
+            )));
+            lines.push(Line::from(""));
+        }
+
+        // Tasks
+        lines.push(Line::from(Span::styled(
+            format!("📋 Tasks ({}):", plan.tasks.len()),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(""));
+
+        for (idx, task) in plan.tasks.iter().enumerate() {
+            // Task line
+            lines.push(Line::from(vec![
+                Span::styled(format!(" {} ", task.status.icon()), Style::default()),
+                Span::styled(
+                    format!("{}. ", idx + 1),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled(&task.title, Style::default().fg(Color::White)),
+            ]));
+
+            // Task details (type and complexity)
+            lines.push(Line::from(vec![
+                Span::styled("    ", Style::default()),
+                Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(task.task_type.to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled("  |  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Complexity: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(task.complexity_stars(), Style::default().fg(Color::Yellow)),
+            ]));
+
+            lines.push(Line::from(""));
+        }
+
+        // Action bar
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "─".repeat(area.width as usize),
+            Style::default().fg(Color::DarkGray),
+        )));
+        lines.push(Line::from(vec![
+            Span::styled("[Ctrl+A] ", Style::default().fg(Color::Green)),
+            Span::styled("Approve  ", Style::default().fg(Color::White)),
+            Span::styled("[Ctrl+R] ", Style::default().fg(Color::Yellow)),
+            Span::styled("Reject  ", Style::default().fg(Color::White)),
+            Span::styled("[Esc] ", Style::default().fg(Color::Red)),
+            Span::styled("Cancel", Style::default().fg(Color::White)),
+        ]));
+
+        let paragraph = Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" 📋 PLAN MODE ")
+                    .border_style(Style::default().fg(Color::Cyan)),
+            )
+            .wrap(Wrap { trim: false })
+            .scroll((app.plan_scroll_offset as u16, 0));
+
+        f.render_widget(paragraph, area);
+    } else {
+        // No plan available
+        let text = vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "📋 Plan Mode",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "No active plan. Switch to Chat mode to create a plan.",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+
+        let paragraph = Paragraph::new(text)
+            .block(Block::default().borders(Borders::ALL))
+            .alignment(ratatui::layout::Alignment::Center);
+
+        f.render_widget(paragraph, area);
+    }
 }
 
 /// Render the settings screen
@@ -865,6 +1066,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let mode_text = match app.mode {
         AppMode::Splash => "WELCOME",
         AppMode::Chat => "CHAT",
+        AppMode::Plan => "PLAN",
         AppMode::Sessions => "SESSIONS",
         AppMode::Help => "HELP",
         AppMode::Settings => "SETTINGS",

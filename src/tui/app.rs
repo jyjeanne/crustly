@@ -3,9 +3,10 @@
 //! Core state management for the terminal user interface.
 
 use super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResponse, TuiEvent};
+use super::plan::PlanDocument;
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
-use crate::services::{MessageService, ServiceContext, SessionService};
+use crate::services::{MessageService, PlanService, ServiceContext, SessionService};
 use anyhow::Result;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -63,10 +64,17 @@ pub struct App {
     pub pending_approval: Option<ToolApprovalRequest>,
     pub show_approval_details: bool,
 
+    // Plan mode state
+    pub current_plan: Option<PlanDocument>,
+    pub plan_scroll_offset: usize,
+    pub selected_task_index: Option<usize>,
+    pub executing_plan: bool,
+
     // Services
     agent_service: Arc<AgentService>,
     session_service: SessionService,
     message_service: MessageService,
+    plan_service: PlanService,
 
     // Events
     event_handler: EventHandler,
@@ -91,8 +99,13 @@ impl App {
             splash_shown_at: Some(std::time::Instant::now()),
             pending_approval: None,
             show_approval_details: false,
+            current_plan: None,
+            plan_scroll_offset: 0,
+            selected_task_index: None,
+            executing_plan: false,
             session_service: SessionService::new(context.clone()),
-            message_service: MessageService::new(context),
+            message_service: MessageService::new(context.clone()),
+            plan_service: PlanService::new(context),
             agent_service,
             event_handler: EventHandler::new(),
         }
@@ -249,6 +262,16 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_toggle_plan(&event) {
+            // Toggle between Chat and Plan modes
+            match self.mode {
+                AppMode::Chat => self.switch_mode(AppMode::Plan).await?,
+                AppMode::Plan => self.switch_mode(AppMode::Chat).await?,
+                _ => {} // Do nothing in other modes
+            }
+            return Ok(());
+        }
+
         // Mode-specific handling
         match self.mode {
             AppMode::Splash => {
@@ -262,6 +285,7 @@ impl App {
                 }
             }
             AppMode::Chat => self.handle_chat_key(event).await?,
+            AppMode::Plan => self.handle_plan_key(event).await?,
             AppMode::Sessions => self.handle_sessions_key(event).await?,
             AppMode::ToolApproval => self.handle_approval_key(event).await?,
             AppMode::Help | AppMode::Settings => {
@@ -328,6 +352,70 @@ impl App {
                 self.load_session(session.id).await?;
                 self.switch_mode(AppMode::Chat).await?;
             }
+        }
+
+        Ok(())
+    }
+
+    /// Handle keys in plan mode
+    async fn handle_plan_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+        use crossterm::event::{KeyCode, KeyModifiers};
+
+        // Cancel/Escape - return to chat
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+            return Ok(());
+        }
+
+        // Ctrl+A - Approve plan
+        if event.code == KeyCode::Char('a') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            if let Some(plan) = &mut self.current_plan {
+                plan.approve();
+                plan.start_execution();
+                // Save plan to file
+                self.save_plan().await?;
+                self.switch_mode(AppMode::Chat).await?;
+                // Start executing tasks sequentially
+                self.execute_plan_tasks().await?;
+            }
+            return Ok(());
+        }
+
+        // Ctrl+R - Reject plan
+        if event.code == KeyCode::Char('r') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            if let Some(plan) = &mut self.current_plan {
+                plan.reject();
+                // Save plan to file
+                self.save_plan().await?;
+                // Clear the plan from memory and return to chat
+                self.current_plan = None;
+                self.switch_mode(AppMode::Chat).await?;
+            }
+            return Ok(());
+        }
+
+        // Arrow keys for scrolling tasks
+        match event.code {
+            KeyCode::Up => {
+                self.plan_scroll_offset = self.plan_scroll_offset.saturating_sub(1);
+            }
+            KeyCode::Down => {
+                if let Some(plan) = &self.current_plan {
+                    let max_scroll = plan.tasks.len().saturating_sub(1);
+                    self.plan_scroll_offset = (self.plan_scroll_offset + 1).min(max_scroll);
+                }
+            }
+            KeyCode::PageUp => {
+                self.plan_scroll_offset = self.plan_scroll_offset.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                if let Some(plan) = &self.current_plan {
+                    let max_scroll = plan.tasks.len().saturating_sub(1);
+                    self.plan_scroll_offset = (self.plan_scroll_offset + 10).min(max_scroll);
+                }
+            }
+            _ => {}
         }
 
         Ok(())
@@ -429,10 +517,11 @@ impl App {
             let agent_service = self.agent_service.clone();
             let session_id = session.id;
             let event_sender = self.event_sender();
+            let read_only_mode = self.mode == AppMode::Plan;
 
             tokio::spawn(async move {
                 match agent_service
-                    .send_message_with_tools(session_id, content, None)
+                    .send_message_with_tools_and_mode(session_id, content, None, read_only_mode)
                     .await
                 {
                     Ok(response) => {
@@ -467,6 +556,13 @@ impl App {
         self.is_processing = false;
         self.streaming_response = None;
 
+        // Check task completion FIRST (before moving response.content)
+        let task_failed = if self.executing_plan {
+            self.check_task_completion(&response.content).await?
+        } else {
+            false
+        };
+
         // Add assistant message to UI
         let assistant_msg = DisplayMessage {
             id: response.message_id,
@@ -493,6 +589,288 @@ impl App {
 
         // Auto-scroll to bottom
         self.scroll_offset = 0;
+
+        // Handle plan execution
+        if self.executing_plan {
+            if task_failed {
+                // Stop execution on failure
+                self.executing_plan = false;
+                let error_msg = DisplayMessage {
+                    id: uuid::Uuid::new_v4(),
+                    role: "system".to_string(),
+                    content: "⚠️ Plan execution stopped due to task failure. \
+                             Review the error above and decide how to proceed."
+                        .to_string(),
+                    timestamp: chrono::Utc::now(),
+                    token_count: None,
+                    cost: None,
+                };
+                self.messages.push(error_msg);
+            } else {
+                // Execute next task if current one succeeded
+                self.execute_next_plan_task().await?;
+            }
+        } else {
+            // Check if a plan was created/finalized
+            self.check_and_load_plan().await?;
+        }
+
+        Ok(())
+    }
+
+    /// Check if the current task completed successfully or failed
+    /// Returns true if task failed, false if succeeded
+    async fn check_task_completion(&mut self, response_content: &str) -> Result<bool> {
+        let Some(plan) = &mut self.current_plan else {
+            return Ok(false);
+        };
+
+        // Find the in-progress task
+        let task_result = plan
+            .tasks
+            .iter_mut()
+            .find(|t| matches!(t.status, crate::tui::plan::TaskStatus::InProgress))
+            .map(|task| {
+                // Check for error indicators in the response
+                let response_lower = response_content.to_lowercase();
+                let has_error = response_lower.contains("error:")
+                    || response_lower.contains("failed to")
+                    || response_lower.contains("cannot")
+                    || response_lower.contains("unable to")
+                    || response_lower.contains("fatal:")
+                    || (response_lower.contains("error") && response_lower.contains("executing"))
+                    || response_lower.contains("compilation error")
+                    || response_lower.contains("build failed");
+
+                if has_error {
+                    // Mark task as failed
+                    task.status = crate::tui::plan::TaskStatus::Failed;
+                    task.notes = Some(
+                        "Task failed during execution. Error detected in response.".to_string(),
+                    );
+                    true // Task failed
+                } else {
+                    // Mark task as completed successfully
+                    task.status = crate::tui::plan::TaskStatus::Completed;
+                    task.completed_at = Some(chrono::Utc::now());
+                    task.notes = Some("Task completed successfully".to_string());
+                    false // Task succeeded
+                }
+            });
+
+        // Save updated plan
+        self.save_plan().await?;
+
+        Ok(task_result.unwrap_or(false))
+    }
+
+    /// Check for and load a plan if one was created
+    /// Loads from database first, with JSON fallback for migration
+    async fn check_and_load_plan(&mut self) -> Result<()> {
+        // Get session ID for session-scoped operations
+        let session_id = match &self.current_session {
+            Some(session) => session.id,
+            None => {
+                tracing::debug!("No current session, skipping plan load");
+                return Ok(());
+            }
+        };
+
+        // Try loading from database first
+        match self.plan_service.get_most_recent_plan(session_id).await {
+            Ok(Some(plan)) => {
+                // Only load if plan is pending approval
+                if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                    tracing::debug!("Loaded plan from database: {}", plan.id);
+                    self.current_plan = Some(plan);
+                    self.mode = AppMode::Plan;
+                    self.plan_scroll_offset = 0;
+                    self.selected_task_index = None;
+                }
+                return Ok(());
+            }
+            Ok(None) => {
+                tracing::debug!("No pending plan found in database");
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load plan from database: {}", e);
+            }
+        }
+
+        // Fallback to JSON file for backward compatibility / migration
+        let plan_filename = format!(".crustly_plan_{}.json", session_id);
+        let plan_file = std::env::current_dir()?.join(&plan_filename);
+
+        match tokio::fs::read_to_string(&plan_file).await {
+            Ok(content) => {
+                if let Ok(plan) = serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
+                    // Only load if plan is pending approval
+                    if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                        tracing::info!("Loaded plan from JSON file, migrating to database");
+                        // Migrate to database
+                        if let Err(e) = self.plan_service.create(&plan).await {
+                            tracing::warn!("Failed to migrate plan to database: {}", e);
+                        }
+                        self.current_plan = Some(plan);
+                        self.mode = AppMode::Plan;
+                        self.plan_scroll_offset = 0;
+                        self.selected_task_index = None;
+                    }
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // File doesn't exist - this is normal, not an error
+            }
+            Err(e) => {
+                // Other errors (permissions, etc.) should be logged
+                tracing::warn!("Failed to read plan JSON file: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Save the current plan
+    /// Dual-write: database as primary, JSON as backup
+    async fn save_plan(&self) -> Result<()> {
+        if let Some(plan) = &self.current_plan {
+            // Get session ID for session-scoped operations
+            let session_id = match &self.current_session {
+                Some(session) => session.id,
+                None => {
+                    tracing::warn!("Cannot save plan: no current session");
+                    return Ok(());
+                }
+            };
+
+            // Primary: Save to database
+            // Try to update first (plan may already exist)
+            match self.plan_service.update(plan).await {
+                Ok(_) => {
+                    tracing::debug!("Updated plan in database: {}", plan.id);
+                }
+                Err(_) => {
+                    // If update fails, try creating (plan doesn't exist yet)
+                    if let Err(e) = self.plan_service.create(plan).await {
+                        tracing::error!("Failed to save plan to database: {}", e);
+                        // Continue to JSON backup even if database fails
+                    } else {
+                        tracing::debug!("Created plan in database: {}", plan.id);
+                    }
+                }
+            }
+
+            // Backup: Save to JSON file (for backward compatibility and backup)
+            let plan_filename = format!(".crustly_plan_{}.json", session_id);
+            let plan_file = std::env::current_dir()?.join(&plan_filename);
+
+            if let Err(e) = self.plan_service.export_to_json(plan, &plan_file).await {
+                tracing::warn!("Failed to save plan JSON backup: {}", e);
+            }
+        }
+        Ok(())
+    }
+
+    /// Execute plan tasks sequentially
+    async fn execute_plan_tasks(&mut self) -> Result<()> {
+        self.executing_plan = true;
+        self.execute_next_plan_task().await
+    }
+
+    /// Execute the next pending task in the plan
+    async fn execute_next_plan_task(&mut self) -> Result<()> {
+        // Collect necessary data from plan first to avoid borrow issues
+        let (task_message, completion_data) = {
+            let Some(plan) = &mut self.current_plan else {
+                self.executing_plan = false;
+                return Ok(());
+            };
+
+            // Get tasks in dependency order
+            let Some(ordered_tasks) = plan.tasks_in_order() else {
+                self.executing_plan = false;
+                self.show_error(
+                    "❌ Cannot Execute Plan\n\n\
+                     Circular dependency detected in task graph. Tasks cannot be ordered \
+                     because they form a dependency cycle.\n\n\
+                     💡 Fix: Review task dependencies and remove circular references.\n\
+                     You can reject this plan (Ctrl+R) and ask the AI to revise it."
+                        .to_string(),
+                );
+                return Ok(());
+            };
+
+            // Find the next pending task and extract its data
+            let next_task_data = ordered_tasks
+                .iter()
+                .find(|task| matches!(task.status, crate::tui::plan::TaskStatus::Pending))
+                .map(|task| {
+                    (
+                        task.id,
+                        task.order,
+                        task.title.clone(),
+                        task.description.clone(),
+                    )
+                });
+
+            let total_tasks = plan.tasks.len();
+
+            // Drop the immutable borrow of ordered_tasks
+            drop(ordered_tasks);
+
+            match next_task_data {
+                Some((task_id, order, title, description)) => {
+                    // Mark task as in progress
+                    if let Some(task_mut) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
+                        task_mut.status = crate::tui::plan::TaskStatus::InProgress;
+                    }
+
+                    // Prepare task message
+                    let message = format!(
+                        "📋 Executing Plan Task #{}/{}\n\n\
+                         **{}**\n\n\
+                         {}\n\n\
+                         Please complete this task.",
+                        order, total_tasks, title, description
+                    );
+
+                    (Some(message), None)
+                }
+                None => {
+                    // No more pending tasks - plan is complete
+                    let title = plan.title.clone();
+                    let task_count = plan.tasks.len();
+                    plan.complete();
+                    self.executing_plan = false;
+
+                    (None, Some((title, task_count)))
+                }
+            }
+        };
+
+        // Save plan after releasing borrow
+        self.save_plan().await?;
+
+        // Handle results
+        if let Some((title, task_count)) = completion_data {
+            // Add completion message
+            let completion_msg = DisplayMessage {
+                id: uuid::Uuid::new_v4(),
+                role: "system".to_string(),
+                content: format!(
+                    "✅ Plan '{}' completed successfully!\n\
+                     All {} tasks have been executed.",
+                    title, task_count
+                ),
+                timestamp: chrono::Utc::now(),
+                token_count: None,
+                cost: None,
+            };
+            self.messages.push(completion_msg);
+        } else if let Some(message) = task_message {
+            // Send task message to agent
+            self.send_message(message).await?;
+        }
 
         Ok(())
     }

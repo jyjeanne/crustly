@@ -112,8 +112,10 @@ pub struct ToolApprovalResponse {
 pub enum AppMode {
     /// Splash screen
     Splash,
-    /// Main chat interface
+    /// Main chat interface (full execution)
     Chat,
+    /// Plan mode (read-only, planning phase)
+    Plan,
     /// Session list/management
     Sessions,
     /// Help screen
@@ -227,6 +229,11 @@ pub mod keys {
     /// Ctrl+K - Clear current session
     pub fn is_clear_session(event: &KeyEvent) -> bool {
         key_matches(event, KeyCode::Char('k'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+P - Toggle Plan mode
+    pub fn is_toggle_plan(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('p'), KeyModifiers::CONTROL)
     }
 
     /// Ctrl+Enter - Submit
