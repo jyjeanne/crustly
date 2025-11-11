@@ -729,7 +729,14 @@ impl App {
             // Get tasks in dependency order
             let Some(ordered_tasks) = plan.tasks_in_order() else {
                 self.executing_plan = false;
-                self.show_error("Cannot execute plan: circular dependency detected".to_string());
+                self.show_error(
+                    "❌ Cannot Execute Plan\n\n\
+                     Circular dependency detected in task graph. Tasks cannot be ordered \
+                     because they form a dependency cycle.\n\n\
+                     💡 Fix: Review task dependencies and remove circular references.\n\
+                     You can reject this plan (Ctrl+R) and ask the AI to revise it."
+                        .to_string(),
+                );
                 return Ok(());
             };
 

@@ -196,16 +196,34 @@ impl PlanDocument {
             for &dep_id in &task.dependencies {
                 if !task_ids.contains(&dep_id) {
                     return Err(format!(
-                        "Task '{}' has invalid dependency: task ID {} not found",
-                        task.title, dep_id
+                        "❌ Invalid Dependency\n\n\
+                         Task '{}' (#{}) depends on a task that doesn't exist.\n\n\
+                         💡 Fix: Remove this dependency or ensure the referenced task is added first.",
+                        task.title, task.order
                     ));
                 }
             }
         }
 
         // Check for circular dependencies using topological sort
-        if self.tasks_in_order().is_none() {
-            return Err("Circular dependency detected in task graph".to_string());
+        let ordered = self.tasks_in_order();
+        if ordered.is_none() {
+            // Identify unprocessed tasks (those in the cycle)
+            let unprocessed: Vec<&str> = self
+                .tasks
+                .iter()
+                .filter(|task| !task.dependencies.is_empty())
+                .map(|task| task.title.as_str())
+                .collect();
+
+            return Err(format!(
+                "❌ Circular Dependency Detected\n\n\
+                 Tasks with dependencies: {}\n\n\
+                 💡 Fix: Review the dependency chain and remove circular references.\n\
+                 Example: If Task A depends on B, B depends on C, and C depends on A,\n\
+                 you need to break one of these dependency links.",
+                unprocessed.join(", ")
+            ));
         }
 
         Ok(())
