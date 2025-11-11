@@ -250,6 +250,15 @@ impl App {
     async fn handle_key_event(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
         use super::events::keys;
 
+        // DEBUG: Log key events when in Plan mode
+        if matches!(self.mode, AppMode::Plan) {
+            tracing::debug!(
+                "🔑 Plan Mode Key: code={:?}, modifiers={:?}",
+                event.code,
+                event.modifiers
+            );
+        }
+
         // Global shortcuts
         if keys::is_quit(&event) {
             self.should_quit = true;
@@ -287,6 +296,7 @@ impl App {
         }
 
         // Mode-specific handling
+        tracing::trace!("Current mode: {:?}", self.mode);
         match self.mode {
             AppMode::Splash => {
                 // Check if minimum display time (3 seconds) has elapsed
@@ -389,6 +399,7 @@ impl App {
 
         // Ctrl+A - Approve plan
         if event.code == KeyCode::Char('a') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            tracing::info!("✅ Ctrl+A pressed - Approving plan");
             if let Some(plan) = &mut self.current_plan {
                 plan.approve();
                 plan.start_execution();
@@ -407,6 +418,7 @@ impl App {
 
         // Ctrl+R - Reject plan
         if event.code == KeyCode::Char('r') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            tracing::info!("❌ Ctrl+R pressed - Rejecting plan");
             if let Some(plan) = &mut self.current_plan {
                 plan.reject();
                 // Save plan to file
@@ -995,6 +1007,7 @@ impl App {
 
     /// Switch to a different mode
     async fn switch_mode(&mut self, mode: AppMode) -> Result<()> {
+        tracing::info!("🔄 Switching mode to: {:?}", mode);
         self.mode = mode;
 
         if mode == AppMode::Sessions {
