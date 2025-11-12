@@ -15,6 +15,9 @@ pub enum TuiEvent {
     /// User pressed a key
     Key(KeyEvent),
 
+    /// User pasted text
+    Paste(String),
+
     /// Terminal was resized
     Resize(u16, u16),
 
@@ -173,6 +176,11 @@ impl EventHandler {
                             }
                             crossterm::event::Event::Resize(w, h) => {
                                 if tx.send(TuiEvent::Resize(w, h)).is_err() {
+                                    break;
+                                }
+                            }
+                            crossterm::event::Event::Paste(text) => {
+                                if tx.send(TuiEvent::Paste(text)).is_err() {
                                     break;
                                 }
                             }

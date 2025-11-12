@@ -172,6 +172,12 @@ impl App {
             TuiEvent::Key(key_event) => {
                 self.handle_key_event(key_event).await?;
             }
+            TuiEvent::Paste(text) => {
+                // Handle paste events - only in Chat mode
+                if self.mode == AppMode::Chat {
+                    self.input_buffer.push_str(&text);
+                }
+            }
             TuiEvent::MessageSubmitted(content) => {
                 self.send_message(content).await?;
             }
