@@ -288,7 +288,17 @@ impl App {
         if keys::is_toggle_plan(&event) {
             // Toggle between Chat and Plan modes
             match self.mode {
-                AppMode::Chat => self.switch_mode(AppMode::Plan).await?,
+                AppMode::Chat => {
+                    // Load plan before switching to Plan mode
+                    self.check_and_load_plan().await?;
+                    // Only switch if a plan was loaded
+                    if self.current_plan.is_some() {
+                        self.switch_mode(AppMode::Plan).await?;
+                    } else {
+                        tracing::info!("No plan available to display");
+                        self.error_message = Some("No plan available. Create a plan first.".to_string());
+                    }
+                }
                 AppMode::Plan => self.switch_mode(AppMode::Chat).await?,
                 _ => {} // Do nothing in other modes
             }
