@@ -352,6 +352,7 @@ impl AgentService {
         let mut total_input_tokens = 0u32;
         let mut total_output_tokens = 0u32;
         let mut final_response: Option<LLMResponse> = None;
+        let mut recent_tool_calls: Vec<String> = Vec::new(); // Track tool calls to detect loops
 
         while iteration < self.max_tool_iterations {
             iteration += 1;
@@ -425,6 +426,34 @@ impl AgentService {
                 tracing::debug!("No tool uses found, completing with final response");
                 final_response = Some(response);
                 break;
+            }
+
+            // Detect tool loops: Track the current batch of tool calls
+            let current_call_signature = tool_uses
+                .iter()
+                .map(|(_, name, _)| name.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+
+            recent_tool_calls.push(current_call_signature.clone());
+
+            // Keep only last 5 iterations for loop detection
+            if recent_tool_calls.len() > 5 {
+                recent_tool_calls.remove(0);
+            }
+
+            // Check for repeated patterns (same tool calls 3+ times in a row)
+            if recent_tool_calls.len() >= 3 {
+                let last_three = &recent_tool_calls[recent_tool_calls.len() - 3..];
+                if last_three.iter().all(|call| call == &current_call_signature) {
+                    tracing::warn!(
+                        "Detected tool loop: '{}' called 3 times in a row. Breaking loop.",
+                        current_call_signature
+                    );
+                    // Force a final response by breaking the loop
+                    final_response = Some(response);
+                    break;
+                }
             }
 
             // Execute tools and build response message
