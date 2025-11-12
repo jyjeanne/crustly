@@ -110,3 +110,4 @@ claude_desktop_config.json
 # Development scripts
 create_stubs.sh
 *.temp.sh
+.crustly_plan_*.json
