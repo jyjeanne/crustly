@@ -57,6 +57,9 @@ pub struct AgentService {
 
     /// Callback for requesting tool approval from user
     approval_callback: Option<ApprovalCallback>,
+
+    /// Working directory for tool execution
+    working_directory: std::path::PathBuf,
 }
 
 impl AgentService {
@@ -70,6 +73,7 @@ impl AgentService {
             default_system_prompt: None,
             auto_approve_tools: false,
             approval_callback: None,
+            working_directory: std::env::current_dir().unwrap_or_default(),
         }
     }
 
@@ -100,6 +104,12 @@ impl AgentService {
     /// Set the approval callback for interactive tool approval
     pub fn with_approval_callback(mut self, callback: Option<ApprovalCallback>) -> Self {
         self.approval_callback = callback;
+        self
+    }
+
+    /// Set the working directory for tool execution
+    pub fn with_working_directory(mut self, working_directory: std::path::PathBuf) -> Self {
+        self.working_directory = working_directory;
         self
     }
 
@@ -344,7 +354,7 @@ impl AgentService {
         // Create tool execution context
         let tool_context = ToolExecutionContext::new(session_id)
             .with_auto_approve(self.auto_approve_tools)
-            .with_working_directory(std::env::current_dir().unwrap_or_default())
+            .with_working_directory(self.working_directory.clone())
             .with_read_only_mode(read_only_mode);
 
         // Tool execution loop

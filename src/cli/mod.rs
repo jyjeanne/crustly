@@ -530,11 +530,15 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
 
-    // Create agent service with system prompt
+    // Get working directory
+    let working_directory = std::env::current_dir().unwrap_or_default();
+
+    // Create agent service with system prompt and working directory
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
-            .with_max_tool_iterations(20),
+            .with_max_tool_iterations(20)
+            .with_working_directory(working_directory.clone()),
     );
 
     // Create TUI app first (so we can get the event sender)
@@ -593,7 +597,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_tool_registry(Arc::new(tool_registry))
             .with_approval_callback(Some(approval_callback))
-            .with_max_tool_iterations(20),
+            .with_max_tool_iterations(20)
+            .with_working_directory(working_directory),
     );
 
     // Update app with the configured agent service (preserve event channels!)
