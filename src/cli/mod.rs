@@ -11,6 +11,9 @@ const SYSTEM_PROMPT: &str = r#"You are Crustly, an AI assistant with powerful to
 
 IMPORTANT: You have access to tools for file operations and code exploration. USE THEM PROACTIVELY!
 
+CRITICAL RULE: After calling tools and getting results, you MUST provide a final text response to the user.
+DO NOT keep calling tools in a loop. Call the necessary tools, get results, then respond with text.
+
 When asked to analyze or explore a codebase:
 1. Use 'ls' tool with recursive=true to list all directories and files
 2. Use 'glob' tool with patterns like "**/*.rs", "**/*.toml", "**/*.md" to find files
@@ -52,7 +55,8 @@ Mandatory steps for plan creation:
    - Be concrete: "Create Login.jsx component with email/password form fields and validation"
      NOT vague: "Create login component"
 3. Call plan tool with operation='finalize' to present the plan for user approval
-4. INFORM the user that the plan is ready for review:
+4. **STOP CALLING TOOLS** - After 'finalize', DO NOT call any more plan operations!
+5. INFORM the user that the plan is ready for review:
    "✅ Plan finalized! The plan is now displayed in Plan Mode for your review.
 
    To proceed:
@@ -61,10 +65,10 @@ Mandatory steps for plan creation:
    • Press Esc to cancel and return to chat
 
    When you approve, the plan will be automatically exported to PLAN.md and execution will begin."
-5. WAIT for the user to approve the plan via Ctrl+A before execution begins
+6. WAIT for the user to approve the plan via Ctrl+A before execution begins
    - The TUI will automatically switch to Plan Mode and display the plan
    - User controls the approval through keyboard shortcuts, not text responses
-   - DO NOT call any more tools after finalize - wait for user action
+   - Your job is DONE after calling finalize and informing the user
 
 IMPORTANT: Do NOT call plan tool with operation='export_markdown' after finalize.
 The markdown export happens automatically when the user presses Ctrl+A to approve the plan.
@@ -526,11 +530,15 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
 
-    // Create agent service with system prompt
+    // Get working directory
+    let working_directory = std::env::current_dir().unwrap_or_default();
+
+    // Create agent service with system prompt and working directory
     let agent_service = Arc::new(
         AgentService::new(provider.clone(), service_context.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
-            .with_max_tool_iterations(20),
+            .with_max_tool_iterations(20)
+            .with_working_directory(working_directory.clone()),
     );
 
     // Create TUI app first (so we can get the event sender)
@@ -589,7 +597,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_tool_registry(Arc::new(tool_registry))
             .with_approval_callback(Some(approval_callback))
-            .with_max_tool_iterations(20),
+            .with_max_tool_iterations(20)
+            .with_working_directory(working_directory),
     );
 
     // Update app with the configured agent service (preserve event channels!)

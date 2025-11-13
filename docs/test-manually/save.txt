@@ -1,0 +1,26 @@
+Next Steps (Priority Order)
+If Continuing in New Session:
+Option A: Quick Win (2-3 hours)
+
+Support multiple concurrent plans
+Simple - just change filename pattern
+Immediate UX improvement
+Option B: Foundation (8-10 hours)
+
+Complete database repository
+Migrate from JSON to DB
+Better scalability and reliability
+Option C: Quality (12+ hours)
+
+Comprehensive test suite
+80% coverage target
+CI/CD confidence
+
+
+
+Writing repository tests
+ Write unit tests for PlanService
+ Write integration tests for plan workflow
+ Write security tests for path validation
+ Verify test coverage reaches 80%
+ Commit and push test suite

@@ -1910,6 +1910,452 @@ cargo run
 
 ---
 
+## 📋 Plan Mode - Structured Task Planning
+
+**Plan Mode** is Crustly's powerful feature for breaking down complex tasks into structured, reviewable, and executable plans. Think of it as "preview before execute" for multi-step operations.
+
+### What is Plan Mode?
+
+When you ask Crustly to perform a complex task (like "Implement user authentication with JWT"), Plan Mode allows the AI to:
+
+1. **Create a structured plan** with numbered tasks
+2. **Define dependencies** between tasks (Task 3 depends on Task 2, etc.)
+3. **Estimate complexity** for each task (1-5 stars)
+4. **Present for approval** before executing anything
+5. **Execute step-by-step** after you approve
+
+### Why Use Plan Mode?
+
+✅ **Visibility** - See exactly what will be done before it happens
+✅ **Control** - Approve, reject, or request revisions to the plan
+✅ **Safety** - No surprise file changes or command executions
+✅ **Clarity** - Understand the approach before implementation
+✅ **Revision** - Request changes without starting over
+
+---
+
+### 🎯 Best Practices: Getting the LLM to Use Plan Mode
+
+The key challenge with local LLMs is **ensuring they actually call the plan tool** instead of just talking about it. Here's how to succeed:
+
+#### ✅ Effective Prompts (RECOMMENDED)
+
+These prompts **explicitly request plan tool usage** and are command-style:
+
+**1. Direct Tool Call (Most Reliable):**
+```
+Use the plan tool to create a plan for implementing JWT authentication:
+operation=create, title="JWT Authentication", description="Add JWT auth to the Rust API"
+
+Then add these tasks:
+1. Install jsonwebtoken crate
+2. Create token generation function
+3. Add middleware for token validation
+4. Update login endpoint
+```
+
+**2. Step-by-Step Instructions:**
+```
+I need JWT authentication. Follow these steps:
+1. Use plan tool operation=create to create a new plan titled "JWT Auth"
+2. Use plan tool operation=add_task to add each implementation task
+3. Use plan tool operation=finalize when all tasks are added
+```
+
+**3. Explicit Tool Mention:**
+```
+Create a detailed implementation plan for user authentication.
+IMPORTANT: Use the plan tool (not just describe it) to:
+- Create the plan with operation=create
+- Add each task with operation=add_task
+- Finalize with operation=finalize
+```
+
+**4. Reference Past Success:**
+```
+Like you did before with the test plan, use the plan tool to create
+a plan for implementing rate limiting on the API endpoints.
+Remember to call operation=finalize when done.
+```
+
+---
+
+#### ❌ Ineffective Prompts (AVOID)
+
+These prompts often lead to **hallucination** (LLM describes a plan without actually creating it):
+
+```
+❌ "Create a plan for JWT authentication"
+   → LLM may just describe steps without calling the tool
+
+❌ "I want to implement user auth with a plan"
+   → Too vague, LLM doesn't know to use plan tool
+
+❌ "Make a detailed plan for this feature"
+   → No explicit tool call request
+
+❌ "Plan out how to add rate limiting"
+   → Sounds like "describe" not "execute tool"
+```
+
+**Why these fail:** Local LLMs need **explicit instructions** to call tools. Vague requests often result in the LLM generating text that *looks* like a plan without actually invoking the plan tool.
+
+---
+
+### 📝 Complete Plan Mode Workflow
+
+Here's the full workflow from request to execution:
+
+#### Step 1: Request a Plan (Explicitly)
+
+```
+User: Use the plan tool to create a plan for implementing JWT authentication.
+
+operation=create
+title="JWT Authentication"
+description="Add JWT-based authentication to the Rust web API"
+
+Then add tasks for:
+1. Adding dependencies (jsonwebtoken crate)
+2. Creating token generation logic
+3. Building token validation middleware
+4. Updating the login endpoint
+5. Writing integration tests
+
+Call operation=finalize when all tasks are added.
+```
+
+#### Step 2: LLM Creates the Plan
+
+```
+Claude: [Calls plan tool with operation=create]
+✓ Created new plan: 'JWT Authentication'
+
+[Calls plan tool with operation=add_task 5 times]
+✓ Added task #1: 'Add jsonwebtoken dependency'
+✓ Added task #2: 'Implement token generation'
+...
+
+[Calls plan tool with operation=finalize]
+✓ Plan finalized and ready for review!
+
+📋 Plan: JWT Authentication
+📝 5 tasks ready for execution
+
+Press Ctrl+P to review the plan.
+```
+
+**IMPORTANT:** The notification stays in **Chat Mode**. No jarring mode switch!
+
+#### Step 3: Review the Plan (Ctrl+P)
+
+Press `Ctrl+P` to open Plan Mode and see the full plan:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 📋 Plan: JWT Authentication                                 │
+│ Status: Pending Approval                                    │
+│ Tasks: 5 • Complexity: Medium                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ 1. [⏹ Pending] Add jsonwebtoken dependency (⭐⭐)           │
+│    Type: Configuration                                      │
+│    Add jsonwebtoken = "9.2" to Cargo.toml                   │
+│                                                             │
+│ 2. [⏹ Pending] Implement token generation (⭐⭐⭐⭐)          │
+│    Type: Create • Depends on: #1                           │
+│    Create JWT token generation with user claims             │
+│                                                             │
+│ 3. [⏹ Pending] Build validation middleware (⭐⭐⭐⭐⭐)       │
+│    Type: Create • Depends on: #2                           │
+│    Middleware to validate tokens on protected routes        │
+│                                                             │
+│ 4. [⏹ Pending] Update login endpoint (⭐⭐⭐)                │
+│    Type: Edit • Depends on: #2                             │
+│    Return JWT token on successful login                     │
+│                                                             │
+│ 5. [⏹ Pending] Write integration tests (⭐⭐⭐)              │
+│    Type: Test • Depends on: #3, #4                         │
+│    Test full auth flow with valid/invalid tokens            │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│ [Ctrl+A] Approve & Execute  [Ctrl+R] Reject               │
+│ [Ctrl+I] Request Changes     [Esc] Back                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Step 4: Make a Decision
+
+You have **four options**:
+
+**A. Approve the Plan (Ctrl+A)**
+```
+Press Ctrl+A → Plan executes task by task
+[✓] Task #1 completed
+[✓] Task #2 completed
+...
+✅ Plan completed successfully!
+```
+
+**B. Reject the Plan (Ctrl+R)**
+```
+Press Ctrl+R → Plan is rejected
+You can start over with a new approach
+```
+
+**C. Request Changes (Ctrl+I)**
+```
+Press Ctrl+I → Returns to Chat Mode with pre-filled message:
+
+"Please revise this plan:
+
+Current plan 'JWT Authentication' has 5 tasks:
+  1. Add jsonwebtoken dependency (Configuration)
+  2. Implement token generation (Create)
+  ...
+
+Requested changes: [Type your feedback here]"
+```
+
+Example feedback:
+```
+Requested changes: Add a task for password hashing before token generation,
+and split the testing task into unit tests and integration tests.
+```
+
+**D. Go Back (Esc)**
+```
+Press Esc → Return to Chat Mode
+Plan stays available for later review
+```
+
+---
+
+### ⌨️ Plan Mode Keyboard Shortcuts
+
+| Shortcut | Action | Description |
+|----------|--------|-------------|
+| `Ctrl+P` | **View Plan** | Open Plan Mode to review current plan |
+| `Ctrl+A` | **Approve** | Approve and execute the plan |
+| `Ctrl+R` | **Reject** | Reject the plan (discard it) |
+| `Ctrl+I` | **Request Changes** | Request revisions (returns to chat) |
+| `Esc` | **Back** | Return to Chat Mode without changes |
+| `↑` / `↓` | **Scroll** | Navigate through long plans |
+
+---
+
+### 🎓 Sample Prompts for Different Tasks
+
+#### 1. Feature Implementation
+```
+Use the plan tool to create a plan for adding rate limiting to our API.
+
+Create a plan with:
+- Title: "API Rate Limiting"
+- Tasks for: choosing a rate limiting strategy, implementing middleware,
+  adding configuration, updating tests, and documenting the feature
+
+Call operation=finalize when done.
+```
+
+#### 2. Bug Fix
+```
+I have a bug where database connections aren't being released.
+
+Use the plan tool to create a debugging and fix plan:
+1. Research the connection pool configuration
+2. Add logging to track connection lifecycle
+3. Identify the leak source
+4. Implement the fix
+5. Verify with stress testing
+
+Finalize the plan when ready.
+```
+
+#### 3. Refactoring
+```
+Use the plan tool to create a refactoring plan for the authentication module.
+
+Tasks should include:
+- Analyzing current code structure
+- Identifying code smells
+- Breaking down monolithic functions
+- Adding proper error handling
+- Writing unit tests
+- Documentation updates
+
+Finalize when all tasks are added.
+```
+
+#### 4. Documentation
+```
+Create a plan using the plan tool for comprehensive documentation:
+1. API endpoint documentation
+2. Authentication flow diagrams
+3. Deployment guide
+4. Development setup instructions
+5. Example usage code
+
+Finalize the plan.
+```
+
+---
+
+### 🐛 Troubleshooting Plan Mode
+
+#### Problem: LLM says "Plan finalized!" but no plan appears
+
+**Symptoms:**
+- LLM responds with "✅ Plan finalized!"
+- But pressing Ctrl+P shows "ERROR: No plan available"
+- No notification appears in chat
+
+**Root Cause:** LLM **hallucinated** - it said it used the tool but didn't actually call it.
+
+**Solution:**
+1. **Check logs** to see if plan tool was actually called:
+   ```bash
+   # Look for tool_calls in LM Studio logs
+   # If tool_calls: [] (empty), it was hallucination
+   ```
+
+2. **Use more explicit prompts:**
+   ```
+   Call the plan tool explicitly with:
+   operation=create, title="My Plan", description="Details here"
+
+   DO NOT just say you created a plan - actually call the tool.
+   ```
+
+3. **Break it down step-by-step:**
+   ```
+   Step 1: Call plan tool with operation=create
+   Step 2: Call plan tool with operation=add_task for each task
+   Step 3: Call plan tool with operation=finalize
+
+   Show me the tool responses after each call.
+   ```
+
+---
+
+#### Problem: Plan shows "Draft" status, not "PendingApproval"
+
+**Symptoms:**
+- Ctrl+P shows the plan
+- But status is "Draft" instead of "PendingApproval"
+- Can't approve or execute
+
+**Root Cause:** The finalize operation wasn't called or failed.
+
+**Solution:**
+1. **Manually request finalize:**
+   ```
+   The plan is still in Draft status. Call the plan tool with
+   operation=finalize to mark it ready for approval.
+   ```
+
+2. **Check logs** for finalize errors:
+   ```bash
+   # Look for: "🔧 Finalize operation starting..."
+   # And: "✅ Plan status changed: Draft → PendingApproval"
+   ```
+
+---
+
+#### Problem: LLM doesn't understand plan tool concept
+
+**Symptoms:**
+- LLM just describes tasks in text
+- No tool calls made
+- Responds with "I can't create plans" or similar
+
+**Root Cause:** Local LLM may not recognize the tool or needs better prompting.
+
+**Solution:**
+1. **Show an example:**
+   ```
+   You have access to a "plan" tool with these operations:
+
+   Example usage:
+   plan(operation="create", title="My Task", description="Details")
+   plan(operation="add_task", title="Step 1", description="Do X", task_type="create")
+   plan(operation="finalize")
+
+   Now create a plan for implementing user authentication.
+   ```
+
+2. **Reference tool in system prompt** (if you have access):
+   ```
+   Tools available: read, write, bash, plan
+
+   Use the plan tool for complex multi-step tasks.
+   ```
+
+---
+
+#### Problem: Plan tool called but with wrong parameters
+
+**Symptoms:**
+- Tool is called but returns errors
+- "Invalid input" or "Missing required field"
+
+**Root Cause:** LLM used wrong parameter names or structure.
+
+**Solution:**
+```
+The plan tool requires these exact parameters:
+
+For create:
+- operation: "create"
+- title: string
+- description: string
+
+For add_task:
+- operation: "add_task"
+- title: string
+- description: string
+- task_type: one of "research", "edit", "create", "delete", "test", "refactor", "documentation", "configuration", "build"
+
+For finalize:
+- operation: "finalize"
+
+Try again with correct parameters.
+```
+
+---
+
+### 💡 Pro Tips for Plan Mode
+
+1. **Always Be Explicit**
+   - Don't say "create a plan"
+   - Say "use the plan tool with operation=create"
+
+2. **Request Finalize**
+   - Always end with "call operation=finalize when done"
+   - This ensures the plan becomes reviewable
+
+3. **Watch for Hallucination**
+   - If no notification appears in chat, the tool wasn't called
+   - Check LM Studio logs to verify tool calls
+
+4. **Use Command-Style Prompts**
+   - "Use plan tool: operation=X, title=Y" works better than "please create a plan"
+   - Local LLMs respond better to directive language
+
+5. **Break Complex Plans Into Phases**
+   - Instead of one huge plan with 20 tasks
+   - Create multiple smaller plans (5-7 tasks each)
+
+6. **Test with Simple Plans First**
+   - Start with a 2-3 task plan to verify it works
+   - Then scale up to complex plans
+
+7. **Save Successful Prompts**
+   - When you find a prompt that works, save it
+   - Reuse the same structure for future plans
+
+---
+
 ## ✨ Features
 
 ### Currently Implemented (Sprint 11 Complete ✅)

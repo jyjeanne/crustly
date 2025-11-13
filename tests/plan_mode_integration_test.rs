@@ -67,6 +67,7 @@ fn create_multi_task_plan(session_id: Uuid) -> PlanDocument {
         task_type: TaskType::Research,
         dependencies: vec![],
         complexity: 3,
+        acceptance_criteria: vec![],
         status: TaskStatus::Pending,
         notes: None,
         completed_at: None,
@@ -80,6 +81,7 @@ fn create_multi_task_plan(session_id: Uuid) -> PlanDocument {
         task_type: TaskType::Create,
         dependencies: vec![task1_id], // Depends on research
         complexity: 5,
+        acceptance_criteria: vec![],
         status: TaskStatus::Pending,
         notes: None,
         completed_at: None,
@@ -93,6 +95,7 @@ fn create_multi_task_plan(session_id: Uuid) -> PlanDocument {
         task_type: TaskType::Test,
         dependencies: vec![task2_id], // Depends on implementation
         complexity: 4,
+        acceptance_criteria: vec![],
         status: TaskStatus::Pending,
         notes: None,
         completed_at: None,

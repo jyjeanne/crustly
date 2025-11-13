@@ -388,6 +388,7 @@ mod tests {
             task_type: TaskType::Edit,
             dependencies: vec![],
             complexity: 1,
+            acceptance_criteria: vec![],
             status: TaskStatus::Pending,
             notes: None,
             completed_at: None,

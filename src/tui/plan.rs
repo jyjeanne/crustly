@@ -31,6 +31,12 @@ pub struct PlanDocument {
     /// Identified risks and unknowns
     pub risks: Vec<String>,
 
+    /// Testing strategy and approach
+    pub test_strategy: String,
+
+    /// Technical stack (frameworks, libraries, tools)
+    pub technical_stack: Vec<String>,
+
     /// Plan status
     pub status: PlanStatus,
 
@@ -55,6 +61,8 @@ impl PlanDocument {
             tasks: Vec::new(),
             context: String::new(),
             risks: Vec::new(),
+            test_strategy: String::new(),
+            technical_stack: Vec::new(),
             status: PlanStatus::Draft,
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -291,6 +299,9 @@ pub struct PlanTask {
     /// Estimated complexity (1-5)
     pub complexity: u8,
 
+    /// Acceptance criteria for task completion
+    pub acceptance_criteria: Vec<String>,
+
     /// Task status
     pub status: TaskStatus,
 
@@ -312,6 +323,7 @@ impl PlanTask {
             task_type,
             dependencies: Vec::new(),
             complexity: 3, // Default medium complexity
+            acceptance_criteria: Vec::new(),
             status: TaskStatus::Pending,
             notes: None,
             completed_at: None,

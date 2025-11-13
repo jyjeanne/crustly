@@ -81,8 +81,8 @@ impl PlanRepository {
         sqlx::query(
             r#"
             INSERT INTO plans (id, session_id, title, description, context, risks,
-                             status, created_at, updated_at, approved_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             test_strategy, technical_stack, status, created_at, updated_at, approved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(db_plan.id.to_string())
@@ -91,6 +91,8 @@ impl PlanRepository {
         .bind(&db_plan.description)
         .bind(&db_plan.context)
         .bind(&db_plan.risks)
+        .bind(&db_plan.test_strategy)
+        .bind(&db_plan.technical_stack)
         .bind(&db_plan.status)
         .bind(db_plan.created_at.timestamp())
         .bind(db_plan.updated_at.timestamp())
@@ -104,9 +106,9 @@ impl PlanRepository {
             sqlx::query(
                 r#"
                 INSERT INTO plan_tasks (id, plan_id, task_order, title, description,
-                                       task_type, dependencies, complexity, status,
-                                       notes, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       task_type, dependencies, complexity, acceptance_criteria,
+                                       status, notes, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
             )
             .bind(task.id.to_string())
@@ -117,6 +119,7 @@ impl PlanRepository {
             .bind(&task.task_type)
             .bind(&task.dependencies)
             .bind(task.complexity)
+            .bind(&task.acceptance_criteria)
             .bind(&task.status)
             .bind(&task.notes)
             .bind(task.completed_at.map(|dt| dt.timestamp()))
@@ -142,6 +145,7 @@ impl PlanRepository {
             r#"
             UPDATE plans
             SET title = ?, description = ?, context = ?, risks = ?,
+                test_strategy = ?, technical_stack = ?,
                 status = ?, updated_at = ?, approved_at = ?
             WHERE id = ?
             "#,
@@ -150,6 +154,8 @@ impl PlanRepository {
         .bind(&db_plan.description)
         .bind(&db_plan.context)
         .bind(&db_plan.risks)
+        .bind(&db_plan.test_strategy)
+        .bind(&db_plan.technical_stack)
         .bind(&db_plan.status)
         .bind(db_plan.updated_at.timestamp())
         .bind(db_plan.approved_at.map(|dt| dt.timestamp()))
@@ -170,9 +176,9 @@ impl PlanRepository {
             sqlx::query(
                 r#"
                 INSERT INTO plan_tasks (id, plan_id, task_order, title, description,
-                                       task_type, dependencies, complexity, status,
-                                       notes, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       task_type, dependencies, complexity, acceptance_criteria,
+                                       status, notes, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
             )
             .bind(task.id.to_string())
@@ -183,6 +189,7 @@ impl PlanRepository {
             .bind(&task.task_type)
             .bind(&task.dependencies)
             .bind(task.complexity)
+            .bind(&task.acceptance_criteria)
             .bind(&task.status)
             .bind(&task.notes)
             .bind(task.completed_at.map(|dt| dt.timestamp()))
@@ -214,6 +221,8 @@ impl PlanRepository {
     fn plan_from_db(&self, db_plan: Plan, db_tasks: Vec<PlanTask>) -> Result<PlanDocument> {
         let risks: Vec<String> =
             serde_json::from_str(&db_plan.risks).context("Failed to parse risks JSON")?;
+        let technical_stack: Vec<String> = serde_json::from_str(&db_plan.technical_stack)
+            .context("Failed to parse technical_stack JSON")?;
 
         let status = self.parse_plan_status(&db_plan.status)?;
 
@@ -230,6 +239,8 @@ impl PlanRepository {
             tasks,
             context: db_plan.context,
             risks,
+            test_strategy: db_plan.test_strategy,
+            technical_stack,
             status,
             created_at: db_plan.created_at,
             updated_at: db_plan.updated_at,
@@ -241,6 +252,9 @@ impl PlanRepository {
     fn task_from_db(&self, db_task: PlanTask) -> Result<crate::tui::plan::PlanTask> {
         let dependencies: Vec<Uuid> = serde_json::from_str(&db_task.dependencies)
             .context("Failed to parse dependencies JSON")?;
+        let acceptance_criteria: Vec<String> =
+            serde_json::from_str(&db_task.acceptance_criteria)
+                .context("Failed to parse acceptance_criteria JSON")?;
 
         let task_type = self.parse_task_type(&db_task.task_type)?;
         let status = self.parse_task_status(&db_task.status)?;
@@ -253,6 +267,7 @@ impl PlanRepository {
             task_type,
             dependencies,
             complexity: db_task.complexity as u8,
+            acceptance_criteria,
             status,
             notes: db_task.notes,
             completed_at: db_task.completed_at,
@@ -262,6 +277,8 @@ impl PlanRepository {
     /// Convert domain model to database models
     fn plan_to_db(&self, plan: &PlanDocument) -> Result<(Plan, Vec<PlanTask>)> {
         let risks = serde_json::to_string(&plan.risks).context("Failed to serialize risks")?;
+        let technical_stack = serde_json::to_string(&plan.technical_stack)
+            .context("Failed to serialize technical_stack")?;
 
         let db_plan = Plan {
             id: plan.id,
@@ -270,6 +287,8 @@ impl PlanRepository {
             description: plan.description.clone(),
             context: plan.context.clone(),
             risks,
+            test_strategy: plan.test_strategy.clone(),
+            technical_stack,
             status: self.format_plan_status(&plan.status),
             created_at: plan.created_at,
             updated_at: plan.updated_at,
@@ -288,6 +307,8 @@ impl PlanRepository {
     fn task_to_db(&self, task: &crate::tui::plan::PlanTask, plan_id: Uuid) -> Result<PlanTask> {
         let dependencies = serde_json::to_string(&task.dependencies)
             .context("Failed to serialize dependencies")?;
+        let acceptance_criteria = serde_json::to_string(&task.acceptance_criteria)
+            .context("Failed to serialize acceptance_criteria")?;
 
         Ok(PlanTask {
             id: task.id,
@@ -298,6 +319,7 @@ impl PlanRepository {
             task_type: self.format_task_type(&task.task_type),
             dependencies,
             complexity: task.complexity as i32,
+            acceptance_criteria,
             status: self.format_task_status(&task.status),
             notes: task.notes.clone(),
             completed_at: task.completed_at,
@@ -446,6 +468,7 @@ mod tests {
             task_type: TaskType::Research,
             dependencies: vec![],
             complexity: 3,
+            acceptance_criteria: vec![],
             status: TaskStatus::Pending,
             notes: None,
             completed_at: None,
@@ -459,6 +482,7 @@ mod tests {
             task_type: TaskType::Edit,
             dependencies: vec![task1.id],
             complexity: 5,
+            acceptance_criteria: vec![],
             status: TaskStatus::Pending,
             notes: Some("Some notes".to_string()),
             completed_at: None,
@@ -571,6 +595,7 @@ mod tests {
             task_type: TaskType::Create,
             dependencies: vec![],
             complexity: 2,
+            acceptance_criteria: vec![],
             status: TaskStatus::Pending,
             notes: None,
             completed_at: None,
@@ -903,6 +928,7 @@ mod tests {
                 task_type: TaskType::Research,
                 dependencies,
                 complexity: ((i % 5) + 1) as u8,
+                acceptance_criteria: vec![],
                 status: TaskStatus::Pending,
                 notes: None,
                 completed_at: None,

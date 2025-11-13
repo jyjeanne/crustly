@@ -172,6 +172,12 @@ impl App {
             TuiEvent::Key(key_event) => {
                 self.handle_key_event(key_event).await?;
             }
+            TuiEvent::Paste(text) => {
+                // Handle paste events - only in Chat mode
+                if self.mode == AppMode::Chat {
+                    self.input_buffer.push_str(&text);
+                }
+            }
             TuiEvent::MessageSubmitted(content) => {
                 self.send_message(content).await?;
             }
@@ -250,6 +256,15 @@ impl App {
     async fn handle_key_event(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
         use super::events::keys;
 
+        // DEBUG: Log key events when in Plan mode
+        if matches!(self.mode, AppMode::Plan) {
+            tracing::debug!(
+                "🔑 Plan Mode Key: code={:?}, modifiers={:?}",
+                event.code,
+                event.modifiers
+            );
+        }
+
         // Global shortcuts
         if keys::is_quit(&event) {
             self.should_quit = true;
@@ -279,7 +294,18 @@ impl App {
         if keys::is_toggle_plan(&event) {
             // Toggle between Chat and Plan modes
             match self.mode {
-                AppMode::Chat => self.switch_mode(AppMode::Plan).await?,
+                AppMode::Chat => {
+                    // Load plan before switching to Plan mode
+                    self.check_and_load_plan().await?;
+                    // Only switch if a plan was loaded
+                    if self.current_plan.is_some() {
+                        self.switch_mode(AppMode::Plan).await?;
+                    } else {
+                        tracing::info!("No plan available to display");
+                        self.error_message =
+                            Some("No plan available. Create a plan first.".to_string());
+                    }
+                }
                 AppMode::Plan => self.switch_mode(AppMode::Chat).await?,
                 _ => {} // Do nothing in other modes
             }
@@ -287,6 +313,7 @@ impl App {
         }
 
         // Mode-specific handling
+        tracing::trace!("Current mode: {:?}", self.mode);
         match self.mode {
             AppMode::Splash => {
                 // Check if minimum display time (3 seconds) has elapsed
@@ -389,6 +416,7 @@ impl App {
 
         // Ctrl+A - Approve plan
         if event.code == KeyCode::Char('a') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            tracing::info!("✅ Ctrl+A pressed - Approving plan");
             if let Some(plan) = &mut self.current_plan {
                 plan.approve();
                 plan.start_execution();
@@ -407,6 +435,7 @@ impl App {
 
         // Ctrl+R - Reject plan
         if event.code == KeyCode::Char('r') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            tracing::info!("❌ Ctrl+R pressed - Rejecting plan");
             if let Some(plan) = &mut self.current_plan {
                 plan.reject();
                 // Save plan to file
@@ -414,6 +443,37 @@ impl App {
                 // Clear the plan from memory and return to chat
                 self.current_plan = None;
                 self.switch_mode(AppMode::Chat).await?;
+            }
+            return Ok(());
+        }
+
+        // Ctrl+I - Request plan revision
+        if event.code == KeyCode::Char('i') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            tracing::info!("🔄 Ctrl+I pressed - Requesting plan revision");
+            if let Some(plan) = &self.current_plan {
+                // Build plan summary for context
+                let plan_summary = format!(
+                    "Current plan '{}' has {} tasks:\n{}",
+                    plan.title,
+                    plan.tasks.len(),
+                    plan.tasks
+                        .iter()
+                        .enumerate()
+                        .map(|(i, t)| format!("  {}. {} ({})", i + 1, t.title, t.task_type))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                );
+
+                // Switch back to chat mode
+                self.switch_mode(AppMode::Chat).await?;
+
+                // Pre-fill input with revision request
+                self.input_buffer = format!(
+                    "Please revise this plan:\n\n{}\n\nRequested changes: ",
+                    plan_summary
+                );
+
+                // Keep plan in memory for reference (don't clear it)
             }
             return Ok(());
         }
@@ -699,21 +759,52 @@ impl App {
             }
         };
 
+        tracing::debug!("Checking for pending plan (session: {})", session_id);
+
         // Try loading from database first
         match self.plan_service.get_most_recent_plan(session_id).await {
             Ok(Some(plan)) => {
+                tracing::debug!(
+                    "Found plan in database: id={}, status={:?}",
+                    plan.id,
+                    plan.status
+                );
                 // Only load if plan is pending approval
                 if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
-                    tracing::debug!("Loaded plan from database: {}", plan.id);
-                    self.current_plan = Some(plan);
-                    self.mode = AppMode::Plan;
-                    self.plan_scroll_offset = 0;
-                    self.selected_task_index = None;
+                    tracing::info!("✅ Plan ready for review!");
+
+                    // Only load if not already loaded (avoid duplicate messages)
+                    if self.current_plan.is_none() {
+                        let plan_title = plan.title.clone();
+                        let task_count = plan.tasks.len();
+                        self.current_plan = Some(plan);
+
+                        // Add notification message to chat (stay in current mode)
+                        let notification = DisplayMessage {
+                            id: Uuid::new_v4(),
+                            role: "system".to_string(),
+                            content: format!(
+                                "✅ Plan '{}' is ready!\n\n\
+                                 {} tasks • Press Ctrl+P to review\n\n\
+                                 Actions:\n\
+                                 • Ctrl+A: Approve and execute\n\
+                                 • Ctrl+R: Reject\n\
+                                 • Ctrl+I: Request changes\n\
+                                 • Ctrl+P: View plan",
+                                plan_title, task_count
+                            ),
+                            timestamp: chrono::Utc::now(),
+                            token_count: None,
+                            cost: None,
+                        };
+
+                        self.messages.push(notification);
+                    }
                 }
                 return Ok(());
             }
             Ok(None) => {
-                tracing::debug!("No pending plan found in database");
+                tracing::debug!("No pending plan found in database, checking JSON file");
             }
             Err(e) => {
                 tracing::warn!("Failed to load plan from database: {}", e);
@@ -722,30 +813,77 @@ impl App {
 
         // Fallback to JSON file for backward compatibility / migration
         let plan_filename = format!(".crustly_plan_{}.json", session_id);
-        let plan_file = std::env::current_dir()?.join(&plan_filename);
+        let plan_file = self.working_directory.join(&plan_filename);
+
+        tracing::debug!("Looking for plan file at: {}", plan_file.display());
+
+        // Check if file exists before trying to read
+        let file_exists = plan_file.exists();
+        tracing::debug!("Plan file exists: {}", file_exists);
 
         match tokio::fs::read_to_string(&plan_file).await {
             Ok(content) => {
-                if let Ok(plan) = serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
-                    // Only load if plan is pending approval
-                    if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
-                        tracing::info!("Loaded plan from JSON file, migrating to database");
-                        // Migrate to database
-                        if let Err(e) = self.plan_service.create(&plan).await {
-                            tracing::warn!("Failed to migrate plan to database: {}", e);
+                tracing::debug!("Found plan JSON file, parsing...");
+                match serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
+                    Ok(plan) => {
+                        tracing::debug!(
+                            "Parsed plan: id={}, status={:?}, tasks={}",
+                            plan.id,
+                            plan.status,
+                            plan.tasks.len()
+                        );
+                        // Only load if plan is pending approval
+                        if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                            tracing::info!("✅ Plan ready for review!");
+
+                            // Migrate to database
+                            if let Err(e) = self.plan_service.create(&plan).await {
+                                tracing::warn!("Failed to migrate plan to database: {}", e);
+                            }
+
+                            // Only load if not already loaded (avoid duplicate messages)
+                            if self.current_plan.is_none() {
+                                let plan_title = plan.title.clone();
+                                let task_count = plan.tasks.len();
+                                self.current_plan = Some(plan);
+
+                                // Add notification message to chat (stay in current mode)
+                                let notification = DisplayMessage {
+                                    id: Uuid::new_v4(),
+                                    role: "system".to_string(),
+                                    content: format!(
+                                        "✅ Plan '{}' is ready!\n\n\
+                                         {} tasks • Press Ctrl+P to review\n\n\
+                                         Actions:\n\
+                                         • Ctrl+A: Approve and execute\n\
+                                         • Ctrl+R: Reject\n\
+                                         • Ctrl+I: Request changes\n\
+                                         • Ctrl+P: View plan",
+                                        plan_title, task_count
+                                    ),
+                                    timestamp: chrono::Utc::now(),
+                                    token_count: None,
+                                    cost: None,
+                                };
+
+                                self.messages.push(notification);
+                            }
+                        } else {
+                            tracing::debug!(
+                                "Plan status is {:?}, not PendingApproval - skipping",
+                                plan.status
+                            );
                         }
-                        self.current_plan = Some(plan);
-                        self.mode = AppMode::Plan;
-                        self.plan_scroll_offset = 0;
-                        self.selected_task_index = None;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse plan JSON: {}", e);
                     }
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                // File doesn't exist - this is normal, not an error
+                tracing::debug!("Plan file not found (this is normal if no plan was created)");
             }
             Err(e) => {
-                // Other errors (permissions, etc.) should be logged
                 tracing::warn!("Failed to read plan JSON file: {}", e);
             }
         }
@@ -780,18 +918,26 @@ impl App {
 
             for task in &plan.tasks {
                 markdown.push_str(&format!("### Task {}: {}\n\n", task.order, task.title));
-                markdown.push_str(&format!("**Type:** {:?} | **Complexity:** {}★\n\n", task.task_type, task.complexity));
+                markdown.push_str(&format!(
+                    "**Type:** {:?} | **Complexity:** {}★\n\n",
+                    task.task_type, task.complexity
+                ));
 
                 if !task.dependencies.is_empty() {
-                    let dep_orders: Vec<String> = task.dependencies
+                    let dep_orders: Vec<String> = task
+                        .dependencies
                         .iter()
                         .filter_map(|dep_id| {
-                            plan.tasks.iter()
+                            plan.tasks
+                                .iter()
                                 .find(|t| &t.id == dep_id)
                                 .map(|t| t.order.to_string())
                         })
                         .collect();
-                    markdown.push_str(&format!("**Dependencies:** Task(s) {}\n\n", dep_orders.join(", ")));
+                    markdown.push_str(&format!(
+                        "**Dependencies:** Task(s) {}\n\n",
+                        dep_orders.join(", ")
+                    ));
                 }
 
                 markdown.push_str("**Implementation Steps:**\n\n");
@@ -799,8 +945,14 @@ impl App {
                 markdown.push_str("---\n\n");
             }
 
-            markdown.push_str(&format!("\n*Plan created: {}*\n", plan.created_at.format("%Y-%m-%d %H:%M:%S")));
-            markdown.push_str(&format!("*Last updated: {}*\n", plan.updated_at.format("%Y-%m-%d %H:%M:%S")));
+            markdown.push_str(&format!(
+                "\n*Plan created: {}*\n",
+                plan.created_at.format("%Y-%m-%d %H:%M:%S")
+            ));
+            markdown.push_str(&format!(
+                "*Last updated: {}*\n",
+                plan.updated_at.format("%Y-%m-%d %H:%M:%S")
+            ));
 
             // Write markdown file to working directory
             let output_path = self.working_directory.join(filename);
@@ -846,7 +998,7 @@ impl App {
 
             // Backup: Save to JSON file (for backward compatibility and backup)
             let plan_filename = format!(".crustly_plan_{}.json", session_id);
-            let plan_file = std::env::current_dir()?.join(&plan_filename);
+            let plan_file = self.working_directory.join(&plan_filename);
 
             if let Err(e) = self.plan_service.export_to_json(plan, &plan_file).await {
                 tracing::warn!("Failed to save plan JSON backup: {}", e);
@@ -970,6 +1122,7 @@ impl App {
 
     /// Switch to a different mode
     async fn switch_mode(&mut self, mode: AppMode) -> Result<()> {
+        tracing::info!("🔄 Switching mode to: {:?}", mode);
         self.mode = mode;
 
         if mode == AppMode::Sessions {

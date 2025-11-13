@@ -57,6 +57,9 @@ pub struct AgentService {
 
     /// Callback for requesting tool approval from user
     approval_callback: Option<ApprovalCallback>,
+
+    /// Working directory for tool execution
+    working_directory: std::path::PathBuf,
 }
 
 impl AgentService {
@@ -70,6 +73,7 @@ impl AgentService {
             default_system_prompt: None,
             auto_approve_tools: false,
             approval_callback: None,
+            working_directory: std::env::current_dir().unwrap_or_default(),
         }
     }
 
@@ -100,6 +104,12 @@ impl AgentService {
     /// Set the approval callback for interactive tool approval
     pub fn with_approval_callback(mut self, callback: Option<ApprovalCallback>) -> Self {
         self.approval_callback = callback;
+        self
+    }
+
+    /// Set the working directory for tool execution
+    pub fn with_working_directory(mut self, working_directory: std::path::PathBuf) -> Self {
+        self.working_directory = working_directory;
         self
     }
 
@@ -344,7 +354,7 @@ impl AgentService {
         // Create tool execution context
         let tool_context = ToolExecutionContext::new(session_id)
             .with_auto_approve(self.auto_approve_tools)
-            .with_working_directory(std::env::current_dir().unwrap_or_default())
+            .with_working_directory(self.working_directory.clone())
             .with_read_only_mode(read_only_mode);
 
         // Tool execution loop
@@ -352,6 +362,7 @@ impl AgentService {
         let mut total_input_tokens = 0u32;
         let mut total_output_tokens = 0u32;
         let mut final_response: Option<LLMResponse> = None;
+        let mut recent_tool_calls: Vec<String> = Vec::new(); // Track tool calls to detect loops
 
         while iteration < self.max_tool_iterations {
             iteration += 1;
@@ -425,6 +436,37 @@ impl AgentService {
                 tracing::debug!("No tool uses found, completing with final response");
                 final_response = Some(response);
                 break;
+            }
+
+            // Detect tool loops: Track the current batch of tool calls
+            let current_call_signature = tool_uses
+                .iter()
+                .map(|(_, name, _)| name.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+
+            recent_tool_calls.push(current_call_signature.clone());
+
+            // Keep only last 5 iterations for loop detection
+            if recent_tool_calls.len() > 5 {
+                recent_tool_calls.remove(0);
+            }
+
+            // Check for repeated patterns (same tool calls 3+ times in a row)
+            if recent_tool_calls.len() >= 3 {
+                let last_three = &recent_tool_calls[recent_tool_calls.len() - 3..];
+                if last_three
+                    .iter()
+                    .all(|call| call == &current_call_signature)
+                {
+                    tracing::warn!(
+                        "Detected tool loop: '{}' called 3 times in a row. Breaking loop.",
+                        current_call_signature
+                    );
+                    // Force a final response by breaking the loop
+                    final_response = Some(response);
+                    break;
+                }
             }
 
             // Execute tools and build response message
