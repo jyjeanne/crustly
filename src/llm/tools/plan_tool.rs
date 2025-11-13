@@ -25,6 +25,10 @@ enum PlanOperation {
         context: String,
         #[serde(default)]
         risks: Vec<String>,
+        #[serde(default)]
+        test_strategy: String,
+        #[serde(default)]
+        technical_stack: Vec<String>,
     },
     /// Add a task to the current plan
     AddTask {
@@ -35,6 +39,8 @@ enum PlanOperation {
         dependencies: Vec<usize>, // Task order numbers
         #[serde(default = "default_complexity")]
         complexity: u8,
+        #[serde(default)]
+        acceptance_criteria: Vec<String>,
     },
     /// Update plan metadata
     UpdatePlan {
@@ -46,6 +52,10 @@ enum PlanOperation {
         context: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         risks: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        test_strategy: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        technical_stack: Option<Vec<String>>,
     },
     /// Mark plan as ready for review
     Finalize,
@@ -164,6 +174,15 @@ impl Tool for PlanTool {
                     "items": { "type": "string" },
                     "description": "Identified risks and unknowns (for create/update_plan)"
                 },
+                "test_strategy": {
+                    "type": "string",
+                    "description": "Testing strategy and approach for the plan (for create/update_plan)"
+                },
+                "technical_stack": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Technologies, frameworks, and tools used (for create/update_plan)"
+                },
                 "task_type": {
                     "type": "string",
                     "enum": ["research", "edit", "create", "delete", "test", "refactor", "documentation", "configuration", "build"],
@@ -180,6 +199,11 @@ impl Tool for PlanTool {
                     "maximum": 5,
                     "default": 3,
                     "description": "Task complexity from 1 (simple) to 5 (very complex)"
+                },
+                "acceptance_criteria": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Acceptance criteria for task completion (for add_task)"
                 }
             },
             "required": ["operation"]
@@ -242,6 +266,8 @@ impl Tool for PlanTool {
                 description,
                 context: ctx,
                 risks,
+                test_strategy,
+                technical_stack,
             } => {
                 // Validate inputs
                 validate_string(&title, MAX_TITLE_LENGTH, "Plan title")?;
@@ -261,6 +287,8 @@ impl Tool for PlanTool {
                     PlanDocument::new(context.session_id, title.clone(), description);
                 new_plan.context = ctx;
                 new_plan.risks = risks;
+                new_plan.test_strategy = test_strategy;
+                new_plan.technical_stack = technical_stack;
                 new_plan.status = PlanStatus::Draft;
 
                 plan = Some(new_plan.clone());
@@ -279,6 +307,7 @@ impl Tool for PlanTool {
                 task_type,
                 dependencies,
                 complexity,
+                acceptance_criteria,
             } => {
                 // Validate inputs
                 validate_string(&title, MAX_TITLE_LENGTH, "Task title")?;
@@ -308,6 +337,7 @@ impl Tool for PlanTool {
                 let mut task =
                     PlanTask::new(task_order, title.clone(), description, parsed_type.clone());
                 task.complexity = complexity.clamp(1, 5);
+                task.acceptance_criteria = acceptance_criteria;
 
                 // Validate and convert dependency order numbers to task IDs
                 for dep_order in dependencies {
@@ -350,6 +380,8 @@ impl Tool for PlanTool {
                 description,
                 context: ctx,
                 risks,
+                test_strategy,
+                technical_stack,
             } => {
                 let current_plan = plan.as_mut().ok_or_else(|| {
                     ToolError::InvalidInput("No active plan to update.".to_string())
@@ -367,24 +399,42 @@ impl Tool for PlanTool {
                 if let Some(r) = risks {
                     current_plan.risks = r;
                 }
+                if let Some(ts) = test_strategy {
+                    current_plan.test_strategy = ts;
+                }
+                if let Some(stack) = technical_stack {
+                    current_plan.technical_stack = stack;
+                }
                 current_plan.updated_at = Utc::now();
 
                 "✓ Plan updated successfully".to_string()
             }
 
             PlanOperation::Finalize => {
+                tracing::info!("🔧 Finalize operation starting...");
+
                 let current_plan = plan.as_mut().ok_or_else(|| {
+                    tracing::error!("❌ Finalize failed: No active plan");
                     ToolError::InvalidInput("No active plan to finalize.".to_string())
                 })?;
 
                 if current_plan.tasks.is_empty() {
+                    tracing::warn!("⚠️ Cannot finalize: Plan has no tasks");
                     return Ok(ToolResult::error(
                         "Cannot finalize plan with no tasks. Add tasks first.".to_string(),
                     ));
                 }
 
+                tracing::debug!(
+                    "📋 Finalizing plan: title='{}', tasks={}, status={:?}",
+                    current_plan.title,
+                    current_plan.tasks.len(),
+                    current_plan.status
+                );
+
                 // Validate dependencies before finalizing
                 if let Err(e) = current_plan.validate_dependencies() {
+                    tracing::error!("❌ Dependency validation failed: {}", e);
                     return Ok(ToolResult::error(format!(
                         "Cannot finalize plan: {}\n\n\
                          Please fix the dependency issues before finalizing.",
@@ -392,15 +442,22 @@ impl Tool for PlanTool {
                     )));
                 }
 
+                // Change status
+                let old_status = current_plan.status.clone();
                 current_plan.status = PlanStatus::PendingApproval;
                 current_plan.updated_at = Utc::now();
+
+                tracing::info!(
+                    "✅ Plan status changed: {:?} → {:?}",
+                    old_status,
+                    current_plan.status
+                );
 
                 format!(
                     "✓ Plan finalized and ready for review!\n\n\
                      📋 Plan: {}\n\
                      📝 {} tasks ready for execution\n\n\
-                     The plan will now be presented to the user for approval.\n\
-                     User can approve with Ctrl+A or reject with Ctrl+R.",
+                     Press Ctrl+P to review the plan.",
                     current_plan.title,
                     current_plan.tasks.len()
                 )
@@ -444,6 +501,43 @@ impl Tool for PlanTool {
             tokio::fs::rename(&temp_file, &plan_file)
                 .await
                 .map_err(ToolError::Io)?;
+
+            tracing::info!(
+                "💾 Plan saved to file: {} (status: {:?})",
+                plan_file.display(),
+                current_plan.status
+            );
+
+            // Verify file was written correctly
+            if plan_file.exists() {
+                match tokio::fs::read_to_string(&plan_file).await {
+                    Ok(content) => match serde_json::from_str::<PlanDocument>(&content) {
+                        Ok(saved_plan) => {
+                            tracing::debug!(
+                                "✅ Verified saved plan: status={:?}, tasks={}",
+                                saved_plan.status,
+                                saved_plan.tasks.len()
+                            );
+
+                            if saved_plan.status != current_plan.status {
+                                tracing::error!(
+                                    "❌ Status mismatch! Expected {:?}, got {:?}",
+                                    current_plan.status,
+                                    saved_plan.status
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("❌ Failed to parse saved plan: {}", e);
+                        }
+                    },
+                    Err(e) => {
+                        tracing::error!("❌ Failed to read saved plan: {}", e);
+                    }
+                }
+            } else {
+                tracing::error!("❌ Plan file does not exist after save!");
+            }
         }
 
         Ok(ToolResult::success(result))

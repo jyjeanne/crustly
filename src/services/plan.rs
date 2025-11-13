@@ -134,6 +134,7 @@ mod tests {
             task_type: TaskType::Research,
             dependencies: vec![],
             complexity: 3,
+            acceptance_criteria: vec![],
             status: TaskStatus::Pending,
             notes: None,
             completed_at: None,

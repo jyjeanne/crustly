@@ -112,7 +112,10 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     ]);
 
     let header_line2 = Line::from(vec![
-        Span::styled(" 📁 Working Directory: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            " 📁 Working Directory: ",
+            Style::default().fg(Color::DarkGray),
+        ),
         Span::styled(
             display_dir,
             Style::default()
@@ -156,8 +159,16 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::from(vec![
                 Span::styled("  ", Style::default()),
                 Span::styled("Press ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Ctrl+P", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(" to review the plan, or switch to Plan Mode to approve/reject.", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    "Ctrl+P",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    " to review the plan, or switch to Plan Mode to approve/reject.",
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]));
             lines.push(Line::from(Span::styled(
                 "  ─".repeat(30),
@@ -764,18 +775,41 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
 
 /// Render help text in the input area during Plan Mode
 fn render_plan_help(f: &mut Frame, area: Rect) {
-    let help_text = vec![
-        Line::from(vec![
-            Span::styled("[Ctrl+A] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-            Span::styled("Approve & Execute  ", Style::default().fg(Color::White)),
-            Span::styled("[Ctrl+R] ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("Reject  ", Style::default().fg(Color::White)),
-            Span::styled("[Esc] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-            Span::styled("Cancel  ", Style::default().fg(Color::White)),
-            Span::styled("[Ctrl+P] ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::styled("Back to Chat", Style::default().fg(Color::White)),
-        ]),
-    ];
+    let help_text = vec![Line::from(vec![
+        Span::styled(
+            "[Ctrl+A] ",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("Approve & Execute  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Ctrl+R] ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("Reject  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Ctrl+I] ",
+            Style::default()
+                .fg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("Request Changes  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Esc] ",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("Back  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[↑↓] ",
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("Scroll", Style::default().fg(Color::White)),
+    ])];
 
     let paragraph = Paragraph::new(help_text)
         .block(
@@ -784,7 +818,9 @@ fn render_plan_help(f: &mut Frame, area: Rect) {
                 .border_style(Style::default().fg(Color::Cyan))
                 .title(Span::styled(
                     " Plan Mode - Review & Approve ",
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
                 )),
         )
         .alignment(Alignment::Center);
@@ -835,6 +871,38 @@ fn render_plan(f: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::from(""));
         }
 
+        // Technical Stack
+        if !plan.technical_stack.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "🛠️  Technical Stack:",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            for tech in &plan.technical_stack {
+                lines.push(Line::from(vec![
+                    Span::styled("    • ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(tech, Style::default().fg(Color::White)),
+                ]));
+            }
+            lines.push(Line::from(""));
+        }
+
+        // Test Strategy
+        if !plan.test_strategy.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "🧪 Test Strategy:",
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::styled(
+                &plan.test_strategy,
+                Style::default().fg(Color::White),
+            )));
+            lines.push(Line::from(""));
+        }
+
         // Tasks
         lines.push(Line::from(Span::styled(
             format!("📋 Tasks ({}):", plan.tasks.len()),
@@ -864,6 +932,20 @@ fn render_plan(f: &mut Frame, app: &App, area: Rect) {
                 Span::styled("Complexity: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(task.complexity_stars(), Style::default().fg(Color::Yellow)),
             ]));
+
+            // Acceptance Criteria
+            if !task.acceptance_criteria.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::styled("    ", Style::default()),
+                    Span::styled("✓ Acceptance Criteria:", Style::default().fg(Color::Green)),
+                ]));
+                for criterion in &task.acceptance_criteria {
+                    lines.push(Line::from(vec![
+                        Span::styled("      • ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(criterion, Style::default().fg(Color::White)),
+                    ]));
+                }
+            }
 
             lines.push(Line::from(""));
         }
@@ -1167,7 +1249,13 @@ fn render_file_picker(f: &mut Frame, app: &App, area: Rect) {
     let end = (start + visible_items).min(app.file_picker_files.len());
 
     // Render file list
-    for (idx, path) in app.file_picker_files.iter().enumerate().skip(start).take(end - start) {
+    for (idx, path) in app
+        .file_picker_files
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(end - start)
+    {
         let is_selected = idx == app.file_picker_selected;
         let is_dir = path.is_dir();
 
@@ -1179,10 +1267,7 @@ fn render_file_picker(f: &mut Frame, app: &App, area: Rect) {
             "📄"
         };
 
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("?");
+        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
 
         let style = if is_selected {
             Style::default()
@@ -1220,11 +1305,24 @@ fn render_file_picker(f: &mut Frame, app: &App, area: Rect) {
     // Help text
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled("[↑↓]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[↑↓]",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Navigate  ", Style::default().fg(Color::White)),
-        Span::styled("[Enter]", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[Enter]",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Select  ", Style::default().fg(Color::White)),
-        Span::styled("[Esc]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[Esc]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Cancel", Style::default().fg(Color::White)),
     ]));
 

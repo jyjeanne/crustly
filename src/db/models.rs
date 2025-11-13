@@ -79,7 +79,9 @@ pub struct Plan {
     pub title: String,
     pub description: String,
     pub context: String,
-    pub risks: String,  // JSON array of strings
+    pub risks: String,           // JSON array of strings
+    pub test_strategy: String,   // Testing strategy and approach
+    pub technical_stack: String, // JSON array of strings (technologies, frameworks, tools)
     pub status: String, // Draft, PendingApproval, Approved, Rejected, InProgress, Completed, Cancelled
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -97,6 +99,7 @@ pub struct PlanTask {
     pub task_type: String, // Research, Edit, Create, Delete, Test, Refactor, Documentation, Configuration, Build, Other
     pub dependencies: String, // JSON array of task IDs
     pub complexity: i32,   // 1-5 scale
+    pub acceptance_criteria: String, // JSON array of strings (task completion criteria)
     pub status: String,    // Pending, InProgress, Completed, Skipped, Failed, Blocked
     pub notes: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
@@ -230,6 +233,8 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for Plan {
             description: row.try_get("description")?,
             context: row.try_get("context")?,
             risks: row.try_get("risks")?,
+            test_strategy: row.try_get("test_strategy")?,
+            technical_stack: row.try_get("technical_stack")?,
             status: row.try_get("status")?,
             created_at: DateTime::from_timestamp(row.try_get("created_at")?, 0)
                 .ok_or_else(|| sqlx::Error::Decode("Invalid timestamp for created_at".into()))?,
@@ -257,6 +262,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for PlanTask {
             task_type: row.try_get("task_type")?,
             dependencies: row.try_get("dependencies")?,
             complexity: row.try_get("complexity")?,
+            acceptance_criteria: row.try_get("acceptance_criteria")?,
             status: row.try_get("status")?,
             notes: row.try_get("notes")?,
             completed_at: row

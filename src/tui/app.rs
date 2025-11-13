@@ -302,7 +302,8 @@ impl App {
                         self.switch_mode(AppMode::Plan).await?;
                     } else {
                         tracing::info!("No plan available to display");
-                        self.error_message = Some("No plan available. Create a plan first.".to_string());
+                        self.error_message =
+                            Some("No plan available. Create a plan first.".to_string());
                     }
                 }
                 AppMode::Plan => self.switch_mode(AppMode::Chat).await?,
@@ -442,6 +443,37 @@ impl App {
                 // Clear the plan from memory and return to chat
                 self.current_plan = None;
                 self.switch_mode(AppMode::Chat).await?;
+            }
+            return Ok(());
+        }
+
+        // Ctrl+I - Request plan revision
+        if event.code == KeyCode::Char('i') && event.modifiers.contains(KeyModifiers::CONTROL) {
+            tracing::info!("🔄 Ctrl+I pressed - Requesting plan revision");
+            if let Some(plan) = &self.current_plan {
+                // Build plan summary for context
+                let plan_summary = format!(
+                    "Current plan '{}' has {} tasks:\n{}",
+                    plan.title,
+                    plan.tasks.len(),
+                    plan.tasks
+                        .iter()
+                        .enumerate()
+                        .map(|(i, t)| format!("  {}. {} ({})", i + 1, t.title, t.task_type))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                );
+
+                // Switch back to chat mode
+                self.switch_mode(AppMode::Chat).await?;
+
+                // Pre-fill input with revision request
+                self.input_buffer = format!(
+                    "Please revise this plan:\n\n{}\n\nRequested changes: ",
+                    plan_summary
+                );
+
+                // Keep plan in memory for reference (don't clear it)
             }
             return Ok(());
         }
@@ -739,11 +771,35 @@ impl App {
                 );
                 // Only load if plan is pending approval
                 if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
-                    tracing::info!("✅ Loading plan from database and switching to Plan Mode");
-                    self.current_plan = Some(plan);
-                    self.mode = AppMode::Plan;
-                    self.plan_scroll_offset = 0;
-                    self.selected_task_index = None;
+                    tracing::info!("✅ Plan ready for review!");
+
+                    // Only load if not already loaded (avoid duplicate messages)
+                    if self.current_plan.is_none() {
+                        let plan_title = plan.title.clone();
+                        let task_count = plan.tasks.len();
+                        self.current_plan = Some(plan);
+
+                        // Add notification message to chat (stay in current mode)
+                        let notification = DisplayMessage {
+                            id: Uuid::new_v4(),
+                            role: "system".to_string(),
+                            content: format!(
+                                "✅ Plan '{}' is ready!\n\n\
+                                 {} tasks • Press Ctrl+P to review\n\n\
+                                 Actions:\n\
+                                 • Ctrl+A: Approve and execute\n\
+                                 • Ctrl+R: Reject\n\
+                                 • Ctrl+I: Request changes\n\
+                                 • Ctrl+P: View plan",
+                                plan_title, task_count
+                            ),
+                            timestamp: chrono::Utc::now(),
+                            token_count: None,
+                            cost: None,
+                        };
+
+                        self.messages.push(notification);
+                    }
                 }
                 return Ok(());
             }
@@ -778,15 +834,40 @@ impl App {
                         );
                         // Only load if plan is pending approval
                         if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
-                            tracing::info!("✅ Loading plan from JSON file and switching to Plan Mode");
+                            tracing::info!("✅ Plan ready for review!");
+
                             // Migrate to database
                             if let Err(e) = self.plan_service.create(&plan).await {
                                 tracing::warn!("Failed to migrate plan to database: {}", e);
                             }
-                            self.current_plan = Some(plan);
-                            self.mode = AppMode::Plan;
-                            self.plan_scroll_offset = 0;
-                            self.selected_task_index = None;
+
+                            // Only load if not already loaded (avoid duplicate messages)
+                            if self.current_plan.is_none() {
+                                let plan_title = plan.title.clone();
+                                let task_count = plan.tasks.len();
+                                self.current_plan = Some(plan);
+
+                                // Add notification message to chat (stay in current mode)
+                                let notification = DisplayMessage {
+                                    id: Uuid::new_v4(),
+                                    role: "system".to_string(),
+                                    content: format!(
+                                        "✅ Plan '{}' is ready!\n\n\
+                                         {} tasks • Press Ctrl+P to review\n\n\
+                                         Actions:\n\
+                                         • Ctrl+A: Approve and execute\n\
+                                         • Ctrl+R: Reject\n\
+                                         • Ctrl+I: Request changes\n\
+                                         • Ctrl+P: View plan",
+                                        plan_title, task_count
+                                    ),
+                                    timestamp: chrono::Utc::now(),
+                                    token_count: None,
+                                    cost: None,
+                                };
+
+                                self.messages.push(notification);
+                            }
                         } else {
                             tracing::debug!(
                                 "Plan status is {:?}, not PendingApproval - skipping",
@@ -837,18 +918,26 @@ impl App {
 
             for task in &plan.tasks {
                 markdown.push_str(&format!("### Task {}: {}\n\n", task.order, task.title));
-                markdown.push_str(&format!("**Type:** {:?} | **Complexity:** {}★\n\n", task.task_type, task.complexity));
+                markdown.push_str(&format!(
+                    "**Type:** {:?} | **Complexity:** {}★\n\n",
+                    task.task_type, task.complexity
+                ));
 
                 if !task.dependencies.is_empty() {
-                    let dep_orders: Vec<String> = task.dependencies
+                    let dep_orders: Vec<String> = task
+                        .dependencies
                         .iter()
                         .filter_map(|dep_id| {
-                            plan.tasks.iter()
+                            plan.tasks
+                                .iter()
                                 .find(|t| &t.id == dep_id)
                                 .map(|t| t.order.to_string())
                         })
                         .collect();
-                    markdown.push_str(&format!("**Dependencies:** Task(s) {}\n\n", dep_orders.join(", ")));
+                    markdown.push_str(&format!(
+                        "**Dependencies:** Task(s) {}\n\n",
+                        dep_orders.join(", ")
+                    ));
                 }
 
                 markdown.push_str("**Implementation Steps:**\n\n");
@@ -856,8 +945,14 @@ impl App {
                 markdown.push_str("---\n\n");
             }
 
-            markdown.push_str(&format!("\n*Plan created: {}*\n", plan.created_at.format("%Y-%m-%d %H:%M:%S")));
-            markdown.push_str(&format!("*Last updated: {}*\n", plan.updated_at.format("%Y-%m-%d %H:%M:%S")));
+            markdown.push_str(&format!(
+                "\n*Plan created: {}*\n",
+                plan.created_at.format("%Y-%m-%d %H:%M:%S")
+            ));
+            markdown.push_str(&format!(
+                "*Last updated: {}*\n",
+                plan.updated_at.format("%Y-%m-%d %H:%M:%S")
+            ));
 
             // Write markdown file to working directory
             let output_path = self.working_directory.join(filename);

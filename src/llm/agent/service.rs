@@ -455,7 +455,10 @@ impl AgentService {
             // Check for repeated patterns (same tool calls 3+ times in a row)
             if recent_tool_calls.len() >= 3 {
                 let last_three = &recent_tool_calls[recent_tool_calls.len() - 3..];
-                if last_three.iter().all(|call| call == &current_call_signature) {
+                if last_three
+                    .iter()
+                    .all(|call| call == &current_call_signature)
+                {
                     tracing::warn!(
                         "Detected tool loop: '{}' called 3 times in a row. Breaking loop.",
                         current_call_signature

@@ -7,7 +7,7 @@ use super::events::EventHandler;
 use super::render;
 use anyhow::Result;
 use crossterm::{
-    event::{EnableBracketedPaste, DisableBracketedPaste},
+    event::{DisableBracketedPaste, EnableBracketedPaste},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };

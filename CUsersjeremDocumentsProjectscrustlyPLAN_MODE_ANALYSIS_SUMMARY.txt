@@ -1,0 +1,42 @@
+# Plan Mode Analysis
+
+Plan Mode is a structured workflow feature in Crustly that separates planning from execution.
+
+## Key Components
+
+1. **Triggering**: User presses Ctrl+P or LLM creates a plan via the plan tool
+2. **Data Structures**: PlanDocument with tasks, dependencies, and status tracking
+3. **Read-Only Phase**: AI analyzes codebase without making changes
+4. **User Review**: Plan shown in Plan Mode with all tasks and dependencies
+5. **Approval**: Ctrl+A executes, Ctrl+R rejects, Esc cancels
+6. **Execution**: Tasks run sequentially in dependency order
+7. **Persistence**: Plans stored in database + JSON backup
+
+## Core Files
+
+- src/tui/plan.rs: Data structures (PlanDocument, PlanTask, status enums)
+- src/llm/tools/plan_tool.rs: LLM interface for plan creation
+- src/tui/app.rs: App state and execution orchestration
+- src/tui/events.rs: Event handling and keyboard shortcuts
+
+## Status Lifecycle
+
+Draft -> PendingApproval -> Approved -> InProgress -> Completed
+
+## Keyboard Shortcuts
+
+- Ctrl+P: Toggle Plan Mode
+- Ctrl+A: Approve plan
+- Ctrl+R: Reject plan
+- Esc: Cancel/return to Chat
+
+## Key Features
+
+- Topological sort for dependency ordering
+- Error detection in task execution
+- Atomic file writes for data safety
+- Auto-generated PLAN.md documentation
+- Session-isolated plan management
+- Read-only tool restrictions during planning
+
+
