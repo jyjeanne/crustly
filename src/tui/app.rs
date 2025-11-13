@@ -4,6 +4,7 @@
 
 use super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResponse, TuiEvent};
 use super::plan::PlanDocument;
+use super::prompt_analyzer::PromptAnalyzer;
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
 use crate::services::{MessageService, PlanService, ServiceContext, SessionService};
@@ -87,6 +88,9 @@ pub struct App {
 
     // Events
     event_handler: EventHandler,
+
+    // Prompt analyzer
+    prompt_analyzer: PromptAnalyzer,
 }
 
 impl App {
@@ -122,6 +126,7 @@ impl App {
             plan_service: PlanService::new(context),
             agent_service,
             event_handler: EventHandler::new(),
+            prompt_analyzer: PromptAnalyzer::new(),
         }
     }
 
@@ -582,7 +587,15 @@ impl App {
             self.is_processing = true;
             self.error_message = None;
 
-            // Add user message to UI immediately
+            // Analyze and transform the prompt before sending to agent
+            let transformed_content = self.prompt_analyzer.analyze_and_transform(&content);
+
+            // Log if the prompt was transformed
+            if transformed_content != content {
+                tracing::info!("✨ Prompt transformed with tool hints");
+            }
+
+            // Add user message to UI immediately (show original content)
             let user_msg = DisplayMessage {
                 id: Uuid::new_v4(),
                 role: "user".to_string(),
@@ -596,7 +609,7 @@ impl App {
             // Auto-scroll to show the new user message
             self.scroll_offset = 0;
 
-            // Send to agent in background
+            // Send transformed content to agent in background
             let agent_service = self.agent_service.clone();
             let session_id = session.id;
             let event_sender = self.event_sender();
@@ -604,7 +617,7 @@ impl App {
 
             tokio::spawn(async move {
                 match agent_service
-                    .send_message_with_tools_and_mode(session_id, content, None, read_only_mode)
+                    .send_message_with_tools_and_mode(session_id, transformed_content, None, read_only_mode)
                     .await
                 {
                     Ok(response) => {
