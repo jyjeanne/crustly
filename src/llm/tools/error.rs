@@ -109,6 +109,79 @@ pub fn validate_path_safety(
     Ok(path)
 }
 
+/// Validate that a path is safe, exists, and is a file
+///
+/// This is a convenience function that combines:
+/// 1. Path safety validation (prevents path traversal)
+/// 2. Existence check
+/// 3. File type check (not a directory)
+///
+/// Returns a user-friendly error message suitable for ToolResult::error()
+pub fn validate_file_path(
+    requested_path: &str,
+    working_directory: &std::path::Path,
+) -> std::result::Result<std::path::PathBuf, String> {
+    // Validate path is safe and within working directory
+    let path = match validate_path_safety(requested_path, working_directory) {
+        Ok(p) => p,
+        Err(ToolError::PermissionDenied(msg)) => {
+            return Err(format!("Access denied: {}", msg));
+        }
+        Err(ToolError::InvalidInput(msg)) => {
+            return Err(format!("Invalid path: {}", msg));
+        }
+        Err(e) => {
+            return Err(format!("Path validation failed: {}", e));
+        }
+    };
+
+    // Check if file exists
+    if !path.exists() {
+        return Err(format!("File not found: {}", path.display()));
+    }
+
+    // Check if it's a file (not a directory)
+    if !path.is_file() {
+        return Err(format!("Path is not a file: {}", path.display()));
+    }
+
+    Ok(path)
+}
+
+/// Validate that a path is safe, exists, and is a directory
+///
+/// Similar to validate_file_path but checks for directories instead of files.
+pub fn validate_directory_path(
+    requested_path: &str,
+    working_directory: &std::path::Path,
+) -> std::result::Result<std::path::PathBuf, String> {
+    // Validate path is safe and within working directory
+    let path = match validate_path_safety(requested_path, working_directory) {
+        Ok(p) => p,
+        Err(ToolError::PermissionDenied(msg)) => {
+            return Err(format!("Access denied: {}", msg));
+        }
+        Err(ToolError::InvalidInput(msg)) => {
+            return Err(format!("Invalid path: {}", msg));
+        }
+        Err(e) => {
+            return Err(format!("Path validation failed: {}", e));
+        }
+    };
+
+    // Check if path exists
+    if !path.exists() {
+        return Err(format!("Directory not found: {}", path.display()));
+    }
+
+    // Check if it's a directory
+    if !path.is_dir() {
+        return Err(format!("Path is not a directory: {}", path.display()));
+    }
+
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

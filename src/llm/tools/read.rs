@@ -2,7 +2,7 @@
 //!
 //! Allows reading file contents from the filesystem.
 
-use super::error::{validate_path_safety, Result, ToolError};
+use super::error::{validate_file_path, Result, ToolError};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -86,33 +86,11 @@ impl Tool for ReadTool {
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: ReadInput = serde_json::from_value(input)?;
 
-        // Validate path is safe and within working directory (prevents path traversal)
-        let path = match validate_path_safety(&input.path, &context.working_directory) {
+        // Validate path: safety check, existence, and file type
+        let path = match validate_file_path(&input.path, &context.working_directory) {
             Ok(p) => p,
-            Err(ToolError::PermissionDenied(msg)) => {
-                return Ok(ToolResult::error(format!("Access denied: {}", msg)));
-            }
-            Err(ToolError::InvalidInput(msg)) => {
-                return Ok(ToolResult::error(format!("Invalid path: {}", msg)));
-            }
-            Err(e) => return Err(e),
+            Err(msg) => return Ok(ToolResult::error(msg)),
         };
-
-        // Check if file exists
-        if !path.exists() {
-            return Ok(ToolResult::error(format!(
-                "File not found: {}",
-                path.display()
-            )));
-        }
-
-        // Check if it's a file (not a directory)
-        if !path.is_file() {
-            return Ok(ToolResult::error(format!(
-                "Path is not a file: {}",
-                path.display()
-            )));
-        }
 
         // Check file size to prevent memory exhaustion
         let metadata = fs::metadata(&path).await.map_err(ToolError::Io)?;

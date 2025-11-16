@@ -2,7 +2,7 @@
 //!
 //! Intelligently modify portions of files (find/replace, line-based edits).
 
-use super::error::{validate_path_safety, Result, ToolError};
+use super::error::{validate_file_path, Result, ToolError};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -159,32 +159,11 @@ impl Tool for EditTool {
 
         let input: EditInput = serde_json::from_value(input)?;
 
-        // Validate path is safe and within working directory (prevents path traversal)
-        let path = match validate_path_safety(&input.path, &context.working_directory) {
+        // Validate path: safety check, existence, and file type
+        let path = match validate_file_path(&input.path, &context.working_directory) {
             Ok(p) => p,
-            Err(ToolError::PermissionDenied(msg)) => {
-                return Ok(ToolResult::error(format!("Access denied: {}", msg)));
-            }
-            Err(ToolError::InvalidInput(msg)) => {
-                return Ok(ToolResult::error(format!("Invalid path: {}", msg)));
-            }
-            Err(e) => return Err(e),
+            Err(msg) => return Ok(ToolResult::error(msg)),
         };
-
-        // Check if file exists
-        if !path.exists() {
-            return Ok(ToolResult::error(format!(
-                "File not found: {}",
-                path.display()
-            )));
-        }
-
-        if !path.is_file() {
-            return Ok(ToolResult::error(format!(
-                "Path is not a file: {}",
-                path.display()
-            )));
-        }
 
         // Read file content
         let content = fs::read_to_string(&path).await.map_err(ToolError::Io)?;
