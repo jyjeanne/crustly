@@ -71,6 +71,11 @@ fn create_multi_task_plan(session_id: Uuid) -> PlanDocument {
         status: TaskStatus::Pending,
         notes: None,
         completed_at: None,
+        execution_history: vec![],
+        retry_count: 0,
+        max_retries: 3,
+        artifacts: vec![],
+        reflection: None,
     };
 
     let task2 = PlanTask {
@@ -85,6 +90,11 @@ fn create_multi_task_plan(session_id: Uuid) -> PlanDocument {
         status: TaskStatus::Pending,
         notes: None,
         completed_at: None,
+        execution_history: vec![],
+        retry_count: 0,
+        max_retries: 3,
+        artifacts: vec![],
+        reflection: None,
     };
 
     let task3 = PlanTask {
@@ -99,6 +109,11 @@ fn create_multi_task_plan(session_id: Uuid) -> PlanDocument {
         status: TaskStatus::Pending,
         notes: None,
         completed_at: None,
+        execution_history: vec![],
+        retry_count: 0,
+        max_retries: 3,
+        artifacts: vec![],
+        reflection: None,
     };
 
     plan.add_task(task1);

@@ -96,7 +96,7 @@ ALWAYS explore first before answering questions about a codebase. Don't guess - 
 #[command(name = "crustly")]
 #[command(version, about, long_about = None)]
 pub struct Cli {
-    /// Enable debug mode
+    /// Enable debug mode (creates log files in .crustly/logs/)
     #[arg(short, long, global = true)]
     pub debug: bool,
 
@@ -151,6 +151,32 @@ pub enum Commands {
         #[command(subcommand)]
         operation: DbCommands,
     },
+
+    /// Log management operations
+    Logs {
+        #[command(subcommand)]
+        operation: LogCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum LogCommands {
+    /// Show log file location and status
+    Status,
+    /// View recent log entries (requires debug mode)
+    View {
+        /// Number of lines to show (default: 50)
+        #[arg(short, long, default_value = "50")]
+        lines: usize,
+    },
+    /// Clean up old log files
+    Clean {
+        /// Maximum age in days (default: 7)
+        #[arg(short = 'a', long, default_value = "7")]
+        days: u64,
+    },
+    /// Open log directory in file manager
+    Open,
 }
 
 #[derive(Subcommand, Debug)]
@@ -198,6 +224,7 @@ pub async fn run() -> Result<()> {
         Some(Commands::Init { force }) => cmd_init(&config, force).await,
         Some(Commands::Config { show_secrets }) => cmd_config(&config, show_secrets).await,
         Some(Commands::Db { operation }) => cmd_db(&config, operation).await,
+        Some(Commands::Logs { operation }) => cmd_logs(operation).await,
         Some(Commands::Run {
             prompt,
             auto_approve,
@@ -419,12 +446,17 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         db::Database,
         llm::{
             agent::AgentService,
-            provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
+            provider::{
+                anthropic::AnthropicProvider,
+                openai::OpenAIProvider,
+                qwen::{QwenProvider, ToolCallParser},
+                Provider,
+            },
             tools::{
-                bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
-                glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
-                notebook::NotebookEditTool, plan_tool::PlanTool, read::ReadTool,
-                registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
+                bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
+                doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
+                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
+                read::ReadTool, registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
                 write::WriteTool,
             },
         },
@@ -446,7 +478,98 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         .context("Failed to run database migrations")?;
 
     // Select provider based on configuration
-    let provider: Arc<dyn Provider> = if let Some(openai_config) = &config.providers.openai {
+    let provider: Arc<dyn Provider> = if let Some(qwen_config) = &config.providers.qwen {
+        // Qwen provider is configured
+        if let Some(base_url) = &qwen_config.base_url {
+            // Local Qwen (vLLM, LM Studio, etc.)
+            tracing::info!("Using local Qwen at: {}", base_url);
+            println!("🏠 Using local Qwen at: {}\n", base_url);
+            let mut provider = QwenProvider::local(base_url.clone());
+
+            // Set tool parser
+            if let Some(parser) = &qwen_config.tool_parser {
+                let tool_parser = match parser.as_str() {
+                    "openai" => ToolCallParser::OpenAI,
+                    "native" | "qwen" => ToolCallParser::NativeQwen,
+                    _ => ToolCallParser::Hermes, // Default to Hermes for Qwen
+                };
+                provider = provider.with_tool_parser(tool_parser);
+                tracing::info!("Using tool parser: {:?}", tool_parser);
+                if tool_parser == ToolCallParser::NativeQwen {
+                    println!("🔧 Using native Qwen function calling (✿FUNCTION✿ markers)\n");
+                }
+            }
+
+            // Set thinking mode
+            if qwen_config.enable_thinking {
+                provider = provider.with_thinking(true);
+                tracing::info!("🧠 Qwen3 thinking mode enabled");
+                println!("🧠 Thinking mode: enabled\n");
+                if let Some(budget) = qwen_config.thinking_budget {
+                    provider = provider.with_thinking_budget(budget);
+                    tracing::info!("Thinking budget: {} tokens", budget);
+                }
+            }
+
+            if let Some(model) = &qwen_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                println!("📦 Model: {}\n", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
+        } else if let Some(api_key) = &qwen_config.api_key {
+            // DashScope cloud API
+            let region = qwen_config.region.as_deref().unwrap_or("intl");
+            let provider_base = match region {
+                "cn" => {
+                    tracing::info!("Using DashScope China (Beijing)");
+                    println!("☁️  Using DashScope China (Beijing)\n");
+                    QwenProvider::dashscope_cn(api_key.clone())
+                }
+                _ => {
+                    tracing::info!("Using DashScope International (Singapore)");
+                    println!("☁️  Using DashScope International (Singapore)\n");
+                    QwenProvider::dashscope_intl(api_key.clone())
+                }
+            };
+
+            let mut provider = provider_base;
+
+            // Set tool parser (default to OpenAI for cloud)
+            if let Some(parser) = &qwen_config.tool_parser {
+                let tool_parser = match parser.as_str() {
+                    "hermes" => ToolCallParser::Hermes,
+                    "native" | "qwen" => ToolCallParser::NativeQwen,
+                    _ => ToolCallParser::OpenAI,
+                };
+                provider = provider.with_tool_parser(tool_parser);
+                if tool_parser == ToolCallParser::NativeQwen {
+                    println!("🔧 Using native Qwen function calling (✿FUNCTION✿ markers)\n");
+                }
+            }
+
+            // Set thinking mode
+            if qwen_config.enable_thinking {
+                provider = provider.with_thinking(true);
+                tracing::info!("🧠 Qwen3 thinking mode enabled");
+                println!("🧠 Thinking mode: enabled\n");
+                if let Some(budget) = qwen_config.thinking_budget {
+                    provider = provider.with_thinking_budget(budget);
+                }
+            }
+
+            if let Some(model) = &qwen_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                println!("📦 Model: {}\n", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
+        } else {
+            // Qwen configured but no credentials - fall back to OpenAI/Anthropic
+            tracing::debug!("Qwen configured but no credentials, falling back");
+            create_fallback_provider(config)?
+        }
+    } else if let Some(openai_config) = &config.providers.openai {
         // OpenAI provider is configured
         if let Some(base_url) = &openai_config.base_url {
             // Local LLM (LM Studio, Ollama, etc.)
@@ -493,7 +616,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             .providers
             .anthropic
             .as_ref()
-            .context("No provider configured.\n\nPlease set one of:\n  - ANTHROPIC_API_KEY for Claude\n  - OPENAI_API_KEY for OpenAI/GPT\n  - OPENAI_BASE_URL for local LLMs (LM Studio, Ollama)\n\nExample for LM Studio:\n  export OPENAI_BASE_URL=\"http://localhost:1234/v1\"")?;
+            .context("No provider configured.\n\nPlease set one of:\n  - ANTHROPIC_API_KEY for Claude\n  - OPENAI_API_KEY for OpenAI/GPT\n  - OPENAI_BASE_URL for local LLMs (LM Studio, Ollama)\n  - QWEN_BASE_URL for local Qwen (vLLM)\n  - DASHSCOPE_API_KEY for DashScope cloud\n\nExample for vLLM with Qwen:\n  export QWEN_BASE_URL=\"http://localhost:8000/v1/chat/completions\"")?;
 
         let api_key = anthropic_config
             .api_key
@@ -505,6 +628,26 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         println!("🤖 Using Anthropic Claude\n");
         Arc::new(AnthropicProvider::new(api_key))
     };
+
+    // Helper function for fallback provider
+    fn create_fallback_provider(config: &crate::config::Config) -> Result<Arc<dyn Provider>> {
+        if let Some(openai_config) = &config.providers.openai {
+            if let Some(api_key) = &openai_config.api_key {
+                return Ok(Arc::new(OpenAIProvider::new(api_key.clone())));
+            }
+        }
+        let anthropic_config = config
+            .providers
+            .anthropic
+            .as_ref()
+            .context("No provider configured")?;
+        let api_key = anthropic_config
+            .api_key
+            .as_ref()
+            .context("Anthropic API key not set")?
+            .clone();
+        Ok(Arc::new(AnthropicProvider::new(api_key)))
+    }
 
     // Create tool registry
     tracing::debug!("Setting up tool registry");
@@ -521,6 +664,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(WebSearchTool));
     tool_registry.register(Arc::new(CodeExecTool));
     tool_registry.register(Arc::new(NotebookEditTool));
+    tool_registry.register(Arc::new(DocParserTool));
     // Phase 3: Workflow & integration
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));
@@ -626,10 +770,10 @@ async fn cmd_run(
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{
-                bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
-                glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
-                notebook::NotebookEditTool, plan_tool::PlanTool, read::ReadTool,
-                registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
+                bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
+                doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
+                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
+                read::ReadTool, registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
                 write::WriteTool,
             },
         },
@@ -708,6 +852,7 @@ async fn cmd_run(
     tool_registry.register(Arc::new(WebSearchTool));
     tool_registry.register(Arc::new(CodeExecTool));
     tool_registry.register(Arc::new(NotebookEditTool));
+    tool_registry.register(Arc::new(DocParserTool));
     // Phase 3: Workflow & integration
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));
@@ -772,6 +917,155 @@ async fn cmd_run(
     }
 
     Ok(())
+}
+
+/// Log management commands
+async fn cmd_logs(operation: LogCommands) -> Result<()> {
+    use crate::logging;
+    use std::io::{BufRead, BufReader};
+
+    let log_dir = std::env::current_dir()?.join(".crustly").join("logs");
+
+    match operation {
+        LogCommands::Status => {
+            println!("📊 Crustly Logging Status\n");
+            println!("Log directory: {}", log_dir.display());
+
+            if log_dir.exists() {
+                // Count log files and total size
+                let mut file_count = 0;
+                let mut total_size = 0u64;
+                let mut newest_file: Option<std::path::PathBuf> = None;
+                let mut newest_time = std::time::UNIX_EPOCH;
+
+                for entry in std::fs::read_dir(&log_dir)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if path.extension().map(|e| e == "log").unwrap_or(false) {
+                        file_count += 1;
+                        if let Ok(metadata) = entry.metadata() {
+                            total_size += metadata.len();
+                            if let Ok(modified) = metadata.modified() {
+                                if modified > newest_time {
+                                    newest_time = modified;
+                                    newest_file = Some(path);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                println!("Status: ✅ Active");
+                println!("Log files: {}", file_count);
+                println!(
+                    "Total size: {:.2} MB",
+                    total_size as f64 / (1024.0 * 1024.0)
+                );
+
+                if let Some(newest) = newest_file {
+                    println!("Latest log: {}", newest.display());
+                }
+
+                println!("\n💡 To enable debug logging, run with -d flag:");
+                println!("   crustly -d");
+            } else {
+                println!("Status: ❌ No logs found");
+                println!("\n💡 To enable debug logging, run with -d flag:");
+                println!("   crustly -d");
+                println!("\nThis will create log files in:");
+                println!("   {}", log_dir.display());
+            }
+
+            Ok(())
+        }
+
+        LogCommands::View { lines } => {
+            if let Some(log_path) = logging::get_log_path() {
+                println!(
+                    "📜 Viewing last {} lines of: {}\n",
+                    lines,
+                    log_path.display()
+                );
+
+                let file = std::fs::File::open(&log_path)?;
+                let reader = BufReader::new(file);
+
+                // Collect all lines then show last N
+                let all_lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
+                let start = all_lines.len().saturating_sub(lines);
+
+                for line in &all_lines[start..] {
+                    println!("{}", line);
+                }
+
+                if all_lines.is_empty() {
+                    println!("(empty log file)");
+                }
+            } else {
+                println!("❌ No log files found.\n");
+                println!("💡 Run Crustly with -d flag to enable debug logging:");
+                println!("   crustly -d");
+            }
+
+            Ok(())
+        }
+
+        LogCommands::Clean { days } => {
+            println!("🧹 Cleaning up log files older than {} days...\n", days);
+
+            match logging::cleanup_old_logs(days) {
+                Ok(removed) => {
+                    if removed > 0 {
+                        println!("✅ Removed {} old log file(s)", removed);
+                    } else {
+                        println!("✅ No old log files to remove");
+                    }
+                }
+                Err(e) => {
+                    println!("❌ Error cleaning logs: {}", e);
+                }
+            }
+
+            Ok(())
+        }
+
+        LogCommands::Open => {
+            if !log_dir.exists() {
+                println!("❌ Log directory does not exist: {}", log_dir.display());
+                println!("\n💡 Run Crustly with -d flag to enable debug logging:");
+                println!("   crustly -d");
+                return Ok(());
+            }
+
+            println!("📂 Opening log directory: {}", log_dir.display());
+
+            #[cfg(target_os = "macos")]
+            {
+                std::process::Command::new("open")
+                    .arg(&log_dir)
+                    .spawn()
+                    .context("Failed to open directory")?;
+            }
+
+            #[cfg(target_os = "linux")]
+            {
+                std::process::Command::new("xdg-open")
+                    .arg(&log_dir)
+                    .spawn()
+                    .context("Failed to open directory")?;
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                std::process::Command::new("explorer")
+                    .arg(&log_dir)
+                    .spawn()
+                    .context("Failed to open directory")?;
+            }
+
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]

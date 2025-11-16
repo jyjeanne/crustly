@@ -40,161 +40,71 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
     let splash_text = vec![
         Line::from(""),
         Line::from(""),
-        // Beautiful Croissant ASCII Art with flaky layers
+        // Clean ASCII Text Logo
         Line::from(vec![
-            Span::raw("                    "),
+            Span::raw("                "),
             Span::styled(
-                "▄▄▄██",
-                Style::default()
-                    .fg(Color::Rgb(160, 82, 45))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("████▄▄", Style::default().fg(Color::Rgb(205, 133, 63))),
-        ]),
-        Line::from(vec![
-            Span::raw("                 "),
-            Span::styled("▄▄█", Style::default().fg(Color::Rgb(139, 69, 19))),
-            Span::styled("▀▀", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled("░░░░░░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▀▀", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled("█▄▄", Style::default().fg(Color::Rgb(139, 69, 19))),
-        ]),
-        Line::from(vec![
-            Span::raw("              "),
-            Span::styled("▄██", Style::default().fg(Color::Rgb(160, 82, 45))),
-            Span::styled("▀", Style::default().fg(Color::Rgb(222, 184, 135))),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled(
-                "▒▒▒▒▒▒▒▒",
+                "   ___             _   _",
                 Style::default()
                     .fg(Color::Rgb(218, 165, 32))
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▀", Style::default().fg(Color::Rgb(222, 184, 135))),
-            Span::styled("██▄", Style::default().fg(Color::Rgb(160, 82, 45))),
         ]),
         Line::from(vec![
-            Span::raw("            "),
+            Span::raw("                "),
             Span::styled(
-                "▄█",
-                Style::default()
-                    .fg(Color::Rgb(139, 69, 19))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("▀", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
-            Span::styled("▓▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled(
-                "▓▓▓▓",
-                Style::default()
-                    .fg(Color::Rgb(255, 215, 0))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("▓▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▀", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled(
-                "█▄",
-                Style::default()
-                    .fg(Color::Rgb(139, 69, 19))
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::raw("           "),
-            Span::styled("▐█", Style::default().fg(Color::Rgb(160, 82, 45))),
-            Span::styled("▌", Style::default().fg(Color::Rgb(205, 133, 63))),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
-            Span::styled("▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled(
-                "█",
-                Style::default()
-                    .fg(Color::Rgb(255, 215, 0))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                "██████",
-                Style::default()
-                    .fg(Color::Rgb(255, 223, 0))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                "█",
-                Style::default()
-                    .fg(Color::Rgb(255, 215, 0))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▐", Style::default().fg(Color::Rgb(205, 133, 63))),
-            Span::styled("█▌", Style::default().fg(Color::Rgb(160, 82, 45))),
-        ]),
-        Line::from(vec![
-            Span::raw("            "),
-            Span::styled(
-                "▀█",
-                Style::default()
-                    .fg(Color::Rgb(139, 69, 19))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("▄", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
-            Span::styled("▓▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled(
-                "▓▓▓▓",
-                Style::default()
-                    .fg(Color::Rgb(255, 215, 0))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("▓▓", Style::default().fg(Color::Rgb(184, 134, 11))),
-            Span::styled("▒", Style::default().fg(Color::Rgb(218, 165, 32))),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▄", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled(
-                "█▀",
-                Style::default()
-                    .fg(Color::Rgb(139, 69, 19))
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::raw("              "),
-            Span::styled("▀██", Style::default().fg(Color::Rgb(160, 82, 45))),
-            Span::styled("▄", Style::default().fg(Color::Rgb(222, 184, 135))),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled(
-                "▒▒▒▒▒▒▒▒",
+                "  / __|_ _ _  _ __| |_| |_  _",
                 Style::default()
                     .fg(Color::Rgb(218, 165, 32))
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▄", Style::default().fg(Color::Rgb(222, 184, 135))),
-            Span::styled("██▀", Style::default().fg(Color::Rgb(160, 82, 45))),
         ]),
         Line::from(vec![
-            Span::raw("                 "),
-            Span::styled("▀██", Style::default().fg(Color::Rgb(139, 69, 19))),
-            Span::styled("▄▄", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled("░░░░░░", Style::default().fg(Color::Rgb(245, 222, 179))),
-            Span::styled("▄▄", Style::default().fg(Color::Rgb(210, 180, 140))),
-            Span::styled("██▀", Style::default().fg(Color::Rgb(139, 69, 19))),
+            Span::raw("                "),
+            Span::styled(
+                " | (__| '_| || (_-<  _| | || |",
+                Style::default()
+                    .fg(Color::Rgb(218, 165, 32))
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]),
+        Line::from(vec![
+            Span::raw("                "),
+            Span::styled(
+                r"  \___|_|  \_,_/__/\__|_|\_, |",
+                Style::default()
+                    .fg(Color::Rgb(218, 165, 32))
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::raw("                "),
+            Span::styled(
+                "                         |__/",
+                Style::default()
+                    .fg(Color::Rgb(218, 165, 32))
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::raw("                        "),
+            Span::styled(
+                "🥐 Flaky & Fast",
+                Style::default()
+                    .fg(Color::Rgb(184, 134, 11))
+                    .add_modifier(Modifier::BOLD | Modifier::ITALIC),
+            ),
+        ]),
+        Line::from(""),
         Line::from(vec![
             Span::raw("                    "),
             Span::styled(
-                "▀▀▀███",
+                "by Jeremy JEANNE",
                 Style::default()
-                    .fg(Color::Rgb(160, 82, 45))
-                    .add_modifier(Modifier::BOLD),
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
             ),
-            Span::styled("████▀▀▀", Style::default().fg(Color::Rgb(139, 69, 19))),
         ]),
         Line::from(""),
         // Project name and version

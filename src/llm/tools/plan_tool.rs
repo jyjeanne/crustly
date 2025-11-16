@@ -4,7 +4,7 @@
 
 use super::error::{Result, ToolError};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
-use crate::tui::plan::{PlanDocument, PlanStatus, PlanTask, TaskType};
+use crate::tui::plan::{PlanDocument, PlanStatus, PlanTask, TaskType, ToolCall as PlanToolCall};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,39 @@ enum PlanOperation {
     Finalize,
     /// Get current plan status
     Status,
+    /// Get the next task to execute
+    NextTask,
+    /// Start executing a specific task
+    StartTask { task_order: usize },
+    /// Complete a task execution with results
+    CompleteTask {
+        task_order: usize,
+        success: bool,
+        output: String,
+        #[serde(default)]
+        artifacts: Vec<String>,
+    },
+    /// Add reflection notes after task execution
+    Reflect {
+        task_order: usize,
+        reflection: String,
+        #[serde(default)]
+        should_retry: bool,
+        #[serde(default)]
+        adjustment_needed: Option<String>,
+    },
+    /// Record a tool call for the current task
+    RecordToolCall {
+        task_order: usize,
+        tool_name: String,
+        input: serde_json::Value,
+        output: Option<String>,
+        success: bool,
+    },
+    /// Skip a task with reason
+    SkipTask { task_order: usize, reason: String },
+    /// Get execution summary
+    Summary,
 }
 
 fn default_complexity() -> u8 {
@@ -144,8 +177,9 @@ impl Tool for PlanTool {
     }
 
     fn description(&self) -> &str {
-        "Manage structured task plans. Use this to break down complex requests into organized, \
-         trackable tasks. Create plans, add tasks with dependencies, and finalize for user approval."
+        "Manage structured task plans with full plan-and-execute capabilities. Create plans, add tasks, \
+         execute them step-by-step, reflect on results, and adjust as needed. Supports dependency tracking, \
+         execution history, and automatic retry logic."
     }
 
     fn input_schema(&self) -> Value {
@@ -154,8 +188,8 @@ impl Tool for PlanTool {
             "properties": {
                 "operation": {
                     "type": "string",
-                    "enum": ["create", "add_task", "update_plan", "finalize", "status"],
-                    "description": "Operation to perform"
+                    "enum": ["create", "add_task", "update_plan", "finalize", "status", "next_task", "start_task", "complete_task", "reflect", "record_tool_call", "skip_task", "summary"],
+                    "description": "Operation to perform: create/add_task/update_plan for planning, next_task/start_task/complete_task/reflect for execution, summary for status"
                 },
                 "title": {
                     "type": "string",
@@ -204,6 +238,48 @@ impl Tool for PlanTool {
                     "type": "array",
                     "items": { "type": "string" },
                     "description": "Acceptance criteria for task completion (for add_task)"
+                },
+                "task_order": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Task number to operate on (for start_task/complete_task/reflect/skip_task)"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the task execution was successful (for complete_task)"
+                },
+                "output": {
+                    "type": "string",
+                    "description": "Output/result of task execution (for complete_task)"
+                },
+                "artifacts": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "File paths or other artifacts produced (for complete_task)"
+                },
+                "reflection": {
+                    "type": "string",
+                    "description": "LLM reflection on task execution results (for reflect)"
+                },
+                "should_retry": {
+                    "type": "boolean",
+                    "description": "Whether to retry the task (for reflect)"
+                },
+                "adjustment_needed": {
+                    "type": "string",
+                    "description": "Description of plan adjustment needed (for reflect)"
+                },
+                "tool_name": {
+                    "type": "string",
+                    "description": "Name of tool that was called (for record_tool_call)"
+                },
+                "input": {
+                    "type": "object",
+                    "description": "Input passed to the tool (for record_tool_call)"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for skipping task (for skip_task)"
                 }
             },
             "required": ["operation"]
@@ -481,6 +557,284 @@ impl Tool for PlanTool {
                 } else {
                     "No active plan. Create one with 'create' operation.".to_string()
                 }
+            }
+
+            PlanOperation::NextTask => {
+                let current_plan = plan
+                    .as_ref()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
+
+                if let Some(next_task) = current_plan.next_executable_task() {
+                    format!(
+                        "🎯 Next Task to Execute\n\n\
+                         Task #{}: {}\n\
+                         Type: {:?}\n\
+                         Complexity: {}\n\
+                         Description: {}\n\n\
+                         Acceptance Criteria:\n{}\n\n\
+                         Use 'start_task' with task_order={} to begin execution.",
+                        next_task.order,
+                        next_task.title,
+                        next_task.task_type,
+                        next_task.complexity_stars(),
+                        next_task.description,
+                        next_task
+                            .acceptance_criteria
+                            .iter()
+                            .map(|c| format!("  • {}", c))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        next_task.order
+                    )
+                } else {
+                    let summary = current_plan.execution_summary();
+                    if summary.pending == 0 && summary.in_progress == 0 {
+                        "✅ All tasks completed! No more tasks to execute.".to_string()
+                    } else if summary.in_progress > 0 {
+                        format!(
+                            "⏳ {} task(s) currently in progress. Complete them before starting new ones.",
+                            summary.in_progress
+                        )
+                    } else {
+                        "⚠️ No tasks ready. Check for blocked dependencies or failed tasks."
+                            .to_string()
+                    }
+                }
+            }
+
+            PlanOperation::StartTask { task_order } => {
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
+
+                // Check if task exists and get its status
+                let task_status = current_plan
+                    .get_task_by_order(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?
+                    .status
+                    .clone();
+
+                if !matches!(task_status, crate::tui::plan::TaskStatus::Pending) {
+                    return Ok(ToolResult::error(format!(
+                        "Task #{} is not pending (current status: {:?})",
+                        task_order, task_status
+                    )));
+                }
+
+                // Check dependencies
+                let deps_satisfied = current_plan
+                    .get_task_by_order(task_order)
+                    .map(|t| current_plan.dependencies_satisfied(t))
+                    .unwrap_or(false);
+
+                if !deps_satisfied {
+                    return Ok(ToolResult::error(format!(
+                        "Cannot start task #{}: dependencies not satisfied.",
+                        task_order
+                    )));
+                }
+
+                // Now get mutable reference and update
+                let task = current_plan.get_task_by_order_mut(task_order).unwrap();
+                task.start_execution();
+                let task_title = task.title.clone();
+
+                current_plan.status = PlanStatus::InProgress;
+
+                format!(
+                    "▶️ Started Task #{}: {}\n\n\
+                     Now execute the task by:\n\
+                     1. Using appropriate tools (read_file, write_file, bash, etc.)\n\
+                     2. Recording tool calls with 'record_tool_call'\n\
+                     3. Completing with 'complete_task' when done\n\
+                     4. Reflecting on results with 'reflect'",
+                    task_order, task_title
+                )
+            }
+
+            PlanOperation::CompleteTask {
+                task_order,
+                success,
+                output,
+                artifacts,
+            } => {
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
+
+                let task = current_plan
+                    .get_task_by_order_mut(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?;
+
+                for artifact in artifacts {
+                    task.add_artifact(artifact);
+                }
+
+                task.complete_execution(output.clone(), success);
+
+                let status_msg = if success {
+                    format!(
+                        "✅ Task #{} completed successfully!\n\nOutput: {}\n\n\
+                         Next: Use 'reflect' to analyze the results, then 'next_task' to continue.",
+                        task_order, output
+                    )
+                } else {
+                    let can_retry = task.can_retry();
+                    format!(
+                        "❌ Task #{} failed (attempt {}/{})\n\nOutput: {}\n\n{}",
+                        task_order,
+                        task.retry_count,
+                        task.max_retries,
+                        output,
+                        if can_retry {
+                            "Next: Use 'reflect' to analyze what went wrong, then retry if appropriate."
+                        } else {
+                            "Max retries reached. Use 'reflect' to document the failure."
+                        }
+                    )
+                };
+
+                // Check if all tasks are complete
+                if current_plan.is_complete() {
+                    current_plan.complete();
+                }
+
+                status_msg
+            }
+
+            PlanOperation::Reflect {
+                task_order,
+                reflection,
+                should_retry,
+                adjustment_needed,
+            } => {
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
+
+                let task = current_plan
+                    .get_task_by_order_mut(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?;
+
+                task.add_reflection(reflection.clone());
+
+                let mut response = format!(
+                    "🤔 Reflection recorded for Task #{}:\n\n{}\n\n",
+                    task_order, reflection
+                );
+
+                if should_retry && task.can_retry() {
+                    // Reset to pending for retry
+                    task.status = crate::tui::plan::TaskStatus::Pending;
+                    response.push_str("🔄 Task marked for retry. Use 'start_task' to retry.\n");
+                }
+
+                if let Some(adjustment) = adjustment_needed {
+                    response.push_str(&format!(
+                        "⚙️ Plan adjustment needed: {}\n\
+                         Consider using 'add_task' to add corrective tasks or 'update_plan' to revise the plan.",
+                        adjustment
+                    ));
+                }
+
+                response
+            }
+
+            PlanOperation::RecordToolCall {
+                task_order,
+                tool_name,
+                input,
+                output,
+                success,
+            } => {
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
+
+                let task = current_plan
+                    .get_task_by_order_mut(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?;
+
+                let tool_call = PlanToolCall {
+                    tool_name: tool_name.clone(),
+                    input,
+                    output: output.clone(),
+                    success,
+                    timestamp: Utc::now(),
+                };
+
+                task.record_tool_call(tool_call);
+
+                format!(
+                    "📝 Recorded tool call: {} ({})",
+                    tool_name,
+                    if success { "success" } else { "failed" }
+                )
+            }
+
+            PlanOperation::SkipTask { task_order, reason } => {
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
+
+                let task = current_plan
+                    .get_task_by_order_mut(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?;
+
+                task.skip(Some(reason.clone()));
+
+                format!(
+                    "⏭️ Skipped Task #{}: {}\nReason: {}",
+                    task_order, task.title, reason
+                )
+            }
+
+            PlanOperation::Summary => {
+                let current_plan = plan
+                    .as_ref()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
+
+                let summary = current_plan.execution_summary();
+
+                format!(
+                    "📊 Execution Summary\n\n\
+                     Plan: {}\n\
+                     Status: {:?}\n\n\
+                     Tasks: {} total\n\
+                     ✅ Completed: {}\n\
+                     ❌ Failed: {}\n\
+                     ▶️ In Progress: {}\n\
+                     ⏸️ Pending: {}\n\
+                     ⏭️ Skipped: {}\n\
+                     🚫 Blocked: {}\n\n\
+                     Progress: {:.1}%\n\
+                     Success Rate: {:.1}%\n\
+                     Total Retries: {}\n\
+                     Total Tool Calls: {}",
+                    current_plan.title,
+                    current_plan.status,
+                    summary.total_tasks,
+                    summary.completed,
+                    summary.failed,
+                    summary.in_progress,
+                    summary.pending,
+                    summary.skipped,
+                    summary.blocked,
+                    current_plan.progress_percentage(),
+                    summary.success_rate,
+                    summary.total_retries,
+                    summary.total_tool_calls
+                )
             }
         };
 
