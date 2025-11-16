@@ -52,24 +52,16 @@ const FN_RESULT: &str = "✿RESULT✿";
 const FN_EXIT: &str = "✿RETURN✿";
 
 // Stop words for native Qwen format - prevent model from generating these
+#[allow(dead_code)] // Used in tests, will be used for stop word configuration
 const QWEN_FN_STOP_WORDS: &[&str] = &["✿RESULT✿", "✿RETURN✿"];
 
 /// Qwen thinking mode configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ThinkingConfig {
     /// Enable thinking mode (Qwen3 feature)
     pub enabled: bool,
     /// Budget tokens for thinking (optional)
     pub budget_tokens: Option<u32>,
-}
-
-impl Default for ThinkingConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            budget_tokens: None,
-        }
-    }
 }
 
 /// Qwen provider for Alibaba's Qwen models
@@ -221,7 +213,7 @@ impl QwenProvider {
                     ) {
                         let id = format!(
                             "call_{}",
-                            uuid::Uuid::new_v4().to_string().replace("-", "")[..24].to_string()
+                            &uuid::Uuid::new_v4().to_string().replace("-", "")[..24]
                         );
                         tool_calls.push((id, name.to_string(), arguments.clone()));
                     }
@@ -336,8 +328,7 @@ impl QwenProvider {
                             Ok(args) => {
                                 let id = format!(
                                     "call_{}",
-                                    uuid::Uuid::new_v4().to_string().replace('-', "")[..24]
-                                        .to_string()
+                                    &uuid::Uuid::new_v4().to_string().replace('-', "")[..24]
                                 );
                                 tool_calls.push((id, fn_name, args));
                             }

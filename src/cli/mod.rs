@@ -991,7 +991,7 @@ async fn cmd_logs(operation: LogCommands) -> Result<()> {
                 let reader = BufReader::new(file);
 
                 // Collect all lines then show last N
-                let all_lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+                let all_lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
                 let start = all_lines.len().saturating_sub(lines);
 
                 for line in &all_lines[start..] {

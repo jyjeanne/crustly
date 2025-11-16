@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Document Parser Tool - extracts text from various document formats
 pub struct DocParserTool;
@@ -201,15 +201,15 @@ impl DocParserTool {
     /// Parse PDF document
     async fn parse_pdf(
         &self,
-        path: &PathBuf,
+        path: &Path,
         input: &DocParserInput,
     ) -> Result<(String, ParsedMetadata)> {
-        let path = path.clone();
+        let path = path.to_path_buf();
         let pages = input.pages.clone();
 
         // Run PDF parsing in blocking task
         tokio::task::spawn_blocking(move || {
-            let bytes = std::fs::read(&path).map_err(|e| ToolError::Io(e))?;
+            let bytes = std::fs::read(&path).map_err(ToolError::Io)?;
 
             // Extract text from PDF
             let text = pdf_extract::extract_text_from_mem(&bytes)
@@ -254,8 +254,8 @@ impl DocParserTool {
     }
 
     /// Parse DOCX document (Office Open XML)
-    async fn parse_docx(&self, path: &PathBuf) -> Result<(String, ParsedMetadata)> {
-        let path = path.clone();
+    async fn parse_docx(&self, path: &Path) -> Result<(String, ParsedMetadata)> {
+        let path = path.to_path_buf();
 
         tokio::task::spawn_blocking(move || {
             let file = std::fs::File::open(&path).map_err(ToolError::Io)?;

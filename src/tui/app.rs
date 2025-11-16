@@ -929,7 +929,7 @@ impl App {
                 for risk in &plan.risks {
                     markdown.push_str(&format!("- {}\n", risk));
                 }
-                markdown.push_str("\n");
+                markdown.push('\n');
             }
 
             markdown.push_str("## Tasks\n\n");

@@ -256,10 +256,8 @@ pub fn cleanup_old_logs(max_age_days: u64) -> Result<usize, Box<dyn std::error::
             if let Ok(metadata) = entry.metadata() {
                 if let Ok(modified) = metadata.modified() {
                     if let Ok(age) = now.duration_since(modified) {
-                        if age > max_age {
-                            if std::fs::remove_file(&path).is_ok() {
-                                removed += 1;
-                            }
+                        if age > max_age && std::fs::remove_file(&path).is_ok() {
+                            removed += 1;
                         }
                     }
                 }
