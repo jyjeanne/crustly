@@ -446,7 +446,12 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         db::Database,
         llm::{
             agent::AgentService,
-            provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
+            provider::{
+                anthropic::AnthropicProvider,
+                openai::OpenAIProvider,
+                qwen::{QwenProvider, ToolCallParser},
+                Provider,
+            },
             tools::{
                 bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
                 glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
@@ -473,7 +478,90 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         .context("Failed to run database migrations")?;
 
     // Select provider based on configuration
-    let provider: Arc<dyn Provider> = if let Some(openai_config) = &config.providers.openai {
+    let provider: Arc<dyn Provider> = if let Some(qwen_config) = &config.providers.qwen {
+        // Qwen provider is configured
+        if let Some(base_url) = &qwen_config.base_url {
+            // Local Qwen (vLLM, LM Studio, etc.)
+            tracing::info!("Using local Qwen at: {}", base_url);
+            println!("🏠 Using local Qwen at: {}\n", base_url);
+            let mut provider = QwenProvider::local(base_url.clone());
+
+            // Set tool parser
+            if let Some(parser) = &qwen_config.tool_parser {
+                let tool_parser = match parser.as_str() {
+                    "openai" => ToolCallParser::OpenAI,
+                    _ => ToolCallParser::Hermes, // Default to Hermes for Qwen
+                };
+                provider = provider.with_tool_parser(tool_parser);
+                tracing::info!("Using tool parser: {:?}", tool_parser);
+            }
+
+            // Set thinking mode
+            if qwen_config.enable_thinking {
+                provider = provider.with_thinking(true);
+                tracing::info!("🧠 Qwen3 thinking mode enabled");
+                println!("🧠 Thinking mode: enabled\n");
+                if let Some(budget) = qwen_config.thinking_budget {
+                    provider = provider.with_thinking_budget(budget);
+                    tracing::info!("Thinking budget: {} tokens", budget);
+                }
+            }
+
+            if let Some(model) = &qwen_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                println!("📦 Model: {}\n", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
+        } else if let Some(api_key) = &qwen_config.api_key {
+            // DashScope cloud API
+            let region = qwen_config.region.as_deref().unwrap_or("intl");
+            let provider_base = match region {
+                "cn" => {
+                    tracing::info!("Using DashScope China (Beijing)");
+                    println!("☁️  Using DashScope China (Beijing)\n");
+                    QwenProvider::dashscope_cn(api_key.clone())
+                }
+                _ => {
+                    tracing::info!("Using DashScope International (Singapore)");
+                    println!("☁️  Using DashScope International (Singapore)\n");
+                    QwenProvider::dashscope_intl(api_key.clone())
+                }
+            };
+
+            let mut provider = provider_base;
+
+            // Set tool parser (default to OpenAI for cloud)
+            if let Some(parser) = &qwen_config.tool_parser {
+                let tool_parser = match parser.as_str() {
+                    "hermes" => ToolCallParser::Hermes,
+                    _ => ToolCallParser::OpenAI,
+                };
+                provider = provider.with_tool_parser(tool_parser);
+            }
+
+            // Set thinking mode
+            if qwen_config.enable_thinking {
+                provider = provider.with_thinking(true);
+                tracing::info!("🧠 Qwen3 thinking mode enabled");
+                println!("🧠 Thinking mode: enabled\n");
+                if let Some(budget) = qwen_config.thinking_budget {
+                    provider = provider.with_thinking_budget(budget);
+                }
+            }
+
+            if let Some(model) = &qwen_config.default_model {
+                tracing::info!("Using custom default model: {}", model);
+                println!("📦 Model: {}\n", model);
+                provider = provider.with_default_model(model.clone());
+            }
+            Arc::new(provider)
+        } else {
+            // Qwen configured but no credentials - fall back to OpenAI/Anthropic
+            tracing::debug!("Qwen configured but no credentials, falling back");
+            create_fallback_provider(config)?
+        }
+    } else if let Some(openai_config) = &config.providers.openai {
         // OpenAI provider is configured
         if let Some(base_url) = &openai_config.base_url {
             // Local LLM (LM Studio, Ollama, etc.)
@@ -520,7 +608,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             .providers
             .anthropic
             .as_ref()
-            .context("No provider configured.\n\nPlease set one of:\n  - ANTHROPIC_API_KEY for Claude\n  - OPENAI_API_KEY for OpenAI/GPT\n  - OPENAI_BASE_URL for local LLMs (LM Studio, Ollama)\n\nExample for LM Studio:\n  export OPENAI_BASE_URL=\"http://localhost:1234/v1\"")?;
+            .context("No provider configured.\n\nPlease set one of:\n  - ANTHROPIC_API_KEY for Claude\n  - OPENAI_API_KEY for OpenAI/GPT\n  - OPENAI_BASE_URL for local LLMs (LM Studio, Ollama)\n  - QWEN_BASE_URL for local Qwen (vLLM)\n  - DASHSCOPE_API_KEY for DashScope cloud\n\nExample for vLLM with Qwen:\n  export QWEN_BASE_URL=\"http://localhost:8000/v1/chat/completions\"")?;
 
         let api_key = anthropic_config
             .api_key
@@ -532,6 +620,28 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         println!("🤖 Using Anthropic Claude\n");
         Arc::new(AnthropicProvider::new(api_key))
     };
+
+    // Helper function for fallback provider
+    fn create_fallback_provider(
+        config: &crate::config::Config,
+    ) -> Result<Arc<dyn Provider>> {
+        if let Some(openai_config) = &config.providers.openai {
+            if let Some(api_key) = &openai_config.api_key {
+                return Ok(Arc::new(OpenAIProvider::new(api_key.clone())));
+            }
+        }
+        let anthropic_config = config
+            .providers
+            .anthropic
+            .as_ref()
+            .context("No provider configured")?;
+        let api_key = anthropic_config
+            .api_key
+            .as_ref()
+            .context("Anthropic API key not set")?
+            .clone();
+        Ok(Arc::new(AnthropicProvider::new(api_key)))
+    }
 
     // Create tool registry
     tracing::debug!("Setting up tool registry");

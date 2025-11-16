@@ -62,6 +62,10 @@ pub struct ProviderConfigs {
     #[serde(default)]
     pub openai: Option<ProviderConfig>,
 
+    /// Qwen/DashScope configuration
+    #[serde(default)]
+    pub qwen: Option<QwenProviderConfig>,
+
     /// Google Gemini configuration
     #[serde(default)]
     pub gemini: Option<ProviderConfig>,
@@ -97,6 +101,42 @@ pub struct ProviderConfig {
     /// Default model to use
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_model: Option<String>,
+}
+
+/// Qwen-specific provider configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QwenProviderConfig {
+    /// Provider enabled
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+
+    /// API key (for DashScope cloud)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+
+    /// API base URL override
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+
+    /// Default model to use
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
+
+    /// Tool call parser: "hermes" or "openai" (default: hermes for local, openai for cloud)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_parser: Option<String>,
+
+    /// Enable Qwen3 thinking mode
+    #[serde(default)]
+    pub enable_thinking: bool,
+
+    /// Thinking budget tokens (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_budget: Option<u32>,
+
+    /// DashScope region: "intl" (Singapore) or "cn" (Beijing)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
 }
 
 fn default_enabled() -> bool {
@@ -374,6 +414,51 @@ impl Config {
                 default_model: None,
             });
             provider.base_url = Some(endpoint);
+        }
+
+        // Qwen/DashScope
+        if let Ok(api_key) = std::env::var("DASHSCOPE_API_KEY") {
+            let provider = config.providers.qwen.get_or_insert(QwenProviderConfig {
+                enabled: true,
+                api_key: None,
+                base_url: None,
+                default_model: None,
+                tool_parser: None,
+                enable_thinking: false,
+                thinking_budget: None,
+                region: None,
+            });
+            provider.api_key = Some(api_key);
+        }
+
+        // Qwen base URL (for vLLM, LM Studio, etc.)
+        if let Ok(base_url) = std::env::var("QWEN_BASE_URL") {
+            let provider = config.providers.qwen.get_or_insert(QwenProviderConfig {
+                enabled: true,
+                api_key: None,
+                base_url: None,
+                default_model: None,
+                tool_parser: None,
+                enable_thinking: false,
+                thinking_budget: None,
+                region: None,
+            });
+            provider.base_url = Some(base_url);
+        }
+
+        // Qwen thinking mode
+        if let Ok(thinking) = std::env::var("QWEN_ENABLE_THINKING") {
+            let provider = config.providers.qwen.get_or_insert(QwenProviderConfig {
+                enabled: true,
+                api_key: None,
+                base_url: None,
+                default_model: None,
+                tool_parser: None,
+                enable_thinking: false,
+                thinking_budget: None,
+                region: None,
+            });
+            provider.enable_thinking = thinking.parse().unwrap_or(false);
         }
 
         Ok(())

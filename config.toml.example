@@ -44,6 +44,31 @@ default_model = "qwen2.5-coder-7b-instruct"
 # default_model = "claude-3-5-sonnet-20240620"  # Optional: override default
 
 # ========================================
+# Qwen Provider (Local vLLM / DashScope Cloud)
+# ========================================
+# For local Qwen deployment (vLLM, LM Studio with Qwen models):
+# [providers.qwen]
+# enabled = true
+# base_url = "http://localhost:8000/v1/chat/completions"  # vLLM default
+# default_model = "qwen3-8b"
+# tool_parser = "hermes"  # Recommended for Qwen3: "hermes" or "openai"
+# enable_thinking = true  # Enable Qwen3 thinking mode
+# thinking_budget = 5000  # Optional: limit thinking tokens
+
+# For DashScope cloud API:
+# [providers.qwen]
+# enabled = true
+# api_key = "your-dashscope-key"  # Or use DASHSCOPE_API_KEY env var
+# region = "intl"  # "intl" (Singapore) or "cn" (Beijing)
+# default_model = "qwen-plus"  # qwen-max, qwen-plus, qwen-turbo
+# enable_thinking = false  # Thinking mode for Qwen3 models only
+
+# Environment variables for Qwen:
+# - QWEN_BASE_URL: Local endpoint URL
+# - DASHSCOPE_API_KEY: Cloud API key
+# - QWEN_ENABLE_THINKING: Enable/disable thinking mode (true/false)
+
+# ========================================
 # Tips for Using Local LLMs
 # ========================================
 # 1. Make sure LM Studio is running before starting Crustly
