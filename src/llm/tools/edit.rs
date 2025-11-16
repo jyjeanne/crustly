@@ -165,6 +165,9 @@ impl Tool for EditTool {
             Err(ToolError::PermissionDenied(msg)) => {
                 return Ok(ToolResult::error(format!("Access denied: {}", msg)));
             }
+            Err(ToolError::InvalidInput(msg)) => {
+                return Ok(ToolResult::error(format!("Invalid path: {}", msg)));
+            }
             Err(e) => return Err(e),
         };
 

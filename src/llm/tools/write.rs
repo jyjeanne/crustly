@@ -129,10 +129,23 @@ impl Tool for WriteTool {
             Err(ToolError::PermissionDenied(msg)) => {
                 return Ok(ToolResult::error(format!("Access denied: {}", msg)));
             }
+            Err(ToolError::InvalidInput(msg)) if msg.contains("Parent directory does not exist") => {
+                // For write operations, we want to give a helpful error about create_dirs
+                if let Some(parent) = path.parent() {
+                    return Ok(ToolResult::error(format!(
+                        "Parent directory does not exist: {}. Use create_dirs: true to create it.",
+                        parent.display()
+                    )));
+                }
+                return Ok(ToolResult::error(msg));
+            }
+            Err(ToolError::InvalidInput(msg)) => {
+                return Ok(ToolResult::error(format!("Invalid path: {}", msg)));
+            }
             Err(e) => return Err(e),
         };
 
-        // Check if parent directory exists
+        // Check if parent directory exists (safety check after validation)
         if let Some(parent) = path.parent() {
             if !parent.exists() {
                 return Ok(ToolResult::error(format!(

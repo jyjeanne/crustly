@@ -82,6 +82,9 @@ impl Tool for ReadTool {
             Err(ToolError::PermissionDenied(msg)) => {
                 return Ok(ToolResult::error(format!("Access denied: {}", msg)));
             }
+            Err(ToolError::InvalidInput(msg)) => {
+                return Ok(ToolResult::error(format!("Invalid path: {}", msg)));
+            }
             Err(e) => return Err(e),
         };
 
@@ -135,21 +138,24 @@ impl Tool for ReadTool {
 mod tests {
     use super::*;
     use std::io::Write;
-    use tempfile::NamedTempFile;
+    use tempfile::{NamedTempFile, TempDir};
     use uuid::Uuid;
 
     #[tokio::test]
     async fn test_read_file() {
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let temp_file_path = temp_dir.path().join("test.txt");
+        let mut temp_file = std::fs::File::create(&temp_file_path).unwrap();
         writeln!(temp_file, "Line 1\nLine 2\nLine 3").unwrap();
         temp_file.flush().unwrap();
 
         let tool = ReadTool;
         let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
+        let context = ToolExecutionContext::new(session_id)
+            .with_working_directory(temp_dir.path().to_path_buf());
 
         let input = serde_json::json!({
-            "path": temp_file.path().to_str().unwrap()
+            "path": temp_file_path.to_str().unwrap()
         });
 
         let result = tool.execute(input, &context).await.unwrap();
@@ -160,16 +166,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_file_line_range() {
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let temp_file_path = temp_dir.path().join("test.txt");
+        let mut temp_file = std::fs::File::create(&temp_file_path).unwrap();
         writeln!(temp_file, "Line 1\nLine 2\nLine 3\nLine 4\nLine 5").unwrap();
         temp_file.flush().unwrap();
 
         let tool = ReadTool;
         let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
+        let context = ToolExecutionContext::new(session_id)
+            .with_working_directory(temp_dir.path().to_path_buf());
 
         let input = serde_json::json!({
-            "path": temp_file.path().to_str().unwrap(),
+            "path": temp_file_path.to_str().unwrap(),
             "start_line": 1,
             "line_count": 2
         });
@@ -184,12 +193,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_nonexistent_file() {
+        let temp_dir = TempDir::new().unwrap();
         let tool = ReadTool;
         let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
+        let context = ToolExecutionContext::new(session_id)
+            .with_working_directory(temp_dir.path().to_path_buf());
 
         let input = serde_json::json!({
-            "path": "/nonexistent/file.txt"
+            "path": "nonexistent_file.txt"
         });
 
         let result = tool.execute(input, &context).await.unwrap();
