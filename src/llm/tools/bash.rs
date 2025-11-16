@@ -37,6 +37,16 @@ fn is_read_only_command(command: &str) -> bool {
         return false;
     }
 
+    // Check for command substitution (can hide dangerous commands)
+    if cmd_lower.contains("$(") || cmd_lower.contains("`") {
+        return false;
+    }
+
+    // Check for subshell execution
+    if cmd_lower.contains("bash ") || cmd_lower.contains("sh ") || cmd_lower.contains("eval ") {
+        return false;
+    }
+
     // Get the first command (before pipes or &&)
     let first_cmd = cmd_lower
         .split('|')
@@ -45,55 +55,84 @@ fn is_read_only_command(command: &str) -> bool {
         .split("&&")
         .next()
         .unwrap_or(&cmd_lower)
+        .split(';')
+        .next()
+        .unwrap_or(&cmd_lower)
         .trim();
 
-    // Get the command name (first word)
+    // Get the command name (first word) - this is what we'll validate
     let cmd_name = first_cmd.split_whitespace().next().unwrap_or("");
 
-    // List of safe read-only commands
-    let safe_commands = [
-        // Git read-only commands
-        "git status",
-        "git log",
-        "git diff",
-        "git branch",
-        "git show",
-        "git remote",
-        // File reading commands
-        "ls",
-        "cat",
-        "head",
-        "tail",
-        "less",
-        "more",
-        "grep",
-        "find",
-        "tree",
-        "file",
-        // Info commands
-        "pwd",
-        "whoami",
-        "hostname",
-        "date",
-        "echo",
-        "which",
-        "type",
-        "env",
-        "printenv",
-        "df",
-        "du",
-        "wc",
-        // Other safe commands
-        "curl",
-        "wget",
+    // List of safe read-only single commands (exact command name match)
+    let safe_single_commands = [
+        "ls", "cat", "head", "tail", "less", "more", "grep", "find", "tree", "file", "pwd",
+        "whoami", "hostname", "date", "echo", "which", "type", "env", "printenv", "df", "du", "wc",
+        "curl", "wget", "rg", "fd", "bat", "exa", "eza",
     ];
 
-    // Check if command starts with any safe command
-    safe_commands
-        .iter()
-        .any(|&safe| first_cmd.starts_with(safe))
-        // Also allow the command name if it's in the list
-        || safe_commands.contains(&cmd_name)
+    // List of safe git subcommands (read-only)
+    let safe_git_subcommands = [
+        "status",
+        "log",
+        "diff",
+        "branch",
+        "show",
+        "remote",
+        "tag",
+        "describe",
+        "rev-parse",
+        "config",
+        "ls-files",
+        "ls-tree",
+        "shortlog",
+        "blame",
+        "reflog",
+    ];
+
+    // List of safe cargo subcommands (read-only)
+    let safe_cargo_subcommands = [
+        "version",
+        "check",
+        "clippy",
+        "fmt",
+        "test",
+        "build",
+        "doc",
+        "tree",
+        "metadata",
+        "verify-project",
+    ];
+
+    // Check if command is in safe single commands list (exact match)
+    if safe_single_commands.contains(&cmd_name) {
+        return true;
+    }
+
+    // Check for git commands with safe subcommands
+    if cmd_name == "git" {
+        let parts: Vec<&str> = first_cmd.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let subcommand = parts[1];
+            // Check if the git subcommand is in our safe list
+            return safe_git_subcommands.contains(&subcommand);
+        }
+        // Bare "git" command is safe (just shows help)
+        return true;
+    }
+
+    // Check for cargo commands with safe subcommands
+    if cmd_name == "cargo" {
+        let parts: Vec<&str> = first_cmd.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let subcommand = parts[1];
+            // Check if the cargo subcommand is in our safe list
+            return safe_cargo_subcommands.contains(&subcommand);
+        }
+        // Bare "cargo" command is safe (just shows help)
+        return true;
+    }
+
+    false
 }
 
 #[async_trait]

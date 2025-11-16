@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
 /// Session context management tool
@@ -52,7 +52,7 @@ impl ContextStore {
         }
     }
 
-    async fn load(path: &PathBuf, session_id: &str) -> Result<Self> {
+    async fn load(path: &Path, session_id: &str) -> Result<Self> {
         if path.exists() {
             let content = fs::read_to_string(path).await.map_err(ToolError::Io)?;
             let mut store: Self = serde_json::from_str(&content).map_err(|e| {
@@ -65,7 +65,7 @@ impl ContextStore {
         }
     }
 
-    async fn save(&self, path: &PathBuf) -> Result<()> {
+    async fn save(&self, path: &Path) -> Result<()> {
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| ToolError::Execution(format!("Failed to serialize context: {}", e)))?;
 

@@ -7,7 +7,7 @@ use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
 /// List directory tool
@@ -128,7 +128,7 @@ impl Tool for LsTool {
 impl LsTool {
     async fn list_directory(
         &self,
-        path: &PathBuf,
+        path: &Path,
         input: &LsInput,
         output: &mut String,
     ) -> Result<()> {

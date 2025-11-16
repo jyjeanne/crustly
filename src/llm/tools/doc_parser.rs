@@ -13,6 +13,10 @@ use std::path::{Path, PathBuf};
 /// Document Parser Tool - extracts text from various document formats
 pub struct DocParserTool;
 
+/// Maximum file size for document parsing (50MB)
+/// This prevents memory exhaustion from very large documents
+const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024;
+
 #[derive(Debug, Deserialize, Serialize)]
 struct DocParserInput {
     /// Path to the document file
@@ -121,8 +125,16 @@ impl Tool for DocParserTool {
             )));
         }
 
-        // Get file size
-        let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        // Check file size to prevent memory exhaustion
+        let file_size = std::fs::metadata(&path).map_err(ToolError::Io)?.len();
+        if file_size > MAX_FILE_SIZE {
+            return Ok(ToolResult::error(format!(
+                "File size ({} MB) exceeds maximum allowed size ({} MB). \
+                Consider splitting the document or using a different approach.",
+                file_size / (1024 * 1024),
+                MAX_FILE_SIZE / (1024 * 1024)
+            )));
+        }
 
         // Determine file type and parse accordingly
         let extension = path
@@ -375,7 +387,7 @@ impl DocParserTool {
     }
 
     /// Parse plain text files
-    async fn parse_text(&self, path: &PathBuf, _format: &str) -> Result<(String, ParsedMetadata)> {
+    async fn parse_text(&self, path: &Path, _format: &str) -> Result<(String, ParsedMetadata)> {
         let text = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;
@@ -390,7 +402,7 @@ impl DocParserTool {
     }
 
     /// Parse HTML files
-    async fn parse_html(&self, path: &PathBuf) -> Result<(String, ParsedMetadata)> {
+    async fn parse_html(&self, path: &Path) -> Result<(String, ParsedMetadata)> {
         let html = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;
@@ -464,7 +476,7 @@ impl DocParserTool {
     }
 
     /// Parse JSON files
-    async fn parse_json(&self, path: &PathBuf) -> Result<(String, ParsedMetadata)> {
+    async fn parse_json(&self, path: &Path) -> Result<(String, ParsedMetadata)> {
         let json_text = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;
@@ -485,7 +497,7 @@ impl DocParserTool {
     }
 
     /// Parse XML files
-    async fn parse_xml(&self, path: &PathBuf) -> Result<(String, ParsedMetadata)> {
+    async fn parse_xml(&self, path: &Path) -> Result<(String, ParsedMetadata)> {
         let xml_text = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;

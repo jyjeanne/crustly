@@ -168,7 +168,7 @@ impl Tool for CodeExecTool {
         let temp_dir = std::env::temp_dir();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| ToolError::Internal(format!("Failed to get system time: {}", e)))?
             .as_nanos();
         let temp_file = temp_dir.join(format!("crustly_exec_{}.{}", timestamp, extension));
 
