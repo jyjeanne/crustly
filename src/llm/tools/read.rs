@@ -2,12 +2,11 @@
 //!
 //! Allows reading file contents from the filesystem.
 
-use super::error::{Result, ToolError};
+use super::error::{validate_path_safety, Result, ToolError};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::PathBuf;
 use tokio::fs;
 
 /// Read file tool
@@ -77,11 +76,13 @@ impl Tool for ReadTool {
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: ReadInput = serde_json::from_value(input)?;
 
-        // Resolve path relative to working directory
-        let path = if PathBuf::from(&input.path).is_absolute() {
-            PathBuf::from(&input.path)
-        } else {
-            context.working_directory.join(&input.path)
+        // Validate path is safe and within working directory (prevents path traversal)
+        let path = match validate_path_safety(&input.path, &context.working_directory) {
+            Ok(p) => p,
+            Err(ToolError::PermissionDenied(msg)) => {
+                return Ok(ToolResult::error(format!("Access denied: {}", msg)));
+            }
+            Err(e) => return Err(e),
         };
 
         // Check if file exists

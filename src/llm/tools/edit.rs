@@ -2,12 +2,11 @@
 //!
 //! Intelligently modify portions of files (find/replace, line-based edits).
 
-use super::error::{Result, ToolError};
+use super::error::{validate_path_safety, Result, ToolError};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::PathBuf;
 use tokio::fs;
 
 /// Edit file tool
@@ -160,11 +159,13 @@ impl Tool for EditTool {
 
         let input: EditInput = serde_json::from_value(input)?;
 
-        // Resolve path
-        let path = if PathBuf::from(&input.path).is_absolute() {
-            PathBuf::from(&input.path)
-        } else {
-            context.working_directory.join(&input.path)
+        // Validate path is safe and within working directory (prevents path traversal)
+        let path = match validate_path_safety(&input.path, &context.working_directory) {
+            Ok(p) => p,
+            Err(ToolError::PermissionDenied(msg)) => {
+                return Ok(ToolResult::error(format!("Access denied: {}", msg)));
+            }
+            Err(e) => return Err(e),
         };
 
         // Check if file exists

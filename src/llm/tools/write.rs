@@ -2,7 +2,7 @@
 //!
 //! Allows writing content to files on the filesystem.
 
-use super::error::{Result, ToolError};
+use super::error::{validate_path_safety, Result, ToolError};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -94,12 +94,43 @@ impl Tool for WriteTool {
             context.working_directory.join(&input.path)
         };
 
-        // Create parent directories if requested
+        // Create parent directories if requested (before path validation)
         if input.create_dirs {
             if let Some(parent) = path.parent() {
+                // Validate parent path is within working directory
+                let canonical_wd = context.working_directory.canonicalize().map_err(|e| {
+                    ToolError::Internal(format!(
+                        "Failed to canonicalize working directory: {}",
+                        e
+                    ))
+                })?;
+
+                // If parent exists, check it's within bounds
+                if parent.exists() {
+                    let canonical_parent = parent.canonicalize().map_err(|e| {
+                        ToolError::InvalidInput(format!("Failed to resolve parent path: {}", e))
+                    })?;
+
+                    if !canonical_parent.starts_with(&canonical_wd) {
+                        return Ok(ToolResult::error(format!(
+                            "Access denied: Path '{}' is outside the working directory",
+                            input.path
+                        )));
+                    }
+                }
+
                 fs::create_dir_all(parent).await.map_err(ToolError::Io)?;
             }
         }
+
+        // Validate path is safe and within working directory (prevents path traversal)
+        let path = match validate_path_safety(&input.path, &context.working_directory) {
+            Ok(p) => p,
+            Err(ToolError::PermissionDenied(msg)) => {
+                return Ok(ToolResult::error(format!("Access denied: {}", msg)));
+            }
+            Err(e) => return Err(e),
+        };
 
         // Check if parent directory exists
         if let Some(parent) = path.parent() {

@@ -106,22 +106,39 @@ impl SessionRepository {
 
     /// List all sessions (most recent first)
     pub async fn list(&self, options: SessionListOptions) -> Result<Vec<Session>> {
-        let mut query = String::from("SELECT * FROM sessions");
-
-        if !options.include_archived {
-            query.push_str(" WHERE archived_at IS NULL");
-        }
-
-        query.push_str(" ORDER BY updated_at DESC");
-
-        if let Some(limit) = options.limit {
-            query.push_str(&format!(" LIMIT {} OFFSET {}", limit, options.offset));
-        }
-
-        let sessions = sqlx::query_as::<_, Session>(&query)
+        // Use parameterized queries to prevent SQL injection
+        let sessions = if let Some(limit) = options.limit {
+            if options.include_archived {
+                sqlx::query_as::<_, Session>(
+                    "SELECT * FROM sessions ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+                )
+                .bind(limit as i64)
+                .bind(options.offset as i64)
+                .fetch_all(&self.pool)
+                .await
+            } else {
+                sqlx::query_as::<_, Session>(
+                    "SELECT * FROM sessions WHERE archived_at IS NULL ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+                )
+                .bind(limit as i64)
+                .bind(options.offset as i64)
+                .fetch_all(&self.pool)
+                .await
+            }
+        } else if options.include_archived {
+            sqlx::query_as::<_, Session>(
+                "SELECT * FROM sessions ORDER BY updated_at DESC",
+            )
             .fetch_all(&self.pool)
             .await
-            .context("Failed to list sessions")?;
+        } else {
+            sqlx::query_as::<_, Session>(
+                "SELECT * FROM sessions WHERE archived_at IS NULL ORDER BY updated_at DESC",
+            )
+            .fetch_all(&self.pool)
+            .await
+        }
+        .context("Failed to list sessions")?;
 
         Ok(sessions)
     }
