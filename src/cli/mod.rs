@@ -172,7 +172,7 @@ pub enum LogCommands {
     /// Clean up old log files
     Clean {
         /// Maximum age in days (default: 7)
-        #[arg(short, long, default_value = "7")]
+        #[arg(short = 'a', long, default_value = "7")]
         days: u64,
     },
     /// Open log directory in file manager
