@@ -97,6 +97,15 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
             ),
         ]),
         Line::from(""),
+        Line::from(vec![
+            Span::raw("                    "),
+            Span::styled(
+                "by Jeremy JEANNE",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            ),
+        ]),
         Line::from(""),
         // Project name and version
         Line::from(vec![
