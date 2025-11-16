@@ -70,7 +70,7 @@ thinking_budget = 5000  # Optional: limit thinking tokens
 
 ## Tool Call Parsing Modes
 
-### Hermes Style (Recommended for Qwen3)
+### Hermes Style (Recommended for Qwen3 via vLLM)
 
 Hermes-style parsing uses XML tags for structured tool calls:
 
@@ -81,9 +81,29 @@ Hermes-style parsing uses XML tags for structured tool calls:
 ```
 
 **Benefits:**
-- Optimized for Qwen3 models
+- Optimized for Qwen3 models via vLLM
 - Better structured reasoning
 - Higher tool call accuracy
+
+### Native Qwen Style (Official Qwen-Agent Format)
+
+Uses the official Qwen-Agent Unicode markers:
+
+```
+✿FUNCTION✿: read_file
+✿ARGS✿: {"path": "/home/user/file.txt"}
+```
+
+**Benefits:**
+- Official format from Qwen-Agent repository
+- Direct compatibility with Qwen's internal function calling
+- Supports parallel function calls natively
+- Stop word handling for better parsing
+
+**Configuration:**
+```toml
+tool_parser = "native"  # or "qwen"
+```
 
 ### OpenAI Style
 
@@ -92,6 +112,7 @@ Standard OpenAI-compatible format with `tool_calls` array in response.
 **Best for:**
 - DashScope cloud API
 - Compatibility with existing tools
+- LM Studio with auto-parsing enabled
 
 ## Qwen3 Thinking Mode
 

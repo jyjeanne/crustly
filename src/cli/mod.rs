@@ -490,10 +490,14 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             if let Some(parser) = &qwen_config.tool_parser {
                 let tool_parser = match parser.as_str() {
                     "openai" => ToolCallParser::OpenAI,
+                    "native" | "qwen" => ToolCallParser::NativeQwen,
                     _ => ToolCallParser::Hermes, // Default to Hermes for Qwen
                 };
                 provider = provider.with_tool_parser(tool_parser);
                 tracing::info!("Using tool parser: {:?}", tool_parser);
+                if tool_parser == ToolCallParser::NativeQwen {
+                    println!("🔧 Using native Qwen function calling (✿FUNCTION✿ markers)\n");
+                }
             }
 
             // Set thinking mode
@@ -535,9 +539,13 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             if let Some(parser) = &qwen_config.tool_parser {
                 let tool_parser = match parser.as_str() {
                     "hermes" => ToolCallParser::Hermes,
+                    "native" | "qwen" => ToolCallParser::NativeQwen,
                     _ => ToolCallParser::OpenAI,
                 };
                 provider = provider.with_tool_parser(tool_parser);
+                if tool_parser == ToolCallParser::NativeQwen {
+                    println!("🔧 Using native Qwen function calling (✿FUNCTION✿ markers)\n");
+                }
             }
 
             // Set thinking mode

@@ -51,9 +51,14 @@ default_model = "qwen2.5-coder-7b-instruct"
 # enabled = true
 # base_url = "http://localhost:8000/v1/chat/completions"  # vLLM default
 # default_model = "qwen3-8b"
-# tool_parser = "hermes"  # Recommended for Qwen3: "hermes" or "openai"
+# tool_parser = "hermes"  # Options: "hermes" (XML tags), "native" (✿FUNCTION✿ markers), "openai"
 # enable_thinking = true  # Enable Qwen3 thinking mode
 # thinking_budget = 5000  # Optional: limit thinking tokens
+
+# Tool parser options:
+# - "hermes": Uses <tool_call> XML tags (recommended for vLLM with --tool-call-parser hermes)
+# - "native" or "qwen": Uses ✿FUNCTION✿ Unicode markers (official Qwen-Agent format)
+# - "openai": Uses standard OpenAI tool_calls format
 
 # For DashScope cloud API:
 # [providers.qwen]

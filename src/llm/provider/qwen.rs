@@ -40,9 +40,20 @@ const DEFAULT_POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 pub enum ToolCallParser {
     /// Standard OpenAI format (works with LM Studio auto-parsing)
     OpenAI,
-    /// Hermes-style parsing (recommended for Qwen3)
+    /// Hermes-style parsing with XML tags (recommended for Qwen3 via vLLM)
     Hermes,
+    /// Native Qwen format with Unicode markers (✿FUNCTION✿, ✿ARGS✿, etc.)
+    NativeQwen,
 }
+
+// Native Qwen function calling markers (from qwen_fncall_prompt.py)
+const FN_NAME: &str = "✿FUNCTION✿";
+const FN_ARGS: &str = "✿ARGS✿";
+const FN_RESULT: &str = "✿RESULT✿";
+const FN_EXIT: &str = "✿RETURN✿";
+
+// Stop words for native Qwen format - prevent model from generating these
+const QWEN_FN_STOP_WORDS: &[&str] = &["✿RESULT✿", "✿RETURN✿"];
 
 /// Qwen thinking mode configuration
 #[derive(Debug, Clone)]
@@ -241,6 +252,133 @@ impl QwenProvider {
         (None, text.to_string())
     }
 
+    /// Format tools in native Qwen format (with Unicode markers)
+    fn format_native_qwen_tools(&self, tools: &[Tool]) -> String {
+        let mut result = String::from(
+            "# Tools\n\nYou may call one or more functions to assist with the user query.\n\n\
+             You are provided with function signatures within <tool_info></tool_info> XML tags:\n\
+             <tool_info>\n",
+        );
+
+        for tool in tools {
+            // Format each tool in Qwen-Agent style
+            result.push_str(&format!(
+                "### {}\n\n{}: {} Parameters: {} Format the arguments as a JSON object.\n\n",
+                tool.name,
+                tool.name,
+                tool.description,
+                serde_json::to_string(&tool.input_schema).unwrap_or_default()
+            ));
+        }
+
+        result.push_str("</tool_info>\n\n");
+        result.push_str(&format!(
+            "For each function call, return a line with the function name prefixed by '{}:', \
+             followed by a line with arguments prefixed by '{}:'.\n\
+             Example:\n\
+             {}: function_name\n\
+             {}: {{\"arg1\": \"value1\"}}\n\n\
+             When you have received the results and are ready to respond to the user, \
+             output '{}:' followed by your final response.",
+            FN_NAME, FN_ARGS, FN_NAME, FN_ARGS, FN_EXIT
+        ));
+
+        result
+    }
+
+    /// Parse native Qwen function calls (with Unicode markers)
+    fn parse_native_qwen_tool_calls(&self, text: &str) -> Vec<(String, String, serde_json::Value)> {
+        let mut tool_calls = Vec::new();
+
+        // Split by function marker and parse each call
+        let parts: Vec<&str> = text.split(FN_NAME).collect();
+
+        for part in parts.iter().skip(1) {
+            // Skip the first part (before any function call)
+            let part = part.trim();
+
+            // Extract function name (after ": ")
+            if let Some(colon_pos) = part.find(':') {
+                let after_colon = &part[colon_pos + 1..].trim_start();
+
+                // Find the function name (up to newline or FN_ARGS)
+                let fn_name = if let Some(newline_pos) = after_colon.find('\n') {
+                    after_colon[..newline_pos].trim().to_string()
+                } else if let Some(args_pos) = after_colon.find(FN_ARGS) {
+                    after_colon[..args_pos].trim().to_string()
+                } else {
+                    after_colon.trim().to_string()
+                };
+
+                // Extract arguments
+                if let Some(args_start) = part.find(FN_ARGS) {
+                    let args_section = &part[args_start + FN_ARGS.len()..];
+                    let args_text = if let Some(colon) = args_section.find(':') {
+                        let after_args_colon = &args_section[colon + 1..];
+                        // Find end of JSON (next marker or end of string)
+                        let end_pos = after_args_colon
+                            .find(FN_NAME)
+                            .or_else(|| after_args_colon.find(FN_RESULT))
+                            .or_else(|| after_args_colon.find(FN_EXIT))
+                            .unwrap_or(after_args_colon.len());
+                        after_args_colon[..end_pos].trim()
+                    } else {
+                        ""
+                    };
+
+                    // Parse arguments JSON
+                    if !fn_name.is_empty() && !args_text.is_empty() {
+                        match serde_json::from_str::<serde_json::Value>(args_text) {
+                            Ok(args) => {
+                                let id = format!(
+                                    "call_{}",
+                                    uuid::Uuid::new_v4().to_string().replace('-', "")[..24]
+                                        .to_string()
+                                );
+                                tool_calls.push((id, fn_name, args));
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Failed to parse native Qwen tool arguments: {}",
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        tool_calls
+    }
+
+    /// Format tool result for native Qwen format
+    fn format_native_qwen_result(&self, result: &str) -> String {
+        format!("\n{}: {}\n{}:", FN_RESULT, result, FN_EXIT)
+    }
+
+    /// Remove incomplete markers from streamed text
+    fn clean_incomplete_markers(&self, text: &str) -> String {
+        let markers = [FN_NAME, FN_ARGS, FN_RESULT, FN_EXIT];
+        let mut result = text.to_string();
+
+        // Remove partial markers at the end of text
+        // Handle multi-byte Unicode characters properly
+        for marker in &markers {
+            let marker_chars: Vec<char> = marker.chars().collect();
+            for i in 1..marker_chars.len() {
+                let partial: String = marker_chars[..i].iter().collect();
+                if result.ends_with(&partial) {
+                    let new_len = result.len() - partial.len();
+                    result = result[..new_len].to_string();
+                    break;
+                }
+            }
+        }
+
+        result
+    }
+
     /// Convert our generic request to Qwen-specific format
     fn to_qwen_request(&self, request: LLMRequest) -> QwenRequest {
         let mut messages = Vec::new();
@@ -251,17 +389,34 @@ impl QwenProvider {
             system_content = system.clone();
         }
 
-        // Add Hermes-style tool instructions to system prompt
-        if self.tool_parser == ToolCallParser::Hermes {
-            if let Some(tools) = &request.tools {
-                if !tools.is_empty() {
-                    let hermes_tools = self.format_hermes_tools(tools);
-                    if system_content.is_empty() {
-                        system_content = hermes_tools;
-                    } else {
-                        system_content = format!("{}\n\n{}", hermes_tools, system_content);
+        // Add tool instructions to system prompt based on parser type
+        match self.tool_parser {
+            ToolCallParser::Hermes => {
+                if let Some(tools) = &request.tools {
+                    if !tools.is_empty() {
+                        let hermes_tools = self.format_hermes_tools(tools);
+                        if system_content.is_empty() {
+                            system_content = hermes_tools;
+                        } else {
+                            system_content = format!("{}\n\n{}", hermes_tools, system_content);
+                        }
                     }
                 }
+            }
+            ToolCallParser::NativeQwen => {
+                if let Some(tools) = &request.tools {
+                    if !tools.is_empty() {
+                        let native_tools = self.format_native_qwen_tools(tools);
+                        if system_content.is_empty() {
+                            system_content = native_tools;
+                        } else {
+                            system_content = format!("{}\n\n{}", native_tools, system_content);
+                        }
+                    }
+                }
+            }
+            ToolCallParser::OpenAI => {
+                // OpenAI format uses the tools field in the request, not system prompt
             }
         }
 
@@ -320,74 +475,110 @@ impl QwenProvider {
 
             // Handle assistant messages with tool calls
             if !tool_uses.is_empty() {
-                if self.tool_parser == ToolCallParser::Hermes {
-                    // Format as Hermes-style tool calls in text
-                    let mut content = text_parts.join("\n");
-                    for (_, name, input) in tool_uses {
-                        content.push_str(&format!(
-                            "\n<tool_call>\n{{\"name\": \"{}\", \"arguments\": {}}}\n</tool_call>",
-                            name,
-                            serde_json::to_string(&input).unwrap_or_default()
-                        ));
-                    }
-                    messages.push(QwenMessage {
-                        role: role.to_string(),
-                        content: Some(content),
-                        tool_calls: None,
-                        tool_call_id: None,
-                    });
-                } else {
-                    // OpenAI-style tool calls
-                    let qwen_tool_calls = tool_uses
-                        .into_iter()
-                        .map(|(id, name, input)| QwenToolCall {
-                            id,
-                            r#type: "function".to_string(),
-                            function: QwenFunctionCall {
+                match self.tool_parser {
+                    ToolCallParser::Hermes => {
+                        // Format as Hermes-style tool calls in text
+                        let mut content = text_parts.join("\n");
+                        for (_, name, input) in tool_uses {
+                            content.push_str(&format!(
+                                "\n<tool_call>\n{{\"name\": \"{}\", \"arguments\": {}}}\n</tool_call>",
                                 name,
-                                arguments: serde_json::to_string(&input).unwrap_or_default(),
-                            },
-                        })
-                        .collect();
-
-                    let content_str = if text_parts.is_empty() {
-                        None
-                    } else {
-                        Some(text_parts.join("\n"))
-                    };
-
-                    messages.push(QwenMessage {
-                        role: role.to_string(),
-                        content: content_str,
-                        tool_calls: Some(qwen_tool_calls),
-                        tool_call_id: None,
-                    });
-                }
-            }
-            // Handle tool result messages
-            else if !tool_results.is_empty() {
-                if self.tool_parser == ToolCallParser::Hermes {
-                    // Format tool results as user message with context
-                    for (tool_use_id, content) in tool_results {
+                                serde_json::to_string(&input).unwrap_or_default()
+                            ));
+                        }
                         messages.push(QwenMessage {
-                            role: "user".to_string(),
-                            content: Some(format!(
-                                "<tool_response>\nTool call ID: {}\nResult: {}\n</tool_response>",
-                                tool_use_id, content
-                            )),
+                            role: role.to_string(),
+                            content: Some(content),
                             tool_calls: None,
                             tool_call_id: None,
                         });
                     }
-                } else {
-                    // OpenAI-style tool results
-                    for (tool_use_id, content) in tool_results {
+                    ToolCallParser::NativeQwen => {
+                        // Format as native Qwen-style tool calls with Unicode markers
+                        let mut content = text_parts.join("\n");
+                        for (_, name, input) in tool_uses {
+                            content.push_str(&format!(
+                                "\n{}: {}\n{}: {}",
+                                FN_NAME,
+                                name,
+                                FN_ARGS,
+                                serde_json::to_string(&input).unwrap_or_default()
+                            ));
+                        }
                         messages.push(QwenMessage {
-                            role: "tool".to_string(),
+                            role: role.to_string(),
                             content: Some(content),
                             tool_calls: None,
-                            tool_call_id: Some(tool_use_id),
+                            tool_call_id: None,
                         });
+                    }
+                    ToolCallParser::OpenAI => {
+                        // OpenAI-style tool calls
+                        let qwen_tool_calls = tool_uses
+                            .into_iter()
+                            .map(|(id, name, input)| QwenToolCall {
+                                id,
+                                r#type: "function".to_string(),
+                                function: QwenFunctionCall {
+                                    name,
+                                    arguments: serde_json::to_string(&input).unwrap_or_default(),
+                                },
+                            })
+                            .collect();
+
+                        let content_str = if text_parts.is_empty() {
+                            None
+                        } else {
+                            Some(text_parts.join("\n"))
+                        };
+
+                        messages.push(QwenMessage {
+                            role: role.to_string(),
+                            content: content_str,
+                            tool_calls: Some(qwen_tool_calls),
+                            tool_call_id: None,
+                        });
+                    }
+                }
+            }
+            // Handle tool result messages
+            else if !tool_results.is_empty() {
+                match self.tool_parser {
+                    ToolCallParser::Hermes => {
+                        // Format tool results as user message with context
+                        for (tool_use_id, content) in tool_results {
+                            messages.push(QwenMessage {
+                                role: "user".to_string(),
+                                content: Some(format!(
+                                    "<tool_response>\nTool call ID: {}\nResult: {}\n</tool_response>",
+                                    tool_use_id, content
+                                )),
+                                tool_calls: None,
+                                tool_call_id: None,
+                            });
+                        }
+                    }
+                    ToolCallParser::NativeQwen => {
+                        // Format tool results with native Qwen markers
+                        for (_tool_use_id, content) in tool_results {
+                            messages.push(QwenMessage {
+                                role: "user".to_string(),
+                                content: Some(self.format_native_qwen_result(&content)),
+                                tool_calls: None,
+                                tool_call_id: None,
+                            });
+                        }
+                    }
+                    ToolCallParser::OpenAI => {
+                        // OpenAI-style tool results
+                        for (tool_use_id, content) in tool_results {
+                            messages.push(QwenMessage {
+                                role: "tool".to_string(),
+                                content: Some(content),
+                                tool_calls: None,
+                                tool_call_id: Some(tool_use_id),
+                            });
+                        }
                     }
                 }
             }
@@ -472,44 +663,96 @@ impl QwenProvider {
                     });
                 }
 
-                // Parse Hermes-style tool calls from remaining text
-                if self.tool_parser == ToolCallParser::Hermes {
-                    let hermes_calls = self.parse_hermes_tool_calls(&remaining);
+                // Parse tool calls based on parser type
+                match self.tool_parser {
+                    ToolCallParser::Hermes => {
+                        let hermes_calls = self.parse_hermes_tool_calls(&remaining);
 
-                    if !hermes_calls.is_empty() {
-                        has_tool_calls = true;
+                        if !hermes_calls.is_empty() {
+                            has_tool_calls = true;
 
-                        // Remove tool_call tags from text for display
-                        let mut clean_text = remaining.clone();
-                        while let Some(start) = clean_text.find("<tool_call>") {
-                            if let Some(end) = clean_text.find("</tool_call>") {
-                                clean_text = format!(
-                                    "{}{}",
-                                    &clean_text[..start],
-                                    &clean_text[end + 12..]
+                            // Remove tool_call tags from text for display
+                            let mut clean_text = remaining.clone();
+                            while let Some(start) = clean_text.find("<tool_call>") {
+                                if let Some(end) = clean_text.find("</tool_call>") {
+                                    clean_text = format!(
+                                        "{}{}",
+                                        &clean_text[..start],
+                                        &clean_text[end + 12..]
+                                    );
+                                } else {
+                                    break;
+                                }
+                            }
+                            let clean_text = clean_text.trim();
+
+                            if !clean_text.is_empty() {
+                                content_blocks.push(ContentBlock::Text {
+                                    text: clean_text.to_string(),
+                                });
+                            }
+
+                            // Add tool use blocks
+                            for (id, name, input) in hermes_calls {
+                                tracing::debug!("Parsed Hermes tool call: {} with id {}", name, id);
+                                content_blocks.push(ContentBlock::ToolUse { id, name, input });
+                            }
+                        } else if !remaining.is_empty() {
+                            content_blocks.push(ContentBlock::Text { text: remaining });
+                        }
+                    }
+                    ToolCallParser::NativeQwen => {
+                        let native_calls = self.parse_native_qwen_tool_calls(&remaining);
+
+                        if !native_calls.is_empty() {
+                            has_tool_calls = true;
+
+                            // Remove native Qwen markers from text for display
+                            let mut clean_text = remaining.clone();
+                            // Remove function call blocks
+                            while let Some(start) = clean_text.find(FN_NAME) {
+                                let end_pos = clean_text[start..]
+                                    .find(FN_RESULT)
+                                    .or_else(|| clean_text[start..].find(FN_EXIT))
+                                    .map(|p| start + p)
+                                    .unwrap_or(clean_text.len());
+                                clean_text =
+                                    format!("{}{}", &clean_text[..start], &clean_text[end_pos..]);
+                            }
+                            // Also remove trailing markers
+                            clean_text = clean_text.replace(FN_RESULT, "").replace(FN_EXIT, "");
+                            let clean_text = self.clean_incomplete_markers(&clean_text);
+                            let clean_text = clean_text.trim();
+
+                            if !clean_text.is_empty() {
+                                content_blocks.push(ContentBlock::Text {
+                                    text: clean_text.to_string(),
+                                });
+                            }
+
+                            // Add tool use blocks
+                            for (id, name, input) in native_calls {
+                                tracing::debug!(
+                                    "Parsed native Qwen tool call: {} with id {}",
+                                    name,
+                                    id
                                 );
-                            } else {
-                                break;
+                                content_blocks.push(ContentBlock::ToolUse { id, name, input });
+                            }
+                        } else if !remaining.is_empty() {
+                            // Clean any markers from text
+                            let clean = self.clean_incomplete_markers(&remaining);
+                            if !clean.is_empty() {
+                                content_blocks.push(ContentBlock::Text { text: clean });
                             }
                         }
-                        let clean_text = clean_text.trim();
-
-                        if !clean_text.is_empty() {
-                            content_blocks.push(ContentBlock::Text {
-                                text: clean_text.to_string(),
-                            });
-                        }
-
-                        // Add tool use blocks
-                        for (id, name, input) in hermes_calls {
-                            tracing::debug!("Parsed Hermes tool call: {} with id {}", name, id);
-                            content_blocks.push(ContentBlock::ToolUse { id, name, input });
-                        }
-                    } else if !remaining.is_empty() {
-                        content_blocks.push(ContentBlock::Text { text: remaining });
                     }
-                } else if !remaining.is_empty() {
-                    content_blocks.push(ContentBlock::Text { text: remaining });
+                    ToolCallParser::OpenAI => {
+                        // OpenAI format doesn't embed tool calls in text
+                        if !remaining.is_empty() {
+                            content_blocks.push(ContentBlock::Text { text: remaining });
+                        }
+                    }
                 }
             }
         }
@@ -1104,4 +1347,104 @@ Here's my analysis of the code."#;
         assert!(formatted.contains("read_file"));
         assert!(formatted.contains("<tool_call>"));
     }
+
+    #[test]
+    fn test_native_qwen_parser_configuration() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_tool_parser(ToolCallParser::NativeQwen);
+        assert_eq!(provider.tool_parser, ToolCallParser::NativeQwen);
+    }
+
+    #[test]
+    fn test_native_qwen_tool_call_parsing() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_tool_parser(ToolCallParser::NativeQwen);
+
+        let text = format!(
+            "I'll read that file for you.\n{}: read_file\n{}: {{\"path\": \"/home/user/test.txt\"}}",
+            FN_NAME, FN_ARGS
+        );
+
+        let calls = provider.parse_native_qwen_tool_calls(&text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].1, "read_file");
+        assert_eq!(calls[0].2["path"], "/home/user/test.txt");
+    }
+
+    #[test]
+    fn test_multiple_native_qwen_tool_calls() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_tool_parser(ToolCallParser::NativeQwen);
+
+        let text = format!(
+            "Let me read and write.\n{}: read_file\n{}: {{\"path\": \"input.txt\"}}\n{}: write_file\n{}: {{\"path\": \"output.txt\", \"content\": \"done\"}}",
+            FN_NAME, FN_ARGS, FN_NAME, FN_ARGS
+        );
+
+        let calls = provider.parse_native_qwen_tool_calls(&text);
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].1, "read_file");
+        assert_eq!(calls[1].1, "write_file");
+    }
+
+    #[test]
+    fn test_native_qwen_tools_format() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_tool_parser(ToolCallParser::NativeQwen);
+
+        let tools = vec![Tool {
+            name: "bash".to_string(),
+            description: "Execute shell commands".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string"}
+                },
+                "required": ["command"]
+            }),
+        }];
+
+        let formatted = provider.format_native_qwen_tools(&tools);
+        assert!(formatted.contains("<tool_info>"));
+        assert!(formatted.contains("</tool_info>"));
+        assert!(formatted.contains("bash"));
+        assert!(formatted.contains(FN_NAME));
+        assert!(formatted.contains(FN_ARGS));
+    }
+
+    #[test]
+    fn test_native_qwen_result_format() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_tool_parser(ToolCallParser::NativeQwen);
+
+        let result = provider.format_native_qwen_result("File content here");
+        assert!(result.contains(FN_RESULT));
+        assert!(result.contains(FN_EXIT));
+        assert!(result.contains("File content here"));
+    }
+
+    #[test]
+    fn test_clean_incomplete_markers() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_tool_parser(ToolCallParser::NativeQwen);
+
+        // Test with incomplete marker at end
+        let text = "Some text ✿FUN";
+        let cleaned = provider.clean_incomplete_markers(text);
+        assert_eq!(cleaned, "Some text ");
+
+        // Test with complete text
+        let text = "Complete text";
+        let cleaned = provider.clean_incomplete_markers(text);
+        assert_eq!(cleaned, "Complete text");
+    }
+
+    #[test]
+    fn test_stop_words_defined() {
+        // Verify stop words are correctly defined
+        assert_eq!(QWEN_FN_STOP_WORDS.len(), 2);
+        assert!(QWEN_FN_STOP_WORDS.contains(&"✿RESULT✿"));
+        assert!(QWEN_FN_STOP_WORDS.contains(&"✿RETURN✿"));
+    }
 }
+
