@@ -127,51 +127,10 @@ impl AgentService {
         user_message: String,
         model: Option<String>,
     ) -> Result<AgentResponse> {
-        // Get or create session
-        let session_service = SessionService::new(self.context.clone());
-        let _session = session_service
-            .get_session(session_id)
-            .await
-            .map_err(|e| AgentError::Database(e.to_string()))?
-            .ok_or(AgentError::SessionNotFound(session_id))?;
-
-        // Load conversation context
-        let message_service = MessageService::new(self.context.clone());
-        let db_messages = message_service
-            .list_messages_for_session(session_id)
-            .await
-            .map_err(|e| AgentError::Database(e.to_string()))?;
-
-        let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
-
-        let mut context =
-            AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
-
-        // Add system prompt if available
-        if let Some(system_prompt) = &self.default_system_prompt {
-            context.system_prompt = Some(system_prompt.clone());
-        }
-
-        // Add user message
-        let user_msg = Message::user(user_message.clone());
-        context.add_message(user_msg.clone());
-
-        // Save user message to database
-        let _user_db_msg = message_service
-            .create_message(session_id, "user".to_string(), user_message)
-            .await
-            .map_err(|e| AgentError::Database(e.to_string()))?;
-
-        // Build LLM request
-        let request =
-            LLMRequest::new(model_name.clone(), context.messages.clone()).with_max_tokens(4096);
-
-        let request = if let Some(system) = context.system_prompt {
-            request.with_system(system)
-        } else {
-            request
-        };
+        // Prepare message context (common setup logic)
+        let (_model_name, request, message_service, session_service) = self
+            .prepare_message_context(session_id, user_message, model)
+            .await?;
 
         // Send to provider
         let response = self
@@ -228,52 +187,13 @@ impl AgentService {
         user_message: String,
         model: Option<String>,
     ) -> Result<AgentStreamResponse> {
-        // Get or create session
-        let session_service = SessionService::new(self.context.clone());
-        let _session = session_service
-            .get_session(session_id)
-            .await
-            .map_err(|e| AgentError::Database(e.to_string()))?
-            .ok_or(AgentError::SessionNotFound(session_id))?;
+        // Prepare message context (common setup logic)
+        let (model_name, request, _message_service, _session_service) = self
+            .prepare_message_context(session_id, user_message, model)
+            .await?;
 
-        // Load conversation context
-        let message_service = MessageService::new(self.context.clone());
-        let db_messages = message_service
-            .list_messages_for_session(session_id)
-            .await
-            .map_err(|e| AgentError::Database(e.to_string()))?;
-
-        let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
-
-        let mut context =
-            AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
-
-        // Add system prompt if available
-        if let Some(system_prompt) = &self.default_system_prompt {
-            context.system_prompt = Some(system_prompt.clone());
-        }
-
-        // Add user message
-        let user_msg = Message::user(user_message.clone());
-        context.add_message(user_msg);
-
-        // Save user message to database
-        message_service
-            .create_message(session_id, "user".to_string(), user_message)
-            .await
-            .map_err(|e| AgentError::Database(e.to_string()))?;
-
-        // Build LLM request
-        let request = LLMRequest::new(model_name.clone(), context.messages.clone())
-            .with_max_tokens(4096)
-            .with_streaming();
-
-        let request = if let Some(system) = context.system_prompt {
-            request.with_system(system)
-        } else {
-            request
-        };
+        // Add streaming flag to request
+        let request = request.with_streaming();
 
         // Get streaming response from provider
         let stream = self
@@ -685,6 +605,65 @@ impl AgentService {
             cost,
             model: response.model,
         })
+    }
+
+    /// Helper to prepare message context for LLM requests
+    ///
+    /// This extracts the common setup logic shared between send_message() and
+    /// send_message_streaming() to reduce code duplication.
+    async fn prepare_message_context(
+        &self,
+        session_id: Uuid,
+        user_message: String,
+        model: Option<String>,
+    ) -> Result<(String, LLMRequest, MessageService, SessionService)> {
+        // Get or create session
+        let session_service = SessionService::new(self.context.clone());
+        let _session = session_service
+            .get_session(session_id)
+            .await
+            .map_err(|e| AgentError::Database(e.to_string()))?
+            .ok_or(AgentError::SessionNotFound(session_id))?;
+
+        // Load conversation context
+        let message_service = MessageService::new(self.context.clone());
+        let db_messages = message_service
+            .list_messages_for_session(session_id)
+            .await
+            .map_err(|e| AgentError::Database(e.to_string()))?;
+
+        let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
+        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
+
+        let mut context =
+            AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
+
+        // Add system prompt if available
+        if let Some(system_prompt) = &self.default_system_prompt {
+            context.system_prompt = Some(system_prompt.clone());
+        }
+
+        // Add user message
+        let user_msg = Message::user(user_message.clone());
+        context.add_message(user_msg);
+
+        // Save user message to database
+        message_service
+            .create_message(session_id, "user".to_string(), user_message)
+            .await
+            .map_err(|e| AgentError::Database(e.to_string()))?;
+
+        // Build base LLM request
+        let request =
+            LLMRequest::new(model_name.clone(), context.messages.clone()).with_max_tokens(4096);
+
+        let request = if let Some(system) = context.system_prompt {
+            request.with_system(system)
+        } else {
+            request
+        };
+
+        Ok((model_name, request, message_service, session_service))
     }
 
     /// Extract text content from an LLM response
