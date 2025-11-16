@@ -1651,11 +1651,22 @@ You: "Run cargo test"
 Crustly: [executes bash tool] Running tests... ✅ 145 tests passed
 ```
 
-**Available Tools:**
-- 📖 **`read`** - Read file contents with syntax awareness
-- ✏️ **`write`** - Create or modify files
+**Available Tools (15 total):**
+- 📖 **`read_file`** - Read file contents with syntax awareness
+- ✏️ **`write_file`** - Create or modify files
+- ✂️ **`edit_file`** - Precise text replacements in files
 - 💻 **`bash`** - Execute shell commands safely
-- 📁 **File tracking** - Monitors all files touched by tools
+- 📂 **`ls`** - List directory contents
+- 🔍 **`glob`** - Find files matching patterns
+- 🔎 **`grep`** - Search file contents with regex
+- 🌐 **`web_search`** - Search the web for information
+- 🐍 **`execute_code`** - Run code in various languages
+- 📓 **`notebook_edit`** - Edit Jupyter notebooks
+- 📄 **`parse_document`** - Extract text from PDF, DOCX, HTML files
+- 📋 **`task_manager`** - Manage agent tasks
+- 🔗 **`http_request`** - Make HTTP requests
+- 📊 **`session_context`** - Access session information
+- 📝 **`plan`** - Create execution plans
 
 #### 2. **Syntax Highlighting for 100+ Languages**
 Code appears with proper highlighting in the terminal:

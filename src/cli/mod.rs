@@ -453,11 +453,11 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
                 Provider,
             },
             tools::{
-                bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
-                glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
-                notebook::NotebookEditTool, plan_tool::PlanTool, read::ReadTool,
-                registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
-                write::WriteTool,
+                bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
+                doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
+                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool,
+                plan_tool::PlanTool, read::ReadTool, registry::ToolRegistry, task::TaskTool,
+                web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::ServiceContext,
@@ -666,6 +666,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(WebSearchTool));
     tool_registry.register(Arc::new(CodeExecTool));
     tool_registry.register(Arc::new(NotebookEditTool));
+    tool_registry.register(Arc::new(DocParserTool));
     // Phase 3: Workflow & integration
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));
@@ -771,11 +772,11 @@ async fn cmd_run(
             agent::AgentService,
             provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{
-                bash::BashTool, code_exec::CodeExecTool, context::ContextTool, edit::EditTool,
-                glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
-                notebook::NotebookEditTool, plan_tool::PlanTool, read::ReadTool,
-                registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
-                write::WriteTool,
+                bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
+                doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
+                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool,
+                plan_tool::PlanTool, read::ReadTool, registry::ToolRegistry, task::TaskTool,
+                web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::{ServiceContext, SessionService},
@@ -853,6 +854,7 @@ async fn cmd_run(
     tool_registry.register(Arc::new(WebSearchTool));
     tool_registry.register(Arc::new(CodeExecTool));
     tool_registry.register(Arc::new(NotebookEditTool));
+    tool_registry.register(Arc::new(DocParserTool));
     // Phase 3: Workflow & integration
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));

@@ -18,6 +18,7 @@ pub mod write;
 
 // Tool implementations - Phase 2: Advanced Features
 pub mod code_exec;
+pub mod doc_parser;
 pub mod notebook;
 pub mod web_search;
 

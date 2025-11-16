@@ -102,6 +102,11 @@ bytes = "1.5"
 mime = "0.3"
 base64 = "0.21"
 
+# Document Parsing
+pdf-extract = "0.7"
+zip = "0.6"
+quick-xml = "0.31"
+
 [dev-dependencies]
 rstest = "0.18"
 proptest = "1.4"
