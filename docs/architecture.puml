@@ -1,0 +1,770 @@
+@startuml Crustly Architecture
+
+!define RECTANGLE class
+
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BackgroundColor #F8F9FA
+    BorderColor #343A40
+    ArrowColor #495057
+}
+skinparam package {
+    BackgroundColor #E9ECEF
+    BorderColor #6C757D
+}
+
+title Crustly - Complete Architecture Diagram
+footer 🥐 Crustly v0.2.0 - Flaky & Fast - by Jeremy JEANNE
+
+' ================================================================
+' MAIN APPLICATION ENTRY
+' ================================================================
+
+package "Entry Points" #FFFFFF {
+    class main {
+        +main()
+        --
+        - Parse CLI args
+        - Initialize logging
+        - Run CLI application
+    }
+
+    class "Cli" as CliStruct {
+        +debug: bool
+        +config: Option<String>
+        +command: Option<Commands>
+        --
+        +run()
+    }
+
+    enum Commands {
+        Chat
+        Run
+        Init
+        Config
+        Db
+        Logs
+    }
+}
+
+' ================================================================
+' TUI MODULE
+' ================================================================
+
+package "TUI (Terminal User Interface)" #FFE4B5 {
+    class App {
+        -current_session: Option<Session>
+        -messages: Vec<DisplayMessage>
+        -sessions: Vec<Session>
+        -mode: AppMode
+        -input_buffer: String
+        -scroll_offset: usize
+        -is_processing: bool
+        -streaming_response: Option<String>
+        -error_message: Option<String>
+        -pending_approval: Option<ToolApprovalRequest>
+        -current_plan: Option<PlanDocument>
+        -executing_plan: bool
+        -agent_service: Arc<AgentService>
+        -session_service: SessionService
+        -message_service: MessageService
+        -plan_service: PlanService
+        -event_handler: EventHandler
+        -prompt_analyzer: PromptAnalyzer
+        --
+        +new(agent_service, context)
+        +initialize()
+        +next_event()
+        +handle_event(event)
+        -send_message(content)
+        -handle_key_event(event)
+        -handle_chat_key(event)
+        -handle_plan_key(event)
+        -check_and_load_plan()
+        -execute_plan_tasks()
+    }
+
+    enum AppMode {
+        Splash
+        Chat
+        Plan
+        Sessions
+        Help
+        Settings
+        ToolApproval
+        FilePicker
+    }
+
+    class EventHandler {
+        -tx: mpsc::UnboundedSender<TuiEvent>
+        -rx: mpsc::UnboundedReceiver<TuiEvent>
+        --
+        +new()
+        +sender()
+        +next()
+        +start_terminal_listener(tx)
+    }
+
+    enum TuiEvent {
+        Key(KeyEvent)
+        Paste(String)
+        Resize(u16, u16)
+        MessageSubmitted(String)
+        ResponseChunk(String)
+        ResponseComplete(AgentResponse)
+        Error(String)
+        SwitchMode(AppMode)
+        Quit
+        Tick
+        ToolApprovalRequested
+        ToolApprovalResponse
+    }
+
+    class PromptAnalyzer {
+        -plan_regex: Regex
+        -read_file_regex: Regex
+        -search_regex: Regex
+        -write_file_regex: Regex
+        -edit_file_regex: Regex
+        -bash_regex: Regex
+        -web_search_regex: Regex
+        --
+        +new()
+        +analyze_and_transform(prompt): String
+        -build_keyword_regex(keywords)
+    }
+
+    class PlanDocument {
+        +id: Uuid
+        +session_id: Uuid
+        +title: String
+        +description: String
+        +context: String
+        +risks: Vec<String>
+        +tasks: Vec<PlanTask>
+        +status: PlanStatus
+        +created_at: DateTime
+        +updated_at: DateTime
+        --
+        +approve()
+        +reject()
+        +start_execution()
+        +complete()
+        +tasks_in_order()
+    }
+
+    class DisplayMessage {
+        +id: Uuid
+        +role: String
+        +content: String
+        +timestamp: DateTime
+        +token_count: Option<i32>
+        +cost: Option<f64>
+    }
+
+    class ToolApprovalRequest {
+        +request_id: Uuid
+        +tool_name: String
+        +tool_description: String
+        +tool_input: Value
+        +capabilities: Vec<String>
+        +response_tx: Sender
+        +requested_at: Instant
+        --
+        +is_timed_out()
+        +time_remaining()
+    }
+}
+
+' ================================================================
+' LLM MODULE
+' ================================================================
+
+package "LLM (Language Model)" #ADD8E6 {
+
+    package "Provider Abstraction" {
+        interface Provider <<trait>> {
+            +complete(request): Result<LLMResponse>
+            +stream(request): Result<ProviderStream>
+            +supports_streaming(): bool
+            +supports_tools(): bool
+            +supports_vision(): bool
+            +name(): &str
+            +default_model(): &str
+            +supported_models(): Vec<String>
+            +validate_model(model): bool
+            +context_window(model): Option<u32>
+            +calculate_cost(model, input, output): f64
+        }
+
+        class AnthropicProvider {
+            -api_key: String
+            -client: Client
+            --
+            +new(api_key)
+        }
+
+        class OpenAIProvider {
+            -api_key: String
+            -base_url: Option<String>
+            -default_model: String
+            --
+            +new(api_key)
+            +local(base_url)
+            +with_default_model(model)
+        }
+
+        class LLMRequest {
+            +model: String
+            +messages: Vec<Message>
+            +system: Option<String>
+            +tools: Option<Vec<Tool>>
+            +temperature: Option<f32>
+            +max_tokens: Option<u32>
+            +stream: bool
+            +metadata: Option<HashMap>
+        }
+
+        class LLMResponse {
+            +id: String
+            +model: String
+            +content: Vec<ContentBlock>
+            +stop_reason: Option<StopReason>
+            +usage: TokenUsage
+        }
+
+        class Message {
+            +role: Role
+            +content: Vec<ContentBlock>
+        }
+
+        enum ContentBlock {
+            Text
+            Image
+            ToolUse
+            ToolResult
+        }
+
+        enum StopReason {
+            EndTurn
+            MaxTokens
+            StopSequence
+            ToolUse
+        }
+
+        class TokenUsage {
+            +input_tokens: u32
+            +output_tokens: u32
+            +cache_creation_input_tokens: u32
+            +cache_read_input_tokens: u32
+        }
+    }
+
+    package "Agent Service" {
+        class AgentService {
+            -provider: Arc<dyn Provider>
+            -context: ServiceContext
+            -tool_registry: Arc<ToolRegistry>
+            -max_tool_iterations: usize
+            -default_system_prompt: Option<String>
+            -auto_approve_tools: bool
+            -approval_callback: Option<ApprovalCallback>
+            -working_directory: PathBuf
+            --
+            +new(provider, context)
+            +send_message(session_id, user_message, model)
+            +send_message_with_tools(session_id, user_message, model)
+            +send_message_with_tools_and_mode(session_id, user_message, model, read_only)
+            +send_message_streaming(session_id, user_message, model)
+            +with_system_prompt(prompt)
+            +with_tool_registry(registry)
+            +with_auto_approve_tools(auto_approve)
+            +with_approval_callback(callback)
+            +with_max_tool_iterations(max)
+            +with_working_directory(dir)
+        }
+
+        class AgentResponse {
+            +message_id: Uuid
+            +content: String
+            +stop_reason: Option<StopReason>
+            +usage: TokenUsage
+            +cost: f64
+            +model: String
+        }
+
+        class AgentContext {
+            +session_id: Uuid
+            +messages: Vec<Message>
+            +context_window: usize
+            --
+            +from_db_messages(session_id, messages, window)
+            +add_message(message)
+            +get_messages()
+            +truncate_to_fit()
+        }
+
+        class ToolApprovalInfo {
+            +tool_name: String
+            +tool_description: String
+            +tool_input: Value
+            +capabilities: Vec<String>
+        }
+    }
+
+    package "Tool System" #98FB98 {
+        interface Tool <<trait>> {
+            +name(): &str
+            +description(): &str
+            +input_schema(): Value
+            +capabilities(): Vec<ToolCapability>
+            +requires_approval(): bool
+            +execute(input, context): Result<ToolResult>
+            +validate_input(input): Result<()>
+        }
+
+        class ToolRegistry {
+            -tools: HashMap<String, Arc<dyn Tool>>
+            --
+            +new()
+            +register(tool)
+            +get(name): Option<Arc<dyn Tool>>
+            +has_tool(name): bool
+            +list_tools(): Vec<String>
+            +get_tool_definitions(): Vec<Tool>
+            +execute(name, input, context)
+            +count(): usize
+        }
+
+        class ToolExecutionContext {
+            +session_id: Uuid
+            +working_directory: PathBuf
+            +env_vars: HashMap<String, String>
+            +auto_approve: bool
+            +timeout_secs: u64
+            +read_only_mode: bool
+            --
+            +new(session_id)
+            +with_working_directory(dir)
+            +with_auto_approve(auto)
+            +with_timeout(timeout)
+            +with_read_only_mode(read_only)
+        }
+
+        class ToolResult {
+            +success: bool
+            +output: String
+            +error: Option<String>
+            +metadata: HashMap<String, String>
+            --
+            +success(output)
+            +error(error)
+            +with_metadata(key, value)
+        }
+
+        enum ToolCapability {
+            ReadFiles
+            WriteFiles
+            ExecuteShell
+            Network
+            SystemModification
+            PlanManagement
+        }
+
+        ' Concrete Tool Implementations
+        class ReadTool <<Tool>> {
+            +name(): "read_file"
+            +capabilities(): [ReadFiles]
+            +requires_approval(): false
+        }
+
+        class WriteTool <<Tool>> {
+            +name(): "write_file"
+            +capabilities(): [WriteFiles, SystemModification]
+            +requires_approval(): true
+        }
+
+        class EditTool <<Tool>> {
+            +name(): "edit_file"
+            +capabilities(): [WriteFiles, SystemModification]
+            +requires_approval(): true
+        }
+
+        class BashTool <<Tool>> {
+            +name(): "bash"
+            +capabilities(): [ExecuteShell, SystemModification]
+            +requires_approval(): true
+        }
+
+        class GlobTool <<Tool>> {
+            +name(): "glob"
+            +capabilities(): [ReadFiles]
+            +requires_approval(): false
+        }
+
+        class GrepTool <<Tool>> {
+            +name(): "grep"
+            +capabilities(): [ReadFiles]
+            +requires_approval(): false
+        }
+
+        class LsTool <<Tool>> {
+            +name(): "ls"
+            +capabilities(): [ReadFiles]
+            +requires_approval(): false
+        }
+
+        class WebSearchTool <<Tool>> {
+            +name(): "web_search"
+            +capabilities(): [Network]
+            +requires_approval(): false
+        }
+
+        class CodeExecTool <<Tool>> {
+            +name(): "execute_code"
+            +capabilities(): [ExecuteShell, SystemModification]
+            +requires_approval(): true
+        }
+
+        class NotebookEditTool <<Tool>> {
+            +name(): "notebook_edit"
+            +capabilities(): [WriteFiles, SystemModification]
+            +requires_approval(): true
+        }
+
+        class PlanTool <<Tool>> {
+            +name(): "plan"
+            +capabilities(): [PlanManagement]
+            +requires_approval(): false
+        }
+
+        class TaskTool <<Tool>> {
+            +name(): "task"
+            +capabilities(): [PlanManagement]
+            +requires_approval(): false
+        }
+
+        class ContextTool <<Tool>> {
+            +name(): "context"
+            +capabilities(): [PlanManagement]
+            +requires_approval(): false
+        }
+
+        class HttpClientTool <<Tool>> {
+            +name(): "http_request"
+            +capabilities(): [Network]
+            +requires_approval(): false
+        }
+    }
+}
+
+' ================================================================
+' SERVICES MODULE
+' ================================================================
+
+package "Services (Business Logic)" #FFC0CB {
+    class ServiceContext {
+        +pool: Arc<Pool>
+        --
+        +new(pool)
+        +clone()
+    }
+
+    class SessionService {
+        -context: ServiceContext
+        --
+        +new(context)
+        +create_session(title)
+        +get_session(id)
+        +get_most_recent_session()
+        +list_sessions(options)
+        +update_session(session)
+        +archive_session(id)
+        +delete_session(id)
+    }
+
+    class MessageService {
+        -context: ServiceContext
+        --
+        +new(context)
+        +create_message(session_id, role, content, sequence)
+        +list_messages_for_session(session_id)
+        +get_message(id)
+        +update_message_usage(id, tokens, cost)
+        +delete_messages_for_session(session_id)
+    }
+
+    class PlanService {
+        -context: ServiceContext
+        --
+        +new(context)
+        +create(plan)
+        +get(id)
+        +get_most_recent_plan(session_id)
+        +update(plan)
+        +delete(id)
+        +export_to_json(plan, path)
+    }
+
+    class FileService {
+        -context: ServiceContext
+        --
+        +new(context)
+        +create_file(path, content)
+        +get_file(path)
+        +delete_file(path)
+    }
+}
+
+' ================================================================
+' DATABASE MODULE
+' ================================================================
+
+package "Database Layer" #DDA0DD {
+    class Database {
+        -pool: SqlitePool
+        --
+        +connect(path)
+        +connect_in_memory()
+        +pool(): &SqlitePool
+        +is_connected(): bool
+        +run_migrations()
+        +close()
+    }
+
+    package "Models" {
+        class Session {
+            +id: Uuid
+            +title: Option<String>
+            +model: Option<String>
+            +created_at: DateTime
+            +updated_at: DateTime
+            +archived_at: Option<DateTime>
+            +token_count: i32
+            +total_cost: f64
+        }
+
+        class MessageModel <<Message>> {
+            +id: Uuid
+            +session_id: Uuid
+            +role: String
+            +content: String
+            +sequence: i32
+            +created_at: DateTime
+            +token_count: Option<i32>
+            +cost: Option<f64>
+        }
+
+        class PlanModel <<Plan>> {
+            +id: Uuid
+            +session_id: Uuid
+            +title: String
+            +description: String
+            +context: String
+            +risks: String
+            +test_strategy: String
+            +technical_stack: String
+            +status: String
+            +created_at: DateTime
+            +updated_at: DateTime
+            +approved_at: Option<DateTime>
+        }
+
+        class PlanTaskModel {
+            +id: Uuid
+            +plan_id: Uuid
+            +task_order: i32
+            +title: String
+            +description: String
+            +task_type: String
+            +dependencies: String
+            +complexity: i32
+            +acceptance_criteria: String
+            +status: String
+            +created_at: DateTime
+            +updated_at: DateTime
+        }
+    }
+
+    package "Repositories" {
+        class SessionRepository {
+            +create(session)
+            +find_by_id(id)
+            +list(options)
+            +update(session)
+            +delete(id)
+        }
+
+        class MessageRepository {
+            +create(message)
+            +find_by_session(session_id)
+            +find_by_id(id)
+            +update(message)
+            +delete_by_session(session_id)
+        }
+
+        class PlanRepository {
+            +create(plan)
+            +find_by_id(id)
+            +find_by_session(session_id)
+            +update(plan)
+            +delete(id)
+        }
+    }
+}
+
+' ================================================================
+' CONFIGURATION MODULE
+' ================================================================
+
+package "Configuration" #F0E68C {
+    class Config {
+        +crabrace: CrabraceConfig
+        +database: DatabaseConfig
+        +logging: LoggingConfig
+        +debug: DebugConfig
+        +providers: ProviderConfigs
+        --
+        +load()
+        +load_from_path(path)
+        +save(path)
+        +validate()
+    }
+
+    class ProviderConfigs {
+        +anthropic: Option<ProviderConfig>
+        +openai: Option<ProviderConfig>
+        +gemini: Option<ProviderConfig>
+        +bedrock: Option<ProviderConfig>
+        +azure: Option<ProviderConfig>
+        +vertex: Option<ProviderConfig>
+    }
+
+    class ProviderConfig {
+        +enabled: bool
+        +api_key: Option<String>
+        +base_url: Option<String>
+        +default_model: Option<String>
+    }
+
+    class DatabaseConfig {
+        +path: PathBuf
+        +max_connections: u32
+        +busy_timeout_secs: u64
+    }
+}
+
+' ================================================================
+' LOGGING MODULE
+' ================================================================
+
+package "Logging" #E6E6FA {
+    class LogConfig {
+        +debug_mode: bool
+        +log_dir: PathBuf
+        +log_level: Level
+        +console_output: bool
+        +log_prefix: String
+        +max_age_days: u64
+        --
+        +new()
+        +with_debug_mode(enabled)
+        +with_log_dir(dir)
+        +with_log_level(level)
+        +with_console_output(enabled)
+    }
+
+    class LoggerGuard {
+        -_guard: Option<WorkerGuard>
+        --
+        -with_guard(guard)
+        -empty()
+    }
+
+    class "logging" as LoggingModule <<module>> {
+        +init_logging(config)
+        +setup_from_cli(debug)
+        +get_log_path()
+        +cleanup_old_logs(max_age_days)
+    }
+}
+
+' ================================================================
+' RELATIONSHIPS
+' ================================================================
+
+' Entry Point
+main --> CliStruct
+CliStruct --> Commands
+
+' TUI to Services
+App --> AgentService : uses
+App --> SessionService : uses
+App --> MessageService : uses
+App --> PlanService : uses
+App --> EventHandler : has
+App --> PromptAnalyzer : has
+App --> PlanDocument : manages
+App --> DisplayMessage : displays
+App --> ToolApprovalRequest : handles
+
+' Agent Service
+AgentService --> Provider : uses
+AgentService --> ToolRegistry : uses
+AgentService --> ServiceContext : has
+AgentService --> AgentResponse : returns
+AgentService --> AgentContext : manages
+AgentService --> ToolApprovalInfo : creates
+
+' Provider Implementations
+Provider <|.. AnthropicProvider
+Provider <|.. OpenAIProvider
+Provider --> LLMRequest : receives
+Provider --> LLMResponse : returns
+
+' Tool System
+Tool <|.. ReadTool
+Tool <|.. WriteTool
+Tool <|.. EditTool
+Tool <|.. BashTool
+Tool <|.. GlobTool
+Tool <|.. GrepTool
+Tool <|.. LsTool
+Tool <|.. WebSearchTool
+Tool <|.. CodeExecTool
+Tool <|.. NotebookEditTool
+Tool <|.. PlanTool
+Tool <|.. TaskTool
+Tool <|.. ContextTool
+Tool <|.. HttpClientTool
+
+ToolRegistry --> Tool : manages
+ToolRegistry --> ToolExecutionContext : uses
+Tool --> ToolResult : returns
+Tool --> ToolCapability : has
+
+' Services to Database
+ServiceContext --> Database : wraps
+SessionService --> ServiceContext : uses
+MessageService --> ServiceContext : uses
+PlanService --> ServiceContext : uses
+FileService --> ServiceContext : uses
+
+SessionService --> SessionRepository : uses
+MessageService --> MessageRepository : uses
+PlanService --> PlanRepository : uses
+
+SessionRepository --> Session : operates on
+MessageRepository --> MessageModel : operates on
+PlanRepository --> PlanModel : operates on
+
+' Configuration
+Config --> ProviderConfigs : has
+ProviderConfigs --> ProviderConfig : contains
+Config --> DatabaseConfig : has
+
+' Logging
+LoggingModule --> LogConfig : uses
+LoggingModule --> LoggerGuard : returns
+
+@enduml
