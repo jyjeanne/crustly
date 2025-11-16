@@ -390,6 +390,16 @@ cargo run -- db init
 
 # Show database statistics
 cargo run -- db stats
+
+# Enable debug mode (creates log files)
+cargo run -- -d
+# or
+cargo run -- --debug
+
+# Log management commands
+cargo run -- logs status    # Check logging status
+cargo run -- logs view      # View recent logs
+cargo run -- logs clean     # Clean old log files
 ```
 
 ---
@@ -2964,6 +2974,128 @@ crustly/
 ├── benches/           # Benchmarks
 └── docs/              # Documentation
 ```
+
+---
+
+## 🔍 Debug and Logging
+
+Crustly features a **conditional logging system** that keeps your workspace clean while providing powerful debugging capabilities when needed.
+
+### Key Features
+
+- **No log files by default** - Clean workspace, no clutter
+- **Debug mode on-demand** - Activate with `-d` flag when troubleshooting
+- **Local storage** - Logs stored in `.crustly/logs/` folder (git-ignored)
+- **Automatic cleanup** - Old logs (>7 days) removed automatically
+- **CLI management** - View, clean, and manage logs easily
+
+### Enabling Debug Mode
+
+Add the `-d` or `--debug` flag to enable detailed logging:
+
+```bash
+# Start with debug mode enabled
+crustly -d
+
+# Or with full flag name
+crustly --debug
+
+# Debug mode with any command
+crustly -d run "analyze this code"
+
+# With cargo run
+cargo run -- -d
+```
+
+**When debug mode is enabled:**
+- Log files created in `.crustly/logs/` folder
+- Daily rolling log rotation
+- DEBUG level logging (verbose output)
+- Thread IDs, file names, and line numbers included
+
+### Disabling Debug Mode (Default)
+
+Simply don't use the `-d` flag:
+
+```bash
+# Normal mode - NO log files created
+crustly
+
+# Or
+cargo run
+```
+
+**When debug mode is disabled (default):**
+- No log files created
+- Minimal logging (warnings and errors only)
+- Silent output to avoid TUI interference
+- Clean workspace with no runtime artifacts
+
+### Log Management Commands
+
+```bash
+# Check logging status
+crustly logs status
+
+# View recent log entries (last 50 lines by default)
+crustly logs view
+
+# View more lines
+crustly logs view -l 100
+
+# Clean up old logs (default: older than 7 days)
+crustly logs clean
+
+# Clean logs older than 3 days
+crustly logs clean -d 3
+
+# Open log directory in file manager
+crustly logs open
+```
+
+### Log File Location
+
+Logs are stored in your current working directory:
+
+```
+./
+├── .crustly/
+│   ├── .gitignore      # Auto-generated to ignore log files
+│   └── logs/
+│       ├── crustly.2024-01-15     # Daily log files
+│       ├── crustly.2024-01-16
+│       └── crustly.2024-01-17
+└── ... your project files
+```
+
+The `.crustly/` folder contains a `.gitignore` file that automatically ignores all runtime files, so logs won't be committed to your repository.
+
+### Log Content Example
+
+```log
+2024-01-15T10:30:45.123Z INFO crustly::logging 🚀 Crustly debug mode enabled
+2024-01-15T10:30:45.124Z INFO crustly::logging 📁 Log directory: /home/user/project/.crustly/logs
+2024-01-15T10:30:45.125Z INFO crustly::cli Connecting to database
+2024-01-15T10:30:45.200Z DEBUG crustly::llm::agent Starting tool execution loop
+2024-01-15T10:30:45.250Z INFO crustly::tui 🔍 Detected PLAN intent in prompt
+```
+
+### When to Use Debug Mode
+
+- **Troubleshooting** - When something isn't working as expected
+- **Issue reporting** - Capture detailed logs to share with maintainers
+- **Development** - When working on Crustly itself
+- **Performance analysis** - Track execution flow and timing
+
+### Best Practices
+
+1. **Normal Usage**: Don't use `-d` flag unless debugging
+2. **Issue Investigation**: Enable `-d` to capture detailed logs
+3. **Before Reporting Issues**: Include relevant log sections
+4. **Regular Cleanup**: Run `crustly logs clean` periodically
+5. **Security**: Review logs for sensitive data before sharing
+
+For complete logging documentation, see [Debug Logging Guide](docs/guides/DEBUG_LOGGING.md).
 
 ---
 
