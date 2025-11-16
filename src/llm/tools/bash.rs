@@ -66,19 +66,40 @@ fn is_read_only_command(command: &str) -> bool {
     // List of safe read-only single commands (exact command name match)
     let safe_single_commands = [
         "ls", "cat", "head", "tail", "less", "more", "grep", "find", "tree", "file", "pwd",
-        "whoami", "hostname", "date", "echo", "which", "type", "env", "printenv", "df", "du",
-        "wc", "curl", "wget", "rg", "fd", "bat", "exa", "eza",
+        "whoami", "hostname", "date", "echo", "which", "type", "env", "printenv", "df", "du", "wc",
+        "curl", "wget", "rg", "fd", "bat", "exa", "eza",
     ];
 
     // List of safe git subcommands (read-only)
     let safe_git_subcommands = [
-        "status", "log", "diff", "branch", "show", "remote", "tag", "describe", "rev-parse",
-        "config", "ls-files", "ls-tree", "shortlog", "blame", "reflog",
+        "status",
+        "log",
+        "diff",
+        "branch",
+        "show",
+        "remote",
+        "tag",
+        "describe",
+        "rev-parse",
+        "config",
+        "ls-files",
+        "ls-tree",
+        "shortlog",
+        "blame",
+        "reflog",
     ];
 
     // List of safe cargo subcommands (read-only)
     let safe_cargo_subcommands = [
-        "version", "check", "clippy", "fmt", "test", "build", "doc", "tree", "metadata",
+        "version",
+        "check",
+        "clippy",
+        "fmt",
+        "test",
+        "build",
+        "doc",
+        "tree",
+        "metadata",
         "verify-project",
     ];
 

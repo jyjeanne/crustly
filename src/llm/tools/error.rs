@@ -85,9 +85,9 @@ pub fn validate_path_safety(
     })?;
 
     let canonical_path = if path_to_check.exists() {
-        path_to_check.canonicalize().map_err(|e| {
-            ToolError::InvalidInput(format!("Failed to resolve path: {}", e))
-        })?
+        path_to_check
+            .canonicalize()
+            .map_err(|e| ToolError::InvalidInput(format!("Failed to resolve path: {}", e)))?
     } else {
         // If parent doesn't exist either, it's invalid
         return Err(ToolError::InvalidInput(format!(

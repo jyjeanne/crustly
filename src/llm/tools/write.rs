@@ -99,10 +99,7 @@ impl Tool for WriteTool {
             if let Some(parent) = path.parent() {
                 // Validate parent path is within working directory
                 let canonical_wd = context.working_directory.canonicalize().map_err(|e| {
-                    ToolError::Internal(format!(
-                        "Failed to canonicalize working directory: {}",
-                        e
-                    ))
+                    ToolError::Internal(format!("Failed to canonicalize working directory: {}", e))
                 })?;
 
                 // If parent exists, check it's within bounds
@@ -129,7 +126,9 @@ impl Tool for WriteTool {
             Err(ToolError::PermissionDenied(msg)) => {
                 return Ok(ToolResult::error(format!("Access denied: {}", msg)));
             }
-            Err(ToolError::InvalidInput(msg)) if msg.contains("Parent directory does not exist") => {
+            Err(ToolError::InvalidInput(msg))
+                if msg.contains("Parent directory does not exist") =>
+            {
                 // For write operations, we want to give a helpful error about create_dirs
                 if let Some(parent) = path.parent() {
                     return Ok(ToolResult::error(format!(

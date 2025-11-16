@@ -126,9 +126,7 @@ impl Tool for DocParserTool {
         }
 
         // Check file size to prevent memory exhaustion
-        let file_size = std::fs::metadata(&path)
-            .map_err(ToolError::Io)?
-            .len();
+        let file_size = std::fs::metadata(&path).map_err(ToolError::Io)?.len();
         if file_size > MAX_FILE_SIZE {
             return Ok(ToolResult::error(format!(
                 "File size ({} MB) exceeds maximum allowed size ({} MB). \

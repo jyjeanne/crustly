@@ -110,10 +110,7 @@ impl FileLock {
                                     .unwrap_or_default();
                                 if age > Duration::from_secs(60) {
                                     // Stale lock, force remove it
-                                    tracing::warn!(
-                                        "Removing stale lock file (age: {:?})",
-                                        age
-                                    );
+                                    tracing::warn!("Removing stale lock file (age: {:?})", age);
                                     let _ = fs::remove_file(&lock_path).await;
                                     continue;
                                 }

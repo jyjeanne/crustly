@@ -107,18 +107,16 @@ impl Tool for ReadTool {
         let is_large_file = file_size > LARGE_FILE_THRESHOLD;
 
         // For large files or line-range requests, use buffered streaming
-        let (output, total_lines, warning) = if input.start_line.is_some()
-            || input.line_count.is_some()
-            || is_large_file
-        {
-            self.read_with_buffer(&path, input.start_line, input.line_count, is_large_file)
-                .await?
-        } else {
-            // Small file: read entire contents directly
-            let contents = fs::read_to_string(&path).await.map_err(ToolError::Io)?;
-            let line_count = contents.lines().count();
-            (contents, line_count, None)
-        };
+        let (output, total_lines, warning) =
+            if input.start_line.is_some() || input.line_count.is_some() || is_large_file {
+                self.read_with_buffer(&path, input.start_line, input.line_count, is_large_file)
+                    .await?
+            } else {
+                // Small file: read entire contents directly
+                let contents = fs::read_to_string(&path).await.map_err(ToolError::Io)?;
+                let line_count = contents.lines().count();
+                (contents, line_count, None)
+            };
 
         let output_len = output.len();
         let mut result = ToolResult::success(output)
