@@ -34,6 +34,7 @@ pub mod db;
 pub mod error;
 pub mod events;
 pub mod llm;
+pub mod logging;
 pub mod lsp;
 pub mod mcp;
 pub mod message;

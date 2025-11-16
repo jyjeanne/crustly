@@ -1,28 +1,27 @@
 use anyhow::Result;
-use crustly::cli;
+use clap::Parser;
+use crustly::{cli, logging};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging to file to avoid interfering with TUI
-    let log_dir = dirs::data_local_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join("crustly")
-        .join("logs");
+    // Parse CLI arguments first to check for debug flag
+    let cli_args = cli::Cli::parse();
 
-    // Create log directory if it doesn't exist
-    std::fs::create_dir_all(&log_dir).ok();
+    // Initialize logging based on debug flag
+    // - Debug mode OFF: No log files created, silent logging
+    // - Debug mode ON: Creates log files in .crustly/logs/, detailed logging
+    let _guard = logging::setup_from_cli(cli_args.debug)
+        .map_err(|e| anyhow::anyhow!("Failed to initialize logging: {}", e))?;
 
-    let file_appender = tracing_appender::rolling::daily(log_dir, "crustly.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    // Clean up old log files (keep last 7 days)
+    if cli_args.debug {
+        if let Ok(removed) = logging::cleanup_old_logs(7) {
+            if removed > 0 {
+                tracing::info!("🧹 Cleaned up {} old log file(s)", removed);
+            }
+        }
+    }
 
-    tracing_subscriber::fmt()
-        .with_writer(non_blocking)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
-        )
-        .init();
-
-    // Parse CLI arguments and run
+    // Run CLI application
     cli::run().await
 }

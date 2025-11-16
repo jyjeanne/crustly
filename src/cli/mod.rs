@@ -96,7 +96,7 @@ ALWAYS explore first before answering questions about a codebase. Don't guess - 
 #[command(name = "crustly")]
 #[command(version, about, long_about = None)]
 pub struct Cli {
-    /// Enable debug mode
+    /// Enable debug mode (creates log files in .crustly/logs/)
     #[arg(short, long, global = true)]
     pub debug: bool,
 
@@ -151,6 +151,32 @@ pub enum Commands {
         #[command(subcommand)]
         operation: DbCommands,
     },
+
+    /// Log management operations
+    Logs {
+        #[command(subcommand)]
+        operation: LogCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum LogCommands {
+    /// Show log file location and status
+    Status,
+    /// View recent log entries (requires debug mode)
+    View {
+        /// Number of lines to show (default: 50)
+        #[arg(short, long, default_value = "50")]
+        lines: usize,
+    },
+    /// Clean up old log files
+    Clean {
+        /// Maximum age in days (default: 7)
+        #[arg(short, long, default_value = "7")]
+        days: u64,
+    },
+    /// Open log directory in file manager
+    Open,
 }
 
 #[derive(Subcommand, Debug)]
@@ -198,6 +224,7 @@ pub async fn run() -> Result<()> {
         Some(Commands::Init { force }) => cmd_init(&config, force).await,
         Some(Commands::Config { show_secrets }) => cmd_config(&config, show_secrets).await,
         Some(Commands::Db { operation }) => cmd_db(&config, operation).await,
+        Some(Commands::Logs { operation }) => cmd_logs(operation).await,
         Some(Commands::Run {
             prompt,
             auto_approve,
@@ -772,6 +799,151 @@ async fn cmd_run(
     }
 
     Ok(())
+}
+
+/// Log management commands
+async fn cmd_logs(operation: LogCommands) -> Result<()> {
+    use crate::logging;
+    use std::io::{BufRead, BufReader};
+
+    let log_dir = std::env::current_dir()?.join(".crustly").join("logs");
+
+    match operation {
+        LogCommands::Status => {
+            println!("📊 Crustly Logging Status\n");
+            println!("Log directory: {}", log_dir.display());
+
+            if log_dir.exists() {
+                // Count log files and total size
+                let mut file_count = 0;
+                let mut total_size = 0u64;
+                let mut newest_file: Option<std::path::PathBuf> = None;
+                let mut newest_time = std::time::UNIX_EPOCH;
+
+                for entry in std::fs::read_dir(&log_dir)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if path.extension().map(|e| e == "log").unwrap_or(false) {
+                        file_count += 1;
+                        if let Ok(metadata) = entry.metadata() {
+                            total_size += metadata.len();
+                            if let Ok(modified) = metadata.modified() {
+                                if modified > newest_time {
+                                    newest_time = modified;
+                                    newest_file = Some(path);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                println!("Status: ✅ Active");
+                println!("Log files: {}", file_count);
+                println!(
+                    "Total size: {:.2} MB",
+                    total_size as f64 / (1024.0 * 1024.0)
+                );
+
+                if let Some(newest) = newest_file {
+                    println!("Latest log: {}", newest.display());
+                }
+
+                println!("\n💡 To enable debug logging, run with -d flag:");
+                println!("   crustly -d");
+            } else {
+                println!("Status: ❌ No logs found");
+                println!("\n💡 To enable debug logging, run with -d flag:");
+                println!("   crustly -d");
+                println!("\nThis will create log files in:");
+                println!("   {}", log_dir.display());
+            }
+
+            Ok(())
+        }
+
+        LogCommands::View { lines } => {
+            if let Some(log_path) = logging::get_log_path() {
+                println!("📜 Viewing last {} lines of: {}\n", lines, log_path.display());
+
+                let file = std::fs::File::open(&log_path)?;
+                let reader = BufReader::new(file);
+
+                // Collect all lines then show last N
+                let all_lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+                let start = all_lines.len().saturating_sub(lines);
+
+                for line in &all_lines[start..] {
+                    println!("{}", line);
+                }
+
+                if all_lines.is_empty() {
+                    println!("(empty log file)");
+                }
+            } else {
+                println!("❌ No log files found.\n");
+                println!("💡 Run Crustly with -d flag to enable debug logging:");
+                println!("   crustly -d");
+            }
+
+            Ok(())
+        }
+
+        LogCommands::Clean { days } => {
+            println!("🧹 Cleaning up log files older than {} days...\n", days);
+
+            match logging::cleanup_old_logs(days) {
+                Ok(removed) => {
+                    if removed > 0 {
+                        println!("✅ Removed {} old log file(s)", removed);
+                    } else {
+                        println!("✅ No old log files to remove");
+                    }
+                }
+                Err(e) => {
+                    println!("❌ Error cleaning logs: {}", e);
+                }
+            }
+
+            Ok(())
+        }
+
+        LogCommands::Open => {
+            if !log_dir.exists() {
+                println!("❌ Log directory does not exist: {}", log_dir.display());
+                println!("\n💡 Run Crustly with -d flag to enable debug logging:");
+                println!("   crustly -d");
+                return Ok(());
+            }
+
+            println!("📂 Opening log directory: {}", log_dir.display());
+
+            #[cfg(target_os = "macos")]
+            {
+                std::process::Command::new("open")
+                    .arg(&log_dir)
+                    .spawn()
+                    .context("Failed to open directory")?;
+            }
+
+            #[cfg(target_os = "linux")]
+            {
+                std::process::Command::new("xdg-open")
+                    .arg(&log_dir)
+                    .spawn()
+                    .context("Failed to open directory")?;
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                std::process::Command::new("explorer")
+                    .arg(&log_dir)
+                    .spawn()
+                    .context("Failed to open directory")?;
+            }
+
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
