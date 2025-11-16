@@ -120,8 +120,7 @@ impl PromptAnalyzer {
             .map(|k| regex::escape(k))
             .collect::<Vec<_>>()
             .join("|");
-        Regex::new(&format!(r"(?i)\b({})\b", pattern))
-            .expect("Failed to compile keyword regex")
+        Regex::new(&format!(r"(?i)\b({})\b", pattern)).expect("Failed to compile keyword regex")
     }
 
     /// Analyze a prompt and transform it if needed
@@ -134,16 +133,15 @@ impl PromptAnalyzer {
             tracing::info!("🔍 Detected PLAN intent in prompt");
             transformations.push(
                 "\n\n**TOOL HINT**: Use the `plan` tool to create a structured plan with tasks, \
-                dependencies, and implementation steps."
+                dependencies, and implementation steps.",
             );
         }
 
         // Check for read_file keywords
         if self.read_file_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected READ_FILE intent in prompt");
-            transformations.push(
-                "\n\n**TOOL HINT**: Use the `read_file` tool to read the contents of files."
-            );
+            transformations
+                .push("\n\n**TOOL HINT**: Use the `read_file` tool to read the contents of files.");
         }
 
         // Check for search keywords
@@ -151,32 +149,29 @@ impl PromptAnalyzer {
             tracing::info!("🔍 Detected SEARCH/GREP intent in prompt");
             transformations.push(
                 "\n\n**TOOL HINT**: Use the `grep` tool to search for patterns in files, \
-                or use `glob` to find files by pattern."
+                or use `glob` to find files by pattern.",
             );
         }
 
         // Check for write_file keywords
         if self.write_file_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected WRITE_FILE intent in prompt");
-            transformations.push(
-                "\n\n**TOOL HINT**: Use the `write_file` tool to create new files."
-            );
+            transformations
+                .push("\n\n**TOOL HINT**: Use the `write_file` tool to create new files.");
         }
 
         // Check for edit_file keywords
         if self.edit_file_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected EDIT_FILE intent in prompt");
-            transformations.push(
-                "\n\n**TOOL HINT**: Use the `edit_file` tool to modify existing files."
-            );
+            transformations
+                .push("\n\n**TOOL HINT**: Use the `edit_file` tool to modify existing files.");
         }
 
         // Check for bash keywords
         if self.bash_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected BASH intent in prompt");
-            transformations.push(
-                "\n\n**TOOL HINT**: Use the `bash` tool to execute shell commands."
-            );
+            transformations
+                .push("\n\n**TOOL HINT**: Use the `bash` tool to execute shell commands.");
         }
 
         // Check for web_search keywords
@@ -184,7 +179,7 @@ impl PromptAnalyzer {
             tracing::info!("🔍 Detected WEB_SEARCH intent in prompt");
             transformations.push(
                 "\n\n**TOOL HINT**: Use the `web_search` tool to search the internet for \
-                real-time information."
+                real-time information.",
             );
         }
 

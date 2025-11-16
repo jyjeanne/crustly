@@ -617,7 +617,12 @@ impl App {
 
             tokio::spawn(async move {
                 match agent_service
-                    .send_message_with_tools_and_mode(session_id, transformed_content, None, read_only_mode)
+                    .send_message_with_tools_and_mode(
+                        session_id,
+                        transformed_content,
+                        None,
+                        read_only_mode,
+                    )
                     .await
                 {
                     Ok(response) => {

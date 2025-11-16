@@ -20,4 +20,4 @@ pub mod qwen;
 
 pub use anthropic::AnthropicProvider;
 pub use openai::OpenAIProvider;
-pub use qwen::{QwenProvider, ToolCallParser, ThinkingConfig};
+pub use qwen::{QwenProvider, ThinkingConfig, ToolCallParser};

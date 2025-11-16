@@ -455,9 +455,9 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             tools::{
                 bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
                 doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
-                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool,
-                plan_tool::PlanTool, read::ReadTool, registry::ToolRegistry, task::TaskTool,
-                web_search::WebSearchTool, write::WriteTool,
+                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
+                read::ReadTool, registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
+                write::WriteTool,
             },
         },
         services::ServiceContext,
@@ -630,9 +630,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     };
 
     // Helper function for fallback provider
-    fn create_fallback_provider(
-        config: &crate::config::Config,
-    ) -> Result<Arc<dyn Provider>> {
+    fn create_fallback_provider(config: &crate::config::Config) -> Result<Arc<dyn Provider>> {
         if let Some(openai_config) = &config.providers.openai {
             if let Some(api_key) = &openai_config.api_key {
                 return Ok(Arc::new(OpenAIProvider::new(api_key.clone())));
@@ -774,9 +772,9 @@ async fn cmd_run(
             tools::{
                 bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
                 doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
-                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool,
-                plan_tool::PlanTool, read::ReadTool, registry::ToolRegistry, task::TaskTool,
-                web_search::WebSearchTool, write::WriteTool,
+                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
+                read::ReadTool, registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
+                write::WriteTool,
             },
         },
         services::{ServiceContext, SessionService},
@@ -983,7 +981,11 @@ async fn cmd_logs(operation: LogCommands) -> Result<()> {
 
         LogCommands::View { lines } => {
             if let Some(log_path) = logging::get_log_path() {
-                println!("📜 Viewing last {} lines of: {}\n", lines, log_path.display());
+                println!(
+                    "📜 Viewing last {} lines of: {}\n",
+                    lines,
+                    log_path.display()
+                );
 
                 let file = std::fs::File::open(&log_path)?;
                 let reader = BufReader::new(file);

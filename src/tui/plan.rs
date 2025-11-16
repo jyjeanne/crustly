@@ -254,7 +254,10 @@ impl PlanDocument {
         // Find first pending task with all dependencies satisfied
         self.tasks.iter().find(|task| {
             matches!(task.status, TaskStatus::Pending)
-                && task.dependencies.iter().all(|dep| completed_ids.contains(dep))
+                && task
+                    .dependencies
+                    .iter()
+                    .all(|dep| completed_ids.contains(dep))
         })
     }
 
@@ -270,7 +273,10 @@ impl PlanDocument {
         self.updated_at = Utc::now();
         self.tasks.iter_mut().find(|task| {
             matches!(task.status, TaskStatus::Pending)
-                && task.dependencies.iter().all(|dep| completed_ids.contains(dep))
+                && task
+                    .dependencies
+                    .iter()
+                    .all(|dep| completed_ids.contains(dep))
         })
     }
 
@@ -574,7 +580,10 @@ impl PlanTask {
         self.retry_count += 1;
         if self.retry_count >= self.max_retries {
             self.status = TaskStatus::Failed;
-            self.notes = Some(format!("Failed after {} attempts: {}", self.retry_count, error));
+            self.notes = Some(format!(
+                "Failed after {} attempts: {}",
+                self.retry_count, error
+            ));
         } else {
             self.status = TaskStatus::Pending;
         }

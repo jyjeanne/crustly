@@ -122,9 +122,7 @@ impl Tool for DocParserTool {
         }
 
         // Get file size
-        let file_size = std::fs::metadata(&path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
 
         // Determine file type and parse accordingly
         let extension = path
@@ -211,8 +209,7 @@ impl DocParserTool {
 
         // Run PDF parsing in blocking task
         tokio::task::spawn_blocking(move || {
-            let bytes = std::fs::read(&path)
-                .map_err(|e| ToolError::Io(e))?;
+            let bytes = std::fs::read(&path).map_err(|e| ToolError::Io(e))?;
 
             // Extract text from PDF
             let text = pdf_extract::extract_text_from_mem(&bytes)
@@ -378,11 +375,7 @@ impl DocParserTool {
     }
 
     /// Parse plain text files
-    async fn parse_text(
-        &self,
-        path: &PathBuf,
-        _format: &str,
-    ) -> Result<(String, ParsedMetadata)> {
+    async fn parse_text(&self, path: &PathBuf, _format: &str) -> Result<(String, ParsedMetadata)> {
         let text = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;
@@ -450,7 +443,11 @@ impl DocParserTool {
         }
 
         // Clean up whitespace
-        let lines: Vec<&str> = text.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+        let lines: Vec<&str> = text
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
         lines.join("\n")
     }
 
@@ -621,7 +618,11 @@ mod tests {
     #[tokio::test]
     async fn test_max_chars_truncation() {
         let mut temp_file = NamedTempFile::with_suffix(".txt").unwrap();
-        writeln!(temp_file, "This is a very long document that should be truncated.").unwrap();
+        writeln!(
+            temp_file,
+            "This is a very long document that should be truncated."
+        )
+        .unwrap();
         temp_file.flush().unwrap();
 
         let tool = DocParserTool;

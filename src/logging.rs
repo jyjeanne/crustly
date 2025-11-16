@@ -133,13 +133,15 @@ fn init_debug_logging(config: LogConfig) -> Result<LoggerGuard, Box<dyn std::err
     let crustly_dir = config.log_dir.parent().unwrap_or(&config.log_dir);
     let gitignore_path = crustly_dir.join(".gitignore");
     if !gitignore_path.exists() {
-        std::fs::write(&gitignore_path, "# Ignore all Crustly runtime files\n*\n!.gitignore\n")
-            .ok();
+        std::fs::write(
+            &gitignore_path,
+            "# Ignore all Crustly runtime files\n*\n!.gitignore\n",
+        )
+        .ok();
     }
 
     // Set up rolling file appender (daily rotation)
-    let file_appender =
-        tracing_appender::rolling::daily(&config.log_dir, &config.log_prefix);
+    let file_appender = tracing_appender::rolling::daily(&config.log_dir, &config.log_prefix);
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     // Build environment filter

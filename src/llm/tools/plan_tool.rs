@@ -64,9 +64,7 @@ enum PlanOperation {
     /// Get the next task to execute
     NextTask,
     /// Start executing a specific task
-    StartTask {
-        task_order: usize,
-    },
+    StartTask { task_order: usize },
     /// Complete a task execution with results
     CompleteTask {
         task_order: usize,
@@ -93,10 +91,7 @@ enum PlanOperation {
         success: bool,
     },
     /// Skip a task with reason
-    SkipTask {
-        task_order: usize,
-        reason: String,
-    },
+    SkipTask { task_order: usize, reason: String },
     /// Get execution summary
     Summary,
 }
@@ -565,9 +560,9 @@ impl Tool for PlanTool {
             }
 
             PlanOperation::NextTask => {
-                let current_plan = plan.as_ref().ok_or_else(|| {
-                    ToolError::InvalidInput("No active plan.".to_string())
-                })?;
+                let current_plan = plan
+                    .as_ref()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
 
                 if let Some(next_task) = current_plan.next_executable_task() {
                     format!(
@@ -601,15 +596,16 @@ impl Tool for PlanTool {
                             summary.in_progress
                         )
                     } else {
-                        "⚠️ No tasks ready. Check for blocked dependencies or failed tasks.".to_string()
+                        "⚠️ No tasks ready. Check for blocked dependencies or failed tasks."
+                            .to_string()
                     }
                 }
             }
 
             PlanOperation::StartTask { task_order } => {
-                let current_plan = plan.as_mut().ok_or_else(|| {
-                    ToolError::InvalidInput("No active plan.".to_string())
-                })?;
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
 
                 // Check if task exists and get its status
                 let task_status = current_plan
@@ -664,13 +660,15 @@ impl Tool for PlanTool {
                 output,
                 artifacts,
             } => {
-                let current_plan = plan.as_mut().ok_or_else(|| {
-                    ToolError::InvalidInput("No active plan.".to_string())
-                })?;
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
 
-                let task = current_plan.get_task_by_order_mut(task_order).ok_or_else(|| {
-                    ToolError::InvalidInput(format!("Task #{} not found.", task_order))
-                })?;
+                let task = current_plan
+                    .get_task_by_order_mut(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?;
 
                 for artifact in artifacts {
                     task.add_artifact(artifact);
@@ -714,13 +712,15 @@ impl Tool for PlanTool {
                 should_retry,
                 adjustment_needed,
             } => {
-                let current_plan = plan.as_mut().ok_or_else(|| {
-                    ToolError::InvalidInput("No active plan.".to_string())
-                })?;
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
 
-                let task = current_plan.get_task_by_order_mut(task_order).ok_or_else(|| {
-                    ToolError::InvalidInput(format!("Task #{} not found.", task_order))
-                })?;
+                let task = current_plan
+                    .get_task_by_order_mut(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?;
 
                 task.add_reflection(reflection.clone());
 
@@ -753,13 +753,15 @@ impl Tool for PlanTool {
                 output,
                 success,
             } => {
-                let current_plan = plan.as_mut().ok_or_else(|| {
-                    ToolError::InvalidInput("No active plan.".to_string())
-                })?;
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
 
-                let task = current_plan.get_task_by_order_mut(task_order).ok_or_else(|| {
-                    ToolError::InvalidInput(format!("Task #{} not found.", task_order))
-                })?;
+                let task = current_plan
+                    .get_task_by_order_mut(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?;
 
                 let tool_call = PlanToolCall {
                     tool_name: tool_name.clone(),
@@ -779,13 +781,15 @@ impl Tool for PlanTool {
             }
 
             PlanOperation::SkipTask { task_order, reason } => {
-                let current_plan = plan.as_mut().ok_or_else(|| {
-                    ToolError::InvalidInput("No active plan.".to_string())
-                })?;
+                let current_plan = plan
+                    .as_mut()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
 
-                let task = current_plan.get_task_by_order_mut(task_order).ok_or_else(|| {
-                    ToolError::InvalidInput(format!("Task #{} not found.", task_order))
-                })?;
+                let task = current_plan
+                    .get_task_by_order_mut(task_order)
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task #{} not found.", task_order))
+                    })?;
 
                 task.skip(Some(reason.clone()));
 
@@ -796,9 +800,9 @@ impl Tool for PlanTool {
             }
 
             PlanOperation::Summary => {
-                let current_plan = plan.as_ref().ok_or_else(|| {
-                    ToolError::InvalidInput("No active plan.".to_string())
-                })?;
+                let current_plan = plan
+                    .as_ref()
+                    .ok_or_else(|| ToolError::InvalidInput("No active plan.".to_string()))?;
 
                 let summary = current_plan.execution_summary();
 

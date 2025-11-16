@@ -28,8 +28,7 @@ use std::time::Duration;
 // DashScope API endpoints
 const DASHSCOPE_INTL_URL: &str =
     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions";
-const DASHSCOPE_CN_URL: &str =
-    "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+const DASHSCOPE_CN_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(180); // Longer for reasoning models
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -196,7 +195,9 @@ impl QwenProvider {
         result.push_str("</tools>\n\n");
         result.push_str("Use the following pydantic model json schema for each tool call you will make: {\"properties\": {\"arguments\": {\"title\": \"Arguments\", \"type\": \"object\"}, \"name\": {\"title\": \"Name\", \"type\": \"string\"}}, \"required\": [\"arguments\", \"name\"], \"title\": \"FunctionCall\", \"type\": \"object\"}\n\n");
         result.push_str("For each function call return a json object with function name and arguments within <tool_call></tool_call> XML tags as follows:\n");
-        result.push_str("<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-dict>}\n</tool_call>");
+        result.push_str(
+            "<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-dict>}\n</tool_call>",
+        );
 
         result
     }
@@ -218,7 +219,10 @@ impl QwenProvider {
                         parsed.get("name").and_then(|v| v.as_str()),
                         parsed.get("arguments"),
                     ) {
-                        let id = format!("call_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..24].to_string());
+                        let id = format!(
+                            "call_{}",
+                            uuid::Uuid::new_v4().to_string().replace("-", "")[..24].to_string()
+                        );
                         tool_calls.push((id, name.to_string(), arguments.clone()));
                     }
                 }
@@ -338,10 +342,7 @@ impl QwenProvider {
                                 tool_calls.push((id, fn_name, args));
                             }
                             Err(e) => {
-                                tracing::warn!(
-                                    "Failed to parse native Qwen tool arguments: {}",
-                                    e
-                                );
+                                tracing::warn!("Failed to parse native Qwen tool arguments: {}", e);
                             }
                         }
                     }
@@ -821,11 +822,10 @@ impl QwenProvider {
     async fn handle_error(&self, response: reqwest::Response) -> ProviderError {
         let status = response.status().as_u16();
 
-        let retry_after = response.headers().get("retry-after").and_then(|v| {
-            v.to_str()
-                .ok()
-                .and_then(|s| s.parse::<u64>().ok())
-        });
+        let retry_after = response
+            .headers()
+            .get("retry-after")
+            .and_then(|v| v.to_str().ok().and_then(|s| s.parse::<u64>().ok()));
 
         if let Ok(error_body) = response.json::<QwenErrorResponse>().await {
             let message = if status == 429 {
@@ -1010,9 +1010,7 @@ impl Provider for QwenProvider {
     }
 
     fn default_model(&self) -> &str {
-        self.custom_default_model
-            .as_deref()
-            .unwrap_or("qwen3-8b")
+        self.custom_default_model.as_deref().unwrap_or("qwen3-8b")
     }
 
     fn supported_models(&self) -> Vec<String> {
@@ -1043,8 +1041,7 @@ impl Provider for QwenProvider {
         if self.api_key == "not-needed" {
             return true;
         }
-        self.supported_models().contains(&model.to_string())
-            || model.starts_with("qwen")
+        self.supported_models().contains(&model.to_string()) || model.starts_with("qwen")
     }
 
     fn context_window(&self, model: &str) -> Option<u32> {
@@ -1079,10 +1076,10 @@ impl Provider for QwenProvider {
         }
 
         let (input_cost, output_cost) = match model {
-            "qwen-max" => (2.4, 9.6),        // Premium tier
-            "qwen-plus" => (0.8, 2.0),       // Standard tier
-            "qwen-turbo" => (0.3, 0.6),      // Economy tier
-            _ => return 0.0,                  // Unknown/local models
+            "qwen-max" => (2.4, 9.6),   // Premium tier
+            "qwen-plus" => (0.8, 2.0),  // Standard tier
+            "qwen-turbo" => (0.3, 0.6), // Economy tier
+            _ => return 0.0,            // Unknown/local models
         };
 
         let input_cost_total = (input_tokens as f64 / 1_000_000.0) * input_cost;
@@ -1447,4 +1444,3 @@ Here's my analysis of the code."#;
         assert!(QWEN_FN_STOP_WORDS.contains(&"✿RETURN✿"));
     }
 }
-
