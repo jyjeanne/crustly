@@ -389,7 +389,7 @@ impl DocParserTool {
     }
 
     /// Parse plain text files
-    async fn parse_text(&self, path: &PathBuf, _format: &str) -> Result<(String, ParsedMetadata)> {
+    async fn parse_text(&self, path: &Path, _format: &str) -> Result<(String, ParsedMetadata)> {
         let text = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;
@@ -404,7 +404,7 @@ impl DocParserTool {
     }
 
     /// Parse HTML files
-    async fn parse_html(&self, path: &PathBuf) -> Result<(String, ParsedMetadata)> {
+    async fn parse_html(&self, path: &Path) -> Result<(String, ParsedMetadata)> {
         let html = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;
@@ -478,7 +478,7 @@ impl DocParserTool {
     }
 
     /// Parse JSON files
-    async fn parse_json(&self, path: &PathBuf) -> Result<(String, ParsedMetadata)> {
+    async fn parse_json(&self, path: &Path) -> Result<(String, ParsedMetadata)> {
         let json_text = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;
@@ -499,7 +499,7 @@ impl DocParserTool {
     }
 
     /// Parse XML files
-    async fn parse_xml(&self, path: &PathBuf) -> Result<(String, ParsedMetadata)> {
+    async fn parse_xml(&self, path: &Path) -> Result<(String, ParsedMetadata)> {
         let xml_text = tokio::fs::read_to_string(path)
             .await
             .map_err(ToolError::Io)?;

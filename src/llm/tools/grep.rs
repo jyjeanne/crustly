@@ -7,7 +7,7 @@ use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
 /// Grep search tool
@@ -217,7 +217,7 @@ impl Tool for GrepTool {
 impl GrepTool {
     async fn search_file(
         &self,
-        path: &PathBuf,
+        path: &Path,
         regex: &regex::Regex,
         input: &GrepInput,
         matches: &mut Vec<String>,

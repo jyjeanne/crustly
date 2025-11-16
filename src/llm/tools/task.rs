@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::fs;
 use uuid::Uuid;
@@ -66,7 +66,7 @@ struct FileLock {
 
 impl FileLock {
     /// Acquire an exclusive lock on the task store file
-    async fn acquire(store_path: &PathBuf) -> Result<Self> {
+    async fn acquire(store_path: &Path) -> Result<Self> {
         let lock_path = store_path.with_extension("lock");
 
         // Ensure parent directory exists
@@ -161,7 +161,7 @@ impl TaskStore {
         }
     }
 
-    async fn load(path: &PathBuf) -> Result<Self> {
+    async fn load(path: &Path) -> Result<Self> {
         if path.exists() {
             let content = fs::read_to_string(path).await.map_err(ToolError::Io)?;
             serde_json::from_str(&content)
@@ -171,7 +171,7 @@ impl TaskStore {
         }
     }
 
-    async fn save(&self, path: &PathBuf) -> Result<()> {
+    async fn save(&self, path: &Path) -> Result<()> {
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| ToolError::Execution(format!("Failed to serialize tasks: {}", e)))?;
 
@@ -191,7 +191,7 @@ impl TaskStore {
     }
 
     /// Load, modify, and save with file locking to prevent race conditions
-    async fn with_lock<F, T>(path: &PathBuf, operation: F) -> Result<T>
+    async fn with_lock<F, T>(path: &Path, operation: F) -> Result<T>
     where
         F: FnOnce(&mut Self) -> Result<T>,
     {
