@@ -484,26 +484,43 @@ impl Provider for OpenAIProvider {
                         if let Some(json_str) = line.strip_prefix("data: ") {
                             // Check for stream end
                             if json_str == "[DONE]" {
+                                tracing::trace!("OpenAI stream completed with [DONE] marker");
                                 return StreamEvent::MessageStop;
                             }
 
                             // Parse JSON chunk
-                            if let Ok(chunk) = serde_json::from_str::<OpenAIStreamChunk>(json_str) {
-                                if let Some(choice) = chunk.choices.first() {
-                                    if let Some(ref delta) = choice.delta {
-                                        if let Some(ref content) = delta.content {
-                                            if !content.is_empty() {
-                                                return StreamEvent::ContentBlockDelta {
-                                                    index: 0,
-                                                    delta: ContentDelta::TextDelta {
-                                                        text: content.clone(),
-                                                    },
-                                                };
+                            match serde_json::from_str::<OpenAIStreamChunk>(json_str) {
+                                Ok(chunk) => {
+                                    if let Some(choice) = chunk.choices.first() {
+                                        if let Some(ref delta) = choice.delta {
+                                            if let Some(ref content) = delta.content {
+                                                if !content.is_empty() {
+                                                    return StreamEvent::ContentBlockDelta {
+                                                        index: 0,
+                                                        delta: ContentDelta::TextDelta {
+                                                            text: content.clone(),
+                                                        },
+                                                    };
+                                                }
                                             }
                                         }
                                     }
                                 }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        "Failed to parse OpenAI stream chunk: {}. Data: {}",
+                                        e,
+                                        json_str.chars().take(200).collect::<String>()
+                                    );
+                                }
                             }
+                        } else if !line.trim().is_empty()
+                            && !line.starts_with("event:")
+                            && !line.starts_with("id:")
+                            && !line.starts_with("retry:")
+                        {
+                            // Log unexpected SSE line formats for debugging
+                            tracing::debug!("OpenAI: Unexpected SSE line format: {}", line);
                         }
                     }
 

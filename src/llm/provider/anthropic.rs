@@ -226,12 +226,26 @@ impl Provider for AnthropicProvider {
                     for line in text.lines() {
                         if let Some(json_str) = line.strip_prefix("data: ") {
                             if json_str == "[DONE]" {
+                                tracing::trace!("Stream completed with [DONE] marker");
                                 continue;
                             }
 
                             // Parse the JSON event
-                            return serde_json::from_str::<StreamEvent>(json_str)
-                                .map_err(ProviderError::JsonError);
+                            return serde_json::from_str::<StreamEvent>(json_str).map_err(|e| {
+                                tracing::warn!(
+                                    "Failed to parse SSE event JSON: {}. Data: {}",
+                                    e,
+                                    json_str.chars().take(200).collect::<String>()
+                                );
+                                ProviderError::JsonError(e)
+                            });
+                        } else if !line.trim().is_empty()
+                            && !line.starts_with("event:")
+                            && !line.starts_with("id:")
+                            && !line.starts_with("retry:")
+                        {
+                            // Log unexpected SSE line formats for debugging
+                            tracing::debug!("Unexpected SSE line format: {}", line);
                         }
                     }
 

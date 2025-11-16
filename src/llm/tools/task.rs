@@ -334,7 +334,14 @@ impl Tool for TaskTool {
                         parsed_status,
                         TaskStatus::InProgress | TaskStatus::Completed
                     ) {
-                        let task_deps = store.tasks.get(&task_id).unwrap().dependencies.clone();
+                        let task_deps = store
+                            .tasks
+                            .get(&task_id)
+                            .ok_or_else(|| {
+                                ToolError::Internal(format!("Task {} not found after check", task_id))
+                            })?
+                            .dependencies
+                            .clone();
                         for dep_id in &task_deps {
                             if let Some(dep_task) = store.tasks.get(dep_id) {
                                 if dep_task.status != TaskStatus::Completed {
@@ -349,7 +356,9 @@ impl Tool for TaskTool {
                 }
 
                 // Now get mutable reference and update all fields
-                let task = store.tasks.get_mut(&task_id).unwrap();
+                let task = store.tasks.get_mut(&task_id).ok_or_else(|| {
+                    ToolError::Internal(format!("Task {} not found after check", task_id))
+                })?;
 
                 if let Some(new_status) = status {
                     let parsed_status = parse_status(&new_status)?;

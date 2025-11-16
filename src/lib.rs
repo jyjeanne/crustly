@@ -32,16 +32,24 @@ pub mod cli;
 pub mod config;
 pub mod db;
 pub mod error;
-pub mod events;
 pub mod llm;
 pub mod logging;
-pub mod lsp;
-pub mod mcp;
-pub mod message;
 pub mod services;
-pub mod sync;
 pub mod tui;
 pub mod utils;
+
+// Placeholder modules for future features
+// TODO: Implement these modules when ready
+#[allow(unused)]
+pub mod events;
+#[allow(unused)]
+pub mod lsp;
+#[allow(unused)]
+pub mod mcp;
+#[allow(unused)]
+pub mod message;
+#[allow(unused)]
+pub mod sync;
 
 // Re-export commonly used types
 pub use error::{CrustlyError, ErrorCode};

@@ -13,6 +13,10 @@ use std::path::{Path, PathBuf};
 /// Document Parser Tool - extracts text from various document formats
 pub struct DocParserTool;
 
+/// Maximum file size for document parsing (50MB)
+/// This prevents memory exhaustion from very large documents
+const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024;
+
 #[derive(Debug, Deserialize, Serialize)]
 struct DocParserInput {
     /// Path to the document file
@@ -121,8 +125,18 @@ impl Tool for DocParserTool {
             )));
         }
 
-        // Get file size
-        let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        // Check file size to prevent memory exhaustion
+        let file_size = std::fs::metadata(&path)
+            .map_err(ToolError::Io)?
+            .len();
+        if file_size > MAX_FILE_SIZE {
+            return Ok(ToolResult::error(format!(
+                "File size ({} MB) exceeds maximum allowed size ({} MB). \
+                Consider splitting the document or using a different approach.",
+                file_size / (1024 * 1024),
+                MAX_FILE_SIZE / (1024 * 1024)
+            )));
+        }
 
         // Determine file type and parse accordingly
         let extension = path
