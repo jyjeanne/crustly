@@ -240,6 +240,120 @@ impl PlanDocument {
 
         Ok(())
     }
+
+    /// Get the next task to execute (respecting dependencies)
+    /// Returns the first pending task whose dependencies are all completed
+    pub fn next_executable_task(&self) -> Option<&PlanTask> {
+        let completed_ids: std::collections::HashSet<Uuid> = self
+            .tasks
+            .iter()
+            .filter(|t| matches!(t.status, TaskStatus::Completed | TaskStatus::Skipped))
+            .map(|t| t.id)
+            .collect();
+
+        // Find first pending task with all dependencies satisfied
+        self.tasks.iter().find(|task| {
+            matches!(task.status, TaskStatus::Pending)
+                && task.dependencies.iter().all(|dep| completed_ids.contains(dep))
+        })
+    }
+
+    /// Get mutable next executable task
+    pub fn next_executable_task_mut(&mut self) -> Option<&mut PlanTask> {
+        let completed_ids: std::collections::HashSet<Uuid> = self
+            .tasks
+            .iter()
+            .filter(|t| matches!(t.status, TaskStatus::Completed | TaskStatus::Skipped))
+            .map(|t| t.id)
+            .collect();
+
+        self.updated_at = Utc::now();
+        self.tasks.iter_mut().find(|task| {
+            matches!(task.status, TaskStatus::Pending)
+                && task.dependencies.iter().all(|dep| completed_ids.contains(dep))
+        })
+    }
+
+    /// Get task by order number (1-indexed)
+    pub fn get_task_by_order(&self, order: usize) -> Option<&PlanTask> {
+        self.tasks.iter().find(|t| t.order == order)
+    }
+
+    /// Get mutable task by order number (1-indexed)
+    pub fn get_task_by_order_mut(&mut self, order: usize) -> Option<&mut PlanTask> {
+        self.updated_at = Utc::now();
+        self.tasks.iter_mut().find(|t| t.order == order)
+    }
+
+    /// Check if all dependencies for a task are satisfied
+    pub fn dependencies_satisfied(&self, task: &PlanTask) -> bool {
+        task.dependencies.iter().all(|dep_id| {
+            self.get_task(dep_id)
+                .map(|dep| matches!(dep.status, TaskStatus::Completed | TaskStatus::Skipped))
+                .unwrap_or(false)
+        })
+    }
+
+    /// Get execution summary for all tasks
+    pub fn execution_summary(&self) -> ExecutionSummary {
+        let mut summary = ExecutionSummary::default();
+
+        for task in &self.tasks {
+            summary.total_tasks += 1;
+            match task.status {
+                TaskStatus::Completed => summary.completed += 1,
+                TaskStatus::Failed => summary.failed += 1,
+                TaskStatus::InProgress => summary.in_progress += 1,
+                TaskStatus::Pending => summary.pending += 1,
+                TaskStatus::Skipped => summary.skipped += 1,
+                TaskStatus::Blocked(_) => summary.blocked += 1,
+            }
+            summary.total_retries += task.retry_count as usize;
+            summary.total_tool_calls += task
+                .execution_history
+                .iter()
+                .map(|e| e.tools_called.len())
+                .sum::<usize>();
+        }
+
+        summary.success_rate = if summary.completed + summary.failed > 0 {
+            (summary.completed as f32 / (summary.completed + summary.failed) as f32) * 100.0
+        } else {
+            0.0
+        };
+
+        summary
+    }
+
+    /// Get tasks that are ready to execute (dependencies satisfied, pending status)
+    pub fn ready_tasks(&self) -> Vec<&PlanTask> {
+        self.tasks
+            .iter()
+            .filter(|task| {
+                matches!(task.status, TaskStatus::Pending) && self.dependencies_satisfied(task)
+            })
+            .collect()
+    }
+
+    /// Get failed tasks that can be retried
+    pub fn retriable_tasks(&self) -> Vec<&PlanTask> {
+        self.tasks.iter().filter(|task| task.can_retry()).collect()
+    }
+}
+
+/// Summary of plan execution
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ExecutionSummary {
+    pub total_tasks: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub in_progress: usize,
+    pub pending: usize,
+    pub skipped: usize,
+    pub blocked: usize,
+    pub total_retries: usize,
+    pub total_tool_calls: usize,
+    pub success_rate: f32,
 }
 
 /// Status of a plan
@@ -310,6 +424,71 @@ pub struct PlanTask {
 
     /// When task was completed
     pub completed_at: Option<DateTime<Utc>>,
+
+    /// Execution history (for plan-and-execute pattern)
+    #[serde(default)]
+    pub execution_history: Vec<TaskExecution>,
+
+    /// Number of retry attempts
+    #[serde(default)]
+    pub retry_count: u8,
+
+    /// Maximum retries allowed
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u8,
+
+    /// Output artifacts (file paths, generated code, etc.)
+    #[serde(default)]
+    pub artifacts: Vec<String>,
+
+    /// Reflection notes from LLM after execution
+    #[serde(default)]
+    pub reflection: Option<String>,
+}
+
+fn default_max_retries() -> u8 {
+    3
+}
+
+/// Record of a single execution attempt
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskExecution {
+    /// When this execution attempt started
+    pub started_at: DateTime<Utc>,
+
+    /// When this execution attempt ended
+    pub ended_at: Option<DateTime<Utc>>,
+
+    /// Tools called during this execution
+    pub tools_called: Vec<ToolCall>,
+
+    /// Output/result of this execution
+    pub output: Option<String>,
+
+    /// Error if execution failed
+    pub error: Option<String>,
+
+    /// Whether this attempt was successful
+    pub success: bool,
+}
+
+/// Record of a tool call during task execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    /// Tool name
+    pub tool_name: String,
+
+    /// Tool input (JSON)
+    pub input: serde_json::Value,
+
+    /// Tool output
+    pub output: Option<String>,
+
+    /// Whether the call succeeded
+    pub success: bool,
+
+    /// Timestamp
+    pub timestamp: DateTime<Utc>,
 }
 
 impl PlanTask {
@@ -327,12 +506,99 @@ impl PlanTask {
             status: TaskStatus::Pending,
             notes: None,
             completed_at: None,
+            execution_history: Vec::new(),
+            retry_count: 0,
+            max_retries: 3,
+            artifacts: Vec::new(),
+            reflection: None,
         }
     }
 
     /// Mark task as in progress
     pub fn start(&mut self) {
         self.status = TaskStatus::InProgress;
+    }
+
+    /// Start a new execution attempt
+    pub fn start_execution(&mut self) -> &mut TaskExecution {
+        self.status = TaskStatus::InProgress;
+        let execution = TaskExecution {
+            started_at: Utc::now(),
+            ended_at: None,
+            tools_called: Vec::new(),
+            output: None,
+            error: None,
+            success: false,
+        };
+        self.execution_history.push(execution);
+        self.execution_history.last_mut().unwrap()
+    }
+
+    /// Record a tool call in the current execution
+    pub fn record_tool_call(&mut self, tool_call: ToolCall) {
+        if let Some(execution) = self.execution_history.last_mut() {
+            execution.tools_called.push(tool_call);
+        }
+    }
+
+    /// Complete the current execution attempt
+    pub fn complete_execution(&mut self, output: String, success: bool) {
+        if let Some(execution) = self.execution_history.last_mut() {
+            execution.ended_at = Some(Utc::now());
+            execution.output = Some(output.clone());
+            execution.success = success;
+        }
+
+        if success {
+            self.status = TaskStatus::Completed;
+            self.notes = Some(output);
+            self.completed_at = Some(Utc::now());
+        } else {
+            self.retry_count += 1;
+            if self.retry_count >= self.max_retries {
+                self.status = TaskStatus::Failed;
+            } else {
+                self.status = TaskStatus::Pending; // Ready for retry
+            }
+        }
+    }
+
+    /// Mark execution as failed with error
+    pub fn fail_execution(&mut self, error: String) {
+        if let Some(execution) = self.execution_history.last_mut() {
+            execution.ended_at = Some(Utc::now());
+            execution.error = Some(error.clone());
+            execution.success = false;
+        }
+
+        self.retry_count += 1;
+        if self.retry_count >= self.max_retries {
+            self.status = TaskStatus::Failed;
+            self.notes = Some(format!("Failed after {} attempts: {}", self.retry_count, error));
+        } else {
+            self.status = TaskStatus::Pending;
+        }
+    }
+
+    /// Add reflection notes after execution
+    pub fn add_reflection(&mut self, reflection: String) {
+        self.reflection = Some(reflection);
+    }
+
+    /// Add an artifact (file path, generated code, etc.)
+    pub fn add_artifact(&mut self, artifact: String) {
+        self.artifacts.push(artifact);
+    }
+
+    /// Check if task can be retried
+    pub fn can_retry(&self) -> bool {
+        self.retry_count < self.max_retries
+            && matches!(self.status, TaskStatus::Pending | TaskStatus::Failed)
+    }
+
+    /// Get the last execution attempt
+    pub fn last_execution(&self) -> Option<&TaskExecution> {
+        self.execution_history.last()
     }
 
     /// Complete the task
