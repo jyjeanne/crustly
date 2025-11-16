@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::Duration;
 use tokio::fs;
 use uuid::Uuid;
 
@@ -58,6 +59,101 @@ struct TaskStore {
     tasks: HashMap<String, Task>,
 }
 
+/// File lock guard that releases the lock when dropped
+struct FileLock {
+    lock_path: PathBuf,
+}
+
+impl FileLock {
+    /// Acquire an exclusive lock on the task store file
+    async fn acquire(store_path: &PathBuf) -> Result<Self> {
+        let lock_path = store_path.with_extension("lock");
+
+        // Ensure parent directory exists
+        if let Some(parent) = lock_path.parent() {
+            fs::create_dir_all(parent).await.map_err(ToolError::Io)?;
+        }
+
+        // Try to acquire lock with retries and exponential backoff
+        let max_attempts = 10;
+        let mut attempt = 0;
+        let mut delay = Duration::from_millis(50);
+
+        loop {
+            attempt += 1;
+
+            // Try to create lock file exclusively (fails if exists)
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&lock_path)
+                .await
+            {
+                Ok(mut file) => {
+                    // Write PID and timestamp to lock file for debugging
+                    use tokio::io::AsyncWriteExt;
+                    let lock_info = format!(
+                        "pid: {}\ntimestamp: {}\n",
+                        std::process::id(),
+                        Utc::now().to_rfc3339()
+                    );
+                    let _ = file.write_all(lock_info.as_bytes()).await;
+                    return Ok(Self { lock_path });
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if attempt >= max_attempts {
+                        // Check if lock is stale (older than 60 seconds)
+                        if let Ok(metadata) = fs::metadata(&lock_path).await {
+                            if let Ok(modified) = metadata.modified() {
+                                let age = std::time::SystemTime::now()
+                                    .duration_since(modified)
+                                    .unwrap_or_default();
+                                if age > Duration::from_secs(60) {
+                                    // Stale lock, force remove it
+                                    tracing::warn!(
+                                        "Removing stale lock file (age: {:?})",
+                                        age
+                                    );
+                                    let _ = fs::remove_file(&lock_path).await;
+                                    continue;
+                                }
+                            }
+                        }
+
+                        return Err(ToolError::Execution(format!(
+                            "Failed to acquire lock after {} attempts. \
+                             Another process may be using the task store.",
+                            max_attempts
+                        )));
+                    }
+
+                    // Wait before retrying
+                    tokio::time::sleep(delay).await;
+                    delay = (delay * 2).min(Duration::from_secs(2));
+                }
+                Err(e) => {
+                    return Err(ToolError::Io(e));
+                }
+            }
+        }
+    }
+
+    /// Release the lock (called automatically on drop)
+    async fn release(&self) -> Result<()> {
+        fs::remove_file(&self.lock_path)
+            .await
+            .map_err(ToolError::Io)
+    }
+}
+
+impl Drop for FileLock {
+    fn drop(&mut self) {
+        // Best-effort synchronous cleanup on drop
+        // This handles cases where the lock isn't explicitly released
+        let _ = std::fs::remove_file(&self.lock_path);
+    }
+}
+
 impl TaskStore {
     fn new() -> Self {
         Self {
@@ -84,8 +180,37 @@ impl TaskStore {
             fs::create_dir_all(parent).await.map_err(ToolError::Io)?;
         }
 
-        fs::write(path, content).await.map_err(ToolError::Io)?;
+        // Atomic write: write to temp file, then rename
+        let temp_path = path.with_extension("tmp");
+        fs::write(&temp_path, content)
+            .await
+            .map_err(ToolError::Io)?;
+        fs::rename(&temp_path, path).await.map_err(ToolError::Io)?;
+
         Ok(())
+    }
+
+    /// Load, modify, and save with file locking to prevent race conditions
+    async fn with_lock<F, T>(path: &PathBuf, operation: F) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
+    {
+        // Acquire exclusive lock
+        let lock = FileLock::acquire(path).await?;
+
+        // Load current state
+        let mut store = Self::load(path).await?;
+
+        // Perform operation
+        let result = operation(&mut store)?;
+
+        // Save updated state
+        store.save(path).await?;
+
+        // Release lock explicitly (also released on drop)
+        let _ = lock.release().await;
+
+        Ok(result)
     }
 }
 
@@ -260,142 +385,19 @@ impl Tool for TaskTool {
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: TaskInput = serde_json::from_value(input)?;
         let store_path = get_store_path(context);
-        let mut store = TaskStore::load(&store_path).await?;
 
+        // Read-only operations don't need locking
         let result = match input.operation {
-            TaskOperation::Create {
-                description,
-                priority,
-                tags,
-                dependencies,
-            } => {
-                let task_priority = if let Some(p) = priority {
-                    parse_priority(&p)?
-                } else {
-                    TaskPriority::Medium
-                };
-
-                // Check dependencies exist
-                for dep_id in &dependencies {
-                    if !store.tasks.contains_key(dep_id) {
-                        return Ok(ToolResult::error(format!(
-                            "Dependency task not found: {}",
-                            dep_id
-                        )));
-                    }
-                }
-
-                let task_id = Uuid::new_v4().to_string();
-                let task = Task {
-                    id: task_id.clone(),
-                    description: description.clone(),
-                    status: TaskStatus::Pending,
-                    priority: task_priority,
-                    created_at: Utc::now(),
-                    updated_at: Utc::now(),
-                    completed_at: None,
-                    blocked_reason: None,
-                    dependencies,
-                    tags,
-                };
-
-                store.tasks.insert(task_id.clone(), task);
-                store.save(&store_path).await?;
-
-                format!(
-                    "Created task {}\nDescription: {}\nStatus: pending",
-                    task_id, description
-                )
-            }
-
-            TaskOperation::Update {
-                task_id,
-                status,
-                description,
-                priority,
-                blocked_reason,
-            } => {
-                // Check if task exists first
-                if !store.tasks.contains_key(&task_id) {
-                    return Err(ToolError::InvalidInput(format!(
-                        "Task not found: {}",
-                        task_id
-                    )));
-                }
-
-                let mut updates = Vec::new();
-
-                // Check dependencies before updating status
-                if let Some(ref new_status) = status {
-                    let parsed_status = parse_status(new_status)?;
-
-                    // Check dependencies before moving to in_progress or completed
-                    if matches!(
-                        parsed_status,
-                        TaskStatus::InProgress | TaskStatus::Completed
-                    ) {
-                        let task_deps = store
-                            .tasks
-                            .get(&task_id)
-                            .ok_or_else(|| {
-                                ToolError::Internal(format!("Task {} not found after check", task_id))
-                            })?
-                            .dependencies
-                            .clone();
-                        for dep_id in &task_deps {
-                            if let Some(dep_task) = store.tasks.get(dep_id) {
-                                if dep_task.status != TaskStatus::Completed {
-                                    return Ok(ToolResult::error(format!(
-                                        "Cannot update task: dependency {} is not completed",
-                                        dep_id
-                                    )));
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Now get mutable reference and update all fields
-                let task = store.tasks.get_mut(&task_id).ok_or_else(|| {
-                    ToolError::Internal(format!("Task {} not found after check", task_id))
-                })?;
-
-                if let Some(new_status) = status {
-                    let parsed_status = parse_status(&new_status)?;
-                    task.status = parsed_status.clone();
-                    updates.push(format!("status: {:?}", parsed_status));
-
-                    if parsed_status == TaskStatus::Completed {
-                        task.completed_at = Some(Utc::now());
-                    }
-                }
-
-                if let Some(new_desc) = description {
-                    task.description = new_desc.clone();
-                    updates.push(format!("description: {}", new_desc));
-                }
-
-                if let Some(new_priority) = priority {
-                    task.priority = parse_priority(&new_priority)?;
-                    updates.push(format!("priority: {}", new_priority));
-                }
-
-                if let Some(reason) = blocked_reason {
-                    task.blocked_reason = Some(reason.clone());
-                    updates.push(format!("blocked_reason: {}", reason));
-                }
-
-                task.updated_at = Utc::now();
-                store.save(&store_path).await?;
-
-                format!("Updated task {}\nChanges: {}", task_id, updates.join(", "))
-            }
-
             TaskOperation::List {
                 status,
                 priority,
                 show_completed,
             } => {
+                // Read-only: acquire lock briefly just for reading
+                let lock = FileLock::acquire(&store_path).await?;
+                let store = TaskStore::load(&store_path).await?;
+                let _ = lock.release().await;
+
                 let mut filtered_tasks: Vec<_> = store
                     .tasks
                     .values()
@@ -469,40 +471,12 @@ impl Tool for TaskTool {
                 output
             }
 
-            TaskOperation::Delete { task_id } => {
-                // Check if any other tasks depend on this task
-                let dependents: Vec<String> = store
-                    .tasks
-                    .values()
-                    .filter(|t| t.dependencies.contains(&task_id))
-                    .map(|t| t.id.clone())
-                    .collect();
-
-                if !dependents.is_empty() {
-                    return Ok(ToolResult::error(format!(
-                        "Cannot delete task: {} other tasks depend on it: {}",
-                        dependents.len(),
-                        dependents
-                            .iter()
-                            .map(|id| &id[..8])
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )));
-                }
-
-                let task = store.tasks.remove(&task_id).ok_or_else(|| {
-                    ToolError::InvalidInput(format!("Task not found: {}", task_id))
-                })?;
-
-                store.save(&store_path).await?;
-
-                format!(
-                    "Deleted task {}\nDescription: {}",
-                    task_id, task.description
-                )
-            }
-
             TaskOperation::Get { task_id } => {
+                // Read-only: acquire lock briefly just for reading
+                let lock = FileLock::acquire(&store_path).await?;
+                let store = TaskStore::load(&store_path).await?;
+                let _ = lock.release().await;
+
                 let task = store.tasks.get(&task_id).ok_or_else(|| {
                     ToolError::InvalidInput(format!("Task not found: {}", task_id))
                 })?;
@@ -542,18 +516,193 @@ impl Tool for TaskTool {
                 output
             }
 
+            // Write operations use atomic locking
+            TaskOperation::Create {
+                description,
+                priority,
+                tags,
+                dependencies,
+            } => {
+                TaskStore::with_lock(&store_path, |store| {
+                    let task_priority = if let Some(p) = priority {
+                        parse_priority(&p)?
+                    } else {
+                        TaskPriority::Medium
+                    };
+
+                    // Check dependencies exist
+                    for dep_id in &dependencies {
+                        if !store.tasks.contains_key(dep_id) {
+                            return Err(ToolError::InvalidInput(format!(
+                                "Dependency task not found: {}",
+                                dep_id
+                            )));
+                        }
+                    }
+
+                    let task_id = Uuid::new_v4().to_string();
+                    let task = Task {
+                        id: task_id.clone(),
+                        description: description.clone(),
+                        status: TaskStatus::Pending,
+                        priority: task_priority,
+                        created_at: Utc::now(),
+                        updated_at: Utc::now(),
+                        completed_at: None,
+                        blocked_reason: None,
+                        dependencies,
+                        tags,
+                    };
+
+                    store.tasks.insert(task_id.clone(), task);
+
+                    Ok(format!(
+                        "Created task {}\nDescription: {}\nStatus: pending",
+                        task_id, description
+                    ))
+                })
+                .await?
+            }
+
+            TaskOperation::Update {
+                task_id,
+                status,
+                description,
+                priority,
+                blocked_reason,
+            } => {
+                TaskStore::with_lock(&store_path, |store| {
+                    // Check if task exists first
+                    if !store.tasks.contains_key(&task_id) {
+                        return Err(ToolError::InvalidInput(format!(
+                            "Task not found: {}",
+                            task_id
+                        )));
+                    }
+
+                    let mut updates = Vec::new();
+
+                    // Check dependencies before updating status
+                    if let Some(ref new_status) = status {
+                        let parsed_status = parse_status(new_status)?;
+
+                        // Check dependencies before moving to in_progress or completed
+                        if matches!(
+                            parsed_status,
+                            TaskStatus::InProgress | TaskStatus::Completed
+                        ) {
+                            let task_deps = store
+                                .tasks
+                                .get(&task_id)
+                                .ok_or_else(|| {
+                                    ToolError::Internal(format!(
+                                        "Task {} not found after check",
+                                        task_id
+                                    ))
+                                })?
+                                .dependencies
+                                .clone();
+                            for dep_id in &task_deps {
+                                if let Some(dep_task) = store.tasks.get(dep_id) {
+                                    if dep_task.status != TaskStatus::Completed {
+                                        return Err(ToolError::InvalidInput(format!(
+                                            "Cannot update task: dependency {} is not completed",
+                                            dep_id
+                                        )));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Now get mutable reference and update all fields
+                    let task = store.tasks.get_mut(&task_id).ok_or_else(|| {
+                        ToolError::Internal(format!("Task {} not found after check", task_id))
+                    })?;
+
+                    if let Some(new_status) = status {
+                        let parsed_status = parse_status(&new_status)?;
+                        task.status = parsed_status.clone();
+                        updates.push(format!("status: {:?}", parsed_status));
+
+                        if parsed_status == TaskStatus::Completed {
+                            task.completed_at = Some(Utc::now());
+                        }
+                    }
+
+                    if let Some(new_desc) = description {
+                        task.description = new_desc.clone();
+                        updates.push(format!("description: {}", new_desc));
+                    }
+
+                    if let Some(new_priority) = priority {
+                        task.priority = parse_priority(&new_priority)?;
+                        updates.push(format!("priority: {}", new_priority));
+                    }
+
+                    if let Some(reason) = blocked_reason {
+                        task.blocked_reason = Some(reason.clone());
+                        updates.push(format!("blocked_reason: {}", reason));
+                    }
+
+                    task.updated_at = Utc::now();
+
+                    Ok(format!(
+                        "Updated task {}\nChanges: {}",
+                        task_id,
+                        updates.join(", ")
+                    ))
+                })
+                .await?
+            }
+
+            TaskOperation::Delete { task_id } => {
+                TaskStore::with_lock(&store_path, |store| {
+                    // Check if any other tasks depend on this task
+                    let dependents: Vec<String> = store
+                        .tasks
+                        .values()
+                        .filter(|t| t.dependencies.contains(&task_id))
+                        .map(|t| t.id.clone())
+                        .collect();
+
+                    if !dependents.is_empty() {
+                        return Err(ToolError::InvalidInput(format!(
+                            "Cannot delete task: {} other tasks depend on it: {}",
+                            dependents.len(),
+                            dependents
+                                .iter()
+                                .map(|id| &id[..8])
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )));
+                    }
+
+                    let task = store.tasks.remove(&task_id).ok_or_else(|| {
+                        ToolError::InvalidInput(format!("Task not found: {}", task_id))
+                    })?;
+
+                    Ok(format!(
+                        "Deleted task {}\nDescription: {}",
+                        task_id, task.description
+                    ))
+                })
+                .await?
+            }
+
             TaskOperation::ClearCompleted => {
-                let completed_count = store
-                    .tasks
-                    .iter()
-                    .filter(|(_, t)| t.status == TaskStatus::Completed)
-                    .count();
+                TaskStore::with_lock(&store_path, |store| {
+                    let completed_count = store
+                        .tasks
+                        .iter()
+                        .filter(|(_, t)| t.status == TaskStatus::Completed)
+                        .count();
 
-                store.tasks.retain(|_, t| t.status != TaskStatus::Completed);
+                    store.tasks.retain(|_, t| t.status != TaskStatus::Completed);
 
-                store.save(&store_path).await?;
-
-                format!("Cleared {} completed tasks", completed_count)
+                    Ok(format!("Cleared {} completed tasks", completed_count))
+                })
+                .await?
             }
         };
 
