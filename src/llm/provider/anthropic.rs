@@ -159,12 +159,22 @@ impl Provider for AnthropicProvider {
     async fn complete(&self, request: LLMRequest) -> Result<LLMResponse> {
         use super::retry::{retry_with_backoff, RetryConfig};
 
+        let model = request.model.clone();
+        let message_count = request.messages.len();
+        tracing::info!(
+            "Anthropic API request: model={}, messages={}, max_tokens={}",
+            model,
+            message_count,
+            request.max_tokens.unwrap_or(4096)
+        );
+
         let anthropic_request = self.to_anthropic_request(request);
         let retry_config = RetryConfig::default();
 
         // Retry the entire API call with exponential backoff
-        retry_with_backoff(
+        let result = retry_with_backoff(
             || async {
+                tracing::debug!("Sending request to Anthropic API");
                 let response = self
                     .client
                     .post(ANTHROPIC_API_URL)
@@ -173,20 +183,46 @@ impl Provider for AnthropicProvider {
                     .send()
                     .await?;
 
-                if !response.status().is_success() {
+                let status = response.status();
+                tracing::debug!("Anthropic API response status: {}", status);
+
+                if !status.is_success() {
                     return Err(self.handle_error(response).await);
                 }
 
                 let anthropic_response: AnthropicResponse = response.json().await?;
-                Ok(self.from_anthropic_response(anthropic_response))
+                let llm_response = self.from_anthropic_response(anthropic_response);
+
+                tracing::info!(
+                    "Anthropic API response: input_tokens={}, output_tokens={}, stop_reason={:?}",
+                    llm_response.usage.input_tokens,
+                    llm_response.usage.output_tokens,
+                    llm_response.stop_reason
+                );
+
+                Ok(llm_response)
             },
             &retry_config,
         )
-        .await
+        .await;
+
+        if let Err(ref e) = result {
+            tracing::error!("Anthropic API request failed: {}", e);
+        }
+
+        result
     }
 
     async fn stream(&self, request: LLMRequest) -> Result<ProviderStream> {
         use super::retry::{retry_with_backoff, RetryConfig};
+
+        let model = request.model.clone();
+        let message_count = request.messages.len();
+        tracing::info!(
+            "Anthropic streaming request: model={}, messages={}",
+            model,
+            message_count
+        );
 
         let mut anthropic_request = self.to_anthropic_request(request);
         anthropic_request.stream = Some(true);

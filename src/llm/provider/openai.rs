@@ -398,14 +398,17 @@ impl Provider for OpenAIProvider {
     async fn complete(&self, request: LLMRequest) -> Result<LLMResponse> {
         use super::retry::{retry_with_backoff, RetryConfig};
 
+        let model = request.model.clone();
+        let message_count = request.messages.len();
         let openai_request = self.to_openai_request(request);
         let retry_config = RetryConfig::default();
 
         let tool_count = openai_request.tools.as_ref().map(|t| t.len()).unwrap_or(0);
-        tracing::debug!(
-            "Sending OpenAI request to {} with model {} and {} tools",
-            self.base_url,
-            openai_request.model,
+        tracing::info!(
+            "OpenAI API request: model={}, messages={}, max_tokens={}, tools={}",
+            model,
+            message_count,
+            openai_request.max_tokens.unwrap_or(4096),
             tool_count
         );
         if tool_count == 0 {
@@ -415,8 +418,9 @@ impl Provider for OpenAIProvider {
         }
 
         // Retry the entire API call with exponential backoff
-        retry_with_backoff(
+        let result = retry_with_backoff(
             || async {
+                tracing::debug!("Sending request to OpenAI API: {}", self.base_url);
                 let response = self
                     .client
                     .post(&self.base_url)
@@ -425,30 +429,50 @@ impl Provider for OpenAIProvider {
                     .send()
                     .await?;
 
-                if !response.status().is_success() {
+                let status = response.status();
+                tracing::debug!("OpenAI API response status: {}", status);
+
+                if !status.is_success() {
                     return Err(self.handle_error(response).await);
                 }
 
                 let openai_response: OpenAIResponse = response.json().await?;
-                Ok(self.from_openai_response(openai_response))
+                let llm_response = self.from_openai_response(openai_response);
+
+                tracing::info!(
+                    "OpenAI API response: input_tokens={}, output_tokens={}, stop_reason={:?}",
+                    llm_response.usage.input_tokens,
+                    llm_response.usage.output_tokens,
+                    llm_response.stop_reason
+                );
+
+                Ok(llm_response)
             },
             &retry_config,
         )
-        .await
+        .await;
+
+        if let Err(ref e) = result {
+            tracing::error!("OpenAI API request failed: {}", e);
+        }
+
+        result
     }
 
     async fn stream(&self, request: LLMRequest) -> Result<ProviderStream> {
         use super::retry::{retry_with_backoff, RetryConfig};
 
+        let model = request.model.clone();
+        let message_count = request.messages.len();
+        tracing::info!(
+            "OpenAI streaming request: model={}, messages={}",
+            model,
+            message_count
+        );
+
         let mut openai_request = self.to_openai_request(request);
         openai_request.stream = Some(true);
         let retry_config = RetryConfig::default();
-
-        tracing::debug!(
-            "Starting OpenAI stream to {} with model {}",
-            self.base_url,
-            openai_request.model
-        );
 
         // Retry the stream connection establishment
         let response = retry_with_backoff(
