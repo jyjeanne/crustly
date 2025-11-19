@@ -7,7 +7,7 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-FSL--1.1--MIT-blue.svg)](LICENSE.md)
-
+[![CI](https://github.com/jyjeanne/crustly/actions/workflows/ci.yml/badge.svg)](https://github.com/jyjeanne/crustly/actions/workflows/ci.yml)
 ```
    ___             _   _
   / __|_ _ _  _ __| |_| |_  _
