@@ -369,31 +369,92 @@ impl AgentService {
             }
 
             // Detect tool loops: Track the current batch of tool calls
-            // For plan tool, we need special handling:
-            // - plan:add_task is EXPECTED to be called multiple times (different tasks)
-            // - Only detect loop if same operation with same error result
+            // Include arguments in signature to distinguish different calls
+            // For example: ls(./src) vs ls(./src/cli) should be different
             let current_call_signature = tool_uses
                 .iter()
                 .map(|(_, name, input)| {
-                    if name == "plan" {
-                        // Extract operation from plan tool input
-                        if let Some(operation) = input.get("operation").and_then(|v| v.as_str()) {
-                            // For add_task, don't consider it a loop - it's expected
-                            if operation == "add_task" {
-                                // Include task title to distinguish different tasks
-                                if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
-                                    format!("{}:{}:{}", name, operation, title)
+                    match name.as_str() {
+                        "plan" => {
+                            // Extract operation from plan tool input
+                            if let Some(operation) = input.get("operation").and_then(|v| v.as_str())
+                            {
+                                // For add_task, include task title to distinguish different tasks
+                                if operation == "add_task" {
+                                    if let Some(title) = input.get("title").and_then(|v| v.as_str())
+                                    {
+                                        format!("{}:{}:{}", name, operation, title)
+                                    } else {
+                                        format!("{}:{}", name, operation)
+                                    }
                                 } else {
                                     format!("{}:{}", name, operation)
                                 }
                             } else {
-                                format!("{}:{}", name, operation)
+                                name.to_string()
                             }
-                        } else {
-                            name.to_string()
                         }
-                    } else {
-                        name.to_string()
+
+                        // File system exploration tools - include path to distinguish calls
+                        "ls" => {
+                            if let Some(path) = input.get("path").and_then(|v| v.as_str()) {
+                                // Normalize path separators for consistent comparison
+                                let normalized = path.replace('\\', "/");
+                                format!("ls:{}", normalized)
+                            } else {
+                                "ls:".to_string()
+                            }
+                        }
+
+                        "glob" => {
+                            if let Some(pattern) = input.get("pattern").and_then(|v| v.as_str()) {
+                                format!("glob:{}", pattern)
+                            } else {
+                                "glob:".to_string()
+                            }
+                        }
+
+                        "grep" => {
+                            // Include pattern AND path to distinguish searches
+                            let pattern =
+                                input.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
+                            let path = input.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                            format!("grep:{}:{}", pattern, path)
+                        }
+
+                        "read" => {
+                            if let Some(path) = input.get("file_path").and_then(|v| v.as_str()) {
+                                let normalized = path.replace('\\', "/");
+                                format!("read:{}", normalized)
+                            } else {
+                                "read:".to_string()
+                            }
+                        }
+
+                        // File modification tools - include file path
+                        "write" | "edit" => {
+                            if let Some(path) = input.get("file_path").and_then(|v| v.as_str()) {
+                                let normalized = path.replace('\\', "/");
+                                format!("{}:{}", name, normalized)
+                            } else {
+                                format!("{}:", name)
+                            }
+                        }
+
+                        // Command execution - include command
+                        "bash" => {
+                            if let Some(cmd) = input.get("command").and_then(|v| v.as_str()) {
+                                // Normalize and truncate for signature
+                                let cmd_normalized = cmd.replace('\\', "/");
+                                let cmd_short: String = cmd_normalized.chars().take(100).collect();
+                                format!("bash:{}", cmd_short)
+                            } else {
+                                "bash:".to_string()
+                            }
+                        }
+
+                        // Other tools: just use name
+                        _ => name.to_string(),
                     }
                 })
                 .collect::<Vec<_>>()
@@ -401,23 +462,58 @@ impl AgentService {
 
             recent_tool_calls.push(current_call_signature.clone());
 
-            // Keep only last 5 iterations for loop detection
-            if recent_tool_calls.len() > 5 {
+            // Keep only last 15 iterations for loop detection (increased for deep exploration)
+            if recent_tool_calls.len() > 15 {
                 recent_tool_calls.remove(0);
             }
 
-            // Check for repeated patterns (same tool calls 3+ times in a row)
-            // This will only trigger for truly identical calls (same operation + same task title)
-            if recent_tool_calls.len() >= 3 {
-                let last_three = &recent_tool_calls[recent_tool_calls.len() - 3..];
-                if last_three
-                    .iter()
-                    .all(|call| call == &current_call_signature)
-                {
+            // Check for repeated patterns with tool-specific thresholds
+            // This will only trigger for truly identical calls (same tool + same arguments)
+
+            // Determine loop threshold based on tool type
+            let is_exploration_tool = current_call_signature.starts_with("ls:")
+                || current_call_signature.starts_with("glob:")
+                || current_call_signature.starts_with("grep:")
+                || current_call_signature.starts_with("read:");
+
+            let is_modification_tool = current_call_signature.starts_with("write:")
+                || current_call_signature.starts_with("edit:")
+                || current_call_signature.starts_with("bash:");
+
+            // Higher threshold for exploration tools (allow deep directory traversal)
+            // Lower threshold for modification tools (dangerous if looping)
+            let loop_threshold = if is_exploration_tool {
+                10 // Allow up to 10 identical calls for exploration
+            } else if is_modification_tool {
+                2 // Only 2 identical calls for modification tools
+            } else {
+                3 // Default: 3 identical calls
+            };
+
+            // Check if we have enough calls to detect a loop
+            if recent_tool_calls.len() >= loop_threshold {
+                let last_n = &recent_tool_calls[recent_tool_calls.len() - loop_threshold..];
+                if last_n.iter().all(|call| call == &current_call_signature) {
                     tracing::warn!(
-                        "Detected tool loop: '{}' called 3 times in a row. Breaking loop.",
-                        current_call_signature
+                        "⚠️ Detected tool loop: '{}' called {} times in a row. Breaking loop.",
+                        current_call_signature,
+                        loop_threshold
                     );
+
+                    if is_exploration_tool {
+                        tracing::info!(
+                            "💡 Hint: The model is stuck trying to access the same path {} times. \
+                             This often means the path doesn't exist or the model is confused about the directory structure.",
+                            loop_threshold
+                        );
+                    } else if is_modification_tool {
+                        tracing::warn!(
+                            "⚠️ Modification tool loop detected! This could be dangerous. \
+                             The model tried to modify the same file/run the same command {} times.",
+                            loop_threshold
+                        );
+                    }
+
                     // Force a final response by breaking the loop
                     final_response = Some(response);
                     break;
