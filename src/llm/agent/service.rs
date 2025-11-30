@@ -113,6 +113,16 @@ impl AgentService {
         self
     }
 
+    /// Get the provider name
+    pub fn provider_name(&self) -> &str {
+        self.provider.name()
+    }
+
+    /// Get the default model for this provider
+    pub fn provider_model(&self) -> &str {
+        self.provider.default_model()
+    }
+
     /// Send a message and get a response
     ///
     /// This will:
@@ -359,9 +369,33 @@ impl AgentService {
             }
 
             // Detect tool loops: Track the current batch of tool calls
+            // For plan tool, we need special handling:
+            // - plan:add_task is EXPECTED to be called multiple times (different tasks)
+            // - Only detect loop if same operation with same error result
             let current_call_signature = tool_uses
                 .iter()
-                .map(|(_, name, _)| name.as_str())
+                .map(|(_, name, input)| {
+                    if name == "plan" {
+                        // Extract operation from plan tool input
+                        if let Some(operation) = input.get("operation").and_then(|v| v.as_str()) {
+                            // For add_task, don't consider it a loop - it's expected
+                            if operation == "add_task" {
+                                // Include task title to distinguish different tasks
+                                if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
+                                    format!("{}:{}:{}", name, operation, title)
+                                } else {
+                                    format!("{}:{}", name, operation)
+                                }
+                            } else {
+                                format!("{}:{}", name, operation)
+                            }
+                        } else {
+                            name.to_string()
+                        }
+                    } else {
+                        name.to_string()
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join(",");
 
@@ -373,6 +407,7 @@ impl AgentService {
             }
 
             // Check for repeated patterns (same tool calls 3+ times in a row)
+            // This will only trigger for truly identical calls (same operation + same task title)
             if recent_tool_calls.len() >= 3 {
                 let last_three = &recent_tool_calls[recent_tool_calls.len() - 3..];
                 if last_three

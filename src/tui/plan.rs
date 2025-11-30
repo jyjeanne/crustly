@@ -345,6 +345,66 @@ impl PlanDocument {
     pub fn retriable_tasks(&self) -> Vec<&PlanTask> {
         self.tasks.iter().filter(|task| task.can_retry()).collect()
     }
+
+    /// Get validation warnings for this plan
+    pub fn get_validation_warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        // Check for overly complex tasks
+        for task in &self.tasks {
+            if task.complexity >= 5 {
+                warnings.push(format!(
+                    "⚠️ Task '{}' has maximum complexity ({}★) - consider breaking it down",
+                    task.title, task.complexity
+                ));
+            }
+
+            // Check for vague task descriptions
+            if task.description.len() < 50 {
+                warnings.push(format!(
+                    "💡 Task '{}' has a brief description ({} chars) - add more detail",
+                    task.title,
+                    task.description.len()
+                ));
+            }
+
+            // Check for tasks with no acceptance criteria
+            if task.acceptance_criteria.is_empty() {
+                warnings.push(format!(
+                    "💡 Task '{}' has no acceptance criteria - define success criteria",
+                    task.title
+                ));
+            }
+        }
+
+        // Check for plans with too many tasks
+        if self.tasks.len() > 20 {
+            warnings.push(format!(
+                "⚠️ Plan has {} tasks (>20) - consider splitting into smaller plans",
+                self.tasks.len()
+            ));
+        }
+
+        // Check for missing context
+        if self.context.is_empty() {
+            warnings
+                .push("💡 Plan has no context - add environment info or constraints".to_string());
+        }
+
+        // Check for missing risks
+        if self.risks.is_empty() {
+            warnings
+                .push("💡 Plan has no identified risks - document potential issues".to_string());
+        }
+
+        // Check for missing test strategy
+        if self.test_strategy.is_empty() {
+            warnings
+                .push("💡 Plan has no test strategy - define how to verify success".to_string());
+        }
+
+        warnings
+    }
 }
 
 /// Summary of plan execution

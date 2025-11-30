@@ -132,8 +132,12 @@ impl PromptAnalyzer {
         if self.plan_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected PLAN intent in prompt");
             transformations.push(
-                "\n\n**TOOL HINT**: Use the `plan` tool to create a structured plan with tasks, \
-                dependencies, and implementation steps.",
+                "\n\n**CRITICAL**: You MUST use the `plan` tool now! \
+                DO NOT write text - CALL THE TOOL IMMEDIATELY:\n\
+                1. plan(operation='create', title='...', description='...')\n\
+                2. plan(operation='add_task', ...) for each task\n\
+                3. plan(operation='finalize')\n\
+                **START WITH THE FIRST TOOL CALL NOW!**",
             );
         }
 

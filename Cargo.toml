@@ -96,6 +96,7 @@ arc-swap = "1.6"
 
 # Security
 zeroize = { version = "1.7", features = ["derive"] }
+keyring = "3.6"
 
 # Misc
 bytes = "1.5"

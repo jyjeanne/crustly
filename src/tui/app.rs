@@ -130,6 +130,16 @@ impl App {
         }
     }
 
+    /// Get the provider name
+    pub fn provider_name(&self) -> &str {
+        self.agent_service.provider_name()
+    }
+
+    /// Get the provider model
+    pub fn provider_model(&self) -> &str {
+        self.agent_service.provider_model()
+    }
+
     /// Initialize the app by loading or creating a session
     pub async fn initialize(&mut self) -> Result<()> {
         // Try to load most recent session
@@ -300,8 +310,8 @@ impl App {
             // Toggle between Chat and Plan modes
             match self.mode {
                 AppMode::Chat => {
-                    // Load plan before switching to Plan mode
-                    self.check_and_load_plan().await?;
+                    // Try to load any plan (not just PendingApproval)
+                    self.load_plan_for_viewing().await?;
                     // Only switch if a plan was loaded
                     if self.current_plan.is_some() {
                         self.switch_mode(AppMode::Plan).await?;
@@ -765,8 +775,81 @@ impl App {
         Ok(task_result.unwrap_or(false))
     }
 
+    /// Load plan for manual viewing (Ctrl+P)
+    /// Loads ANY plan (Draft, PendingApproval, etc.) for viewing
+    async fn load_plan_for_viewing(&mut self) -> Result<()> {
+        // Get session ID for session-scoped operations
+        let session_id = match &self.current_session {
+            Some(session) => session.id,
+            None => {
+                tracing::debug!("No current session, skipping plan load");
+                return Ok(());
+            }
+        };
+
+        tracing::debug!("Loading plan for viewing (session: {})", session_id);
+
+        // Try loading from database first
+        match self.plan_service.get_most_recent_plan(session_id).await {
+            Ok(Some(plan)) => {
+                tracing::info!(
+                    "✅ Loaded plan from database: '{}' ({:?}, {} tasks)",
+                    plan.title,
+                    plan.status,
+                    plan.tasks.len()
+                );
+                self.current_plan = Some(plan);
+                return Ok(());
+            }
+            Ok(None) => {
+                tracing::debug!("No plan found in database, checking JSON file");
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load plan from database: {}", e);
+            }
+        }
+
+        // Fallback to JSON file for backward compatibility / migration
+        let plan_filename = format!(".crustly_plan_{}.json", session_id);
+        let plan_file = self.working_directory.join(&plan_filename);
+
+        tracing::debug!("Looking for plan file at: {}", plan_file.display());
+
+        match tokio::fs::read_to_string(&plan_file).await {
+            Ok(content) => {
+                tracing::debug!("Found plan JSON file, parsing...");
+                match serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
+                    Ok(plan) => {
+                        tracing::info!(
+                            "✅ Loaded plan from JSON: '{}' ({:?}, {} tasks)",
+                            plan.title,
+                            plan.status,
+                            plan.tasks.len()
+                        );
+
+                        // Migrate to database
+                        if let Err(e) = self.plan_service.create(&plan).await {
+                            tracing::warn!("Failed to migrate plan to database: {}", e);
+                        }
+
+                        self.current_plan = Some(plan);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse plan JSON: {}", e);
+                    }
+                }
+            }
+            Err(_) => {
+                tracing::debug!("No plan file found");
+            }
+        }
+
+        Ok(())
+    }
+
     /// Check for and load a plan if one was created
     /// Loads from database first, with JSON fallback for migration
+    /// Only loads plans with status PendingApproval (for automatic notification)
     async fn check_and_load_plan(&mut self) -> Result<()> {
         // Get session ID for session-scoped operations
         let session_id = match &self.current_session {

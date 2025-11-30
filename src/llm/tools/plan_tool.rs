@@ -352,11 +352,25 @@ impl Tool for PlanTool {
                     validate_string(&ctx, MAX_CONTEXT_LENGTH, "Plan context")?;
                 }
 
-                if plan.is_some() {
-                    return Ok(ToolResult::error(
-                        "A plan already exists. Use 'update_plan' to modify it or 'finalize' to complete it."
-                            .to_string(),
-                    ));
+                // Check if plan exists
+                if let Some(existing_plan) = plan.as_ref() {
+                    // Allow replacing empty Draft plans (likely stale/abandoned)
+                    if existing_plan.status == PlanStatus::Draft && existing_plan.tasks.is_empty() {
+                        tracing::info!(
+                            "📝 Replacing empty Draft plan '{}' with new plan '{}'",
+                            existing_plan.title,
+                            title
+                        );
+                        // Continue to create new plan (will replace existing)
+                    } else {
+                        // Don't allow replacing plans with tasks or in other states
+                        return Ok(ToolResult::error(format!(
+                            "A plan already exists: '{}' ({:?}, {} tasks). Use 'update_plan' to modify it or 'finalize' to complete it.",
+                            existing_plan.title,
+                            existing_plan.status,
+                            existing_plan.tasks.len()
+                        )));
+                    }
                 }
 
                 let mut new_plan =
@@ -518,6 +532,19 @@ impl Tool for PlanTool {
                     )));
                 }
 
+                // Get validation warnings
+                let warnings = current_plan.get_validation_warnings();
+                let warning_text = if !warnings.is_empty() {
+                    let warning_list = warnings
+                        .iter()
+                        .map(|w| format!("  {}", w))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    format!("\n\n📊 Plan Quality Notes:\n{}\n", warning_list)
+                } else {
+                    String::new()
+                };
+
                 // Change status
                 let old_status = current_plan.status.clone();
                 current_plan.status = PlanStatus::PendingApproval;
@@ -532,10 +559,11 @@ impl Tool for PlanTool {
                 format!(
                     "✓ Plan finalized and ready for review!\n\n\
                      📋 Plan: {}\n\
-                     📝 {} tasks ready for execution\n\n\
+                     📝 {} tasks ready for execution{}\n\
                      Press Ctrl+P to review the plan.",
                     current_plan.title,
-                    current_plan.tasks.len()
+                    current_plan.tasks.len(),
+                    warning_text
                 )
             }
 

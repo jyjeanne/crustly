@@ -330,6 +330,28 @@ cargo run
 ### First Run
 
 1. **Set your API key** (choose your preferred provider):
+
+**Option A: Secure OS Keyring (Recommended)**
+```bash
+# Store API key securely in OS credential manager
+cargo run -- keyring set anthropic YOUR_API_KEY_HERE
+# or
+cargo run -- keyring set openai YOUR_API_KEY_HERE
+
+# List stored keys
+cargo run -- keyring list
+
+# View stored key (displays in terminal)
+cargo run -- keyring get anthropic
+```
+
+Benefits:
+- ✅ Encrypted by OS (Windows Credential Manager / macOS Keychain / Linux Secret Service)
+- ✅ Not stored in plaintext files
+- ✅ Automatically loaded on startup
+- ✅ Secure and persistent
+
+**Option B: Environment Variables (Temporary)**
 ```bash
 # Example with Anthropic (Linux/Mac)
 export ANTHROPIC_API_KEY="sk-ant-api03-YOUR_KEY_HERE"
@@ -343,6 +365,7 @@ $env:ANTHROPIC_API_KEY="sk-ant-api03-YOUR_KEY_HERE"
 $env:OPENAI_API_KEY="sk-YOUR_OPENAI_KEY"
 ```
 
+> 💡 Crustly automatically tries keyring first, then falls back to environment variables.
 > 💡 See the **Supported AI Providers** section above for the complete list of environment variables.
 
 
@@ -3194,15 +3217,53 @@ Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidel
 
 ---
 
-## 🐛 Known Issues
+## 🐛 Known Issues & Platform-Specific Notes
 
-### Windows Build Issue
+### Windows Build Requirements
 
-**Error:** `dlltool.exe not found`
+Building Crustly on Windows requires additional tools due to native dependencies:
 
-**Solution:** See [BUILD_NOTES.md](docs/guides/BUILD_NOTES.md) for Windows setup instructions.
+**Error you might see:**
+```
+error: failed to run custom build command for `aws-lc-sys`
+error: Error calling dlltool 'dlltool.exe': program not found
+```
 
-Alternative: Use WSL2 or Linux/macOS for development.
+**Root Cause:**
+The `aws-lc-sys` crate (used by cryptographic libraries) requires CMake and NASM for Windows builds.
+
+**Solutions (choose one):**
+
+**Option 1: Install Build Tools (Recommended for Windows development)**
+1. Install [CMake](https://cmake.org/download/) (Windows x64 Installer)
+   - During installation, choose "Add CMake to the system PATH"
+2. Install [NASM](https://www.nasm.us/)
+   - Download Windows 64-bit installer
+   - Add to PATH: `C:\Program Files\NASM`
+3. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/)
+   - Select "Desktop development with C++"
+4. Restart terminal and run: `cargo build`
+
+**Option 2: Use WSL2 (Recommended for Linux-like environment)**
+```bash
+# In WSL2 Ubuntu
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+sudo apt-get update
+sudo apt-get install build-essential pkg-config libssl-dev
+git clone https://github.com/jyjeanne/crustly.git
+cd crustly
+cargo build --release
+```
+
+**Option 3: Use Pre-built Binaries (Coming Soon)**
+- Download from [Releases](https://github.com/jyjeanne/crustly/releases)
+
+**Platform-specific notes:**
+- **macOS**: No additional dependencies required
+- **Linux**: Requires `build-essential`, `pkg-config`, `libssl-dev`
+- **Windows**: See build requirements above
+
+For detailed build troubleshooting, see [BUILD_NOTES.md](docs/guides/BUILD_NOTES.md).
 
 ---
 

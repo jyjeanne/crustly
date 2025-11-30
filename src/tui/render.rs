@@ -18,7 +18,7 @@ use ratatui::{
 pub fn render(f: &mut Frame, app: &App) {
     // Show splash screen if in splash mode
     if app.mode == AppMode::Splash {
-        splash::render_splash(f, f.size());
+        splash::render_splash(f, f.size(), app.provider_name(), app.provider_model());
         return;
     }
 

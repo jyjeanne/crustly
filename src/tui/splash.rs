@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 /// Render the splash screen
-pub fn render_splash(f: &mut Frame, area: Rect) {
+pub fn render_splash(f: &mut Frame, area: Rect, provider_name: &str, model_name: &str) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -31,10 +31,10 @@ pub fn render_splash(f: &mut Frame, area: Rect) {
         ])
         .split(chunks[1]);
 
-    render_splash_content(f, center_chunks[1]);
+    render_splash_content(f, center_chunks[1], provider_name, model_name);
 }
 
-fn render_splash_content(f: &mut Frame, area: Rect) {
+fn render_splash_content(f: &mut Frame, area: Rect, provider_name: &str, model_name: &str) {
     let version = env!("CARGO_PKG_VERSION");
 
     let splash_text = vec![
@@ -130,7 +130,7 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
             Span::raw("                    "),
             Span::styled("Model: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                "Claude 3.5 Sonnet",
+                model_name,
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
@@ -139,7 +139,7 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
         Line::from(vec![
             Span::raw("                    "),
             Span::styled("Provider: ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Crabrace Registry", Style::default().fg(Color::Cyan)),
+            Span::styled(provider_name, Style::default().fg(Color::Cyan)),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
@@ -154,7 +154,7 @@ fn render_splash_content(f: &mut Frame, area: Rect) {
             "                   Press any key to continue...",
             Style::default()
                 .fg(Color::Yellow)
-                .add_modifier(Modifier::DIM),
+                .add_modifier(Modifier::BOLD),
         )]),
     ];
 

@@ -157,6 +157,12 @@ pub enum Commands {
         #[command(subcommand)]
         operation: LogCommands,
     },
+
+    /// Manage API keys in OS keyring (secure storage)
+    Keyring {
+        #[command(subcommand)]
+        operation: KeyringCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -193,6 +199,29 @@ pub enum DbCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+pub enum KeyringCommands {
+    /// Store an API key in OS keyring
+    Set {
+        /// Provider name (anthropic, openai, gemini, azure)
+        provider: String,
+        /// API key to store
+        api_key: String,
+    },
+    /// Retrieve an API key from OS keyring
+    Get {
+        /// Provider name
+        provider: String,
+    },
+    /// Delete an API key from OS keyring
+    Delete {
+        /// Provider name
+        provider: String,
+    },
+    /// List all stored providers
+    List,
+}
+
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum OutputFormat {
     Text,
@@ -225,6 +254,7 @@ pub async fn run() -> Result<()> {
         Some(Commands::Config { show_secrets }) => cmd_config(&config, show_secrets).await,
         Some(Commands::Db { operation }) => cmd_db(&config, operation).await,
         Some(Commands::Logs { operation }) => cmd_logs(operation).await,
+        Some(Commands::Keyring { operation }) => cmd_keyring(operation).await,
         Some(Commands::Run {
             prompt,
             auto_approve,
@@ -446,12 +476,6 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         db::Database,
         llm::{
             agent::AgentService,
-            provider::{
-                anthropic::AnthropicProvider,
-                openai::OpenAIProvider,
-                qwen::{QwenProvider, ToolCallParser},
-                Provider,
-            },
             tools::{
                 bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
                 doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
@@ -477,7 +501,11 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         .await
         .context("Failed to run database migrations")?;
 
-    // Select provider based on configuration
+    // Select provider based on configuration using factory
+    let provider = crate::llm::provider::create_provider(config)?;
+
+    // OLD CODE - REPLACED BY FACTORY PATTERN
+    /*
     let provider: Arc<dyn Provider> = if let Some(qwen_config) = &config.providers.qwen {
         // Qwen provider is configured
         if let Some(base_url) = &qwen_config.base_url {
@@ -629,25 +657,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         Arc::new(AnthropicProvider::new(api_key))
     };
 
-    // Helper function for fallback provider
-    fn create_fallback_provider(config: &crate::config::Config) -> Result<Arc<dyn Provider>> {
-        if let Some(openai_config) = &config.providers.openai {
-            if let Some(api_key) = &openai_config.api_key {
-                return Ok(Arc::new(OpenAIProvider::new(api_key.clone())));
-            }
-        }
-        let anthropic_config = config
-            .providers
-            .anthropic
-            .as_ref()
-            .context("No provider configured")?;
-        let api_key = anthropic_config
-            .api_key
-            .as_ref()
-            .context("Anthropic API key not set")?
-            .clone();
-        Ok(Arc::new(AnthropicProvider::new(api_key)))
-    }
+    // Helper function for fallback provider - REMOVED, now in factory module
+    */
 
     // Create tool registry
     tracing::debug!("Setting up tool registry");
@@ -768,7 +779,6 @@ async fn cmd_run(
         db::Database,
         llm::{
             agent::AgentService,
-            provider::{anthropic::AnthropicProvider, openai::OpenAIProvider, Provider},
             tools::{
                 bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
                 doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
@@ -786,57 +796,8 @@ async fn cmd_run(
     let db = Database::connect(&config.database.path).await?;
     db.run_migrations().await?;
 
-    // Select provider based on configuration
-    let provider: Arc<dyn Provider> = if let Some(openai_config) = &config.providers.openai {
-        // OpenAI provider is configured
-        if let Some(base_url) = &openai_config.base_url {
-            // Local LLM (LM Studio, Ollama, etc.)
-            tracing::info!("Using local LLM at: {}", base_url);
-            let mut provider = OpenAIProvider::local(base_url.clone());
-            if let Some(model) = &openai_config.default_model {
-                tracing::info!("Using custom default model: {}", model);
-                provider = provider.with_default_model(model.clone());
-            }
-            Arc::new(provider)
-        } else if let Some(api_key) = &openai_config.api_key {
-            // Official OpenAI API
-            tracing::info!("Using OpenAI provider");
-            let mut provider = OpenAIProvider::new(api_key.clone());
-            if let Some(model) = &openai_config.default_model {
-                tracing::info!("Using custom default model: {}", model);
-                provider = provider.with_default_model(model.clone());
-            }
-            Arc::new(provider)
-        } else {
-            // Fall back to Anthropic
-            let anthropic_config = config
-                .providers
-                .anthropic
-                .as_ref()
-                .context("No provider configured")?;
-            let api_key = anthropic_config
-                .api_key
-                .as_ref()
-                .context("Anthropic API key not set")?
-                .clone();
-            tracing::info!("Using Anthropic provider");
-            Arc::new(AnthropicProvider::new(api_key))
-        }
-    } else {
-        // No OpenAI config, use Anthropic
-        let anthropic_config = config
-            .providers
-            .anthropic
-            .as_ref()
-            .context("No provider configured")?;
-        let api_key = anthropic_config
-            .api_key
-            .as_ref()
-            .context("Anthropic API key not set")?
-            .clone();
-        tracing::info!("Using Anthropic provider");
-        Arc::new(AnthropicProvider::new(api_key))
-    };
+    // Select provider based on configuration using factory
+    let provider = crate::llm::provider::create_provider(config)?;
 
     // Create tool registry
     let mut tool_registry = ToolRegistry::new();
@@ -917,6 +878,104 @@ async fn cmd_run(
     }
 
     Ok(())
+}
+
+/// Keyring management commands
+async fn cmd_keyring(operation: KeyringCommands) -> Result<()> {
+    use crate::config::secrets::SecretString;
+
+    match operation {
+        KeyringCommands::Set { provider, api_key } => {
+            println!("🔐 Saving API key for {} to OS keyring...\n", provider);
+
+            let secret = SecretString::from_str(&api_key);
+            let key_name = format!("{}_api_key", provider.to_lowercase());
+
+            secret
+                .save_to_keyring(&key_name)
+                .with_context(|| format!("Failed to save {} API key to keyring", provider))?;
+
+            println!("✅ Successfully saved {} API key to OS keyring", provider);
+            println!("\n💡 The key is now securely stored in your system's credential manager:");
+            #[cfg(target_os = "windows")]
+            println!("   - Windows Credential Manager");
+            #[cfg(target_os = "macos")]
+            println!("   - macOS Keychain");
+            #[cfg(target_os = "linux")]
+            println!("   - Linux Secret Service");
+
+            println!("\n🔒 Security benefits:");
+            println!("   ✓ Encrypted by the operating system");
+            println!("   ✓ Not stored in plaintext files");
+            println!("   ✓ Automatically cleared from memory");
+
+            Ok(())
+        }
+
+        KeyringCommands::Get { provider } => {
+            let key_name = format!("{}_api_key", provider.to_lowercase());
+
+            match SecretString::from_keyring_optional(&key_name) {
+                Some(secret) => {
+                    println!("🔐 API key for {}: {}", provider, secret.expose_secret());
+                    println!(
+                        "\n⚠️  Warning: API key displayed in plain text. Clear your terminal history."
+                    );
+                }
+                None => {
+                    println!("❌ No API key found for {} in OS keyring", provider);
+                    println!("\n💡 To store an API key, use:");
+                    println!("   crustly keyring set {} YOUR_API_KEY", provider);
+                }
+            }
+
+            Ok(())
+        }
+
+        KeyringCommands::Delete { provider } => {
+            let key_name = format!("{}_api_key", provider.to_lowercase());
+
+            SecretString::delete_from_keyring(&key_name)
+                .with_context(|| format!("Failed to delete {} API key from keyring", provider))?;
+
+            println!("✅ Deleted {} API key from OS keyring", provider);
+            Ok(())
+        }
+
+        KeyringCommands::List => {
+            println!("🔐 API Keys in OS Keyring\n");
+
+            let providers = ["anthropic", "openai", "gemini", "azure"];
+            let mut found_any = false;
+
+            for provider in &providers {
+                let key_name = format!("{}_api_key", provider);
+                if let Some(secret) = SecretString::from_keyring_optional(&key_name) {
+                    let masked = format!(
+                        "{}...{}",
+                        &secret.expose_secret()[..4.min(secret.len())],
+                        if secret.len() > 8 {
+                            &secret.expose_secret()[secret.len() - 4..]
+                        } else {
+                            ""
+                        }
+                    );
+                    println!("  ✓ {:<12} {}", provider, masked);
+                    found_any = true;
+                } else {
+                    println!("  ✗ {:<12} (not configured)", provider);
+                }
+            }
+
+            if !found_any {
+                println!("\n💡 No API keys found in keyring.");
+                println!("   To store an API key, use:");
+                println!("   crustly keyring set <provider> <api-key>");
+            }
+
+            Ok(())
+        }
+    }
 }
 
 /// Log management commands
