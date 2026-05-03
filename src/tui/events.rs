@@ -171,11 +171,12 @@ impl EventHandler {
                             {
                                 break;
                             }
-                            crossterm::event::Event::Resize(w, h) => {
-                                if tx.send(TuiEvent::Resize(w, h)).is_err() {
-                                    break;
-                                }
+                            crossterm::event::Event::Resize(w, h)
+                                if tx.send(TuiEvent::Resize(w, h)).is_err() =>
+                            {
+                                break;
                             }
+                            #[allow(clippy::collapsible_match)]
                             crossterm::event::Event::Paste(text) => {
                                 if tx.send(TuiEvent::Paste(text)).is_err() {
                                     break;

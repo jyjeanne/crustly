@@ -60,45 +60,41 @@ pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
                 Tag::Emphasis => {
                     // Italic text - will be handled in text event
                 }
-                Tag::BlockQuote => {
-                    if !current_line.is_empty() {
-                        lines.push(Line::from(std::mem::take(&mut current_line)));
-                    }
+                Tag::BlockQuote if !current_line.is_empty() => {
+                    lines.push(Line::from(std::mem::take(&mut current_line)));
                 }
                 _ => {}
             },
 
             Event::End(tag) => match tag {
-                Tag::Heading(..) => {
-                    if !current_line.is_empty() {
-                        // Add heading prefix and style
-                        let prefix = match heading_level {
-                            1 => "# ",
-                            2 => "## ",
-                            3 => "### ",
-                            _ => "",
-                        };
+                Tag::Heading(..) if !current_line.is_empty() => {
+                    // Add heading prefix and style
+                    let prefix = match heading_level {
+                        1 => "# ",
+                        2 => "## ",
+                        3 => "### ",
+                        _ => "",
+                    };
 
-                        let mut styled_line = vec![Span::styled(
-                            prefix.to_string(),
+                    let mut styled_line = vec![Span::styled(
+                        prefix.to_string(),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    )];
+
+                    for span in &mut current_line {
+                        // Apply heading style to all spans in the line
+                        *span = span.clone().style(
                             Style::default()
                                 .fg(Color::Cyan)
-                                .add_modifier(Modifier::BOLD),
-                        )];
-
-                        for span in &mut current_line {
-                            // Apply heading style to all spans in the line
-                            *span = span.clone().style(
-                                Style::default()
-                                    .fg(Color::Cyan)
-                                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-                            );
-                        }
-
-                        styled_line.extend(std::mem::take(&mut current_line));
-                        lines.push(Line::from(styled_line));
-                        lines.push(Line::from("")); // Add spacing after heading
+                                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                        );
                     }
+
+                    styled_line.extend(std::mem::take(&mut current_line));
+                    lines.push(Line::from(styled_line));
+                    lines.push(Line::from("")); // Add spacing after heading
                 }
                 Tag::CodeBlock(_) => {
                     if !current_line.is_empty() {
@@ -140,10 +136,8 @@ pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
                     }
                     lines.push(Line::from("")); // Add spacing after paragraph
                 }
-                Tag::Item => {
-                    if !current_line.is_empty() {
-                        lines.push(Line::from(std::mem::take(&mut current_line)));
-                    }
+                Tag::Item if !current_line.is_empty() => {
+                    lines.push(Line::from(std::mem::take(&mut current_line)));
                 }
                 Tag::BlockQuote => {
                     lines.push(Line::from("")); // Add spacing after blockquote
@@ -174,10 +168,8 @@ pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
                 ));
             }
 
-            Event::HardBreak | Event::SoftBreak => {
-                if !current_line.is_empty() {
-                    lines.push(Line::from(std::mem::take(&mut current_line)));
-                }
+            Event::HardBreak | Event::SoftBreak if !current_line.is_empty() => {
+                lines.push(Line::from(std::mem::take(&mut current_line)));
             }
 
             Event::Rule => {
