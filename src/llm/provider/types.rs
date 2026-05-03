@@ -114,6 +114,30 @@ pub struct LLMRequest {
     /// Temperature (0.0-1.0); forced to 1.0 when thinking is active
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
+    /// Nucleus sampling threshold (0.0-1.0). Limits token selection to the
+    /// top-p probability mass. Mutually exclusive with `temperature` in most
+    /// providers — use one or the other.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f32>,
+    /// Random seed for reproducible outputs (supported by Ollama and OpenAI).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
+    /// Stop sequences — generation halts when any of these strings are produced.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop: Option<Vec<String>>,
+    /// Penalises tokens by how often they have already appeared (−2.0..2.0).
+    /// Reduces repetition; forwarded to OpenAI-compatible backends.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub frequency_penalty: Option<f32>,
+    /// Penalises tokens that have appeared at all (−2.0..2.0).
+    /// Encourages topic diversity; forwarded to OpenAI-compatible backends.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presence_penalty: Option<f32>,
+    /// Response format override (e.g. `{"type":"json_object"}` for JSON mode,
+    /// or a full JSON Schema for structured outputs).  Forwarded verbatim to
+    /// OpenAI-compatible backends; ignored by Anthropic.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<serde_json::Value>,
     /// Maximum tokens to generate
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
@@ -137,6 +161,12 @@ impl LLMRequest {
             system: None,
             tools: None,
             temperature: None,
+            top_p: None,
+            seed: None,
+            stop: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            response_format: None,
             max_tokens: None,
             stream: false,
             metadata: None,
@@ -172,6 +202,44 @@ impl LLMRequest {
     /// Set temperature
     pub fn with_temperature(mut self, temperature: f32) -> Self {
         self.temperature = Some(temperature);
+        self
+    }
+
+    /// Set top_p (nucleus sampling threshold, 0.0–1.0).
+    /// Use instead of `temperature`, not alongside it.
+    pub fn with_top_p(mut self, top_p: f32) -> Self {
+        self.top_p = Some(top_p);
+        self
+    }
+
+    /// Set a random seed for reproducible outputs.
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    /// Set stop sequences — generation halts at the first match.
+    pub fn with_stop(mut self, stop: Vec<String>) -> Self {
+        self.stop = Some(stop);
+        self
+    }
+
+    /// Set frequency penalty (−2.0..2.0). Reduces token repetition.
+    pub fn with_frequency_penalty(mut self, penalty: f32) -> Self {
+        self.frequency_penalty = Some(penalty);
+        self
+    }
+
+    /// Set presence penalty (−2.0..2.0). Encourages topic diversity.
+    pub fn with_presence_penalty(mut self, penalty: f32) -> Self {
+        self.presence_penalty = Some(penalty);
+        self
+    }
+
+    /// Set response format (e.g. JSON mode or a JSON Schema).
+    /// Pass `serde_json::json!({"type":"json_object"})` for JSON mode.
+    pub fn with_response_format(mut self, format: serde_json::Value) -> Self {
+        self.response_format = Some(format);
         self
     }
 
@@ -324,6 +392,49 @@ pub struct MessageDelta {
     pub stop_sequence: Option<String>,
 }
 
+/// Extract all `<think>…</think>` blocks from `text`.
+///
+/// Returns `(thinking_content, cleaned_text)` where:
+/// - `thinking_content` — concatenated inner text of every `<think>` block, trimmed
+/// - `cleaned_text`     — original text with all `<think>` blocks removed and trimmed
+///
+/// Used to separate on-the-fly reasoning traces (DeepSeek-R1, QwQ-32B, etc.)
+/// from the visible response text for both streaming and non-streaming paths.
+pub fn extract_think_tags(text: &str) -> (String, String) {
+    const OPEN: &str = "<think>";
+    const CLOSE: &str = "</think>";
+
+    let mut thinking = String::new();
+    let mut cleaned = String::new();
+    let mut remaining = text;
+
+    while let Some(open_pos) = remaining.find(OPEN) {
+        // Text before the opening tag belongs to the visible response.
+        cleaned.push_str(&remaining[..open_pos]);
+        remaining = &remaining[open_pos + OPEN.len()..];
+
+        if let Some(close_pos) = remaining.find(CLOSE) {
+            if !thinking.is_empty() {
+                thinking.push('\n');
+            }
+            thinking.push_str(&remaining[..close_pos]);
+            remaining = &remaining[close_pos + CLOSE.len()..];
+        } else {
+            // No closing tag — treat the rest as thinking (truncated stream).
+            if !thinking.is_empty() {
+                thinking.push('\n');
+            }
+            thinking.push_str(remaining);
+            remaining = "";
+            break;
+        }
+    }
+
+    cleaned.push_str(remaining);
+
+    (thinking.trim().to_string(), cleaned.trim().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,5 +509,43 @@ mod tests {
         assert!((cm.hit_rate() - 0.8).abs() < 0.001);
         let empty = CacheMetrics::default();
         assert_eq!(empty.hit_rate(), 0.0);
+    }
+
+    #[test]
+    fn extract_think_tags_single_block() {
+        let (thinking, cleaned) =
+            extract_think_tags("<think>I reason here</think>The answer is 42.");
+        assert_eq!(thinking, "I reason here");
+        assert_eq!(cleaned, "The answer is 42.");
+    }
+
+    #[test]
+    fn extract_think_tags_multiple_blocks() {
+        let (thinking, cleaned) =
+            extract_think_tags("<think>first</think> middle <think>second</think> end");
+        assert_eq!(thinking, "first\nsecond");
+        // " middle " + " end" → two spaces between words after block removal
+        assert_eq!(cleaned, "middle  end");
+    }
+
+    #[test]
+    fn extract_think_tags_no_tags() {
+        let (thinking, cleaned) = extract_think_tags("plain text");
+        assert!(thinking.is_empty());
+        assert_eq!(cleaned, "plain text");
+    }
+
+    #[test]
+    fn extract_think_tags_unclosed() {
+        let (thinking, cleaned) = extract_think_tags("<think>reasoning truncated");
+        assert_eq!(thinking, "reasoning truncated");
+        assert!(cleaned.is_empty());
+    }
+
+    #[test]
+    fn extract_think_tags_only_block() {
+        let (thinking, cleaned) = extract_think_tags("<think>only thinking</think>");
+        assert_eq!(thinking, "only thinking");
+        assert!(cleaned.is_empty());
     }
 }

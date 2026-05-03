@@ -638,22 +638,40 @@ impl App {
             // Auto-scroll to show the new user message
             self.scroll_offset = 0;
 
-            // Send transformed content to agent in background
+            // Send transformed content to agent in background with live streaming.
             let agent_service = self.agent_service.clone();
             let session_id = session.id;
             let event_sender = self.event_sender();
             let read_only_mode = self.mode == AppMode::Plan;
 
+            let (chunk_tx, mut chunk_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+
+            // Forward stream chunks to the TUI event loop.
+            let event_sender_chunks = event_sender.clone();
+            let forwarder_handle = tokio::spawn(async move {
+                while let Some(chunk) = chunk_rx.recv().await {
+                    let _ = event_sender_chunks.send(TuiEvent::ResponseChunk(chunk));
+                }
+            });
+
             tokio::spawn(async move {
-                match agent_service
-                    .send_message_with_tools_and_mode(
+                let result = agent_service
+                    .send_message_with_tools_and_mode_streaming(
                         session_id,
                         transformed_content,
                         None,
                         read_only_mode,
+                        chunk_tx,
                     )
-                    .await
-                {
+                    .await;
+
+                // Wait for the forwarder to drain all buffered chunks before sending
+                // ResponseComplete. This guarantees ResponseComplete is always processed
+                // after every ResponseChunk event, preventing the TUI from clearing
+                // streaming_response while chunks are still in-flight.
+                let _ = forwarder_handle.await;
+
+                match result {
                     Ok(response) => {
                         let _ = event_sender.send(TuiEvent::ResponseComplete(response));
                     }

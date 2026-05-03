@@ -19,7 +19,6 @@ use super::error::{ProviderError, Result};
 use super::r#trait::{Provider, ProviderStream};
 use super::types::*;
 use async_trait::async_trait;
-use futures::stream::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -132,6 +131,7 @@ impl OpenAIProvider {
                 content: Some(system),
                 tool_calls: None,
                 tool_call_id: None,
+                reasoning_content: None,
             });
         }
 
@@ -198,6 +198,7 @@ impl OpenAIProvider {
                     content: content_str,
                     tool_calls: Some(openai_tool_calls),
                     tool_call_id: None,
+                    reasoning_content: None,
                 });
             }
             // Handle tool result messages
@@ -208,6 +209,7 @@ impl OpenAIProvider {
                         content: Some(content),
                         tool_calls: None,
                         tool_call_id: Some(tool_use_id),
+                        reasoning_content: None,
                     });
                 }
             }
@@ -224,6 +226,7 @@ impl OpenAIProvider {
                     content: content_str,
                     tool_calls: None,
                     tool_call_id: None,
+                    reasoning_content: None,
                 });
             }
         }
@@ -243,13 +246,38 @@ impl OpenAIProvider {
                 .collect()
         });
 
+        // Set tool_choice to "auto" whenever tools are present so that models
+        // (including Ollama-hosted ones) reliably invoke tools instead of
+        // responding with plain text.
+        let tool_choice = tools.as_ref().map(|_| "auto".to_string());
+
+        // Map Anthropic-style thinking config to OpenAI/Ollama reasoning_effort.
+        // This enables the reasoning trace on thinking-capable models such as
+        // DeepSeek-R1, Qwen3, and GPT-OSS served through Ollama.
+        let reasoning_effort = request.thinking.as_ref().map(|t| {
+            match t.budget_tokens {
+                0..=2_000 => "low".to_string(),
+                2_001..=8_000 => "medium".to_string(),
+                _ => "high".to_string(),
+            }
+        });
+
         OpenAIRequest {
             model: request.model,
             messages,
             temperature: request.temperature,
+            top_p: request.top_p,
+            seed: request.seed,
+            stop: request.stop,
+            frequency_penalty: request.frequency_penalty,
+            presence_penalty: request.presence_penalty,
             max_tokens: request.max_tokens,
             stream: Some(request.stream),
+            stream_options: None, // set to include_usage=true by stream()
             tools,
+            tool_choice,
+            reasoning_effort,
+            response_format: request.response_format,
         }
     }
 
@@ -267,6 +295,7 @@ impl OpenAIProvider {
                     content: Some(String::new()),
                     tool_calls: None,
                     tool_call_id: None,
+                    reasoning_content: None,
                 },
                 finish_reason: Some("error".to_string()),
             });
@@ -274,11 +303,42 @@ impl OpenAIProvider {
         // Convert content to content blocks
         let mut content_blocks = Vec::new();
 
-        // Add text content if present
-        if let Some(content) = choice.message.content {
-            if !content.is_empty() {
-                content_blocks.push(ContentBlock::Text { text: content });
+        // --- Reasoning / thinking block ---
+        //
+        // Priority:
+        //  1. `reasoning_content` field (DeepSeek-R1 direct API, some OpenAI-compat servers)
+        //  2. `<think>…</think>` tags embedded in the text content (Ollama DeepSeek-R1, QwQ-32B)
+        let (thinking_text, visible_text) = {
+            // Resolve reasoning_content first.
+            let explicit_thinking = choice.message.reasoning_content.clone();
+
+            match choice.message.content.as_deref() {
+                Some(text) if !text.is_empty() => {
+                    if let Some(r) = explicit_thinking.filter(|s| !s.is_empty()) {
+                        // API provided reasoning separately — preserve content verbatim.
+                        // Do NOT strip any tags, as they may be intentional display text.
+                        (r, text.to_string())
+                    } else {
+                        // No separate reasoning field — extract from <think> tags if present.
+                        let (tag_thinking, cleaned) =
+                            crate::llm::provider::extract_think_tags(text);
+                        (tag_thinking, cleaned)
+                    }
+                }
+                _ => {
+                    let thinking = explicit_thinking.unwrap_or_default();
+                    (thinking, String::new())
+                }
             }
+        };
+
+        if !thinking_text.is_empty() {
+            content_blocks.push(ContentBlock::Thinking { thinking: thinking_text });
+        }
+
+        // Add visible text content if present
+        if !visible_text.is_empty() {
+            content_blocks.push(ContentBlock::Text { text: visible_text });
         }
 
         // Convert tool_calls to ToolUse content blocks
@@ -329,8 +389,8 @@ impl OpenAIProvider {
             content: content_blocks,
             stop_reason,
             usage: TokenUsage {
-                input_tokens: response.usage.prompt_tokens,
-                output_tokens: response.usage.completion_tokens,
+                input_tokens: response.usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
+                output_tokens: response.usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0),
             },
             cache_metrics: None,
         }
@@ -476,6 +536,9 @@ impl Provider for OpenAIProvider {
 
         let mut openai_request = self.to_openai_request(request);
         openai_request.stream = Some(true);
+        // Request token usage in the final SSE chunk — required for Ollama to
+        // report non-zero counts in streaming mode.
+        openai_request.stream_options = Some(OpenAIStreamOptions { include_usage: true });
         let retry_config = RetryConfig::default();
 
         // Retry the stream connection establishment
@@ -499,64 +562,242 @@ impl Provider for OpenAIProvider {
         )
         .await?;
 
-        // Parse Server-Sent Events stream
+        // Parse Server-Sent Events stream.
+        //
+        // Tool calls arrive as *fragmented* deltas across many chunks:
+        //   chunk 1: { tool_calls: [{ index:0, id:"call_abc", type:"function", function:{name:"read_file"} }] }
+        //   chunk 2: { tool_calls: [{ index:0, function:{arguments:"{\"path\":"} }] }
+        //   chunk 3: { tool_calls: [{ index:0, function:{arguments:"\"src/main.rs\"}"} }] }
+        //   chunk N: { finish_reason: "tool_calls" }
+        //
+        // We accumulate fragments in `tool_call_builders` (indexed by tool call
+        // position) and emit all ToolUse events just before the MessageStop.
         let byte_stream = response.bytes_stream();
-        let event_stream = byte_stream.map(|chunk_result| {
-            chunk_result
-                .map_err(|e| ProviderError::StreamError(e.to_string()))
-                .map(|chunk| {
-                    let text = String::from_utf8_lossy(&chunk);
 
-                    // Parse SSE format: "data: {...}\n\n"
-                    for line in text.lines() {
-                        if let Some(json_str) = line.strip_prefix("data: ") {
-                            // Check for stream end
-                            if json_str == "[DONE]" {
-                                tracing::trace!("OpenAI stream completed with [DONE] marker");
-                                return StreamEvent::MessageStop;
-                            }
+        // Intermediate accumulator for a single tool call's fragments.
+        #[derive(Default)]
+        struct ToolCallBuilder {
+            id: String,
+            name: String,
+            arguments: String,
+        }
 
-                            // Parse JSON chunk
-                            match serde_json::from_str::<OpenAIStreamChunk>(json_str) {
-                                Ok(chunk) => {
-                                    if let Some(choice) = chunk.choices.first() {
-                                        if let Some(ref delta) = choice.delta {
-                                            if let Some(ref content) = delta.content {
-                                                if !content.is_empty() {
-                                                    return StreamEvent::ContentBlockDelta {
-                                                        index: 0,
-                                                        delta: ContentDelta::TextDelta {
-                                                            text: content.clone(),
-                                                        },
-                                                    };
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "Failed to parse OpenAI stream chunk: {}. Data: {}",
-                                        e,
-                                        json_str.chars().take(200).collect::<String>()
-                                    );
-                                }
-                            }
-                        } else if !line.trim().is_empty()
-                            && !line.starts_with("event:")
-                            && !line.starts_with("id:")
-                            && !line.starts_with("retry:")
-                        {
-                            // Log unexpected SSE line formats for debugging
-                            tracing::debug!("OpenAI: Unexpected SSE line format: {}", line);
-                        }
+        // Collect the full byte stream first so we can hold mutable state while
+        // processing.  Tool call JSON is fragmented across many SSE chunks and must
+        // be fully assembled before it can be parsed.
+        let mut tool_call_builders: Vec<ToolCallBuilder> = Vec::new();
+        let mut events: Vec<StreamEvent> = Vec::new();
+        let mut raw_bytes = Vec::<u8>::new();
+
+        {
+            use futures::StreamExt as _;
+            let mut bs = byte_stream;
+            while let Some(chunk_result) = bs.next().await {
+                match chunk_result {
+                    Ok(chunk) => raw_bytes.extend_from_slice(&chunk),
+                    Err(e) => {
+                        return Err(ProviderError::StreamError(e.to_string()));
+                    }
+                }
+            }
+        }
+
+        let text = String::from_utf8_lossy(&raw_bytes);
+        let mut finish_reason: Option<String> = None;
+        // Captured from the first SSE chunk for MessageStart.
+        let mut message_id: Option<String> = None;
+        let mut stream_model: Option<String> = None;
+        // Captured from the final SSE chunk when stream_options.include_usage is true.
+        let mut stream_usage: Option<OpenAIUsage> = None;
+        // Whether a text ContentBlock (index 0) has been opened via ContentBlockStart.
+        let mut text_block_started = false;
+
+        for line in text.lines() {
+            let Some(json_str) = line.strip_prefix("data: ") else {
+                if !line.trim().is_empty()
+                    && !line.starts_with("event:")
+                    && !line.starts_with("id:")
+                    && !line.starts_with("retry:")
+                {
+                    tracing::debug!("OpenAI: Unexpected SSE line format: {}", line);
+                }
+                continue;
+            };
+
+            if json_str == "[DONE]" {
+                tracing::trace!("OpenAI stream completed with [DONE] marker");
+                break;
+            }
+
+            match serde_json::from_str::<OpenAIStreamChunk>(json_str) {
+                Ok(chunk) => {
+                    // Capture id and model from the first chunk for MessageStart.
+                    if message_id.is_none() {
+                        message_id = Some(chunk.id.clone());
+                        stream_model = chunk.model.clone();
+                    }
+                    // Capture usage from the final chunk (stream_options.include_usage).
+                    if chunk.usage.is_some() {
+                        stream_usage = chunk.usage;
                     }
 
-                    // Skip non-data lines
-                    StreamEvent::Ping
-                })
-        });
+                    if let Some(choice) = chunk.choices.first() {
+                        // Capture finish_reason for the final flush decision.
+                        if let Some(ref reason) = choice.finish_reason {
+                            if !reason.is_empty() {
+                                finish_reason = Some(reason.clone());
+                            }
+                        }
 
+                        if let Some(ref delta) = choice.delta {
+                            // --- text content ---
+                            if let Some(ref content) = delta.content {
+                                if !content.is_empty() {
+                                    // Open the text block on the first non-empty delta.
+                                    if !text_block_started {
+                                        text_block_started = true;
+                                        events.push(StreamEvent::ContentBlockStart {
+                                            index: 0,
+                                            content_block: ContentBlock::Text {
+                                                text: String::new(),
+                                            },
+                                        });
+                                    }
+                                    events.push(StreamEvent::ContentBlockDelta {
+                                        index: 0,
+                                        delta: ContentDelta::TextDelta {
+                                            text: content.clone(),
+                                        },
+                                    });
+                                }
+                            }
+
+                            // --- tool call fragments ---
+                            for tc_delta in &delta.tool_calls {
+                                let idx = tc_delta.index;
+
+                                // Grow the builder vec as needed.
+                                if idx >= tool_call_builders.len() {
+                                    tool_call_builders.resize_with(idx + 1, Default::default);
+                                }
+                                let builder = &mut tool_call_builders[idx];
+
+                                if let Some(ref id) = tc_delta.id {
+                                    builder.id.clone_from(id);
+                                }
+                                if let Some(ref func) = tc_delta.function {
+                                    if let Some(ref name) = func.name {
+                                        builder.name.clone_from(name);
+                                    }
+                                    if let Some(ref args) = func.arguments {
+                                        builder.arguments.push_str(args);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to parse OpenAI stream chunk: {}. Data: {}",
+                        e,
+                        json_str.chars().take(200).collect::<String>()
+                    );
+                }
+            }
+        }
+
+        // Prepend MessageStart as the required first event in the stream.
+        // Use id/model captured from the first SSE chunk; fall back to request values.
+        events.insert(
+            0,
+            StreamEvent::MessageStart {
+                message: StreamMessage {
+                    id: message_id.unwrap_or_else(|| "unknown".to_string()),
+                    model: stream_model.unwrap_or_else(|| model.clone()),
+                    role: Role::Assistant,
+                    usage: TokenUsage {
+                        input_tokens: 0,
+                        output_tokens: 0,
+                    },
+                },
+            },
+        );
+
+        // Close the text block before emitting any tool call blocks.
+        if text_block_started {
+            events.push(StreamEvent::ContentBlockStop { index: 0 });
+        }
+
+        // Flush accumulated tool calls as ToolUse events before MessageStop.
+        if !tool_call_builders.is_empty() {
+            tracing::debug!(
+                "OpenAI stream: flushing {} tool call(s) accumulated from deltas",
+                tool_call_builders.len()
+            );
+            // Block indices start at 1 when a text block was opened at index 0,
+            // or at 0 when the response contains only tool calls.
+            let base_index: usize = if text_block_started { 1 } else { 0 };
+            for (i, builder) in tool_call_builders.into_iter().enumerate() {
+                // Skip incomplete tool calls produced by truncated/malformed responses.
+                if builder.id.is_empty() || builder.name.is_empty() {
+                    tracing::warn!(
+                        "Skipping incomplete streamed tool call at index {}: id='{}', name='{}'",
+                        i,
+                        builder.id,
+                        builder.name
+                    );
+                    continue;
+                }
+                let input = serde_json::from_str(&builder.arguments).unwrap_or_else(|e| {
+                    tracing::warn!(
+                        "Failed to parse streamed tool arguments for '{}': {}",
+                        builder.name,
+                        e
+                    );
+                    serde_json::json!({})
+                });
+                let block_index = base_index + i;
+                events.push(StreamEvent::ContentBlockStart {
+                    index: block_index,
+                    content_block: ContentBlock::ToolUse {
+                        id: builder.id,
+                        name: builder.name,
+                        input,
+                    },
+                });
+                events.push(StreamEvent::ContentBlockStop { index: block_index });
+            }
+        }
+
+        // Emit stop reason via MessageDelta then the terminal MessageStop.
+        let stop_reason = finish_reason.as_deref().and_then(|r| match r {
+            "tool_calls" | "function_call" => Some(StopReason::ToolUse),
+            "length" => Some(StopReason::MaxTokens),
+            "stop" => Some(StopReason::EndTurn),
+            _ => None,
+        });
+        if stop_reason.is_some() {
+            events.push(StreamEvent::MessageDelta {
+                delta: MessageDelta {
+                    stop_reason,
+                    stop_sequence: None,
+                },
+                usage: TokenUsage {
+                    input_tokens: stream_usage
+                        .as_ref()
+                        .map(|u| u.prompt_tokens)
+                        .unwrap_or(0),
+                    output_tokens: stream_usage
+                        .as_ref()
+                        .map(|u| u.completion_tokens)
+                        .unwrap_or(0),
+                },
+            });
+        }
+        events.push(StreamEvent::MessageStop);
+
+        let event_stream = futures::stream::iter(events.into_iter().map(Ok::<_, ProviderError>));
         Ok(Box::pin(event_stream))
     }
 
@@ -569,8 +810,30 @@ impl Provider for OpenAIProvider {
     }
 
     fn supports_vision(&self) -> bool {
-        // Only GPT-4 Vision models support vision
-        false
+        // Detect common vision-capable model names served through Ollama and
+        // other OpenAI-compatible backends.  The check is intentionally broad
+        // (substring match, case-insensitive) to handle tag variants like
+        // "llava:13b", "llama3.2-vision:11b-instruct-fp16", etc.
+        let model_lc = self
+            .custom_default_model
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
+        let vision_patterns = [
+            "llava",
+            "vision",
+            "minicpm-v",
+            "bakllava",
+            "moondream",
+            "cogvlm",
+            "qwen-vl",
+            "qwenvl",
+            "internvl",
+            "phi-3-vision",
+            "phi3-vision",
+            "idefics",
+        ];
+        vision_patterns.iter().any(|p| model_lc.contains(p))
     }
 
     fn name(&self) -> &str {
@@ -600,7 +863,11 @@ impl Provider for OpenAIProvider {
             "gpt-4-32k" => Some(32_768),
             "gpt-3.5-turbo" => Some(4_096),
             "gpt-3.5-turbo-16k" => Some(16_384),
-            _ => None,
+            // Return a conservative default for unknown models (e.g. Ollama-hosted models
+            // like "llama3.2", "qwen2.5-coder:7b", etc.).  Most current local models
+            // support at least 8 K tokens; without this, service.rs falls back to 4 096
+            // and aggressively truncates conversation context.
+            _ => Some(8_192),
         }
     }
 
@@ -632,12 +899,49 @@ struct OpenAIRequest {
     messages: Vec<OpenAIMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
+    /// Nucleus sampling (0.0–1.0). Use instead of temperature, not alongside.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    top_p: Option<f32>,
+    /// Random seed for reproducible outputs (Ollama + OpenAI).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seed: Option<u64>,
+    /// Stop sequences — generation halts at first match.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stop: Option<Vec<String>>,
+    /// Penalises already-seen tokens (−2.0..2.0); reduces repetition.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    frequency_penalty: Option<f32>,
+    /// Penalises tokens that have appeared at all (−2.0..2.0).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    presence_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stream: Option<bool>,
+    /// When streaming, request token usage in the final SSE chunk.
+    /// Required for Ollama — without this, streaming responses never include usage.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream_options: Option<OpenAIStreamOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tools: Option<Vec<OpenAITool>>,
+    /// Set to "auto" whenever tools are present so local models (e.g. Ollama)
+    /// reliably call tools instead of responding with plain text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_choice: Option<String>,
+    /// Maps from ThinkingConfig to Ollama/OpenAI reasoning_effort levels.
+    /// Enables reasoning traces for thinking models (DeepSeek-R1, Qwen3, etc.).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_effort: Option<String>,
+    /// JSON mode or structured output schema (OpenAI `response_format`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    response_format: Option<serde_json::Value>,
+}
+
+/// Controls streaming behaviour extras sent alongside `"stream": true`.
+#[derive(Debug, Clone, Serialize)]
+struct OpenAIStreamOptions {
+    /// When true, the final SSE chunk includes a `usage` object with token counts.
+    include_usage: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -649,6 +953,9 @@ struct OpenAIMessage {
     tool_calls: Option<Vec<OpenAIToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
+    /// Reasoning trace returned by some models (e.g. DeepSeek-R1 via its own API).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reasoning_content: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -682,7 +989,9 @@ struct OpenAIResponse {
     id: String,
     model: String,
     choices: Vec<OpenAIChoice>,
-    usage: OpenAIUsage,
+    // Ollama and some other local backends omit `usage` in certain responses.
+    #[serde(default)]
+    usage: Option<OpenAIUsage>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -703,7 +1012,13 @@ struct OpenAIUsage {
 #[allow(dead_code)]
 struct OpenAIStreamChunk {
     id: String,
+    /// Some providers omit `model` from streaming chunks.
+    #[serde(default)]
+    model: Option<String>,
     choices: Vec<OpenAIStreamChoice>,
+    /// Present in the final chunk when `stream_options.include_usage` is true.
+    #[serde(default)]
+    usage: Option<OpenAIUsage>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -719,6 +1034,34 @@ struct OpenAIStreamChoice {
 struct OpenAIMessageDelta {
     role: Option<String>,
     content: Option<String>,
+    // Tool call deltas arrive as partial fragments across multiple SSE chunks.
+    // Each entry may only carry `index`, `id`, `type`, or `function.{name,arguments}`.
+    #[serde(default)]
+    tool_calls: Vec<OpenAIToolCallDelta>,
+}
+
+/// A single streamed fragment of a tool call.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[allow(dead_code)]
+struct OpenAIToolCallDelta {
+    /// Position in the tool_calls array (used to merge fragments).
+    index: usize,
+    /// Present only in the first chunk for this tool call.
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(rename = "type", default)]
+    call_type: Option<String>,
+    #[serde(default)]
+    function: Option<OpenAIFunctionDelta>,
+}
+
+/// Streamed function name/arguments fragment.
+#[derive(Debug, Clone, Deserialize, Default)]
+struct OpenAIFunctionDelta {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    arguments: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -767,7 +1110,71 @@ mod tests {
             provider.context_window("gpt-4-turbo-preview"),
             Some(128_000)
         );
-        assert_eq!(provider.context_window("unknown"), None);
+        // Unknown models (e.g. Ollama-hosted) get a conservative 8 K default
+        // instead of None so service.rs does not hard-cap context at 4 096.
+        assert_eq!(provider.context_window("unknown"), Some(8_192));
+        assert_eq!(provider.context_window("llama3.2"), Some(8_192));
+    }
+
+    #[test]
+    fn test_supports_vision_detection() {
+        let provider_llava =
+            OpenAIProvider::local("http://localhost:11434/v1/chat/completions".to_string())
+                .with_default_model("llava:13b".to_string());
+        assert!(provider_llava.supports_vision());
+
+        let provider_vision =
+            OpenAIProvider::local("http://localhost:11434/v1/chat/completions".to_string())
+                .with_default_model("llama3.2-vision:11b".to_string());
+        assert!(provider_vision.supports_vision());
+
+        let provider_plain =
+            OpenAIProvider::local("http://localhost:11434/v1/chat/completions".to_string())
+                .with_default_model("llama3.2:8b".to_string());
+        assert!(!provider_plain.supports_vision());
+
+        let provider_gpt4 = OpenAIProvider::new("test-key".to_string());
+        assert!(!provider_gpt4.supports_vision()); // no default model set
+    }
+
+    #[test]
+    fn test_llm_request_new_fields() {
+        use crate::llm::provider::types::{LLMRequest, Message};
+        let req = LLMRequest::new("llama3.2", vec![Message::user("hi")])
+            .with_top_p(0.9)
+            .with_seed(42)
+            .with_stop(vec!["</s>".to_string()])
+            .with_frequency_penalty(0.5)
+            .with_presence_penalty(0.3)
+            .with_response_format(serde_json::json!({"type": "json_object"}));
+
+        assert_eq!(req.top_p, Some(0.9));
+        assert_eq!(req.seed, Some(42));
+        assert_eq!(req.stop, Some(vec!["</s>".to_string()]));
+        assert_eq!(req.frequency_penalty, Some(0.5));
+        assert_eq!(req.presence_penalty, Some(0.3));
+        assert!(req.response_format.is_some());
+    }
+
+    #[test]
+    fn test_new_fields_forwarded_to_openai_request() {
+        use crate::llm::provider::types::{LLMRequest, Message};
+        let provider = OpenAIProvider::new("test-key".to_string());
+        let req = LLMRequest::new("gpt-4", vec![Message::user("hi")])
+            .with_top_p(0.8)
+            .with_seed(99)
+            .with_stop(vec!["STOP".to_string()])
+            .with_frequency_penalty(0.2)
+            .with_presence_penalty(0.1)
+            .with_response_format(serde_json::json!({"type": "json_object"}));
+
+        let openai_req = provider.to_openai_request(req);
+        assert_eq!(openai_req.top_p, Some(0.8));
+        assert_eq!(openai_req.seed, Some(99));
+        assert_eq!(openai_req.stop, Some(vec!["STOP".to_string()]));
+        assert_eq!(openai_req.frequency_penalty, Some(0.2));
+        assert_eq!(openai_req.presence_penalty, Some(0.1));
+        assert!(openai_req.response_format.is_some());
     }
 
     #[test]

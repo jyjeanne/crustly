@@ -7,16 +7,19 @@ use super::context::AgentContext;
 use super::error::{AgentError, Result};
 use crate::llm::provider::router::ModelRouter;
 use crate::llm::provider::{
-    ContentBlock, LLMRequest, LLMResponse, Message, Provider, ProviderStream, StopReason,
+    ContentBlock, ContentDelta, LLMRequest, LLMResponse, Message, Provider, ProviderStream,
+    StopReason, StreamEvent, TokenUsage,
 };
 use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
 use crate::llm::tools::{ToolExecutionContext, ToolRegistry};
 use crate::services::{MessageService, ServiceContext, SessionService};
 use futures::future::join_all;
+use futures::StreamExt as _;
 use serde_json::Value;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use uuid::Uuid;
 
 /// Returns true for read-only, idempotent tools that can run concurrently.
@@ -88,6 +91,173 @@ pub struct AgentService {
 
     /// SQLite pool for compaction writes (T032)
     pool: Option<Arc<sqlx::SqlitePool>>,
+}
+
+/// Route a streaming `TextDelta` through `<think>` tag detection.
+///
+/// Text outside `<think>` blocks is appended to `text_buf` and forwarded via
+/// `chunk_tx` for live TUI rendering. Text inside `<think>` blocks is
+/// accumulated in `thinking_buf` and suppressed from `chunk_tx`, so the user
+/// never sees raw reasoning tags during streaming.
+///
+/// `in_think` carries state between calls (tag may span multiple deltas).
+fn route_text_delta(
+    input: &str,
+    in_think: &mut bool,
+    text_buf: &mut String,
+    thinking_buf: &mut String,
+    chunk_tx: Option<&mpsc::UnboundedSender<String>>,
+) {
+    const OPEN: &str = "<think>";
+    const CLOSE: &str = "</think>";
+
+    let mut remaining = input;
+    loop {
+        if *in_think {
+            if let Some(pos) = remaining.find(CLOSE) {
+                thinking_buf.push_str(&remaining[..pos]);
+                remaining = &remaining[pos + CLOSE.len()..];
+                *in_think = false;
+            } else {
+                // Rest of delta is thinking content.
+                thinking_buf.push_str(remaining);
+                break;
+            }
+        } else {
+            if let Some(pos) = remaining.find(OPEN) {
+                let before = &remaining[..pos];
+                if !before.is_empty() {
+                    text_buf.push_str(before);
+                    if let Some(tx) = chunk_tx {
+                        let _ = tx.send(before.to_string());
+                    }
+                }
+                remaining = &remaining[pos + OPEN.len()..];
+                *in_think = true;
+            } else {
+                // No more tags — forward remaining text.
+                if !remaining.is_empty() {
+                    text_buf.push_str(remaining);
+                    if let Some(tx) = chunk_tx {
+                        let _ = tx.send(remaining.to_string());
+                    }
+                }
+                break;
+            }
+        }
+    }
+}
+
+/// Consume a [`ProviderStream`] and assemble a complete [`LLMResponse`].
+///
+/// While consuming the stream, text deltas are optionally forwarded to
+/// `chunk_tx` so the TUI can render partial output in real time. Text inside
+/// `<think>…</think>` blocks is routed to the thinking buffer and suppressed
+/// from `chunk_tx`.
+async fn drain_stream_to_response(
+    stream: ProviderStream,
+    chunk_tx: Option<&mpsc::UnboundedSender<String>>,
+    model_name: &str,
+) -> crate::llm::provider::Result<LLMResponse> {
+    use crate::llm::provider::ProviderError;
+
+    let mut response_id = format!("stream-{}", Uuid::new_v4());
+    let mut text_buf = String::new();
+    let mut thinking_buf = String::new();
+    let mut tool_uses: Vec<ContentBlock> = Vec::new();
+    let mut stop_reason: Option<StopReason> = None;
+    let mut usage = TokenUsage { input_tokens: 0, output_tokens: 0 };
+
+    // A ToolUse block assembled from ContentBlockStart + ContentBlockStop.
+    let mut pending_tool: Option<ContentBlock> = None;
+
+    // Tracks whether we are currently inside a `<think>…</think>` block while
+    // routing TextDelta events from tag-based reasoning models (e.g. Ollama
+    // DeepSeek-R1, QwQ-32B).
+    let mut in_think_block = false;
+
+    futures::pin_mut!(stream);
+    while let Some(event_result) = stream.next().await {
+        match event_result? {
+            StreamEvent::MessageStart { message } => {
+                response_id = message.id.clone();
+            }
+            StreamEvent::ContentBlockStart { content_block, .. } => {
+                if matches!(content_block, ContentBlock::ToolUse { .. }) {
+                    pending_tool = Some(content_block);
+                }
+            }
+            StreamEvent::ContentBlockStop { .. } => {
+                if let Some(tool) = pending_tool.take() {
+                    tool_uses.push(tool);
+                }
+            }
+            StreamEvent::ContentBlockDelta { delta, .. } => match delta {
+                ContentDelta::TextDelta { ref text } if !text.is_empty() => {
+                    // Route through <think> tag detector: thinking content is
+                    // suppressed from chunk_tx, visible text is forwarded.
+                    route_text_delta(
+                        text,
+                        &mut in_think_block,
+                        &mut text_buf,
+                        &mut thinking_buf,
+                        chunk_tx,
+                    );
+                }
+                ContentDelta::ThinkingDelta { ref thinking } if !thinking.is_empty() => {
+                    thinking_buf.push_str(thinking);
+                }
+                _ => {}
+            },
+            StreamEvent::MessageDelta { delta, usage: u } => {
+                stop_reason = delta.stop_reason;
+                usage = u;
+            }
+            StreamEvent::MessageStop => break,
+            // Propagate provider-emitted error events as hard errors.
+            StreamEvent::Error { error } => {
+                return Err(ProviderError::StreamError(error));
+            }
+            StreamEvent::Ping => {}
+        }
+    }
+
+    // Flush any tool use block that arrived without a matching ContentBlockStop
+    // (e.g. stream truncated or provider omitted the stop event).
+    if let Some(tool) = pending_tool.take() {
+        tool_uses.push(tool);
+    }
+
+    // Fallback: if `route_text_delta` did not extract any thinking (no <think>
+    // tags seen during streaming but text contains them — e.g. non-streaming
+    // path or partial-tag boundary edge case), extract from the assembled
+    // text buffer. This is a no-op when in-stream routing already populated
+    // `thinking_buf`.
+    if thinking_buf.is_empty() && !text_buf.is_empty() {
+        let (tag_thinking, cleaned) = crate::llm::provider::extract_think_tags(&text_buf);
+        if !tag_thinking.is_empty() {
+            thinking_buf = tag_thinking;
+            text_buf = cleaned;
+        }
+    }
+
+    let mut content: Vec<ContentBlock> = Vec::new();
+    if !thinking_buf.is_empty() {
+        content.push(ContentBlock::Thinking { thinking: thinking_buf });
+    }
+    if !text_buf.is_empty() {
+        content.push(ContentBlock::Text { text: text_buf });
+    }
+    content.extend(tool_uses);
+
+    Ok(LLMResponse {
+        id: response_id,
+        model: model_name.to_string(),
+        content,
+        stop_reason,
+        usage,
+        cache_metrics: None,
+    })
 }
 
 impl AgentService {
@@ -282,13 +452,46 @@ impl AgentService {
             .await
     }
 
-    /// Send a message with automatic tool execution and explicit read-only mode control
+    /// Send a message with automatic tool execution and explicit read-only mode control.
     pub async fn send_message_with_tools_and_mode(
         &self,
         session_id: Uuid,
         user_message: String,
         model: Option<String>,
         read_only_mode: bool,
+    ) -> Result<AgentResponse> {
+        self.send_message_with_tools_inner(session_id, user_message, model, read_only_mode, None)
+            .await
+    }
+
+    /// Streaming variant — identical to [`send_message_with_tools_and_mode`] but forwards
+    /// each LLM text delta to `chunk_tx` so the TUI can render incremental output.
+    pub async fn send_message_with_tools_and_mode_streaming(
+        &self,
+        session_id: Uuid,
+        user_message: String,
+        model: Option<String>,
+        read_only_mode: bool,
+        chunk_tx: mpsc::UnboundedSender<String>,
+    ) -> Result<AgentResponse> {
+        self.send_message_with_tools_inner(
+            session_id,
+            user_message,
+            model,
+            read_only_mode,
+            Some(chunk_tx),
+        )
+        .await
+    }
+
+    /// Core implementation — `chunk_tx` is `Some` when streaming to TUI, `None` for CLI/tests.
+    async fn send_message_with_tools_inner(
+        &self,
+        session_id: Uuid,
+        user_message: String,
+        model: Option<String>,
+        read_only_mode: bool,
+        chunk_tx: Option<mpsc::UnboundedSender<String>>,
     ) -> Result<AgentResponse> {
         // Get or create session
         let session_service = SessionService::new(self.context.clone());
@@ -387,12 +590,15 @@ impl AgentService {
                 tracing::warn!("No tools registered in tool registry!");
             }
 
-            // Send to provider
-            let response = self
-                .provider
-                .complete(request)
-                .await
-                .map_err(AgentError::Provider)?;
+            // Send to provider — stream when chunk_tx is available, otherwise block.
+            let response = Self::call_provider_streaming(
+                &self.provider,
+                request,
+                chunk_tx.as_ref(),
+                &model_name,
+            )
+            .await
+            .map_err(AgentError::Provider)?;
 
             // Track token usage
             total_input_tokens += response.usage.input_tokens;
@@ -933,6 +1139,24 @@ impl AgentService {
             cost,
             model: response.model,
         })
+    }
+
+    /// Call the provider for one tool-loop iteration.
+    ///
+    /// Streams when `chunk_tx` is `Some`, forwarding text deltas to the sender.
+    /// Falls back to a blocking `complete()` call when `None` (CLI / tests).
+    async fn call_provider_streaming(
+        provider: &Arc<dyn Provider>,
+        request: LLMRequest,
+        chunk_tx: Option<&mpsc::UnboundedSender<String>>,
+        model_name: &str,
+    ) -> crate::llm::provider::Result<LLMResponse> {
+        if let Some(tx) = chunk_tx {
+            let stream = provider.stream(request.with_streaming()).await?;
+            drain_stream_to_response(stream, Some(tx), model_name).await
+        } else {
+            provider.complete(request).await
+        }
     }
 
     /// Helper to prepare message context for LLM requests
