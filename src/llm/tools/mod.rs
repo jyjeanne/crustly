@@ -30,7 +30,15 @@ pub mod http;
 pub mod plan_tool;
 pub mod task;
 
+// Tool implementations - Phase 4: Claw Code parity
+pub mod agent;
+pub mod ask_user;
+pub mod powershell;
+pub mod skill;
+pub mod todo_write;
+pub mod web_fetch;
+
 // Re-exports
 pub use error::{Result, ToolError};
-pub use r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
+pub use r#trait::{SubAgentLauncher, Tool, ToolCapability, ToolExecutionContext, ToolResult};
 pub use registry::ToolRegistry;

@@ -4,7 +4,25 @@ use super::error::Result;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
+
+/// Trait for spawning background sub-agent sessions.
+///
+/// Implementors must be `Send + Sync` so they can be stored in `Arc` and
+/// moved into tokio tasks.  The `Debug` bound keeps `ToolExecutionContext`
+/// derivable.
+#[async_trait]
+pub trait SubAgentLauncher: Send + Sync + std::fmt::Debug {
+    /// Launch a new sub-agent session with `agent_id` as its session UUID.
+    /// Returns when the sub-agent has been *submitted* (not necessarily finished).
+    async fn launch(
+        &self,
+        agent_id: Uuid,
+        description: &str,
+        prompt: &str,
+    ) -> std::result::Result<(), String>;
+}
 
 /// Execution context for tools
 #[derive(Debug, Clone)]
@@ -26,6 +44,10 @@ pub struct ToolExecutionContext {
 
     /// Whether in read-only mode (Plan mode) - restricts write operations
     pub read_only_mode: bool,
+
+    /// Optional spawner used by the Agent tool to launch sub-agent sessions.
+    /// `None` in unit tests or when the caller has not wired up a launcher.
+    pub sub_agent_launcher: Option<Arc<dyn SubAgentLauncher>>,
 }
 
 impl ToolExecutionContext {
@@ -38,6 +60,7 @@ impl ToolExecutionContext {
             auto_approve: false,
             timeout_secs: 30,
             read_only_mode: false,
+            sub_agent_launcher: None,
         }
     }
 
@@ -62,6 +85,12 @@ impl ToolExecutionContext {
     /// Set read-only mode (for Plan mode)
     pub fn with_read_only_mode(mut self, read_only: bool) -> Self {
         self.read_only_mode = read_only;
+        self
+    }
+
+    /// Set the sub-agent launcher (for Agent tool)
+    pub fn with_sub_agent_launcher(mut self, launcher: Arc<dyn SubAgentLauncher>) -> Self {
+        self.sub_agent_launcher = Some(launcher);
         self
     }
 }

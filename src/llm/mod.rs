@@ -4,6 +4,7 @@
 //! and agent services for handling conversations, tool execution, and context management.
 
 pub mod agent;
+pub mod pdf_context;
 pub mod provider;
 pub mod tools;
 

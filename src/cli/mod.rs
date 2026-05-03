@@ -506,11 +506,13 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         llm::{
             agent::AgentService,
             tools::{
-                bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
-                doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
-                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
-                read::ReadTool, registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
-                write::WriteTool,
+                agent::AgentTool, ask_user::AskUserTool, bash::BashTool,
+                code_exec::CodeExecTool, context::ContextTool, doc_parser::DocParserTool,
+                edit::EditTool, glob::GlobTool, grep::GrepTool, http::HttpClientTool,
+                ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
+                powershell::PowerShellTool, read::ReadTool, registry::ToolRegistry,
+                skill::SkillTool, task::TaskTool, todo_write::TodoWriteTool,
+                web_fetch::WebFetchTool, web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::ServiceContext,
@@ -710,6 +712,13 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(ContextTool));
     tool_registry.register(Arc::new(HttpClientTool));
     tool_registry.register(Arc::new(PlanTool));
+    // Phase 4: Claw Code parity
+    tool_registry.register(Arc::new(WebFetchTool));
+    tool_registry.register(Arc::new(TodoWriteTool));
+    tool_registry.register(Arc::new(AskUserTool));
+    tool_registry.register(Arc::new(SkillTool));
+    tool_registry.register(Arc::new(AgentTool));
+    tool_registry.register(Arc::new(PowerShellTool));
 
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
@@ -809,11 +818,13 @@ async fn cmd_run(
         llm::{
             agent::AgentService,
             tools::{
-                bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
-                doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
-                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
-                read::ReadTool, registry::ToolRegistry, task::TaskTool, web_search::WebSearchTool,
-                write::WriteTool,
+                agent::AgentTool, ask_user::AskUserTool, bash::BashTool,
+                code_exec::CodeExecTool, context::ContextTool, doc_parser::DocParserTool,
+                edit::EditTool, glob::GlobTool, grep::GrepTool, http::HttpClientTool,
+                ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
+                powershell::PowerShellTool, read::ReadTool, registry::ToolRegistry,
+                skill::SkillTool, task::TaskTool, todo_write::TodoWriteTool,
+                web_fetch::WebFetchTool, web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::{ServiceContext, SessionService},
@@ -848,6 +859,13 @@ async fn cmd_run(
     tool_registry.register(Arc::new(ContextTool));
     tool_registry.register(Arc::new(HttpClientTool));
     tool_registry.register(Arc::new(PlanTool));
+    // Phase 4: Claw Code parity
+    tool_registry.register(Arc::new(WebFetchTool));
+    tool_registry.register(Arc::new(TodoWriteTool));
+    tool_registry.register(Arc::new(AskUserTool));
+    tool_registry.register(Arc::new(SkillTool));
+    tool_registry.register(Arc::new(AgentTool));
+    tool_registry.register(Arc::new(PowerShellTool));
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());

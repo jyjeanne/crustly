@@ -91,6 +91,11 @@ pub struct AgentService {
 
     /// SQLite pool for compaction writes (T032)
     pool: Option<Arc<sqlx::SqlitePool>>,
+
+    /// Whether this service may wire a SubAgentLauncher into tool contexts.
+    /// Always false for services created by AgentServiceLauncher to prevent
+    /// recursive sub-agent spawning.
+    allow_sub_agents: bool,
 }
 
 /// Route a streaming `TextDelta` through `<think>` tag detection.
@@ -280,6 +285,7 @@ impl AgentService {
             model_router: None,
             tool_cache: Arc::new(ToolResultCache::new(ToolTtlConfig::default())),
             pool: None,
+            allow_sub_agents: true,
         }
     }
 
@@ -328,6 +334,13 @@ impl AgentService {
     /// Set the working directory for tool execution
     pub fn with_working_directory(mut self, working_directory: std::path::PathBuf) -> Self {
         self.working_directory = working_directory;
+        self
+    }
+
+    /// Control whether this service wires a SubAgentLauncher into tool contexts.
+    /// Set to false for sub-agents to prevent recursive spawning.
+    pub fn with_allow_sub_agents(mut self, allow: bool) -> Self {
+        self.allow_sub_agents = allow;
         self
     }
 
@@ -524,6 +537,13 @@ impl AgentService {
             context.system_prompt = Some(system_prompt.clone());
         }
 
+        // Auto-inject PDF content when the user message references a .pdf file
+        let user_message = crate::llm::pdf_context::augment_message_with_pdf(
+            &user_message,
+            &self.working_directory,
+        )
+        .await;
+
         // Add user message
         let user_msg = Message::user(user_message.clone());
         context.add_message(user_msg);
@@ -560,11 +580,23 @@ impl AgentService {
             model_name
         };
 
-        // Create tool execution context
-        let tool_context = ToolExecutionContext::new(session_id)
+        // Create tool execution context.
+        // Only wire a SubAgentLauncher for top-level services; sub-agents started by
+        // AgentServiceLauncher have allow_sub_agents=false to prevent recursive spawning.
+        let mut tool_context = ToolExecutionContext::new(session_id)
             .with_auto_approve(self.auto_approve_tools)
             .with_working_directory(self.working_directory.clone())
             .with_read_only_mode(read_only_mode);
+        if self.allow_sub_agents {
+            let launcher = Arc::new(AgentServiceLauncher::new(
+                self.provider.clone(),
+                self.context.clone(),
+                self.tool_registry.clone(),
+                self.working_directory.clone(),
+                self.default_system_prompt.clone(),
+            ));
+            tool_context = tool_context.with_sub_agent_launcher(launcher);
+        }
 
         // Tool execution loop
         let mut iteration = 0;
@@ -971,6 +1003,7 @@ impl AgentService {
                                     auto_approve: true, // User approved this execution
                                     timeout_secs: tool_context.timeout_secs,
                                     read_only_mode: tool_context.read_only_mode,
+                                    sub_agent_launcher: tool_context.sub_agent_launcher.clone(),
                                 };
 
                                 // Execute the tool with approved context
@@ -1200,6 +1233,13 @@ impl AgentService {
             context.system_prompt = Some(system_prompt.clone());
         }
 
+        // Auto-inject PDF content when the user message references a .pdf file
+        let user_message = crate::llm::pdf_context::augment_message_with_pdf(
+            &user_message,
+            &self.working_directory,
+        )
+        .await;
+
         // Add user message
         let user_msg = Message::user(user_message.clone());
         context.add_message(user_msg);
@@ -1300,6 +1340,88 @@ pub struct AgentStreamResponse {
 
     /// Model being used
     pub model: String,
+}
+
+/// Implements [`SubAgentLauncher`] by creating a fresh [`AgentService`] and
+/// running the sub-agent prompt in a detached Tokio task.
+///
+/// Wired into [`ToolExecutionContext`] so the `AgentTool` can fire sub-agents
+/// without depending directly on `AgentService` internals.
+pub struct AgentServiceLauncher {
+    provider: Arc<dyn Provider>,
+    context: ServiceContext,
+    tool_registry: Arc<ToolRegistry>,
+    working_directory: std::path::PathBuf,
+    system_prompt: Option<String>,
+}
+
+impl std::fmt::Debug for AgentServiceLauncher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentServiceLauncher")
+            .field("working_directory", &self.working_directory)
+            .finish_non_exhaustive()
+    }
+}
+
+impl AgentServiceLauncher {
+    pub fn new(
+        provider: Arc<dyn Provider>,
+        context: ServiceContext,
+        tool_registry: Arc<ToolRegistry>,
+        working_directory: std::path::PathBuf,
+        system_prompt: Option<String>,
+    ) -> Self {
+        Self {
+            provider,
+            context,
+            tool_registry,
+            working_directory,
+            system_prompt,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::llm::tools::SubAgentLauncher for AgentServiceLauncher {
+    async fn launch(
+        &self,
+        _agent_id: uuid::Uuid,
+        description: &str,
+        prompt: &str,
+    ) -> std::result::Result<(), String> {
+        let mut svc = AgentService::new(self.provider.clone(), self.context.clone())
+            .with_tool_registry(self.tool_registry.clone())
+            .with_working_directory(self.working_directory.clone())
+            .with_auto_approve_tools(true)
+            .with_max_tool_iterations(20)
+            .with_allow_sub_agents(false);
+
+        if let Some(sp) = &self.system_prompt {
+            svc = svc.with_system_prompt(sp.clone());
+        }
+
+        let prompt = prompt.to_string();
+        let description = description.to_string();
+        let context = self.context.clone();
+        tokio::spawn(async move {
+            let session_svc = crate::services::SessionService::new(context);
+            let session = match session_svc
+                .create_session(Some(format!("sub-agent: {description}")))
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!(%description, error = %e, "Sub-agent failed to create session");
+                    return;
+                }
+            };
+            if let Err(e) = svc.send_message_with_tools(session.id, prompt, None).await {
+                tracing::warn!(%description, error = %e, "Sub-agent failed");
+            }
+        });
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
