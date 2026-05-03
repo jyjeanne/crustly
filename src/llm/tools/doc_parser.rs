@@ -332,17 +332,15 @@ impl DocParserTool {
                         text.push('\n');
                     }
                 }
-                Ok(quick_xml::events::Event::Text(e)) => {
-                    if in_text {
-                        if let Ok(t) = e.unescape() {
-                            text.push_str(&t);
-                        }
+                Ok(quick_xml::events::Event::Text(e)) if in_text => {
+                    if let Ok(t) = e.unescape() {
+                        text.push_str(&t);
                     }
                 }
-                Ok(quick_xml::events::Event::End(ref e)) => {
-                    if e.name().as_ref() == b"w:t" {
-                        in_text = false;
-                    }
+                Ok(quick_xml::events::Event::End(ref e))
+                    if e.name().as_ref() == b"w:t" =>
+                {
+                    in_text = false;
                 }
                 Ok(quick_xml::events::Event::Eof) => break,
                 Err(_) => break,
