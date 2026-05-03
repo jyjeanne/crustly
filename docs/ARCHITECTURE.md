@@ -15,7 +15,7 @@
 
 Crustly is a high-performance terminal AI assistant built in Rust, featuring:
 - **Multi-LLM Support**: Anthropic, OpenAI, and local LLMs
-- **Extensible Tool System**: 14 tools for file operations, code execution, and workflows
+- **Extensible Tool System**: 21 tools for file operations, code execution, agent delegation, and workflows
 - **Interactive TUI**: Ratatui-based terminal interface with plan mode
 - **Local-First Storage**: SQLite database for privacy and persistence
 - **Intelligent Prompt Analysis**: Automatic tool hint detection
@@ -70,20 +70,22 @@ Crustly is a high-performance terminal AI assistant built in Rust, featuring:
 │                       PROVIDER LAYER                            │
 ├─────────────────────────────────────────────────────────────────┤
 │   Provider Trait              │       Tool Registry              │
-│   ├─ AnthropicProvider        │       ├─ ReadTool (read_file)   │
-│   ├─ OpenAIProvider           │       ├─ WriteTool (write_file) │
-│   ├─ GeminiProvider           │       ├─ EditTool (edit_file)   │
-│   ├─ BedrockProvider          │       ├─ BashTool (bash)        │
-│   ├─ AzureProvider            │       ├─ GlobTool (glob)        │
-│   └─ VertexAIProvider         │       ├─ GrepTool (grep)        │
-│                               │       ├─ LsTool (ls)            │
-│                               │       ├─ WebSearchTool          │
-│                               │       ├─ CodeExecTool           │
-│                               │       ├─ NotebookEditTool       │
-│                               │       ├─ PlanTool               │
-│                               │       ├─ TaskTool               │
+│   ├─ AnthropicProvider        │       ├─ ReadTool / WriteTool   │
+│   ├─ OpenAIProvider           │       ├─ EditTool / BashTool    │
+│   ├─ GeminiProvider           │       ├─ GlobTool / GrepTool    │
+│   ├─ BedrockProvider          │       ├─ LsTool / WebSearchTool │
+│   ├─ AzureProvider            │       ├─ CodeExecTool           │
+│   └─ VertexAIProvider         │       ├─ NotebookEditTool       │
+│                               │       ├─ DocParserTool          │
+│                               │       ├─ PlanTool / TaskTool    │
 │                               │       ├─ ContextTool            │
-│                               │       └─ HttpClientTool         │
+│                               │       ├─ HttpClientTool         │
+│                               │       ├─ WebFetchTool           │
+│                               │       ├─ TodoWriteTool          │
+│                               │       ├─ AskUserTool            │
+│                               │       ├─ SkillTool              │
+│                               │       ├─ AgentTool              │
+│                               │       └─ PowerShellTool         │
 └─────────────────────┬────────┴──────────┬───────────────────────┘
                       │                   │
                       ▼                   ▼
@@ -175,7 +177,7 @@ src/
 │   │   ├── trait.rs       # Tool trait definition
 │   │   ├── registry.rs    # ToolRegistry
 │   │   ├── error.rs       # Tool errors
-│   │   └── [14 tool implementations...]
+│   │   └── [21 tool implementations...]
 │   └── prompt/            # Prompt formatting
 │       └── mod.rs
 │
@@ -235,7 +237,7 @@ main.rs
                  │    │    ├─► AnthropicProvider
                  │    │    └─► OpenAIProvider
                  │    ├─► ToolRegistry
-                 │    │    └─► Tool (trait) x 14
+                 │    │    └─► Tool (trait) x 21
                  │    └─► ServiceContext
                  │         └─► Database::pool()
                  ├─► SessionService
@@ -818,7 +820,7 @@ pub enum ToolCapability {
 }
 ```
 
-### 5.3 All 14 Tools
+### 5.3 All 21 Tools
 
 | # | Tool Name | File | Capabilities | Approval | Description |
 |---|-----------|------|--------------|----------|-------------|
@@ -832,10 +834,17 @@ pub enum ToolCapability {
 | 8 | `web_search` | web_search.rs | Network | No | Internet search (DuckDuckGo) |
 | 9 | `execute_code` | code_exec.rs | ExecuteShell, SystemMod | **Yes** | Run Python/JS/Rust/Shell code |
 | 10 | `notebook_edit` | notebook.rs | WriteFiles, SystemMod | **Yes** | Edit Jupyter notebooks |
-| 11 | `task` | task.rs | PlanManagement | No | Task tracking and management |
-| 12 | `context` | context.rs | PlanManagement | No | Session context/variables |
-| 13 | `http_request` | http.rs | Network | No | Make HTTP API requests |
-| 14 | `plan` | plan_tool.rs | PlanManagement | No | Create and manage structured plans |
+| 11 | `parse_document` | doc_parser.rs | ReadFiles | No | Extract text from PDF/DOCX documents |
+| 12 | `task` | task.rs | PlanManagement | No | Task tracking and management |
+| 13 | `context` | context.rs | PlanManagement | No | Session context/variables |
+| 14 | `http_request` | http.rs | Network | No | Make HTTP API requests |
+| 15 | `plan` | plan_tool.rs | PlanManagement | No | Create and manage structured plans |
+| 16 | `web_fetch` | web_fetch.rs | Network | No | Fetch a URL and extract readable text |
+| 17 | `todo_write` | todo_write.rs | WriteFiles | No | Read/write persistent todo lists |
+| 18 | `ask_user` | ask_user.rs | — | No | Pause execution and ask the user a question |
+| 19 | `skill` | skill.rs | ReadFiles | No | Load a named skill (slash command) from SKILL.md |
+| 20 | `agent` | agent.rs | WriteFiles | No | Spawn a background sub-agent for a focused task |
+| 21 | `powershell` | powershell.rs | ExecuteShell, SystemMod, Network | **Yes** | Execute PowerShell (pwsh / powershell.exe) commands |
 
 ### 5.4 Tool Execution Context
 
@@ -846,9 +855,12 @@ pub struct ToolExecutionContext {
     pub env_vars: HashMap<String, String>,
     pub auto_approve: bool,
     pub timeout_secs: u64,
-    pub read_only_mode: bool,  // Plan mode restriction
+    pub read_only_mode: bool,                          // Plan mode restriction
+    pub sub_agent_launcher: Option<Arc<dyn SubAgentLauncher>>, // Injected by AgentService
 }
 ```
+
+`SubAgentLauncher` is a trait injected into the context by `AgentService`. `AgentTool` depends on it to spawn sub-agents without knowing `AgentService` internals. Sub-agents created via the launcher have `allow_sub_agents: false` to prevent infinite recursion.
 
 **Read-Only Mode Restrictions:**
 
@@ -857,7 +869,9 @@ When `read_only_mode = true`:
 - ❌ `edit_file`: Blocked
 - ❌ `execute_code`: Blocked
 - ❌ `notebook_edit`: Blocked
+- ❌ `agent`: Blocked (cannot spawn sub-agents in plan mode)
 - ⚠️ `bash`: Filters unsafe commands (>, >>, | tee, rm, mv, etc.)
+- ⚠️ `powershell`: Allowlist of safe cmdlets (Get-Content, Select-String, etc.); blocks redirection, Remove-Item, Invoke-Expression, etc.
 - ✅ All other tools: Normal operation
 
 ### 5.5 ToolRegistry
@@ -898,12 +912,21 @@ tool_registry.register(Arc::new(GrepTool));
 tool_registry.register(Arc::new(WebSearchTool));
 tool_registry.register(Arc::new(CodeExecTool));
 tool_registry.register(Arc::new(NotebookEditTool));
+tool_registry.register(Arc::new(DocParserTool));
 
 // Phase 3: Workflow & integration
 tool_registry.register(Arc::new(TaskTool));
 tool_registry.register(Arc::new(ContextTool));
 tool_registry.register(Arc::new(HttpClientTool));
 tool_registry.register(Arc::new(PlanTool));
+
+// Phase 4: Claw Code parity
+tool_registry.register(Arc::new(WebFetchTool));
+tool_registry.register(Arc::new(TodoWriteTool));
+tool_registry.register(Arc::new(AskUserTool));
+tool_registry.register(Arc::new(SkillTool));
+tool_registry.register(Arc::new(AgentTool));
+tool_registry.register(Arc::new(PowerShellTool));
 ```
 
 ---
@@ -1460,7 +1483,7 @@ Dependencies: 652 crates
 
 ---
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Last Updated:** May 2026
 **Author:** Jeremy JEANNE
 **License:** FSL-1.1-MIT

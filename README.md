@@ -47,7 +47,7 @@
 
 | Feature | Description | Benefit |
 |---------|-------------|---------|
-| 🔧 **Built-in Tools** | Read/Write files, Execute commands | Direct code manipulation from chat |
+| 🔧 **Built-in Tools** | 21 tools: files, shell, web, agents, skills | Direct code manipulation from chat |
 | 🔒 **Interactive Approval** | Permission dialogs for dangerous operations | Full control over what AI can do |
 | 🎨 **Syntax Highlighting** | 100+ languages with line numbers | Beautiful code display in terminal |
 | 🏠 **Local LLM Support** | Run with LM Studio/Ollama | 100% private, $0 cost, offline |
@@ -97,6 +97,21 @@ Crustly: [creates comprehensive docs]
 ---
 
 ## ✨ What's New
+
+### Phase 4 Tools — Claw Code Parity (v0.4.1)
+
+Six new tools bring Crustly to full feature parity with Claw Code's tool set:
+
+| Tool | Description |
+|------|-------------|
+| `web_fetch` | Fetch a URL and extract readable text (strips scripts/styles, converts HTML to plain text) |
+| `todo_write` | Persistent todo list — read or write a structured task list stored in `.crustly/todos.json` |
+| `ask_user` | Pause agent execution and ask the user a clarifying question before continuing |
+| `skill` | Load a named slash command from `SKILL.md` files (project-local `.crustly/skills/` or user-global `~/.claude/skills/`) |
+| `agent` | Spawn a background sub-agent for a focused task; writes output to `.crustly/agents/<id>.md` |
+| `powershell` | Execute PowerShell (`pwsh` / `powershell.exe`) commands with background execution, read-only mode guards, and cmdlet allowlisting |
+
+Sub-agents are recursion-safe: agents spawned by `AgentTool` cannot themselves spawn further sub-agents.
 
 ### Real-time Streaming TUI
 LLM responses now render **token-by-token** as they arrive. A live `[streaming]` label appears while the model is generating; the final message — complete with thinking block and syntax highlighting — replaces it when the stream ends. For models that embed reasoning inside `<think>` tags (DeepSeek-R1, QwQ-32B via Ollama), thinking content is **filtered from the live view** so the user only ever sees clean visible text during generation.
