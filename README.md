@@ -55,7 +55,8 @@
 | 🧠 **Session Context** | Persistent conversation memory | Maintains project context |
 | ⌨️ **Terminal Native** | Fast keyboard shortcuts | No context switching |
 | 💰 **Cost Tracking** | Per-message token & cost | Budget control |
-| 🌊 **Streaming** | Real-time response generation | See code as it's written |
+| 🌊 **Streaming** | Real-time token-by-token rendering | See code as it's written |
+| 🧠 **Reasoning Display** | DeepSeek-R1 / QwQ-32B thinking blocks | Understand AI reasoning, press `t` to expand |
 
 ### 🚀 **Quick Example**
 
@@ -97,11 +98,22 @@ Crustly: [creates comprehensive docs]
 
 ## ✨ What's New
 
+### Real-time Streaming TUI
+LLM responses now render **token-by-token** as they arrive. A live `[streaming]` label appears while the model is generating; the final message — complete with thinking block and syntax highlighting — replaces it when the stream ends. For models that embed reasoning inside `<think>` tags (DeepSeek-R1, QwQ-32B via Ollama), thinking content is **filtered from the live view** so the user only ever sees clean visible text during generation.
+
+### Reasoning Display
+Extended thinking is now a first-class citizen in the TUI. Crustly surfaces reasoning content from three sources:
+
+| Source | How |
+|--------|-----|
+| **Anthropic extended thinking** | `ThinkingDelta` events in the stream |
+| **DeepSeek-R1 direct API** | `reasoning_content` field in the response |
+| **Ollama reasoning models** (DeepSeek-R1, QwQ-32B) | `<think>…</think>` tag extraction |
+
+Press **`t`** on any assistant message to expand or collapse the `[Thinking ▸]` panel. The panel is collapsed by default to keep the chat clean.
+
 ### Context Compaction
 When the conversation window reaches **80% capacity**, Crustly automatically compacts the context: older turns are summarised, the last 10 turns are preserved verbatim, and a `CompactionRecord` is written to SQLite before any context is modified — so a failed compaction leaves the session untouched.
-
-### Extended Thinking UI
-Claude's extended reasoning (thinking blocks) now surfaces inside the TUI. Press **`t`** to toggle the thinking panel for any assistant message — collapsed by default to keep the chat clean.
 
 ### Smart Model Routing
 Crustly automatically picks the right model tier based on what you're asking:

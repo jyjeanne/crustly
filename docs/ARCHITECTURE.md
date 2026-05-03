@@ -28,6 +28,8 @@ Crustly is a high-performance terminal AI assistant built in Rust, featuring:
 2. [Module Architecture](#2-module-architecture)
 3. [Core Components](#3-core-components)
 4. [Data Flow](#4-data-flow)
+   - [4.4 Streaming Architecture](#44-streaming-architecture)
+   - [4.5 Reasoning / Thinking Display](#45-reasoning--thinking-display)
 5. [Tool System](#5-tool-system)
 6. [Database Layer](#6-database-layer)
 7. [Service Layer](#7-service-layer)
@@ -269,8 +271,8 @@ pub struct AgentService {
 |--------|---------|
 | `send_message()` | Simple message without tools |
 | `send_message_with_tools()` | Message with tool execution |
-| `send_message_with_tools_and_mode()` | With read-only mode support |
-| `send_message_streaming()` | Streaming response support |
+| `send_message_with_tools_and_mode()` | With read-only mode support (non-streaming) |
+| `send_message_with_tools_and_mode_streaming()` | Streaming variant — forwards text chunks via `UnboundedSender<String>` |
 
 **Tool Execution Loop:**
 
@@ -366,7 +368,11 @@ pub struct App {
 
     // Processing
     is_processing: bool,
-    streaming_response: Option<String>,
+    streaming_response: Option<String>,   // Live text accumulator (cleared on ResponseComplete)
+
+    // Reasoning / thinking
+    // Populated by complete_response() from AgentResponse.thinking_text
+    // Rendered as collapsible [Thinking ▸/▾] block; toggled with 't'
 
     // Plan mode
     current_plan: Option<PlanDocument>,
@@ -406,6 +412,7 @@ pub struct App {
 | `Ctrl+A` | Approve plan (Plan mode) |
 | `Ctrl+R` | Reject plan (Plan mode) |
 | `Ctrl+I` | Request revision (Plan mode) |
+| `t` | Toggle thinking panel on focused message |
 | `@` | Open file picker |
 | `Esc` | Cancel/Back |
 
@@ -467,37 +474,69 @@ User Types Message (TUI)
 ┌─────────────────────┐
 │ App.send_message()  │
 │ - Analyze prompt    │
-│ - Transform w/ hints│
+│ - Create chunk_tx   │  ← unbounded_channel for streaming
+│ - Spawn forwarder   │  ← task: chunk_rx → ResponseChunk events
 └─────────┬───────────┘
           │
           ▼
 ┌─────────────────────────────────┐
-│ AgentService.send_message_*()  │
+│ AgentService                    │
+│ .send_message_with_tools_and_  │
+│  mode_streaming(chunk_tx)       │
 │ - Load conversation context    │
 │ - Build LLMRequest with tools  │
-│ - Send to provider             │
+│ - Call provider.stream()       │
+│ - drain_stream_to_response()   │
+│   ├─ TextDelta → route_text_delta()
+│   │   ├─ outside <think> → text_buf + chunk_tx.send()
+│   │   └─ inside <think>  → thinking_buf (suppressed)
+│   ├─ ThinkingDelta  → thinking_buf (Anthropic)
+│   └─ ToolUse events → pending_tool / tool_uses
+└─────────┬───────────────────────┘
+          │
+          ▼ (streaming)
+┌─────────────────────┐
+│ TUI Event Loop      │
+│ ResponseChunk(str)  │  ← forwarded by forwarder task
+│ - append_streaming_ │
+│   chunk() → render  │  ← live [streaming] label in UI
+└─────────┬───────────┘
+          │ (on stream end, forwarder exits)
+          ▼
+┌─────────────────────────────────┐
+│ AgentService: Tool Execution    │
+│ (if tool_use block present)     │
+│ - Approval check                │
+│ - Execute tool via Registry     │
+│ - Format result, continue loop  │
 └─────────┬───────────────────────┘
           │
           ▼
 ┌─────────────────────┐
-│ Provider.complete() │
-│ - Call LLM API      │
-│ - Parse response    │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ Tool Execution Loop │
-│ (if tool_use block) │
-│ - Approval check    │
-│ - Execute tool      │
-│ - Format result     │
-│ - Continue loop     │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
 │ Save to Database    │
+│ - Message content   │
+│ - Token usage       │
+│ - Cost calculation  │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ ResponseComplete    │
+│ (AgentResponse)     │
+│ - content blocks    │
+│ - thinking_text     │  ← extracted from ContentBlock::Thinking
+│ - usage / cost      │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ complete_response() │
+│ - clears streaming_ │
+│   response          │
+│ - adds DisplayMsg   │
+│   with thinking_text│
+└─────────────────────┘
+```
 │ - Message content   │
 │ - Token usage       │
 │ - Cost calculation  │
@@ -635,6 +674,115 @@ Execute Clear   Prefill   Return
     ▼     ▼     ▼
 Execute Return Return
   Tool   Error   Error
+```
+
+---
+
+## 4.4 Streaming Architecture
+
+### Overview
+
+Crustly streams LLM responses token-by-token to the TUI using a `tokio::sync::mpsc::unbounded_channel`:
+
+```
+AgentService (async task)           TUI Event Loop
+┌──────────────────────────┐        ┌───────────────────────┐
+│ provider.stream(request) │        │ TuiEvent::ResponseChunk│
+│      │                   │        │  → append_streaming_  │
+│      ▼                   │  chunk │    chunk()            │
+│ drain_stream_to_response │──tx───▶│  → streaming_response │
+│   │                      │        │     rendered live     │
+│   ├─ TextDelta (visible) │        └───────────────────────┘
+│   │   └─ tx.send(text)   │
+│   └─ ThinkingDelta / tags│        ┌───────────────────────┐
+│       └─ thinking_buf    │  await │ TuiEvent::ResponseComp│
+│                          │  fwd ──▶  lete(AgentResponse)  │
+│ await forwarder_handle   │        │  → clear streaming_   │
+│ send(ResponseComplete)   │        │    response           │
+└──────────────────────────┘        │  → show DisplayMessage│
+                                    └───────────────────────┘
+```
+
+**Race-condition guarantee:** `forwarder_handle.await` is called before `ResponseComplete` is emitted. This ensures all `ResponseChunk` events are already in the TUI channel when `ResponseComplete` arrives — FIFO ordering is maintained.
+
+### `drain_stream_to_response` (free async fn in `service.rs`)
+
+Consumes a `ProviderStream` and assembles a complete `LLMResponse`:
+
+| Stream event | Action |
+|---|---|
+| `MessageStart` | Capture response ID |
+| `ContentBlockStart(ToolUse)` | Store as `pending_tool` |
+| `ContentBlockStop` | Flush `pending_tool` → `tool_uses` |
+| `ContentBlockDelta::TextDelta` | Route via `route_text_delta()` |
+| `ContentBlockDelta::ThinkingDelta` | Append to `thinking_buf` |
+| `MessageDelta` | Capture stop reason + token usage |
+| `MessageStop` | Break loop |
+| `StreamEvent::Error` | Return hard error immediately |
+
+### `route_text_delta` (private fn in `service.rs`)
+
+Statefully routes each `TextDelta` through `<think>` tag detection:
+
+```
+TextDelta text
+     │
+     ├─ outside <think> block ──► text_buf + chunk_tx.send()  (visible to TUI)
+     └─ inside <think>…</think> ► thinking_buf               (hidden from TUI)
+
+State: `in_think_block: bool` persists between delta calls
+```
+
+**Post-processing fallback:** if `thinking_buf` is empty after the stream ends (no `ThinkingDelta` events and no `<think>` tags detected in-stream), `extract_think_tags()` is run on the assembled `text_buf` as a safety net.
+
+---
+
+## 4.5 Reasoning / Thinking Display
+
+### Sources
+
+Crustly unifies three reasoning sources into a single `ContentBlock::Thinking`:
+
+| Source | Provider | Field / Mechanism |
+|--------|----------|-------------------|
+| Anthropic extended thinking | AnthropicProvider | `ThinkingDelta` stream events |
+| DeepSeek-R1 direct API | OpenAIProvider | `reasoning_content` JSON field |
+| Ollama tag-based reasoning | OpenAIProvider | `<think>…</think>` in content text |
+
+### `extract_think_tags(text: &str) -> (String, String)` (`types.rs`)
+
+Utility that strips all `<think>…</think>` blocks from text:
+- Returns `(thinking_content, cleaned_text)` — both trimmed
+- Handles multiple blocks (joined with `\n`)
+- Unclosed `<think>` tag: rest of string treated as thinking
+- Case-sensitive (`<think>` only — consistent with DeepSeek/QwQ output)
+
+### Priority logic in `from_openai_response()` (`openai.rs`)
+
+```
+1. reasoning_content field present & non-empty?
+   YES → use it as thinking; preserve content text verbatim (no tag stripping)
+    NO → run extract_think_tags() on content text;
+          tag_thinking → thinking, cleaned → visible text
+```
+
+### TUI rendering (`render.rs`)
+
+```
+DisplayMessage.thinking_text: Option<String>
+                │
+     press 't' to toggle thinking_expanded
+                │
+        ┌───────┴───────┐
+        │ collapsed     │ expanded
+        ▼               ▼
+  [Thinking ▸]    [Thinking ▾]
+                  ┌─────────────┐
+                  │ thinking    │
+                  │ content     │
+                  │ rendered as │
+                  │ markdown    │
+                  └─────────────┘
 ```
 
 ---
@@ -1134,6 +1282,7 @@ LogConfig::new()
 pub enum TuiEvent {
     Key(KeyEvent),
     MessageSubmitted(String),
+    ResponseChunk(String),               // streaming: partial text token
     ResponseComplete(AgentResponse),
     ToolApprovalRequested(ToolApprovalRequest),
     ToolApprovalResponse(ToolApprovalResponse),
@@ -1301,15 +1450,17 @@ Dependencies: 652 crates
 
 - [ ] RAG (Retrieval-Augmented Generation) support
 - [ ] Vector store integration
-- [ ] More LLM providers
+- [ ] More LLM providers (Gemini, Azure, Vertex)
 - [ ] Plugin system for custom tools
 - [ ] Web interface
 - [ ] Multi-user support
-- [ ] Enhanced LSP integration
+- [ ] Enhanced LSP integration (currently a stub)
+- [x] ~~Real-time streaming TUI~~ *(implemented)*
+- [x] ~~Reasoning / thinking display~~ *(implemented — DeepSeek-R1, QwQ-32B, Anthropic)*
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** November 2024
+**Document Version:** 1.1
+**Last Updated:** May 2026
 **Author:** Jeremy JEANNE
 **License:** FSL-1.1-MIT
