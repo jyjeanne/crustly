@@ -4,8 +4,8 @@
 //! and token tracking.
 
 use crate::db::models::Message as DbMessage;
-use crate::llm::provider::{ContentBlock, Message, Role};
 use crate::llm::provider::types::CacheMetrics;
+use crate::llm::provider::{ContentBlock, Message, Role};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -330,7 +330,11 @@ impl AgentContext {
         let count = token_count(rust_snippet);
         // cl100k_base gives ~80-120 tokens for this 400-char Rust snippet.
         // Accept a wide range to avoid coupling to exact tiktoken internals.
-        assert!(count >= 50 && count <= 200, "BPE count out of expected range: {}", count);
+        assert!(
+            (50..=200).contains(&count),
+            "BPE count out of expected range: {}",
+            count
+        );
         assert!(count > 0);
     }
 
@@ -344,6 +348,10 @@ impl AgentContext {
         let prose = "The quick brown fox jumps over the lazy dog. This sentence has ten words.";
         let count = token_count(prose);
         // Ground-truth BPE for this sentence: ~14-18 tokens
-        assert!(count >= 10 && count <= 30, "prose count unreasonable: {}", count);
+        assert!(
+            (10..=30).contains(&count),
+            "prose count unreasonable: {}",
+            count
+        );
     }
 }

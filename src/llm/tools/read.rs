@@ -87,7 +87,9 @@ impl Tool for ReadTool {
         let input: ReadInput = serde_json::from_value(input)?;
 
         // Enforce project boundary (T056)
-        if let Err(reason) = crate::llm::tools::sandbox::check_path(&input.path, &context.working_directory) {
+        if let Err(reason) =
+            crate::llm::tools::sandbox::check_path(&input.path, &context.working_directory)
+        {
             return Ok(ToolResult::error(reason));
         }
 
@@ -311,8 +313,8 @@ mod tests {
     #[tokio::test]
     async fn test_five_concurrent_reads_no_deadlock() {
         use futures::future::join_all;
-        use std::sync::Arc;
         use std::io::Write;
+        use std::sync::Arc;
 
         let temp_dir = Arc::new(TempDir::new().unwrap());
         let session_id = Uuid::new_v4();
@@ -348,7 +350,9 @@ mod tests {
             let tool_result = result.expect("tool error");
             assert!(tool_result.success, "read {} should succeed", i);
             assert!(
-                tool_result.output.contains(&format!("content of file {}", i)),
+                tool_result
+                    .output
+                    .contains(&format!("content of file {}", i)),
                 "file {} content mismatch",
                 i
             );

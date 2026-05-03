@@ -477,7 +477,11 @@ impl PlanTaskRepository {
         error_text: Option<String>,
     ) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
-        let started_at = if status == PlanTaskStatus::Running { Some(now) } else { None };
+        let started_at = if status == PlanTaskStatus::Running {
+            Some(now)
+        } else {
+            None
+        };
         let completed_at = if matches!(status, PlanTaskStatus::Done | PlanTaskStatus::Failed) {
             Some(now)
         } else {
@@ -505,59 +509,138 @@ impl PlanTaskRepository {
 
     /// Fetch a single task by ID.
     pub async fn get_task(&self, task_id: Uuid) -> Result<PlanTask> {
-        let row: (String, String, i32, String, String, String, String, i32, String, String, Option<String>, Option<i64>, Option<i64>, Option<String>, Option<String>) =
-            sqlx::query_as(
-                "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
+        #[allow(clippy::type_complexity)]
+        let row: (
+            String,
+            String,
+            i32,
+            String,
+            String,
+            String,
+            String,
+            i32,
+            String,
+            String,
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
                  complexity, acceptance_criteria, status, notes, started_at, completed_at, \
                  output_summary, error_text FROM plan_tasks WHERE id = ?",
-            )
-            .bind(task_id.to_string())
-            .fetch_one(&self.pool)
-            .await
-            .context("Failed to fetch task")?;
+        )
+        .bind(task_id.to_string())
+        .fetch_one(&self.pool)
+        .await
+        .context("Failed to fetch task")?;
         Ok(row_to_plan_task(row))
     }
 
     /// Fetch all tasks for a plan ordered by task_order.
     pub async fn list_tasks_for_plan(&self, plan_id: Uuid) -> Result<Vec<PlanTask>> {
-        let rows: Vec<(String, String, i32, String, String, String, String, i32, String, String, Option<String>, Option<i64>, Option<i64>, Option<String>, Option<String>)> =
-            sqlx::query_as(
-                "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
+        #[allow(clippy::type_complexity)]
+        let rows: Vec<(
+            String,
+            String,
+            i32,
+            String,
+            String,
+            String,
+            String,
+            i32,
+            String,
+            String,
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+        )> = sqlx::query_as(
+            "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
                  complexity, acceptance_criteria, status, notes, started_at, completed_at, \
                  output_summary, error_text FROM plan_tasks WHERE plan_id = ? ORDER BY task_order",
-            )
-            .bind(plan_id.to_string())
-            .fetch_all(&self.pool)
-            .await
-            .context("Failed to list tasks")?;
+        )
+        .bind(plan_id.to_string())
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to list tasks")?;
         Ok(rows.into_iter().map(row_to_plan_task).collect())
     }
 
     /// Fetch tasks that are not Done or Skipped (for crash recovery).
     pub async fn get_incomplete_tasks(&self, plan_id: Uuid) -> Result<Vec<PlanTask>> {
-        let rows: Vec<(String, String, i32, String, String, String, String, i32, String, String, Option<String>, Option<i64>, Option<i64>, Option<String>, Option<String>)> =
-            sqlx::query_as(
-                "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
+        #[allow(clippy::type_complexity)]
+        let rows: Vec<(
+            String,
+            String,
+            i32,
+            String,
+            String,
+            String,
+            String,
+            i32,
+            String,
+            String,
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+        )> = sqlx::query_as(
+            "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
                  complexity, acceptance_criteria, status, notes, started_at, completed_at, \
                  output_summary, error_text FROM plan_tasks \
                  WHERE plan_id = ? AND status NOT IN ('Done', 'Skipped') \
                  ORDER BY task_order",
-            )
-            .bind(plan_id.to_string())
-            .fetch_all(&self.pool)
-            .await
-            .context("Failed to fetch incomplete tasks")?;
+        )
+        .bind(plan_id.to_string())
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch incomplete tasks")?;
         Ok(rows.into_iter().map(row_to_plan_task).collect())
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn row_to_plan_task(
-    row: (String, String, i32, String, String, String, String, i32, String, String, Option<String>, Option<i64>, Option<i64>, Option<String>, Option<String>),
+    row: (
+        String,
+        String,
+        i32,
+        String,
+        String,
+        String,
+        String,
+        i32,
+        String,
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+        Option<String>,
+    ),
 ) -> PlanTask {
     use chrono::DateTime;
-    let (id, plan_id, task_order, title, description, task_type, dependencies,
-         complexity, acceptance_criteria, status, notes, started_at, completed_at,
-         output_summary, error_text) = row;
+    let (
+        id,
+        plan_id,
+        task_order,
+        title,
+        description,
+        task_type,
+        dependencies,
+        complexity,
+        acceptance_criteria,
+        status,
+        notes,
+        started_at,
+        completed_at,
+        output_summary,
+        error_text,
+    ) = row;
     PlanTask {
         id: id.parse().unwrap_or_else(|_| Uuid::new_v4()),
         plan_id: plan_id.parse().unwrap_or_else(|_| Uuid::new_v4()),

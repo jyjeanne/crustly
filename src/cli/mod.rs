@@ -285,9 +285,10 @@ pub async fn run() -> Result<()> {
             auto_approve,
             format,
         }) => cmd_run(&config, prompt, auto_approve, format).await,
-        Some(Commands::AutoPlan { goal, max_iterations }) => {
-            cmd_autoplan(&config, goal, max_iterations).await
-        }
+        Some(Commands::AutoPlan {
+            goal,
+            max_iterations,
+        }) => cmd_autoplan(&config, goal, max_iterations).await,
     }
 }
 
@@ -1181,9 +1182,17 @@ async fn cmd_logs(operation: LogCommands) -> Result<()> {
 
         LogCommands::ShowCacheStats => {
             println!("📊 Prompt Cache Statistics\n");
-            println!("Session cache metrics are accumulated in AgentContext during a live session.");
+            println!(
+                "Session cache metrics are accumulated in AgentContext during a live session."
+            );
             println!("Start a chat session with -d to see per-turn cache telemetry in the log.");
-            println!("\nLog location: {}", std::env::current_dir()?.join(".crustly").join("logs").display());
+            println!(
+                "\nLog location: {}",
+                std::env::current_dir()?
+                    .join(".crustly")
+                    .join("logs")
+                    .display()
+            );
             Ok(())
         }
     }

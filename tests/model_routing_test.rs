@@ -30,7 +30,10 @@ fn thinking_config_forces_temperature_one() {
 #[test]
 fn zero_budget_does_not_enable_thinking() {
     let req = LLMRequest::new("model", vec![]).with_thinking(0);
-    assert!(req.thinking.is_none(), "zero budget must leave thinking disabled");
+    assert!(
+        req.thinking.is_none(),
+        "zero budget must leave thinking disabled"
+    );
 }
 
 /// Contract 5: Powerful tier must have a higher max_output_tokens than Fast.

@@ -816,9 +816,18 @@ pub enum PauseReason {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlanModeState {
     Idle,
-    Planning { draft: String },
-    AwaitingApproval { plan_id: uuid::Uuid, tasks: Vec<PlanTask> },
-    Executing { plan_id: uuid::Uuid, task_index: usize, total: usize },
+    Planning {
+        draft: String,
+    },
+    AwaitingApproval {
+        plan_id: uuid::Uuid,
+        tasks: Vec<PlanTask>,
+    },
+    Executing {
+        plan_id: uuid::Uuid,
+        task_index: usize,
+        total: usize,
+    },
     AutoExecuting {
         plan_id: uuid::Uuid,
         task_index: usize,
@@ -835,17 +844,20 @@ pub enum PlanModeState {
         task_index: usize,
         reason: PauseReason,
     },
-    Done { plan_id: uuid::Uuid },
-    Failed { plan_id: uuid::Uuid, task_index: usize, error: String },
+    Done {
+        plan_id: uuid::Uuid,
+    },
+    Failed {
+        plan_id: uuid::Uuid,
+        task_index: usize,
+        error: String,
+    },
 }
 
 impl PlanModeState {
     /// Returns true if the tool requires user approval in this state.
     pub fn tool_needs_approval(&self, tool_name: &str, _threshold: u8) -> bool {
-        let is_high_risk = matches!(
-            tool_name,
-            "bash" | "write_file" | "edit_file" | "code_exec"
-        );
+        let is_high_risk = matches!(tool_name, "bash" | "write_file" | "edit_file" | "code_exec");
         match self {
             PlanModeState::AutoExecuting { .. } => is_high_risk,
             PlanModeState::Executing { .. } => true,
@@ -877,18 +889,36 @@ impl PlanModeState {
     /// Advance to the next task, or transition to Done.
     pub fn advance(self) -> Self {
         match self {
-            PlanModeState::Executing { plan_id, task_index, total } => {
+            PlanModeState::Executing {
+                plan_id,
+                task_index,
+                total,
+            } => {
                 if task_index + 1 >= total {
                     PlanModeState::Done { plan_id }
                 } else {
-                    PlanModeState::Executing { plan_id, task_index: task_index + 1, total }
+                    PlanModeState::Executing {
+                        plan_id,
+                        task_index: task_index + 1,
+                        total,
+                    }
                 }
             }
-            PlanModeState::AutoExecuting { plan_id, task_index, total, mode } => {
+            PlanModeState::AutoExecuting {
+                plan_id,
+                task_index,
+                total,
+                mode,
+            } => {
                 if task_index + 1 >= total {
                     PlanModeState::Done { plan_id }
                 } else {
-                    PlanModeState::AutoExecuting { plan_id, task_index: task_index + 1, total, mode }
+                    PlanModeState::AutoExecuting {
+                        plan_id,
+                        task_index: task_index + 1,
+                        total,
+                        mode,
+                    }
                 }
             }
             other => other,
@@ -920,7 +950,11 @@ impl InterruptedPlan {
         if incomplete.is_empty() {
             return None;
         }
-        let resume_at = incomplete.iter().map(|t| t.task_order as usize).min().unwrap_or(0);
+        let resume_at = incomplete
+            .iter()
+            .map(|t| t.task_order as usize)
+            .min()
+            .unwrap_or(0);
         Some(InterruptedPlan {
             plan_id,
             resume_at_index: resume_at,

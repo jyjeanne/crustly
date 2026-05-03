@@ -101,10 +101,13 @@ impl ToolResultCache {
         if ttl == Duration::ZERO {
             return;
         }
-        self.entries.insert(key, CacheEntry {
-            result,
-            expires_at: Instant::now() + ttl,
-        });
+        self.entries.insert(
+            key,
+            CacheEntry {
+                result,
+                expires_at: Instant::now() + ttl,
+            },
+        );
     }
 
     /// Convenience: insert using the tool name to determine TTL.
@@ -128,7 +131,11 @@ mod tests {
     fn cache_hit_returns_same_result() {
         let cache = ToolResultCache::new(ToolTtlConfig::default());
         let key = CacheKey::from_tool("read_file", &serde_json::json!({ "path": "src/main.rs" }));
-        cache.insert(key.clone(), "fn main() {}".to_string(), Duration::from_secs(60));
+        cache.insert(
+            key.clone(),
+            "fn main() {}".to_string(),
+            Duration::from_secs(60),
+        );
         assert_eq!(cache.get(&key), Some("fn main() {}".to_string()));
     }
 
@@ -136,7 +143,11 @@ mod tests {
     async fn cache_expires_after_ttl() {
         let cache = ToolResultCache::new(ToolTtlConfig::default());
         let key = CacheKey::from_tool("read_file", &serde_json::json!({ "path": "x" }));
-        cache.insert(key.clone(), "content".to_string(), Duration::from_millis(10));
+        cache.insert(
+            key.clone(),
+            "content".to_string(),
+            Duration::from_millis(10),
+        );
         tokio::time::sleep(Duration::from_millis(20)).await;
         assert!(cache.get(&key).is_none(), "entry must be expired");
     }

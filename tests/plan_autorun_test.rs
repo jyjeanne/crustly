@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo test plan_autorun
 
-use crustly::tui::plan::{AutoRunMode, PauseReason, PlanModeState, PlanTask, TaskStatus, TaskType};
+use crustly::tui::plan::{AutoRunMode, PlanModeState, PlanTask, TaskStatus, TaskType};
 use uuid::Uuid;
 
 fn make_plan_task(order: usize, title: &str) -> PlanTask {
@@ -41,7 +41,12 @@ fn auto_plan_approval_goes_to_auto_executing() {
     let state = PlanModeState::approve(plan_id, tasks, true);
 
     match &state {
-        PlanModeState::AutoExecuting { task_index, total, mode, .. } => {
+        PlanModeState::AutoExecuting {
+            task_index,
+            total,
+            mode,
+            ..
+        } => {
             assert_eq!(*task_index, 0);
             assert_eq!(*total, 3);
             assert_eq!(*mode, AutoRunMode::AutoPlan);
@@ -53,7 +58,8 @@ fn auto_plan_approval_goes_to_auto_executing() {
     for read_tool in &["read_file", "glob", "grep", "ls", "web_search"] {
         assert!(
             !state.tool_needs_approval(read_tool, 70),
-            "{} must not need approval in AutoExecuting", read_tool
+            "{} must not need approval in AutoExecuting",
+            read_tool
         );
     }
 }
@@ -86,11 +92,13 @@ fn high_risk_tools_pause_auto_execution() {
     for high_risk_tool in &["bash", "write_file", "edit_file", "code_exec"] {
         assert!(
             PlanModeState::is_high_risk_tool(high_risk_tool),
-            "{} must be classified high-risk", high_risk_tool
+            "{} must be classified high-risk",
+            high_risk_tool
         );
         assert!(
             state.tool_needs_approval(high_risk_tool, 70),
-            "{} must need approval in AutoExecuting", high_risk_tool
+            "{} must need approval in AutoExecuting",
+            high_risk_tool
         );
     }
 }

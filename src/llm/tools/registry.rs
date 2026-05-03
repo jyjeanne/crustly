@@ -112,6 +112,39 @@ impl ToolRegistry {
         Ok(result)
     }
 
+    /// Connect to an MCP server, discover its tools, and register them.
+    ///
+    /// Built-in tool names take precedence — if a tool with the same namespaced name
+    /// already exists, it is silently skipped.
+    pub async fn register_mcp_server(
+        &mut self,
+        server_name: &str,
+        command: &str,
+        args: &[&str],
+    ) -> anyhow::Result<usize> {
+        use crate::mcp::client::{MCPClient, McpTool};
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        let mut client = MCPClient::connect(server_name, command, args).await?;
+        let tool_defs = client.discover_tools().await?;
+        let client_arc = Arc::new(Mutex::new(client));
+
+        let mut registered = 0usize;
+        for def in tool_defs {
+            let mcp_tool = McpTool::new(server_name, def, client_arc.clone());
+            let name = mcp_tool.name().to_string();
+            if self.tools.contains_key(&name) {
+                tracing::debug!("MCP tool '{}' skipped — built-in takes precedence", name);
+                continue;
+            }
+            self.tools.insert(name.clone(), Arc::new(mcp_tool));
+            tracing::info!("Registered MCP tool: {}", name);
+            registered += 1;
+        }
+        Ok(registered)
+    }
+
     /// Get the number of registered tools
     pub fn count(&self) -> usize {
         self.tools.len()

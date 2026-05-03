@@ -159,6 +159,11 @@ name = "database"
 harness = false
 path = "benches/database.rs"
 
+[[bench]]
+name = "parallel_tool_dispatch"
+harness = false
+path = "benches/parallel_tool_dispatch.rs"
+
 # [[bench]]
 # name = "llm_processing"
 # harness = false

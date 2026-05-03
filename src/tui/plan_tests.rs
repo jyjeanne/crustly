@@ -560,6 +560,9 @@ mod tests {
         // AwaitingApproval -> AutoExecuting via approve(auto_plan=true)
         let _awaiting = PlanModeState::AwaitingApproval { plan_id, tasks };
         let result = PlanModeState::approve(plan_id, vec![], true);
-        assert!(matches!(result, PlanModeState::AutoExecuting { task_index: 0, .. }));
+        assert!(matches!(
+            result,
+            PlanModeState::AutoExecuting { task_index: 0, .. }
+        ));
     }
 }

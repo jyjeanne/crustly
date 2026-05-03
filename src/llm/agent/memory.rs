@@ -174,7 +174,10 @@ fn extract_symbols(file_path: &str, content: &str) -> Vec<CodebaseIndexEntry> {
 
     for (line_idx, line) in content.lines().enumerate() {
         for (pattern, kind) in patterns {
-            if let Some(caps) = regex::Regex::new(pattern).ok().and_then(|re| re.captures(line)) {
+            if let Some(caps) = regex::Regex::new(pattern)
+                .ok()
+                .and_then(|re| re.captures(line))
+            {
                 if let Some(name) = caps.get(1) {
                     entries.push(CodebaseIndexEntry {
                         id: Uuid::new_v4(),

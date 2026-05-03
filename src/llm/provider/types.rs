@@ -212,7 +212,11 @@ impl CacheMetrics {
     /// Fraction of input tokens that were served from cache (0.0–1.0).
     pub fn hit_rate(&self) -> f32 {
         let total = self.read_tokens + self.creation_tokens;
-        if total == 0 { 0.0 } else { self.read_tokens as f32 / total as f32 }
+        if total == 0 {
+            0.0
+        } else {
+            self.read_tokens as f32 / total as f32
+        }
     }
 }
 
@@ -309,6 +313,8 @@ pub enum ContentDelta {
     TextDelta { text: String },
     /// Tool input delta (JSON)
     InputJsonDelta { partial_json: String },
+    /// Thinking delta (Anthropic extended thinking streaming)
+    ThinkingDelta { thinking: String },
 }
 
 /// Message delta for final updates
@@ -367,8 +373,7 @@ mod tests {
 
     #[test]
     fn with_thinking_sets_temperature() {
-        let req = LLMRequest::new("claude-3-7-sonnet", vec![])
-            .with_thinking(8192);
+        let req = LLMRequest::new("claude-3-7-sonnet", vec![]).with_thinking(8192);
         assert_eq!(req.temperature, Some(1.0));
         let tc = req.thinking.unwrap();
         assert_eq!(tc.r#type, "enabled");
@@ -378,12 +383,18 @@ mod tests {
     #[test]
     fn with_thinking_zero_budget_is_noop() {
         let req = LLMRequest::new("model", vec![]).with_thinking(0);
-        assert!(req.thinking.is_none(), "zero budget should not enable thinking");
+        assert!(
+            req.thinking.is_none(),
+            "zero budget should not enable thinking"
+        );
     }
 
     #[test]
     fn cache_metrics_hit_rate() {
-        let cm = CacheMetrics { read_tokens: 800, creation_tokens: 200 };
+        let cm = CacheMetrics {
+            read_tokens: 800,
+            creation_tokens: 200,
+        };
         assert!((cm.hit_rate() - 0.8).abs() < 0.001);
         let empty = CacheMetrics::default();
         assert_eq!(empty.hit_rate(), 0.0);

@@ -217,6 +217,40 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
             ),
         ]));
 
+        // Render thinking block (collapsed by default, expanded with 't' key)
+        if let Some(ref thinking) = msg.thinking_text {
+            if msg.thinking_expanded {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        "[Thinking ▾] ",
+                        Style::default()
+                            .fg(Color::Magenta)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        "(press t to collapse)",
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]));
+                for thinking_line in thinking.lines() {
+                    lines.push(Line::from(vec![
+                        Span::styled("  │ ", Style::default().fg(Color::Magenta)),
+                        Span::styled(thinking_line.to_string(), Style::default().fg(Color::Gray)),
+                    ]));
+                }
+            } else {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        "[Thinking ▸] ",
+                        Style::default()
+                            .fg(Color::Magenta)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled("(press t to expand)", Style::default().fg(Color::DarkGray)),
+                ]));
+            }
+        }
+
         // Parse and render message content as markdown
         let mut content_lines = parse_markdown(&msg.content);
         lines.append(&mut content_lines);

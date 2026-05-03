@@ -16,19 +16,16 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Plan execution mode
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanExecMode {
     /// Ask for approval before every task.
+    #[default]
     Interactive,
     /// Approve the plan once, then run all tasks automatically.
     AutoPlan,
     /// Fully autonomous: no approval gate at all.
     FullAuto,
-}
-
-impl Default for PlanExecMode {
-    fn default() -> Self { Self::Interactive }
 }
 
 /// Plan mode configuration (`[plan_mode]` section).
@@ -44,8 +41,12 @@ pub struct PlanModeConfig {
     pub max_auto_iterations: u32,
 }
 
-fn default_risk_threshold() -> u8 { 70 }
-fn default_max_iterations() -> u32 { 20 }
+fn default_risk_threshold() -> u8 {
+    70
+}
+fn default_max_iterations() -> u32 {
+    20
+}
 
 /// Security configuration (`[security]` section).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -64,7 +65,9 @@ pub struct SecurityConfig {
 impl SecurityConfig {
     /// Build a composable permission policy from this security config.
     pub fn to_policy(&self) -> Box<dyn crate::llm::tools::sandbox::PermissionPolicy> {
-        use crate::llm::tools::sandbox::{AllowAll, AndPolicy, BashCommandAllowlist, DenyPathPrefixRule, DenyToolRule};
+        use crate::llm::tools::sandbox::{
+            AllowAll, AndPolicy, BashCommandAllowlist, DenyPathPrefixRule, DenyToolRule,
+        };
 
         let mut rules: Vec<Box<dyn crate::llm::tools::sandbox::PermissionPolicy>> = Vec::new();
 
@@ -114,9 +117,15 @@ impl Default for MemoryConfig {
     }
 }
 
-fn default_episodic_budget() -> i32 { 2_000 }
-fn default_compaction_threshold() -> f64 { 0.80 }
-fn default_true() -> bool { true }
+fn default_episodic_budget() -> i32 {
+    2_000
+}
+fn default_compaction_threshold() -> f64 {
+    0.80
+}
+fn default_true() -> bool {
+    true
+}
 
 /// MCP server configuration (`[[mcp.servers]]`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,10 +153,18 @@ pub struct ToolCacheConfig {
     pub web_search_secs: u64,
 }
 
-fn default_read_file_ttl() -> u64 { 60 }
-fn default_glob_ttl() -> u64 { 30 }
-fn default_grep_ttl() -> u64 { 30 }
-fn default_web_search_ttl() -> u64 { 300 }
+fn default_read_file_ttl() -> u64 {
+    60
+}
+fn default_glob_ttl() -> u64 {
+    30
+}
+fn default_grep_ttl() -> u64 {
+    30
+}
+fn default_web_search_ttl() -> u64 {
+    300
+}
 
 impl Default for ToolCacheConfig {
     fn default() -> Self {

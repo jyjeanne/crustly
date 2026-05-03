@@ -26,7 +26,10 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
 
     // Need at least 11 messages to compact (preserve last 10)
     if total_turns <= 10 {
-        anyhow::bail!("not enough turns to compact (need >10, have {})", total_turns);
+        anyhow::bail!(
+            "not enough turns to compact (need >10, have {})",
+            total_turns
+        );
     }
 
     let preserve_from = total_turns.saturating_sub(10);
@@ -75,7 +78,10 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
     ctx.messages.push(Message {
         role: Role::System,
         content: vec![ContentBlock::Text {
-            text: format!("[COMPACTED: turns 0–{} summarized]\n\n{}", preserve_from, summary),
+            text: format!(
+                "[COMPACTED: turns 0–{} summarized]\n\n{}",
+                preserve_from, summary
+            ),
         }],
     });
     ctx.messages.extend(preserved);
@@ -85,17 +91,22 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
         .messages
         .iter()
         .map(|m| {
-            m.content.iter().map(|b| match b {
-                ContentBlock::Text { text } => crate::llm::agent::context::token_count(text) as usize,
-                ContentBlock::ToolUse { name, input, .. } => {
-                    crate::llm::agent::context::token_count(name) as usize
-                        + crate::llm::agent::context::token_count(&input.to_string()) as usize
-                }
-                ContentBlock::ToolResult { content, .. } => {
-                    crate::llm::agent::context::token_count(content) as usize
-                }
-                _ => 100,
-            }).sum::<usize>()
+            m.content
+                .iter()
+                .map(|b| match b {
+                    ContentBlock::Text { text } => {
+                        crate::llm::agent::context::token_count(text) as usize
+                    }
+                    ContentBlock::ToolUse { name, input, .. } => {
+                        crate::llm::agent::context::token_count(name) as usize
+                            + crate::llm::agent::context::token_count(&input.to_string()) as usize
+                    }
+                    ContentBlock::ToolResult { content, .. } => {
+                        crate::llm::agent::context::token_count(content) as usize
+                    }
+                    _ => 100,
+                })
+                .sum::<usize>()
         })
         .sum::<usize>()
         + summary_tokens;
@@ -103,15 +114,16 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
     ctx.token_count = new_token_count;
 
     let tokens_after = new_token_count as i32;
-    sqlx::query(
-        "UPDATE compaction_records SET tokens_after = ? WHERE id = ?",
-    )
-    .bind(tokens_after)
-    .bind(record.id.to_string())
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE compaction_records SET tokens_after = ? WHERE id = ?")
+        .bind(tokens_after)
+        .bind(record.id.to_string())
+        .execute(pool)
+        .await?;
 
-    Ok(CompactionRecord { tokens_after, ..record })
+    Ok(CompactionRecord {
+        tokens_after,
+        ..record
+    })
 }
 
 fn summarise_turns(messages: &[crate::llm::provider::types::Message]) -> String {
@@ -129,7 +141,12 @@ fn summarise_turns(messages: &[crate::llm::provider::types::Message]) -> String 
             .collect::<Vec<_>>()
             .join(" ");
         if !text.trim().is_empty() {
-            parts.push(format!("Turn {}: [{}] {}", i, role, &text[..text.len().min(200)]));
+            parts.push(format!(
+                "Turn {}: [{}] {}",
+                i,
+                role,
+                &text[..text.len().min(200)]
+            ));
         }
     }
     parts.join("\n")
@@ -154,7 +171,10 @@ mod tests {
             let msg = Message {
                 role: Role::User,
                 content: vec![ContentBlock::Text {
-                    text: format!("message number {} with some padding content here to use tokens", i),
+                    text: format!(
+                        "message number {} with some padding content here to use tokens",
+                        i
+                    ),
                 }],
             };
             ctx.add_message(msg);
@@ -164,9 +184,16 @@ mod tests {
             }
         }
 
-        assert!(compaction_fired, "should_compact() must fire before 50 messages with 100-token budget");
+        assert!(
+            compaction_fired,
+            "should_compact() must fire before 50 messages with 100-token budget"
+        );
         let usage = ctx.usage_percentage();
-        assert!(usage > 80.0, "usage should be >80% when should_compact() returns true, got {}", usage);
+        assert!(
+            usage > 80.0,
+            "usage should be >80% when should_compact() returns true, got {}",
+            usage
+        );
     }
 
     #[tokio::test]
@@ -180,7 +207,11 @@ mod tests {
 
         for i in 0..15 {
             ctx.add_message(Message {
-                role: if i % 2 == 0 { Role::User } else { Role::Assistant },
+                role: if i % 2 == 0 {
+                    Role::User
+                } else {
+                    Role::Assistant
+                },
                 content: vec![ContentBlock::Text {
                     text: format!("message {}", i),
                 }],
@@ -195,7 +226,8 @@ mod tests {
 
         assert!(result.is_err(), "compact must fail when table is missing");
         assert_eq!(
-            ctx.messages.len(), original_len,
+            ctx.messages.len(),
+            original_len,
             "context must be unchanged on DB failure"
         );
         assert_eq!(
@@ -228,9 +260,16 @@ mod tests {
 
         for i in 0..15 {
             ctx.add_message(Message {
-                role: if i % 2 == 0 { Role::User } else { Role::Assistant },
+                role: if i % 2 == 0 {
+                    Role::User
+                } else {
+                    Role::Assistant
+                },
                 content: vec![ContentBlock::Text {
-                    text: format!("Turn {} content with enough padding tokens here to consume budget", i),
+                    text: format!(
+                        "Turn {} content with enough padding tokens here to consume budget",
+                        i
+                    ),
                 }],
             });
         }
@@ -252,6 +291,9 @@ mod tests {
         // Record captures original token count
         assert!(record.tokens_before > 0, "tokens_before must be recorded");
         // tokens_after is recorded (may be higher or lower depending on summary length)
-        assert!(record.tokens_after >= 0, "tokens_after must be non-negative");
+        assert!(
+            record.tokens_after >= 0,
+            "tokens_after must be non-negative"
+        );
     }
 }

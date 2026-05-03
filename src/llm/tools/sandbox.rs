@@ -31,7 +31,9 @@ pub struct DenyToolRule {
 
 impl DenyToolRule {
     pub fn new(pattern: &str) -> Self {
-        Self { pattern: glob::Pattern::new(pattern).expect("invalid glob pattern") }
+        Self {
+            pattern: glob::Pattern::new(pattern).expect("invalid glob pattern"),
+        }
     }
 }
 
@@ -52,7 +54,9 @@ pub struct AllowToolRule {
 
 impl AllowToolRule {
     pub fn new(pattern: &str) -> Self {
-        Self { pattern: glob::Pattern::new(pattern).expect("invalid glob pattern") }
+        Self {
+            pattern: glob::Pattern::new(pattern).expect("invalid glob pattern"),
+        }
     }
 }
 
@@ -73,7 +77,9 @@ pub struct DenyPathPrefixRule {
 
 impl DenyPathPrefixRule {
     pub fn new(raw: &str) -> Self {
-        Self { prefix: PathBuf::from(raw) }
+        Self {
+            prefix: PathBuf::from(raw),
+        }
     }
 }
 
@@ -124,8 +130,8 @@ impl PathBoundaryRule {
                     return PolicyDecision::Deny(format!("cannot resolve path: {}", e));
                 }
             };
-            let root_canonical = std::fs::canonicalize(&self.root)
-                .unwrap_or_else(|_| normalize_path(&self.root));
+            let root_canonical =
+                std::fs::canonicalize(&self.root).unwrap_or_else(|_| normalize_path(&self.root));
             if resolved.starts_with(&root_canonical) {
                 PolicyDecision::Allow
             } else {
@@ -179,10 +185,7 @@ impl PermissionPolicy for BashCommandAllowlist {
         if tool_name != "bash" {
             return PolicyDecision::Allow;
         }
-        let cmd = inputs
-            .get("command")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let cmd = inputs.get("command").and_then(|v| v.as_str()).unwrap_or("");
         let program = cmd.split_whitespace().next().unwrap_or("");
         if self.allowed_programs.iter().any(|p| p == program) {
             PolicyDecision::Allow
@@ -263,7 +266,9 @@ pub fn check_path(raw: &str, root: &Path) -> Result<(), String> {
     } else {
         canonical_root.join(raw).to_string_lossy().into_owned()
     };
-    let rule = PathBoundaryRule { root: canonical_root };
+    let rule = PathBoundaryRule {
+        root: canonical_root,
+    };
     let inputs = serde_json::json!({ "path": resolved });
     match rule.evaluate("", &inputs) {
         PolicyDecision::Allow => Ok(()),
@@ -313,7 +318,10 @@ mod tests {
         let file = root.join("main.rs");
         std::fs::write(&file, "").unwrap();
         let rule = PathBoundaryRule { root };
-        let d = rule.evaluate("read_file", &serde_json::json!({ "path": file.to_str().unwrap() }));
+        let d = rule.evaluate(
+            "read_file",
+            &serde_json::json!({ "path": file.to_str().unwrap() }),
+        );
         assert_eq!(d, PolicyDecision::Allow);
     }
 
@@ -337,7 +345,10 @@ mod tests {
         ]);
         let d = policy.evaluate("bash", &serde_json::json!({}));
         assert!(matches!(d, PolicyDecision::Deny(_)));
-        assert!(!called.load(Ordering::SeqCst), "second rule must not be evaluated");
+        assert!(
+            !called.load(Ordering::SeqCst),
+            "second rule must not be evaluated"
+        );
     }
 
     #[test]
@@ -360,7 +371,10 @@ mod tests {
         ]);
         let d = policy.evaluate("read_file", &serde_json::json!({}));
         assert_eq!(d, PolicyDecision::Allow);
-        assert!(!called.load(Ordering::SeqCst), "second rule must not be evaluated");
+        assert!(
+            !called.load(Ordering::SeqCst),
+            "second rule must not be evaluated"
+        );
     }
 
     #[test]
@@ -368,14 +382,23 @@ mod tests {
         let rule = BashCommandAllowlist {
             allowed_programs: vec!["cargo".to_string(), "git".to_string()],
         };
-        assert_eq!(rule.evaluate("bash", &serde_json::json!({ "command": "cargo test" })), PolicyDecision::Allow);
-        assert!(matches!(rule.evaluate("bash", &serde_json::json!({ "command": "rm -rf ." })), PolicyDecision::Deny(_)));
+        assert_eq!(
+            rule.evaluate("bash", &serde_json::json!({ "command": "cargo test" })),
+            PolicyDecision::Allow
+        );
+        assert!(matches!(
+            rule.evaluate("bash", &serde_json::json!({ "command": "rm -rf ." })),
+            PolicyDecision::Deny(_)
+        ));
     }
 
     #[test]
     fn not_policy_inverts_allow() {
         let policy = NotPolicy(Box::new(AllowAll));
-        assert!(matches!(policy.evaluate("read_file", &serde_json::json!({})), PolicyDecision::Deny(_)));
+        assert!(matches!(
+            policy.evaluate("read_file", &serde_json::json!({})),
+            PolicyDecision::Deny(_)
+        ));
     }
 
     #[test]
@@ -384,8 +407,14 @@ mod tests {
         let rule = PathBoundaryRule { root: root.clone() };
         // Construct a traversal path: root/../../etc/passwd
         let traversal = root.join("..").join("..").join("etc").join("passwd");
-        let d = rule.evaluate("read_file", &serde_json::json!({ "path": traversal.to_str().unwrap() }));
-        assert!(matches!(d, PolicyDecision::Deny(_)), "path traversal must be denied");
+        let d = rule.evaluate(
+            "read_file",
+            &serde_json::json!({ "path": traversal.to_str().unwrap() }),
+        );
+        assert!(
+            matches!(d, PolicyDecision::Deny(_)),
+            "path traversal must be denied"
+        );
     }
 
     #[test]
@@ -400,7 +429,10 @@ mod tests {
         let (_tmp, root) = make_root();
         let rule = DenyPathPrefixRule::new("/etc");
         let file = root.join("main.rs");
-        let d = rule.evaluate("read_file", &serde_json::json!({ "path": file.to_str().unwrap() }));
+        let d = rule.evaluate(
+            "read_file",
+            &serde_json::json!({ "path": file.to_str().unwrap() }),
+        );
         assert_eq!(d, PolicyDecision::Allow);
     }
 
@@ -415,6 +447,9 @@ mod tests {
             "read_file",
             &serde_json::json!({ "path": link_path.join("passwd").to_str().unwrap() }),
         );
-        assert!(matches!(d, PolicyDecision::Deny(_)), "symlink outside root must be denied");
+        assert!(
+            matches!(d, PolicyDecision::Deny(_)),
+            "symlink outside root must be denied"
+        );
     }
 }

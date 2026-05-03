@@ -76,9 +76,12 @@ impl ModelRouter {
     /// Default router using Anthropic claude models.
     pub fn default_anthropic() -> Self {
         Self::new(
-            "anthropic", "claude-haiku-4-5-20251001",
-            "anthropic", "claude-sonnet-4-6",
-            "anthropic", "claude-opus-4-7",
+            "anthropic",
+            "claude-haiku-4-5-20251001",
+            "anthropic",
+            "claude-sonnet-4-6",
+            "anthropic",
+            "claude-opus-4-7",
         )
     }
 
@@ -86,9 +89,12 @@ impl ModelRouter {
     #[cfg(test)]
     pub fn default_for_test() -> Self {
         Self::new(
-            "anthropic", "claude-haiku-4-5-20251001",
-            "anthropic", "claude-sonnet-4-6",
-            "anthropic", "claude-opus-4-7",
+            "anthropic",
+            "claude-haiku-4-5-20251001",
+            "anthropic",
+            "claude-sonnet-4-6",
+            "anthropic",
+            "claude-opus-4-7",
         )
     }
 }
@@ -116,8 +122,14 @@ mod tests {
     #[test]
     fn token_limits_ordered_correctly() {
         let router = ModelRouter::default_for_test();
-        assert!(router.max_output_tokens(ModelTier::Fast) < router.max_output_tokens(ModelTier::Balanced));
-        assert!(router.max_output_tokens(ModelTier::Balanced) < router.max_output_tokens(ModelTier::Powerful));
+        assert!(
+            router.max_output_tokens(ModelTier::Fast)
+                < router.max_output_tokens(ModelTier::Balanced)
+        );
+        assert!(
+            router.max_output_tokens(ModelTier::Balanced)
+                < router.max_output_tokens(ModelTier::Powerful)
+        );
         assert!(router.max_output_tokens(ModelTier::Fast) >= 2_048);
         assert!(router.max_output_tokens(ModelTier::Powerful) >= 16_384);
     }

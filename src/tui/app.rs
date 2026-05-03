@@ -18,6 +18,10 @@ pub struct DisplayMessage {
     pub id: Uuid,
     pub role: String,
     pub content: String,
+    /// Extended thinking trace, if the response included one
+    pub thinking_text: Option<String>,
+    /// Whether the thinking block is currently expanded in the UI
+    pub thinking_expanded: bool,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub token_count: Option<i32>,
     pub cost: Option<f64>,
@@ -29,6 +33,8 @@ impl From<Message> for DisplayMessage {
             id: msg.id,
             role: msg.role,
             content: msg.content,
+            thinking_text: None,
+            thinking_expanded: false,
             timestamp: msg.created_at,
             token_count: msg.token_count,
             cost: msg.cost,
@@ -381,6 +387,17 @@ impl App {
                     // Trigger file picker mode
                     self.open_file_picker().await?;
                 }
+                KeyCode::Char('t') if self.input_buffer.is_empty() => {
+                    // Toggle thinking block on the most recent assistant message
+                    if let Some(msg) = self
+                        .messages
+                        .iter_mut()
+                        .rev()
+                        .find(|m| m.role == "assistant" && m.thinking_text.is_some())
+                    {
+                        msg.thinking_expanded = !msg.thinking_expanded;
+                    }
+                }
                 KeyCode::Char(c) => {
                     self.input_buffer.push(c);
                 }
@@ -610,6 +627,8 @@ impl App {
                 id: Uuid::new_v4(),
                 role: "user".to_string(),
                 content: content.clone(),
+                thinking_text: None,
+                thinking_expanded: false,
                 timestamp: chrono::Utc::now(),
                 token_count: None,
                 cost: None,
@@ -679,6 +698,8 @@ impl App {
             id: response.message_id,
             role: "assistant".to_string(),
             content: response.content,
+            thinking_text: response.thinking_text,
+            thinking_expanded: false,
             timestamp: chrono::Utc::now(),
             token_count: Some(
                 response.usage.input_tokens as i32 + response.usage.output_tokens as i32,
@@ -712,6 +733,8 @@ impl App {
                     content: "⚠️ Plan execution stopped due to task failure. \
                              Review the error above and decide how to proceed."
                         .to_string(),
+                    thinking_text: None,
+                    thinking_expanded: false,
                     timestamp: chrono::Utc::now(),
                     token_count: None,
                     cost: None,
@@ -894,6 +917,8 @@ impl App {
                                  • Ctrl+P: View plan",
                                 plan_title, task_count
                             ),
+                            thinking_text: None,
+                            thinking_expanded: false,
                             timestamp: chrono::Utc::now(),
                             token_count: None,
                             cost: None,
@@ -962,6 +987,8 @@ impl App {
                                          • Ctrl+P: View plan",
                                         plan_title, task_count
                                     ),
+                                    thinking_text: None,
+                                    thinking_expanded: false,
                                     timestamp: chrono::Utc::now(),
                                     token_count: None,
                                     cost: None,
@@ -1199,6 +1226,8 @@ impl App {
                      All {} tasks have been executed.",
                     title, task_count
                 ),
+                thinking_text: None,
+                thinking_expanded: false,
                 timestamp: chrono::Utc::now(),
                 token_count: None,
                 cost: None,

@@ -122,7 +122,7 @@ impl PlanTaskStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s {
             "Running" => PlanTaskStatus::Running,
             "Done" => PlanTaskStatus::Done,
@@ -166,7 +166,7 @@ impl PlanTask {
 
     /// Parse status string as a PlanTaskStatus.
     pub fn exec_status(&self) -> PlanTaskStatus {
-        PlanTaskStatus::from_str(&self.status)
+        PlanTaskStatus::parse(&self.status)
     }
 }
 

@@ -5,12 +5,12 @@
 
 use super::context::AgentContext;
 use super::error::{AgentError, Result};
+use crate::llm::provider::router::ModelRouter;
 use crate::llm::provider::{
     ContentBlock, LLMRequest, LLMResponse, Message, Provider, ProviderStream, StopReason,
 };
-use crate::llm::provider::router::ModelRouter;
-use crate::llm::tools::{ToolExecutionContext, ToolRegistry};
 use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
+use crate::llm::tools::{ToolExecutionContext, ToolRegistry};
 use crate::services::{MessageService, ServiceContext, SessionService};
 use futures::future::join_all;
 use serde_json::Value;
@@ -192,8 +192,9 @@ impl AgentService {
             .await
             .map_err(AgentError::Provider)?;
 
-        // Extract text from response
+        // Extract text and optional thinking from response
         let assistant_text = Self::extract_text_from_response(&response);
+        let thinking_text = Self::extract_thinking_from_response(&response);
 
         // Save assistant response to database
         let assistant_db_msg = message_service
@@ -224,6 +225,7 @@ impl AgentService {
         Ok(AgentResponse {
             message_id: assistant_db_msg.id,
             content: assistant_text,
+            thinking_text,
             stop_reason: response.stop_reason,
             usage: response.usage,
             cost,
@@ -326,11 +328,23 @@ impl AgentService {
 
         // Resolve model: router picks tier-appropriate model when available (T046)
         let model_name = if let Some(ref router) = self.model_router {
-            let last_text = context.messages.last().map(|m| {
-                m.content.iter().filter_map(|b| {
-                    if let ContentBlock::Text { text } = b { Some(text.as_str()) } else { None }
-                }).collect::<Vec<_>>().join(" ")
-            }).unwrap_or_default();
+            let last_text = context
+                .messages
+                .last()
+                .map(|m| {
+                    m.content
+                        .iter()
+                        .filter_map(|b| {
+                            if let ContentBlock::Text { text } = b {
+                                Some(text.as_str())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
+                .unwrap_or_default();
             let tier = crate::tui::prompt_analyzer::PromptAnalyzer::new().classify_tier(&last_text);
             let (_, model_id) = router.resolve(tier);
             model_id.to_string()
@@ -601,8 +615,9 @@ impl AgentService {
                     context.add_message(Message::user(hint));
 
                     // Ask LLM to recover without tools so it is forced to produce a text answer.
-                    let recovery_request = LLMRequest::new(model_name.clone(), context.messages.clone())
-                        .with_max_tokens(2048);
+                    let recovery_request =
+                        LLMRequest::new(model_name.clone(), context.messages.clone())
+                            .with_max_tokens(2048);
                     let recovery_request = if let Some(system) = &context.system_prompt {
                         recovery_request.with_system(system.clone())
                     } else {
@@ -653,7 +668,9 @@ impl AgentService {
                                 let content = if result.success {
                                     result.output
                                 } else {
-                                    result.error.unwrap_or_else(|| "Tool execution failed".to_string())
+                                    result
+                                        .error
+                                        .unwrap_or_else(|| "Tool execution failed".to_string())
                                 };
                                 if result.success {
                                     cache.insert_for_tool(cache_key, content.clone());
@@ -851,7 +868,8 @@ impl AgentService {
                         Ok(record) => {
                             tracing::info!(
                                 "Compaction complete: {} → {} tokens",
-                                record.tokens_before, record.tokens_after
+                                record.tokens_before,
+                                record.tokens_after
                             );
                         }
                         Err(e) => {
@@ -859,7 +877,9 @@ impl AgentService {
                         }
                     }
                 } else {
-                    tracing::warn!("Context at >80% token budget but no DB pool — compaction skipped");
+                    tracing::warn!(
+                        "Context at >80% token budget but no DB pool — compaction skipped"
+                    );
                 }
             }
 
@@ -873,8 +893,9 @@ impl AgentService {
             AgentError::Internal("Tool loop completed without final response".to_string())
         })?;
 
-        // Extract text from final response
+        // Extract text and thinking from final response
         let assistant_text = Self::extract_text_from_response(&response);
+        let thinking_text = Self::extract_thinking_from_response(&response);
 
         // Save final assistant response to database
         let assistant_db_msg = message_service
@@ -903,6 +924,7 @@ impl AgentService {
         Ok(AgentResponse {
             message_id: assistant_db_msg.id,
             content: assistant_text,
+            thinking_text,
             stop_reason: response.stop_reason,
             usage: crate::llm::provider::TokenUsage {
                 input_tokens: total_input_tokens,
@@ -991,6 +1013,24 @@ impl AgentService {
 
         text
     }
+
+    /// Extract thinking content from an LLM response (extended thinking blocks only).
+    fn extract_thinking_from_response(response: &LLMResponse) -> Option<String> {
+        let mut thinking = String::new();
+        for content in &response.content {
+            if let ContentBlock::Thinking { thinking: t } = content {
+                if !thinking.is_empty() {
+                    thinking.push('\n');
+                }
+                thinking.push_str(t);
+            }
+        }
+        if thinking.is_empty() {
+            None
+        } else {
+            Some(thinking)
+        }
+    }
 }
 
 /// Response from the agent
@@ -1001,6 +1041,9 @@ pub struct AgentResponse {
 
     /// Response content
     pub content: String,
+
+    /// Extended thinking text (Anthropic claude-3-7-sonnet+ only), if present
+    pub thinking_text: Option<String>,
 
     /// Stop reason
     pub stop_reason: Option<StopReason>,

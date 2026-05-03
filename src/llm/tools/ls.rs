@@ -88,7 +88,9 @@ impl Tool for LsTool {
 
         // Enforce project boundary on explicit path (T056)
         if let Some(ref p) = input.path {
-            if let Err(reason) = crate::llm::tools::sandbox::check_path(p, &context.working_directory) {
+            if let Err(reason) =
+                crate::llm::tools::sandbox::check_path(p, &context.working_directory)
+            {
                 return Ok(ToolResult::error(reason));
             }
         }

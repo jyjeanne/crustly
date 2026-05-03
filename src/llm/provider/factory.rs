@@ -54,7 +54,9 @@ impl Provider for FailoverProvider {
                 Err(e) if Self::is_failover_error(&e) => {
                     tracing::warn!(
                         "[FAILOVER] provider '{}' (index {}) failed: {}; trying next",
-                        provider.name(), i, e
+                        provider.name(),
+                        i,
+                        e
                     );
                     last_err = e;
                 }
@@ -75,7 +77,9 @@ impl Provider for FailoverProvider {
                 Err(e) if Self::is_failover_error(&e) => {
                     tracing::warn!(
                         "[FAILOVER] provider '{}' (index {}) stream failed: {}; trying next",
-                        provider.name(), i, e
+                        provider.name(),
+                        i,
+                        e
                     );
                     last_err = e;
                 }
@@ -94,7 +98,10 @@ impl Provider for FailoverProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        self.chain.iter().flat_map(|p| p.supported_models()).collect()
+        self.chain
+            .iter()
+            .flat_map(|p| p.supported_models())
+            .collect()
     }
 
     fn context_window(&self, model: &str) -> Option<u32> {
@@ -267,13 +274,13 @@ fn create_anthropic(config: &Config) -> Result<Arc<dyn Provider>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::config::{Config, ProviderConfig, ProviderConfigs, QwenProviderConfig};
     use super::super::{
         error::{ProviderError, Result as ProviderResult},
         r#trait::ProviderStream,
         types::{ContentBlock, LLMRequest, LLMResponse, StopReason, TokenUsage},
     };
+    use super::*;
+    use crate::config::{Config, ProviderConfig, ProviderConfigs, QwenProviderConfig};
     use async_trait::async_trait;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -290,11 +297,21 @@ mod tests {
         async fn stream(&self, _req: LLMRequest) -> ProviderResult<ProviderStream> {
             Err(ProviderError::RateLimitExceeded("mock 429".to_string()))
         }
-        fn name(&self) -> &str { "mock-primary" }
-        fn default_model(&self) -> &str { "mock" }
-        fn supported_models(&self) -> Vec<String> { vec!["mock".to_string()] }
-        fn context_window(&self, _model: &str) -> Option<u32> { Some(4096) }
-        fn calculate_cost(&self, _model: &str, _in: u32, _out: u32) -> f64 { 0.0 }
+        fn name(&self) -> &str {
+            "mock-primary"
+        }
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["mock".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(4096)
+        }
+        fn calculate_cost(&self, _model: &str, _in: u32, _out: u32) -> f64 {
+            0.0
+        }
     }
 
     /// Succeeds and increments a call counter.
@@ -309,27 +326,46 @@ mod tests {
             Ok(LLMResponse {
                 id: "test-id".to_string(),
                 model: "mock-secondary".to_string(),
-                content: vec![ContentBlock::Text { text: "ok".to_string() }],
+                content: vec![ContentBlock::Text {
+                    text: "ok".to_string(),
+                }],
                 stop_reason: Some(StopReason::EndTurn),
-                usage: TokenUsage { input_tokens: 1, output_tokens: 1 },
+                usage: TokenUsage {
+                    input_tokens: 1,
+                    output_tokens: 1,
+                },
                 cache_metrics: None,
             })
         }
         async fn stream(&self, _req: LLMRequest) -> ProviderResult<ProviderStream> {
-            Err(ProviderError::InvalidRequest("streaming not implemented in mock".to_string()))
+            Err(ProviderError::InvalidRequest(
+                "streaming not implemented in mock".to_string(),
+            ))
         }
-        fn name(&self) -> &str { "mock-secondary" }
-        fn default_model(&self) -> &str { "mock" }
-        fn supported_models(&self) -> Vec<String> { vec!["mock".to_string()] }
-        fn context_window(&self, _model: &str) -> Option<u32> { Some(4096) }
-        fn calculate_cost(&self, _model: &str, _in: u32, _out: u32) -> f64 { 0.0 }
+        fn name(&self) -> &str {
+            "mock-secondary"
+        }
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["mock".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(4096)
+        }
+        fn calculate_cost(&self, _model: &str, _in: u32, _out: u32) -> f64 {
+            0.0
+        }
     }
 
     #[tokio::test]
     async fn test_failover_on_rate_limit_tries_next_provider() {
         let counter = Arc::new(AtomicUsize::new(0));
         let primary: Arc<dyn Provider> = Arc::new(RateLimitedProvider);
-        let secondary: Arc<dyn Provider> = Arc::new(SucceedingProvider { calls: counter.clone() });
+        let secondary: Arc<dyn Provider> = Arc::new(SucceedingProvider {
+            calls: counter.clone(),
+        });
 
         let failover = FailoverProvider::new(vec![primary, secondary]);
         let req = LLMRequest::new("mock", vec![]);
@@ -337,7 +373,11 @@ mod tests {
         let result = failover.complete(req).await;
 
         assert!(result.is_ok(), "failover should succeed via secondary");
-        assert_eq!(counter.load(Ordering::SeqCst), 1, "secondary must be called once");
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "secondary must be called once"
+        );
     }
 
     #[tokio::test]
@@ -347,7 +387,10 @@ mod tests {
         let failover = FailoverProvider::new(vec![p1, p2]);
 
         let result = failover.complete(LLMRequest::new("mock", vec![])).await;
-        assert!(result.is_err(), "should propagate error when all providers fail");
+        assert!(
+            result.is_err(),
+            "should propagate error when all providers fail"
+        );
         let err = result.unwrap_err();
         assert!(matches!(err, ProviderError::RateLimitExceeded(_)));
     }

@@ -36,6 +36,7 @@ impl CompactionRecordRepository {
     }
 
     pub async fn list_for_session(&self, session_id: Uuid) -> Result<Vec<CompactionRecord>> {
+        #[allow(clippy::type_complexity)]
         let rows: Vec<(String, String, i32, i32, i32, i32, String, i64)> = sqlx::query_as(
             "SELECT id, session_id, turn_range_start, turn_range_end, \
              tokens_before, tokens_after, summary_text, created_at \
@@ -47,17 +48,18 @@ impl CompactionRecordRepository {
 
         Ok(rows
             .into_iter()
-            .map(|(id, sid, start, end, before, after, summary, ts)| CompactionRecord {
-                id: id.parse().unwrap_or_else(|_| Uuid::new_v4()),
-                session_id: sid.parse().unwrap_or_else(|_| Uuid::new_v4()),
-                turn_range_start: start,
-                turn_range_end: end,
-                tokens_before: before,
-                tokens_after: after,
-                summary_text: summary,
-                created_at: DateTime::from_timestamp(ts, 0)
-                    .unwrap_or_else(chrono::Utc::now),
-            })
+            .map(
+                |(id, sid, start, end, before, after, summary, ts)| CompactionRecord {
+                    id: id.parse().unwrap_or_else(|_| Uuid::new_v4()),
+                    session_id: sid.parse().unwrap_or_else(|_| Uuid::new_v4()),
+                    turn_range_start: start,
+                    turn_range_end: end,
+                    tokens_before: before,
+                    tokens_after: after,
+                    summary_text: summary,
+                    created_at: DateTime::from_timestamp(ts, 0).unwrap_or_else(chrono::Utc::now),
+                },
+            )
             .collect())
     }
 }

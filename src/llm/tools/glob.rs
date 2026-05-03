@@ -93,7 +93,9 @@ impl Tool for GlobTool {
 
         // Enforce project boundary on explicit base_dir (T056)
         if let Some(ref dir) = input.base_dir {
-            if let Err(reason) = crate::llm::tools::sandbox::check_path(dir, &context.working_directory) {
+            if let Err(reason) =
+                crate::llm::tools::sandbox::check_path(dir, &context.working_directory)
+            {
                 return Ok(ToolResult::error(reason));
             }
         }

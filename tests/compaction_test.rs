@@ -15,8 +15,8 @@ async fn create_session(pool: &sqlx::SqlitePool, session_id: Uuid) {
         .unwrap()
         .as_secs() as i64;
     sqlx::query(
-        "INSERT INTO sessions (id, title, model, provider, created_at, updated_at) \
-         VALUES (?, 'Test', 'claude-3-sonnet', 'anthropic', ?, ?)"
+        "INSERT INTO sessions (id, title, model, created_at, updated_at) \
+         VALUES (?, 'Test', 'claude-3-sonnet', ?, ?)",
     )
     .bind(session_id.to_string())
     .bind(now)
@@ -29,7 +29,9 @@ async fn create_session(pool: &sqlx::SqlitePool, session_id: Uuid) {
 fn text_message(role: Role, text: &str) -> Message {
     Message {
         role,
-        content: vec![ContentBlock::Text { text: text.to_string() }],
+        content: vec![ContentBlock::Text {
+            text: text.to_string(),
+        }],
     }
 }
 
@@ -37,7 +39,11 @@ fn text_message(role: Role, text: &str) -> Message {
 fn build_context(session_id: Uuid, n: usize, max_tokens: usize) -> AgentContext {
     let mut ctx = AgentContext::new(session_id, max_tokens);
     for i in 0..n {
-        let role = if i % 2 == 0 { Role::User } else { Role::Assistant };
+        let role = if i % 2 == 0 {
+            Role::User
+        } else {
+            Role::Assistant
+        };
         ctx.add_message(text_message(
             role,
             &format!("This is message number {} in the conversation.", i),
@@ -51,10 +57,9 @@ fn build_context(session_id: Uuid, n: usize, max_tokens: usize) -> AgentContext 
 async fn compaction_preserves_last_10_turns() {
     let db = Database::connect_in_memory().await.expect("db");
     db.run_migrations().await.expect("migrations");
-    // Disable FK enforcement so we can create records without parent sessions
-    sqlx::query("PRAGMA foreign_keys = OFF").execute(db.pool()).await.unwrap();
 
     let session_id = Uuid::new_v4();
+    create_session(db.pool(), session_id).await;
     let mut ctx = build_context(session_id, 50, 200_000);
 
     // Capture the last 10 messages before compaction
@@ -73,7 +78,11 @@ async fn compaction_preserves_last_10_turns() {
     let record = compact(&mut ctx, db.pool()).await.expect("compact");
 
     // Post-compaction: context should have 1 summary message + 10 preserved turns = 11
-    assert_eq!(ctx.messages.len(), 11, "expected 11 messages after compaction");
+    assert_eq!(
+        ctx.messages.len(),
+        11,
+        "expected 11 messages after compaction"
+    );
 
     // The last 10 messages must match the original last 10 verbatim
     let after_last_10: Vec<String> = ctx.messages[1..]
@@ -88,7 +97,10 @@ async fn compaction_preserves_last_10_turns() {
         })
         .collect();
 
-    assert_eq!(before_last_10, after_last_10, "last 10 turns must be preserved verbatim");
+    assert_eq!(
+        before_last_10, after_last_10,
+        "last 10 turns must be preserved verbatim"
+    );
     assert!(record.tokens_before > 0);
     assert!(record.turn_range_end == 40);
 }
@@ -112,8 +124,15 @@ async fn compaction_fails_gracefully_with_insufficient_turns() {
     assert!(result.is_err(), "compact must fail with <11 turns");
 
     // Context must be unchanged
-    assert_eq!(ctx.messages.len(), original_len, "context must not be modified on failure");
-    assert_eq!(ctx.token_count, original_tokens, "token count must not be modified on failure");
+    assert_eq!(
+        ctx.messages.len(),
+        original_len,
+        "context must not be modified on failure"
+    );
+    assert_eq!(
+        ctx.token_count, original_tokens,
+        "token count must not be modified on failure"
+    );
 }
 
 /// should_compact() threshold: context at 80% capacity triggers compaction.
@@ -137,10 +156,9 @@ fn should_compact_fires_at_80_percent() {
 async fn compaction_writes_one_record_to_db() {
     let db = Database::connect_in_memory().await.expect("db");
     db.run_migrations().await.expect("migrations");
-    // Disable FK enforcement so we can create records without parent sessions
-    sqlx::query("PRAGMA foreign_keys = OFF").execute(db.pool()).await.unwrap();
 
     let session_id = Uuid::new_v4();
+    create_session(db.pool(), session_id).await;
     let mut ctx = build_context(session_id, 30, 200_000);
 
     compact(&mut ctx, db.pool()).await.expect("compact");

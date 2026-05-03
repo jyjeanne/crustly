@@ -54,6 +54,23 @@ impl EpisodicMemoryRepository {
 
         for (id, session_id, summary_text, token_count, files_json, decisions_json, ts) in rows {
             if token_count > remaining {
+                // Contract 6: truncate instead of skipping the oversized summary
+                let max_chars = (remaining as usize) * 4;
+                let truncated = if max_chars < summary_text.len() {
+                    format!("{}…", &summary_text[..max_chars])
+                } else {
+                    summary_text.clone()
+                };
+                result.push(EpisodicMemory {
+                    id: id.parse().unwrap_or_else(|_| Uuid::new_v4()),
+                    session_id: session_id.parse().unwrap_or_else(|_| Uuid::new_v4()),
+                    summary_text: truncated,
+                    token_count: remaining,
+                    files_touched: serde_json::from_str(&files_json).unwrap_or_default(),
+                    decisions: serde_json::from_str(&decisions_json).unwrap_or_default(),
+                    created_at: chrono::DateTime::from_timestamp(ts, 0)
+                        .unwrap_or_else(chrono::Utc::now),
+                });
                 break;
             }
             remaining -= token_count;
@@ -94,10 +111,13 @@ impl EpisodicMemoryRepository {
 
         let total_tokens: i32 = memories.iter().map(|m| m.token_count).sum();
 
-        ctx.messages.insert(0, Message {
-            role: Role::System,
-            content: vec![ContentBlock::Text { text }],
-        });
+        ctx.messages.insert(
+            0,
+            Message {
+                role: Role::System,
+                content: vec![ContentBlock::Text { text }],
+            },
+        );
         ctx.token_count += total_tokens as usize;
 
         Ok(())
@@ -164,15 +184,28 @@ mod tests {
         ctx.inject_episodic_memories(&pool, 2000).await.unwrap();
 
         // Must have exactly 1 prepended system message containing all 3 memories
-        assert_eq!(ctx.messages.len(), 1, "should have exactly 1 injected system message");
+        assert_eq!(
+            ctx.messages.len(),
+            1,
+            "should have exactly 1 injected system message"
+        );
         let injected = &ctx.messages[0].content[0];
         let text = match injected {
             crate::llm::provider::types::ContentBlock::Text { text } => text,
             _ => panic!("expected Text block"),
         };
-        assert!(text.contains("Session 0"), "should include session 0 summary");
-        assert!(text.contains("Session 1"), "should include session 1 summary");
-        assert!(text.contains("Session 2"), "should include session 2 summary");
+        assert!(
+            text.contains("Session 0"),
+            "should include session 0 summary"
+        );
+        assert!(
+            text.contains("Session 1"),
+            "should include session 1 summary"
+        );
+        assert!(
+            text.contains("Session 2"),
+            "should include session 2 summary"
+        );
 
         // Token count must have increased
         assert!(

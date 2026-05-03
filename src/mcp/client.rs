@@ -63,7 +63,8 @@ impl MCPClient {
             .with_context(|| format!("failed to spawn MCP server '{}'", server_name))?;
 
         let stdin = child.stdin.take().context("failed to get MCP stdin")?;
-        let stdout = tokio::io::BufReader::new(child.stdout.take().context("failed to get MCP stdout")?);
+        let stdout =
+            tokio::io::BufReader::new(child.stdout.take().context("failed to get MCP stdout")?);
 
         let mut client = Self {
             server_name: server_name.to_string(),
@@ -75,11 +76,16 @@ impl MCPClient {
         };
 
         // Send initialize
-        client.send_request("initialize", Some(serde_json::json!({
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": { "name": "crustly", "version": env!("CARGO_PKG_VERSION") }
-        }))).await?;
+        client
+            .send_request(
+                "initialize",
+                Some(serde_json::json!({
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": { "name": "crustly", "version": env!("CARGO_PKG_VERSION") }
+                })),
+            )
+            .await?;
 
         Ok(client)
     }
@@ -100,13 +106,19 @@ impl MCPClient {
             anyhow::bail!("MCP server '{}' is unavailable", self.server_name);
         }
 
-        let result = self.send_request("tools/call", Some(serde_json::json!({
-            "name": name,
-            "arguments": arguments
-        }))).await.map_err(|e| {
-            self.healthy = false;
-            e
-        })?;
+        let result = self
+            .send_request(
+                "tools/call",
+                Some(serde_json::json!({
+                    "name": name,
+                    "arguments": arguments
+                })),
+            )
+            .await
+            .map_err(|e| {
+                self.healthy = false;
+                e
+            })?;
 
         // Extract text content from the result
         if let Some(content) = result.get("content").and_then(|c| c.as_array()) {
@@ -152,12 +164,16 @@ impl MCPClient {
 
         let mut line = serde_json::to_string(&req)?;
         line.push('\n');
-        self.stdin.write_all(line.as_bytes()).await
+        self.stdin
+            .write_all(line.as_bytes())
+            .await
             .with_context(|| format!("failed to write to MCP server '{}'", self.server_name))?;
         self.stdin.flush().await?;
 
         let mut response_line = String::new();
-        self.stdout.read_line(&mut response_line).await
+        self.stdout
+            .read_line(&mut response_line)
+            .await
             .with_context(|| format!("failed to read from MCP server '{}'", self.server_name))?;
 
         let response: JsonRpcResponse = serde_json::from_str(response_line.trim())
@@ -206,14 +222,21 @@ impl Tool for McpTool {
     }
 
     fn input_schema(&self) -> Value {
-        self.def.input_schema.clone().unwrap_or_else(|| serde_json::json!({}))
+        self.def
+            .input_schema
+            .clone()
+            .unwrap_or_else(|| serde_json::json!({}))
     }
 
     fn capabilities(&self) -> Vec<ToolCapability> {
         vec![] // MCP tools declare no built-in capabilities
     }
 
-    async fn execute(&self, input: Value, _ctx: &ToolExecutionContext) -> crate::llm::tools::Result<ToolResult> {
+    async fn execute(
+        &self,
+        input: Value,
+        _ctx: &ToolExecutionContext,
+    ) -> crate::llm::tools::Result<ToolResult> {
         let mut client = self.client.lock().await;
         match client.call_tool(&self.def.name, input).await {
             Ok(output) => Ok(ToolResult::success(output)),

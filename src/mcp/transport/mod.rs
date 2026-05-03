@@ -1,11 +1,8 @@
-//! MCP Transport Layer (Placeholder)
+//! MCP Transport Layer
 //!
-//! Transport implementations for Model Context Protocol.
+//! Newline-delimited JSON-RPC over stdio.
+//! The transport itself is embedded in `MCPClient` in `src/mcp/client.rs`:
+//! - `MCPClient::connect(name, command, args)` spawns the subprocess and pipes stdio
+//! - `send_request` / `call_tool` frame messages as `{"jsonrpc":"2.0",...}\n`
 //!
-//! ## Planned Transports
-//! - stdio (standard input/output)
-//! - HTTP (REST API)
-//! - WebSocket (real-time)
-//!
-//! ## Status
-//! 🔴 Not implemented
+//! This module exists as a namespace for future alternative transports (HTTP, WebSocket).
