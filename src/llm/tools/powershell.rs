@@ -99,9 +99,9 @@ const READ_ONLY_CMDLETS: &[&str] = &[
 /// Patterns that indicate dangerous operations regardless of cmdlet name.
 const DANGEROUS_PATTERNS: &[&str] = &[
     "invoke-expression",
-    "iex",           // alias for Invoke-Expression (covers iex(...), iex"...", iex $var)
-    " >",            // output redirection (space before > avoids false positives on ">" in string args)
-    ">>",            // append redirection without spaces (e.g. cmd>>file)
+    "iex", // alias for Invoke-Expression (covers iex(...), iex"...", iex $var)
+    " >",  // output redirection (space before > avoids false positives on ">" in string args)
+    ">>",  // append redirection without spaces (e.g. cmd>>file)
     "|out-file",
     "| out-file",
     "|set-content",
@@ -118,10 +118,10 @@ const DANGEROUS_PATTERNS: &[&str] = &[
     "invoke-command",
     "invoke-webrequest",
     "invoke-restmethod",
-    "[system.",      // direct .NET static method calls
+    "[system.", // direct .NET static method calls
     "[io.",
-    "&(",            // call operator on subexpression
-    ".(",            // dot-sourcing a subexpression
+    "&(", // call operator on subexpression
+    ".(", // dot-sourcing a subexpression
 ];
 
 /// Return `true` if `command` is safe to run in Plan (read-only) mode.
@@ -222,7 +222,9 @@ impl Tool for PowerShellTool {
             .map_err(|e| ToolError::InvalidInput(format!("Invalid input: {}", e)))?;
 
         if input.command.trim().is_empty() {
-            return Err(ToolError::InvalidInput("command cannot be empty".to_string()));
+            return Err(ToolError::InvalidInput(
+                "command cannot be empty".to_string(),
+            ));
         }
         if let Some(t) = input.timeout_secs {
             if t == 0 || t > 600 {
@@ -252,9 +254,11 @@ impl Tool for PowerShellTool {
         // Force initialization in a blocking thread so the ~5ms PATH probe does not
         // block the Tokio worker thread on the very first call.
         if once_cell::sync::Lazy::get(&PS_EXECUTABLE).is_none() {
-            tokio::task::spawn_blocking(|| { let _ = &*PS_EXECUTABLE; })
-                .await
-                .map_err(|e| ToolError::Execution(format!("PS detection task panicked: {e}")))?;
+            tokio::task::spawn_blocking(|| {
+                let _ = &*PS_EXECUTABLE;
+            })
+            .await
+            .map_err(|e| ToolError::Execution(format!("PS detection task panicked: {e}")))?;
         }
         let shell = (*PS_EXECUTABLE).ok_or_else(|| {
             ToolError::Execution(
@@ -299,12 +303,12 @@ impl Tool for PowerShellTool {
             // Drop without waiting — the process keeps running independently.
             drop(child);
 
-            return Ok(ToolResult::success(format!(
-                "Command started in background (PID: {pid})."
-            ))
-            .with_metadata("pid".to_string(), pid.to_string())
-            .with_metadata("background".to_string(), "true".to_string())
-            .with_metadata("shell".to_string(), shell.to_string()));
+            return Ok(
+                ToolResult::success(format!("Command started in background (PID: {pid})."))
+                    .with_metadata("pid".to_string(), pid.to_string())
+                    .with_metadata("background".to_string(), "true".to_string())
+                    .with_metadata("shell".to_string(), shell.to_string()),
+            );
         }
 
         // ── Foreground execution with timeout ─────────────────────────────────
@@ -385,7 +389,9 @@ mod tests {
 
     #[test]
     fn read_only_allows_select_string() {
-        assert!(is_read_only_powershell("Select-String -Pattern 'fn ' -Path *.rs"));
+        assert!(is_read_only_powershell(
+            "Select-String -Pattern 'fn ' -Path *.rs"
+        ));
     }
 
     #[test]
@@ -405,7 +411,9 @@ mod tests {
 
     #[test]
     fn read_only_blocks_net_method_call() {
-        assert!(!is_read_only_powershell("[System.IO.File]::WriteAllText('x', 'y')"));
+        assert!(!is_read_only_powershell(
+            "[System.IO.File]::WriteAllText('x', 'y')"
+        ));
     }
 
     #[test]
@@ -417,7 +425,9 @@ mod tests {
     #[test]
     fn read_only_allows_gt_in_string_argument() {
         // ">" inside a quoted argument must not be treated as redirection
-        assert!(is_read_only_powershell(r#"Select-String -Pattern ">" -Path *.rs"#));
+        assert!(is_read_only_powershell(
+            r#"Select-String -Pattern ">" -Path *.rs"#
+        ));
     }
 
     #[test]
@@ -493,10 +503,7 @@ mod tests {
         let tool = PowerShellTool;
         let ctx = make_ctx().with_read_only_mode(true);
         let result = tool
-            .execute(
-                serde_json::json!({ "command": "Write-Output hello" }),
-                &ctx,
-            )
+            .execute(serde_json::json!({ "command": "Write-Output hello" }), &ctx)
             .await
             .unwrap();
         assert!(result.success);

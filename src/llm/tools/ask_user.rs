@@ -100,7 +100,10 @@ impl Tool for AskUserTool {
 
         // Non-interactive run mode: write to stderr, read from stdin
         let prompt = match &input.context {
-            Some(ctx) => format!("\n[Crustly] Context: {}\n[Crustly] Question: {}\n> ", ctx, input.question),
+            Some(ctx) => format!(
+                "\n[Crustly] Context: {}\n[Crustly] Question: {}\n> ",
+                ctx, input.question
+            ),
             None => format!("\n[Crustly] Question: {}\n> ", input.question),
         };
 
@@ -141,9 +144,8 @@ mod tests {
     #[test]
     fn test_validate_valid_question() {
         let tool = AskUserTool;
-        let result = tool.validate_input(
-            &serde_json::json!({ "question": "Which database should I use?" }),
-        );
+        let result =
+            tool.validate_input(&serde_json::json!({ "question": "Which database should I use?" }));
         assert!(result.is_ok());
     }
 

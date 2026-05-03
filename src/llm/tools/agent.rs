@@ -100,10 +100,14 @@ impl Tool for AgentTool {
             .map_err(|e| ToolError::InvalidInput(format!("Invalid input: {}", e)))?;
 
         if input.description.trim().is_empty() {
-            return Err(ToolError::InvalidInput("description must not be empty".to_string()));
+            return Err(ToolError::InvalidInput(
+                "description must not be empty".to_string(),
+            ));
         }
         if input.prompt.trim().is_empty() {
-            return Err(ToolError::InvalidInput("prompt must not be empty".to_string()));
+            return Err(ToolError::InvalidInput(
+                "prompt must not be empty".to_string(),
+            ));
         }
         Ok(())
     }
@@ -175,10 +179,15 @@ impl Tool for AgentTool {
         // via tokio::spawn. The error arm below is for future launcher implementations
         // that may perform synchronous pre-flight checks before spawning.
         if let Some(launcher) = &context.sub_agent_launcher {
-            if let Err(e) = launcher.launch(agent_id, &input.description, &input.prompt).await {
+            if let Err(e) = launcher
+                .launch(agent_id, &input.description, &input.prompt)
+                .await
+            {
                 let _ = tokio::fs::remove_file(&output_file).await;
                 let _ = tokio::fs::remove_file(&manifest_file).await;
-                return Err(ToolError::Execution(format!("failed to spawn sub-agent: {e}")));
+                return Err(ToolError::Execution(format!(
+                    "failed to spawn sub-agent: {e}"
+                )));
             }
         } else {
             tracing::debug!(
@@ -196,7 +205,13 @@ impl Tool for AgentTool {
 /// Convert a free-form string into a short kebab-case slug.
 fn slugify(s: &str) -> String {
     s.chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .split('-')
         .filter(|part| !part.is_empty())
@@ -226,9 +241,8 @@ mod tests {
     #[test]
     fn test_validate_empty_prompt() {
         let tool = AgentTool;
-        let result = tool.validate_input(
-            &serde_json::json!({ "description": "search code", "prompt": "  " }),
-        );
+        let result = tool
+            .validate_input(&serde_json::json!({ "description": "search code", "prompt": "  " }));
         assert!(result.is_err());
     }
 

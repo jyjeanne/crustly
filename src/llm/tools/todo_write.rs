@@ -224,10 +224,8 @@ impl Tool for TodoWriteTool {
         match todo_input {
             TodoInput::Read(_) => {
                 let store = TodoStore::load(&todo_path).await?;
-                Ok(ToolResult::success(render_todos(&store.todos)).with_metadata(
-                    "count".to_string(),
-                    store.todos.len().to_string(),
-                ))
+                Ok(ToolResult::success(render_todos(&store.todos))
+                    .with_metadata("count".to_string(), store.todos.len().to_string()))
             }
             TodoInput::Write(write_input) => {
                 if context.read_only_mode {
@@ -240,8 +238,11 @@ impl Tool for TodoWriteTool {
 
                 // Load existing to preserve created_at timestamps
                 let existing = TodoStore::load(&todo_path).await.unwrap_or_default();
-                let existing_map: std::collections::HashMap<_, _> =
-                    existing.todos.into_iter().map(|t| (t.id.clone(), t)).collect();
+                let existing_map: std::collections::HashMap<_, _> = existing
+                    .todos
+                    .into_iter()
+                    .map(|t| (t.id.clone(), t))
+                    .collect();
 
                 let todos: Vec<TodoItem> = write_input
                     .todos
@@ -266,8 +267,10 @@ impl Tool for TodoWriteTool {
                 let store = TodoStore { todos };
                 store.save(&todo_path).await?;
 
-                Ok(ToolResult::success(format!("Todo list updated ({} items).", count))
-                    .with_metadata("count".to_string(), count.to_string()))
+                Ok(
+                    ToolResult::success(format!("Todo list updated ({} items).", count))
+                        .with_metadata("count".to_string(), count.to_string()),
+                )
             }
         }
     }

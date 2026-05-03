@@ -79,7 +79,9 @@ impl Tool for SkillTool {
             .map_err(|e| ToolError::InvalidInput(format!("Invalid input: {}", e)))?;
         let name = input.skill.trim().trim_start_matches('/');
         if name.is_empty() {
-            return Err(ToolError::InvalidInput("skill name must not be empty".to_string()));
+            return Err(ToolError::InvalidInput(
+                "skill name must not be empty".to_string(),
+            ));
         }
         // Reject path traversal: ".." components or null bytes could escape the skills dir.
         if name.contains('\0') || name.split(['/', '\\']).any(|c| c == "..") {
@@ -125,11 +127,9 @@ impl Tool for SkillTool {
             prompt: contents,
         };
 
-        let json = serde_json::to_string_pretty(&output)
-            .map_err(ToolError::Json)?;
+        let json = serde_json::to_string_pretty(&output).map_err(ToolError::Json)?;
 
-        Ok(ToolResult::success(json)
-            .with_metadata("path".to_string(), output.path))
+        Ok(ToolResult::success(json).with_metadata("path".to_string(), output.path))
     }
 }
 
@@ -192,7 +192,10 @@ fn skill_lookup_roots(cwd: &Path) -> Vec<PathBuf> {
 
     if let Some(home) = &home {
         let home = Path::new(home);
-        push_if_dir(&mut roots, home.join(".config").join("crustly").join("skills"));
+        push_if_dir(
+            &mut roots,
+            home.join(".config").join("crustly").join("skills"),
+        );
         push_if_dir(&mut roots, home.join(".claude").join("skills"));
     }
 
@@ -225,7 +228,10 @@ fn parse_skill_frontmatter_value(contents: &str, key: &str) -> Option<String> {
             break;
         }
         if let Some(value) = trimmed.strip_prefix(prefix.as_str()) {
-            let v = value.trim().trim_matches(|ch| matches!(ch, '"' | '\'')).trim();
+            let v = value
+                .trim()
+                .trim_matches(|ch| matches!(ch, '"' | '\''))
+                .trim();
             if !v.is_empty() {
                 return Some(v.to_string());
             }

@@ -15,8 +15,7 @@ use serde_json::Value;
 // Compile regexes once at startup rather than on every call to html_to_text.
 static SCRIPT_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?si)<script[^>]*>.*?</script>").unwrap());
-static STYLE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?si)<style[^>]*>.*?</style>").unwrap());
+static STYLE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?si)<style[^>]*>.*?</style>").unwrap());
 static TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"<[^>]+>").unwrap());
 static WS_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[ \t]+").unwrap());
 static NEWLINE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\n{3,}").unwrap());

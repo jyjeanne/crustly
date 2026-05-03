@@ -53,7 +53,8 @@ pub fn looks_like_pdf_path(text: &str, cwd: &Path) -> Option<PathBuf> {
 /// Run inside `spawn_blocking` by the caller when an async context is active.
 /// Returns `Err` with a human-readable message on failure.
 pub fn extract_pdf_text(path: &Path) -> Result<String, String> {
-    let bytes = std::fs::read(path).map_err(|e| format!("failed to read '{}': {}", path.display(), e))?;
+    let bytes =
+        std::fs::read(path).map_err(|e| format!("failed to read '{}': {}", path.display(), e))?;
     pdf_extract::extract_text_from_mem(&bytes)
         .map_err(|e| format!("PDF extraction failed for '{}': {}", path.display(), e))
 }
@@ -85,7 +86,10 @@ pub async fn augment_message_with_pdf(message: &str, cwd: &Path) -> String {
     let text = match extraction {
         Ok(Ok(t)) if !t.trim().is_empty() => t,
         Ok(Ok(_)) => {
-            tracing::debug!(?pdf_path, "PDF contained no extractable text; skipping injection");
+            tracing::debug!(
+                ?pdf_path,
+                "PDF contained no extractable text; skipping injection"
+            );
             return message.to_string();
         }
         Ok(Err(e)) => {
@@ -110,11 +114,7 @@ pub async fn augment_message_with_pdf(message: &str, cwd: &Path) -> String {
     let truncated = safe_end < text.len();
     let body = &text[..safe_end];
 
-    let mut out = format!(
-        "[PDF Content: {}]\n{}\n",
-        pdf_path.display(),
-        body.trim()
-    );
+    let mut out = format!("[PDF Content: {}]\n{}\n", pdf_path.display(), body.trim());
     if truncated {
         out.push_str(&format!(
             "\n[PDF truncated: {} of {} characters shown — use the `parse_document` tool with `pages` or `max_chars` for more]\n",
