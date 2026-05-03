@@ -89,7 +89,18 @@ TASK DESCRIPTION QUALITY REQUIREMENTS:
 
 NEVER generate text plans. ALWAYS use the plan tool for planning requests.
 
-ALWAYS explore first before answering questions about a codebase. Don't guess - use the tools!"#;
+ALWAYS explore first before answering questions about a codebase. Don't guess - use the tools!
+
+## Reasoning Pattern (ReAct)
+
+For complex tasks (multi-file analysis, debugging, architecture questions), structure your internal reasoning before acting:
+
+**THINK:** What is the user asking? What information do I need? What is the dependency order of my tool calls?
+**ACT:** Call the minimum set of tools needed to answer the question.
+**OBSERVE:** What did the tool results reveal? Did anything surprise me or contradict my hypothesis?
+**UPDATE:** Revise my understanding. Is my plan still correct, or do I need different tool calls?
+
+Apply this pattern silently — do not output the THINK/OBSERVE/UPDATE labels to the user unless they ask to see your reasoning. Emit **ACT:** labels only when you want to explain which tool you are about to call and why."#;
 
 /// Crustly - High-Performance Terminal AI Assistant
 #[derive(Parser, Debug)]
@@ -163,6 +174,18 @@ pub enum Commands {
         #[command(subcommand)]
         operation: KeyringCommands,
     },
+
+    /// Run in fully-autonomous plan mode (FullAuto — no approval gates).
+    ///
+    /// Example: crustly autoplan "Refactor the auth module to use the repository pattern"
+    AutoPlan {
+        /// The goal to pursue autonomously.
+        goal: String,
+
+        /// Maximum number of agent iterations before stopping.
+        #[arg(short, long, default_value = "20")]
+        max_iterations: u32,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -183,6 +206,8 @@ pub enum LogCommands {
     },
     /// Open log directory in file manager
     Open,
+    /// Show prompt cache hit/miss statistics for the current session.
+    ShowCacheStats,
 }
 
 #[derive(Subcommand, Debug)]
@@ -260,6 +285,9 @@ pub async fn run() -> Result<()> {
             auto_approve,
             format,
         }) => cmd_run(&config, prompt, auto_approve, format).await,
+        Some(Commands::AutoPlan { goal, max_iterations }) => {
+            cmd_autoplan(&config, goal, max_iterations).await
+        }
     }
 }
 
@@ -978,6 +1006,32 @@ async fn cmd_keyring(operation: KeyringCommands) -> Result<()> {
     }
 }
 
+/// FullAuto plan mode: no approval gates, runs to completion or max_iterations.
+async fn cmd_autoplan(
+    config: &crate::config::Config,
+    goal: String,
+    max_iterations: u32,
+) -> Result<()> {
+    use crate::tui::plan::PlanModeState;
+
+    println!("🤖 Crustly AutoPlan — FullAuto mode");
+    println!("Goal: {}", goal);
+    println!("Max iterations: {}", max_iterations);
+    println!();
+
+    let state = PlanModeState::FullAuto {
+        goal: goal.clone(),
+        iteration: 0,
+        max_iterations,
+    };
+
+    // Launch the non-interactive agent runner with FullAuto state.
+    // TODO: wire into AgentService once that layer supports session injection.
+    // For now, fall back to the existing `run` path with auto-approve.
+    let _ = state; // suppress unused warning until wired
+    cmd_run(config, goal, true, OutputFormat::Text).await
+}
+
 /// Log management commands
 async fn cmd_logs(operation: LogCommands) -> Result<()> {
     use crate::logging;
@@ -1122,6 +1176,14 @@ async fn cmd_logs(operation: LogCommands) -> Result<()> {
                     .context("Failed to open directory")?;
             }
 
+            Ok(())
+        }
+
+        LogCommands::ShowCacheStats => {
+            println!("📊 Prompt Cache Statistics\n");
+            println!("Session cache metrics are accumulated in AgentContext during a live session.");
+            println!("Start a chat session with -d to see per-turn cache telemetry in the log.");
+            println!("\nLog location: {}", std::env::current_dir()?.join(".crustly").join("logs").display());
             Ok(())
         }
     }

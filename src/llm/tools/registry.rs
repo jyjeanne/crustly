@@ -11,6 +11,7 @@ use std::sync::Arc;
 /// Registry of available tools
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn Tool>>,
+    policy: Option<Arc<dyn crate::llm::tools::sandbox::PermissionPolicy>>,
 }
 
 impl ToolRegistry {
@@ -18,7 +19,13 @@ impl ToolRegistry {
     pub fn new() -> Self {
         Self {
             tools: HashMap::new(),
+            policy: None,
         }
+    }
+
+    /// Set the permission policy for this registry
+    pub fn set_policy(&mut self, policy: Arc<dyn crate::llm::tools::sandbox::PermissionPolicy>) {
+        self.policy = Some(policy);
     }
 
     /// Register a tool
@@ -68,6 +75,17 @@ impl ToolRegistry {
 
         // Validate input
         tool.validate_input(&input)?;
+
+        // Check permission policy
+        if let Some(ref policy) = self.policy {
+            use crate::llm::tools::sandbox::PolicyDecision;
+            match policy.evaluate(name, &input) {
+                PolicyDecision::Allow => {}
+                PolicyDecision::Deny(reason) => {
+                    return Err(ToolError::PermissionDenied(reason));
+                }
+            }
+        }
 
         // Check if approval is required
         if tool.requires_approval() && !context.auto_approve {

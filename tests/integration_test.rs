@@ -65,6 +65,7 @@ impl Provider for MockProvider {
                 input_tokens: 10,
                 output_tokens: 20,
             },
+            cache_metrics: None,
         })
     }
 

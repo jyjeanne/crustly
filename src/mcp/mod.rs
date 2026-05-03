@@ -14,4 +14,5 @@
 //! ## Priority
 //! Medium - Useful for enterprise integrations
 
+pub mod client;
 pub mod transport;

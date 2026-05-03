@@ -3,8 +3,10 @@
 //! Provides high-level agent functionality for managing conversations,
 //! executing tools, and coordinating with LLM providers.
 
+pub mod compaction;
 pub mod context;
 pub mod error;
+pub mod memory;
 pub mod service;
 
 // Re-exports

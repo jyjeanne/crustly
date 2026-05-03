@@ -87,6 +87,11 @@ impl Tool for WriteTool {
 
         let input: WriteInput = serde_json::from_value(input)?;
 
+        // Enforce project boundary (T056)
+        if let Err(reason) = crate::llm::tools::sandbox::check_path(&input.path, &context.working_directory) {
+            return Ok(ToolResult::error(reason));
+        }
+
         // Resolve path relative to working directory
         let path = if PathBuf::from(&input.path).is_absolute() {
             PathBuf::from(&input.path)

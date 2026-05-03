@@ -71,6 +71,19 @@ pub struct ToolExecution {
     pub created_at: DateTime<Utc>,
 }
 
+/// Compaction record: one row per context compaction event.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactionRecord {
+    pub id: Uuid,
+    pub session_id: Uuid,
+    pub turn_range_start: i32,
+    pub turn_range_end: i32,
+    pub tokens_before: i32,
+    pub tokens_after: i32,
+    pub summary_text: String,
+    pub created_at: DateTime<Utc>,
+}
+
 /// Plan model
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Plan {
@@ -88,7 +101,43 @@ pub struct Plan {
     pub approved_at: Option<DateTime<Utc>>,
 }
 
-/// Plan task model
+/// Execution-state enum for plan task crash recovery.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlanTaskStatus {
+    Pending,
+    Running,
+    Done,
+    Failed,
+    Skipped,
+}
+
+impl PlanTaskStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PlanTaskStatus::Pending => "Pending",
+            PlanTaskStatus::Running => "Running",
+            PlanTaskStatus::Done => "Done",
+            PlanTaskStatus::Failed => "Failed",
+            PlanTaskStatus::Skipped => "Skipped",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "Running" => PlanTaskStatus::Running,
+            "Done" => PlanTaskStatus::Done,
+            "Failed" => PlanTaskStatus::Failed,
+            "Skipped" => PlanTaskStatus::Skipped,
+            _ => PlanTaskStatus::Pending,
+        }
+    }
+
+    pub fn is_incomplete(&self) -> bool {
+        matches!(self, PlanTaskStatus::Pending | PlanTaskStatus::Running)
+    }
+}
+
+/// Plan task model (DB record)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanTask {
     pub id: Uuid,
@@ -103,6 +152,22 @@ pub struct PlanTask {
     pub status: String,    // Pending, InProgress, Completed, Skipped, Failed, Blocked
     pub notes: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
+    // Execution-tracking columns (added via migration 20260503000004)
+    pub started_at: Option<DateTime<Utc>>,
+    pub output_summary: Option<String>,
+    pub error_text: Option<String>,
+}
+
+impl PlanTask {
+    /// Returns task_order as task_index (execution-tracking alias).
+    pub fn task_index(&self) -> i32 {
+        self.task_order
+    }
+
+    /// Parse status string as a PlanTaskStatus.
+    pub fn exec_status(&self) -> PlanTaskStatus {
+        PlanTaskStatus::from_str(&self.status)
+    }
 }
 
 impl Session {
@@ -268,6 +333,12 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for PlanTask {
             completed_at: row
                 .try_get::<Option<i64>, _>("completed_at")?
                 .and_then(|ts| DateTime::from_timestamp(ts, 0)),
+            started_at: row
+                .try_get::<Option<i64>, _>("started_at")
+                .unwrap_or(None)
+                .and_then(|ts| DateTime::from_timestamp(ts, 0)),
+            output_summary: row.try_get("output_summary").unwrap_or(None),
+            error_text: row.try_get("error_text").unwrap_or(None),
         })
     }
 }

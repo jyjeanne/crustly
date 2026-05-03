@@ -45,7 +45,10 @@ impl Database {
             .acquire_timeout(std::time::Duration::from_secs(10))
             .after_connect(|conn, _meta| {
                 Box::pin(async move {
-                    // Set busy_timeout to 5 seconds to handle database locks
+                    // WAL mode: enables concurrent reads during writes (T018)
+                    sqlx::query("PRAGMA journal_mode=WAL")
+                        .execute(&mut *conn)
+                        .await?;
                     sqlx::query("PRAGMA busy_timeout = 5000")
                         .execute(&mut *conn)
                         .await?;

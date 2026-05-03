@@ -2,7 +2,7 @@
 //!
 //! Database operations for plans and plan tasks.
 
-use crate::db::models::{Plan, PlanTask};
+use crate::db::models::{Plan, PlanTask, PlanTaskStatus};
 use crate::tui::plan::{PlanDocument, PlanStatus, TaskStatus, TaskType};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
@@ -328,6 +328,9 @@ impl PlanRepository {
             status: self.format_task_status(&task.status),
             notes: task.notes.clone(),
             completed_at: task.completed_at,
+            started_at: None,
+            output_summary: None,
+            error_text: None,
         })
     }
 
@@ -418,6 +421,159 @@ impl PlanRepository {
             TaskStatus::Failed => "Failed".to_string(),
             TaskStatus::Blocked(reason) => format!("Blocked:{}", reason),
         }
+    }
+}
+
+// ── PlanTaskRepository (execution-state CRUD) ─────────────────────────────
+
+/// Repository for execution-state tracking of plan tasks (crash recovery).
+///
+/// This is a lightweight layer on top of the `plan_tasks` table focused
+/// exclusively on the execution state machine columns: status, started_at,
+/// output_summary, error_text.
+#[derive(Clone)]
+pub struct PlanTaskRepository {
+    pool: SqlitePool,
+}
+
+impl PlanTaskRepository {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+
+    /// Insert a task row with Pending status (for crash-recovery registration).
+    pub async fn create_task(&self, task: PlanTask) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO plan_tasks \
+             (id, plan_id, task_order, title, description, task_type, dependencies, \
+              complexity, acceptance_criteria, status, notes) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(task.id.to_string())
+        .bind(task.plan_id.to_string())
+        .bind(task.task_order)
+        .bind(&task.title)
+        .bind(&task.description)
+        .bind(&task.task_type)
+        .bind(&task.dependencies)
+        .bind(task.complexity)
+        .bind(&task.acceptance_criteria)
+        .bind(task.status)
+        .bind(&task.notes)
+        .execute(&self.pool)
+        .await
+        .context("Failed to create plan task")?;
+        Ok(())
+    }
+
+    /// Update execution state for a task.
+    ///
+    /// Sets `started_at` when transitioning to Running, `completed_at` on Done/Failed.
+    pub async fn update_task_status(
+        &self,
+        task_id: Uuid,
+        status: PlanTaskStatus,
+        output_summary: Option<String>,
+        error_text: Option<String>,
+    ) -> Result<()> {
+        let now = chrono::Utc::now().timestamp();
+        let started_at = if status == PlanTaskStatus::Running { Some(now) } else { None };
+        let completed_at = if matches!(status, PlanTaskStatus::Done | PlanTaskStatus::Failed) {
+            Some(now)
+        } else {
+            None
+        };
+
+        sqlx::query(
+            "UPDATE plan_tasks SET status = ?, output_summary = ?, error_text = ?, \
+             started_at = COALESCE(CASE WHEN ? IS NOT NULL THEN ? ELSE started_at END, started_at), \
+             completed_at = COALESCE(?, completed_at) \
+             WHERE id = ?",
+        )
+        .bind(status.as_str())
+        .bind(&output_summary)
+        .bind(&error_text)
+        .bind(started_at)
+        .bind(started_at)
+        .bind(completed_at)
+        .bind(task_id.to_string())
+        .execute(&self.pool)
+        .await
+        .context("Failed to update task status")?;
+        Ok(())
+    }
+
+    /// Fetch a single task by ID.
+    pub async fn get_task(&self, task_id: Uuid) -> Result<PlanTask> {
+        let row: (String, String, i32, String, String, String, String, i32, String, String, Option<String>, Option<i64>, Option<i64>, Option<String>, Option<String>) =
+            sqlx::query_as(
+                "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
+                 complexity, acceptance_criteria, status, notes, started_at, completed_at, \
+                 output_summary, error_text FROM plan_tasks WHERE id = ?",
+            )
+            .bind(task_id.to_string())
+            .fetch_one(&self.pool)
+            .await
+            .context("Failed to fetch task")?;
+        Ok(row_to_plan_task(row))
+    }
+
+    /// Fetch all tasks for a plan ordered by task_order.
+    pub async fn list_tasks_for_plan(&self, plan_id: Uuid) -> Result<Vec<PlanTask>> {
+        let rows: Vec<(String, String, i32, String, String, String, String, i32, String, String, Option<String>, Option<i64>, Option<i64>, Option<String>, Option<String>)> =
+            sqlx::query_as(
+                "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
+                 complexity, acceptance_criteria, status, notes, started_at, completed_at, \
+                 output_summary, error_text FROM plan_tasks WHERE plan_id = ? ORDER BY task_order",
+            )
+            .bind(plan_id.to_string())
+            .fetch_all(&self.pool)
+            .await
+            .context("Failed to list tasks")?;
+        Ok(rows.into_iter().map(row_to_plan_task).collect())
+    }
+
+    /// Fetch tasks that are not Done or Skipped (for crash recovery).
+    pub async fn get_incomplete_tasks(&self, plan_id: Uuid) -> Result<Vec<PlanTask>> {
+        let rows: Vec<(String, String, i32, String, String, String, String, i32, String, String, Option<String>, Option<i64>, Option<i64>, Option<String>, Option<String>)> =
+            sqlx::query_as(
+                "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
+                 complexity, acceptance_criteria, status, notes, started_at, completed_at, \
+                 output_summary, error_text FROM plan_tasks \
+                 WHERE plan_id = ? AND status NOT IN ('Done', 'Skipped') \
+                 ORDER BY task_order",
+            )
+            .bind(plan_id.to_string())
+            .fetch_all(&self.pool)
+            .await
+            .context("Failed to fetch incomplete tasks")?;
+        Ok(rows.into_iter().map(row_to_plan_task).collect())
+    }
+}
+
+fn row_to_plan_task(
+    row: (String, String, i32, String, String, String, String, i32, String, String, Option<String>, Option<i64>, Option<i64>, Option<String>, Option<String>),
+) -> PlanTask {
+    use chrono::DateTime;
+    let (id, plan_id, task_order, title, description, task_type, dependencies,
+         complexity, acceptance_criteria, status, notes, started_at, completed_at,
+         output_summary, error_text) = row;
+    PlanTask {
+        id: id.parse().unwrap_or_else(|_| Uuid::new_v4()),
+        plan_id: plan_id.parse().unwrap_or_else(|_| Uuid::new_v4()),
+        task_order,
+        title,
+        description,
+        task_type,
+        dependencies,
+        complexity,
+        acceptance_criteria,
+        status,
+        notes,
+        started_at: started_at.and_then(|ts| DateTime::from_timestamp(ts, 0)),
+        completed_at: completed_at.and_then(|ts| DateTime::from_timestamp(ts, 0)),
+        output_summary,
+        error_text,
     }
 }
 

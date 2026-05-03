@@ -462,6 +462,9 @@ impl QwenProvider {
                     ContentBlock::Image { .. } => {
                         tracing::warn!("Image content blocks not yet supported for Qwen");
                     }
+                    ContentBlock::Thinking { .. } => {
+                        // Thinking blocks are Anthropic-specific; skip for Qwen
+                    }
                 }
             }
 
@@ -806,6 +809,7 @@ impl QwenProvider {
                 input_tokens: response.usage.prompt_tokens,
                 output_tokens: response.usage.completion_tokens,
             },
+            cache_metrics: None,
         }
     }
 

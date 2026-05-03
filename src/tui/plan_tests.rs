@@ -535,4 +535,31 @@ mod tests {
         assert!(task4_pos > task2_pos);
         assert!(task4_pos > task3_pos);
     }
+
+    #[test]
+    fn auto_run_no_dialogs() {
+        use uuid::Uuid;
+        let plan_id = Uuid::new_v4();
+        let tasks: Vec<PlanTask> = vec![];
+        let state = PlanModeState::AutoExecuting {
+            plan_id,
+            task_index: 0,
+            total: 10,
+            mode: AutoRunMode::AutoPlan,
+        };
+
+        // Read-only tools don't need approval in AutoExecuting
+        assert!(!state.tool_needs_approval("read_file", 70));
+        assert!(!state.tool_needs_approval("glob", 70));
+        assert!(!state.tool_needs_approval("grep", 70));
+
+        // High-risk tools do need approval
+        assert!(state.tool_needs_approval("bash", 70));
+        assert!(state.tool_needs_approval("write_file", 70));
+
+        // AwaitingApproval -> AutoExecuting via approve(auto_plan=true)
+        let _awaiting = PlanModeState::AwaitingApproval { plan_id, tasks };
+        let result = PlanModeState::approve(plan_id, vec![], true);
+        assert!(matches!(result, PlanModeState::AutoExecuting { task_index: 0, .. }));
+    }
 }

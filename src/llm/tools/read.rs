@@ -86,6 +86,11 @@ impl Tool for ReadTool {
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: ReadInput = serde_json::from_value(input)?;
 
+        // Enforce project boundary (T056)
+        if let Err(reason) = crate::llm::tools::sandbox::check_path(&input.path, &context.working_directory) {
+            return Ok(ToolResult::error(reason));
+        }
+
         // Validate path: safety check, existence, and file type
         let path = match validate_file_path(&input.path, &context.working_directory) {
             Ok(p) => p,
@@ -301,5 +306,52 @@ mod tests {
 
         let schema = tool.input_schema();
         assert!(schema.is_object());
+    }
+
+    #[tokio::test]
+    async fn test_five_concurrent_reads_no_deadlock() {
+        use futures::future::join_all;
+        use std::sync::Arc;
+        use std::io::Write;
+
+        let temp_dir = Arc::new(TempDir::new().unwrap());
+        let session_id = Uuid::new_v4();
+
+        // Create 5 files to read concurrently
+        let mut paths = Vec::new();
+        for i in 0..5 {
+            let path = temp_dir.path().join(format!("file_{}.txt", i));
+            let mut f = std::fs::File::create(&path).unwrap();
+            writeln!(f, "content of file {}", i).unwrap();
+            paths.push(path);
+        }
+
+        let tool = Arc::new(ReadTool);
+        let context = Arc::new(
+            ToolExecutionContext::new(session_id)
+                .with_working_directory(temp_dir.path().to_path_buf()),
+        );
+
+        let handles: Vec<_> = paths
+            .iter()
+            .map(|p| {
+                let tool = tool.clone();
+                let ctx = context.clone();
+                let input = serde_json::json!({ "path": p.to_str().unwrap() });
+                tokio::spawn(async move { tool.execute(input, &ctx).await })
+            })
+            .collect();
+
+        let results = join_all(handles).await;
+        for (i, result) in results.into_iter().enumerate() {
+            let result = result.expect("task panicked");
+            let tool_result = result.expect("tool error");
+            assert!(tool_result.success, "read {} should succeed", i);
+            assert!(
+                tool_result.output.contains(&format!("content of file {}", i)),
+                "file {} content mismatch",
+                i
+            );
+        }
     }
 }

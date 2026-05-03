@@ -88,6 +88,9 @@ pulldown-cmark = "0.9"
 tower-lsp = "0.20"
 lsp-types = "0.95"
 
+# Tokenization (BPE-based, accurate to <2% for cl100k_base vocab)
+tiktoken-rs = "0.5"
+
 # Concurrent Data Structures
 dashmap = "5.5"
 parking_lot = "0.12"

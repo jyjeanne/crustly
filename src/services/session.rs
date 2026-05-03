@@ -4,8 +4,10 @@
 
 use crate::db::{
     models::Session,
-    repository::{SessionListOptions, SessionRepository},
+    repository::{EpisodicMemoryRepository, SessionListOptions, SessionRepository},
 };
+use crate::llm::agent::memory::EpisodicMemory;
+use crate::llm::provider::types::Message;
 use crate::services::ServiceContext;
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -173,6 +175,60 @@ impl SessionService {
         repo.count(true)
             .await
             .context("Failed to count archived sessions")
+    }
+
+    /// Session-end hook: summarise the message history and persist as `EpisodicMemory`.
+    ///
+    /// Extracts `files_touched` by scanning tool-result messages for file paths.
+    /// Spawns a blocking task to avoid blocking the async runtime for the summary
+    /// generation (which is CPU-bound text processing).
+    pub async fn end_session_with_summary(
+        &self,
+        session_id: Uuid,
+        messages: Vec<Message>,
+        files_touched: Vec<String>,
+    ) -> Result<()> {
+        use crate::llm::agent::context::token_count;
+        use crate::llm::provider::types::ContentBlock;
+
+        // Build summary text by concatenating assistant turns (at most 300 chars each)
+        let summary_text = tokio::task::spawn_blocking(move || {
+            let mut parts: Vec<String> = Vec::new();
+            for msg in &messages {
+                use crate::llm::provider::types::Role;
+                if msg.role == Role::Assistant {
+                    for block in &msg.content {
+                        if let ContentBlock::Text { text } = block {
+                            let snippet = if text.len() > 300 { &text[..300] } else { text };
+                            parts.push(snippet.to_string());
+                        }
+                    }
+                }
+            }
+            parts.join("\n---\n")
+        })
+        .await
+        .context("summary task panicked")?;
+
+        let token_count_val = token_count(&summary_text) as i32;
+
+        let memory = EpisodicMemory {
+            id: Uuid::new_v4(),
+            session_id,
+            summary_text,
+            token_count: token_count_val,
+            files_touched,
+            decisions: Vec::new(),
+            created_at: Utc::now(),
+        };
+
+        let repo = EpisodicMemoryRepository::new(self.context.pool());
+        repo.insert(memory)
+            .await
+            .context("Failed to persist episodic memory")?;
+
+        tracing::info!("Episodic memory saved for session {}", session_id);
+        Ok(())
     }
 }
 

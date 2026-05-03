@@ -8,13 +8,32 @@ use super::error::{AgentError, Result};
 use crate::llm::provider::{
     ContentBlock, LLMRequest, LLMResponse, Message, Provider, ProviderStream, StopReason,
 };
+use crate::llm::provider::router::ModelRouter;
 use crate::llm::tools::{ToolExecutionContext, ToolRegistry};
+use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
 use crate::services::{MessageService, ServiceContext, SessionService};
+use futures::future::join_all;
 use serde_json::Value;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use uuid::Uuid;
+
+/// Returns true for read-only, idempotent tools that can run concurrently.
+pub fn is_parallelizable(tool_name: &str) -> bool {
+    matches!(
+        tool_name,
+        "read_file"
+            | "glob"
+            | "grep"
+            | "ls"
+            | "web_search"
+            | "lsp_hover"
+            | "lsp_diagnostics"
+            | "lsp_references"
+            | "http_get"
+    )
+}
 
 /// Tool approval request information
 #[derive(Debug, Clone)]
@@ -60,6 +79,15 @@ pub struct AgentService {
 
     /// Working directory for tool execution
     working_directory: std::path::PathBuf,
+
+    /// Optional model router for tier-based model selection (T046)
+    model_router: Option<ModelRouter>,
+
+    /// Session-scoped tool result cache (T037)
+    tool_cache: Arc<ToolResultCache>,
+
+    /// SQLite pool for compaction writes (T032)
+    pool: Option<Arc<sqlx::SqlitePool>>,
 }
 
 impl AgentService {
@@ -74,7 +102,22 @@ impl AgentService {
             auto_approve_tools: false,
             approval_callback: None,
             working_directory: std::env::current_dir().unwrap_or_default(),
+            model_router: None,
+            tool_cache: Arc::new(ToolResultCache::new(ToolTtlConfig::default())),
+            pool: None,
         }
+    }
+
+    /// Enable tier-based model routing (T046)
+    pub fn with_model_router(mut self, router: ModelRouter) -> Self {
+        self.model_router = Some(router);
+        self
+    }
+
+    /// Enable compaction with a DB pool (T032)
+    pub fn with_pool(mut self, pool: Arc<sqlx::SqlitePool>) -> Self {
+        self.pool = Some(pool);
+        self
     }
 
     /// Set the default system prompt
@@ -281,6 +324,20 @@ impl AgentService {
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
+        // Resolve model: router picks tier-appropriate model when available (T046)
+        let model_name = if let Some(ref router) = self.model_router {
+            let last_text = context.messages.last().map(|m| {
+                m.content.iter().filter_map(|b| {
+                    if let ContentBlock::Text { text } = b { Some(text.as_str()) } else { None }
+                }).collect::<Vec<_>>().join(" ")
+            }).unwrap_or_default();
+            let tier = crate::tui::prompt_analyzer::PromptAnalyzer::new().classify_tier(&last_text);
+            let (_, model_id) = router.resolve(tier);
+            model_id.to_string()
+        } else {
+            model_name
+        };
+
         // Create tool execution context
         let tool_context = ToolExecutionContext::new(session_id)
             .with_auto_approve(self.auto_approve_tools)
@@ -326,6 +383,12 @@ impl AgentService {
             // Track token usage
             total_input_tokens += response.usage.input_tokens;
             total_output_tokens += response.usage.output_tokens;
+
+            // Accumulate prompt-cache metrics (T065)
+            if let Some(ref cm) = response.cache_metrics {
+                context.accumulated_cache_metrics.read_tokens += cm.read_tokens;
+                context.accumulated_cache_metrics.creation_tokens += cm.creation_tokens;
+            }
 
             // Check if response contains tool use
             tracing::debug!("Response has {} content blocks", response.content.len());
@@ -514,16 +577,108 @@ impl AgentService {
                         );
                     }
 
-                    // Force a final response by breaking the loop
-                    final_response = Some(response);
+                    // T052: Instead of silently breaking, inject a recovery hint and let the
+                    // LLM self-correct via a follow-up turn (no tools = forced text response).
+                    tracing::warn!(
+                        "⚠️ Detected tool loop: '{}' called {} times in a row. Injecting recovery hint.",
+                        current_call_signature,
+                        loop_threshold
+                    );
+
+                    let hint = format!(
+                        "⚠️ Loop detected: you called '{}' {} times in a row without making progress. \
+                         Please reassess your approach. Summarise what you have found so far and \
+                         explain what the next step should be without repeating the same tool call.",
+                        current_call_signature, loop_threshold
+                    );
+
+                    // Add the assistant's last response and a user recovery message to context.
+                    let assistant_msg = Message {
+                        role: crate::llm::provider::Role::Assistant,
+                        content: response.content.clone(),
+                    };
+                    context.add_message(assistant_msg);
+                    context.add_message(Message::user(hint));
+
+                    // Ask LLM to recover without tools so it is forced to produce a text answer.
+                    let recovery_request = LLMRequest::new(model_name.clone(), context.messages.clone())
+                        .with_max_tokens(2048);
+                    let recovery_request = if let Some(system) = &context.system_prompt {
+                        recovery_request.with_system(system.clone())
+                    } else {
+                        recovery_request
+                    };
+
+                    match self.provider.complete(recovery_request).await {
+                        Ok(recovery_response) => {
+                            final_response = Some(recovery_response);
+                        }
+                        Err(_) => {
+                            final_response = Some(response);
+                        }
+                    }
                     break;
                 }
             }
 
-            // Execute tools and build response message
-            let mut tool_results = Vec::new();
+            // Execute tools and build response message.
+            // Parallelizable tools (read-only, idempotent) run concurrently; others sequentially.
+            // Tool results are cached per-session to avoid redundant calls (T037 / T049).
+            let mut tool_results: Vec<ContentBlock> = Vec::new();
 
-            for (tool_id, tool_name, tool_input) in tool_uses {
+            // Partition tool uses
+            let (parallel_uses, sequential_uses): (Vec<_>, Vec<_>) = tool_uses
+                .into_iter()
+                .partition(|(_, name, _)| is_parallelizable(name));
+
+            // --- Parallel execution ---
+            let parallel_futures: Vec<_> = parallel_uses
+                .into_iter()
+                .map(|(tool_id, tool_name, tool_input)| {
+                    let registry = Arc::clone(&self.tool_registry);
+                    let cache = Arc::clone(&self.tool_cache);
+                    let ctx = tool_context.clone();
+                    async move {
+                        let cache_key = CacheKey::from_tool(&tool_name, &tool_input);
+                        if let Some(cached) = cache.get(&cache_key) {
+                            tracing::debug!("Cache hit for tool '{}'", tool_name);
+                            return ContentBlock::ToolResult {
+                                tool_use_id: tool_id,
+                                content: cached,
+                                is_error: Some(false),
+                            };
+                        }
+                        match registry.execute(&tool_name, tool_input, &ctx).await {
+                            Ok(result) => {
+                                let content = if result.success {
+                                    result.output
+                                } else {
+                                    result.error.unwrap_or_else(|| "Tool execution failed".to_string())
+                                };
+                                if result.success {
+                                    cache.insert_for_tool(cache_key, content.clone());
+                                }
+                                ContentBlock::ToolResult {
+                                    tool_use_id: tool_id,
+                                    content,
+                                    is_error: Some(!result.success),
+                                }
+                            }
+                            Err(e) => ContentBlock::ToolResult {
+                                tool_use_id: tool_id,
+                                content: format!("Tool execution error: {}", e),
+                                is_error: Some(true),
+                            },
+                        }
+                    }
+                })
+                .collect();
+
+            let parallel_results = join_all(parallel_futures).await;
+            tool_results.extend(parallel_results);
+
+            // --- Sequential execution (tools requiring approval or non-idempotent) ---
+            for (tool_id, tool_name, tool_input) in sequential_uses {
                 tracing::info!(
                     "Executing tool '{}' (iteration {}/{})",
                     tool_name,
@@ -687,6 +842,26 @@ impl AgentService {
                 content: tool_results,
             };
             context.add_message(tool_result_msg);
+
+            // Trigger compaction if token budget is >80% full (T032)
+            if context.should_compact() {
+                if let Some(ref pool) = self.pool {
+                    tracing::info!("Context at >80% token budget — triggering compaction");
+                    match crate::llm::agent::compaction::compact(&mut context, pool).await {
+                        Ok(record) => {
+                            tracing::info!(
+                                "Compaction complete: {} → {} tokens",
+                                record.tokens_before, record.tokens_after
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!("Compaction failed (context unchanged): {}", e);
+                        }
+                    }
+                } else {
+                    tracing::warn!("Context at >80% token budget but no DB pool — compaction skipped");
+                }
+            }
 
             // Check if we've hit max iterations
             if iteration >= self.max_tool_iterations {
@@ -882,6 +1057,7 @@ mod tests {
                     input_tokens: 10,
                     output_tokens: 20,
                 },
+                cache_metrics: None,
             })
         }
 
@@ -1011,6 +1187,7 @@ mod tests {
                         input_tokens: 10,
                         output_tokens: 20,
                     },
+                    cache_metrics: None,
                 })
             } else {
                 // Second call: final response after tool execution
@@ -1025,6 +1202,7 @@ mod tests {
                         input_tokens: 15,
                         output_tokens: 25,
                     },
+                    cache_metrics: None,
                 })
             }
         }
@@ -1134,5 +1312,15 @@ mod tests {
         // Should have tokens from both calls
         assert!(response.usage.input_tokens >= 25); // 10 + 15
         assert!(response.usage.output_tokens >= 45); // 20 + 25
+    }
+
+    #[test]
+    fn loop_detection_recovery_message_logic() {
+        assert!(is_parallelizable("read_file"));
+        assert!(is_parallelizable("glob"));
+        assert!(is_parallelizable("grep"));
+        assert!(!is_parallelizable("bash"));
+        assert!(!is_parallelizable("write_file"));
+        assert!(!is_parallelizable("edit_file"));
     }
 }

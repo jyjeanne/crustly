@@ -167,6 +167,9 @@ impl OpenAIProvider {
                         // Skip images for now (OpenAI needs special handling)
                         tracing::warn!("Image content blocks not yet supported for OpenAI");
                     }
+                    ContentBlock::Thinking { .. } => {
+                        // Thinking blocks are Anthropic-specific; skip for OpenAI
+                    }
                 }
             }
 
@@ -329,6 +332,7 @@ impl OpenAIProvider {
                 input_tokens: response.usage.prompt_tokens,
                 output_tokens: response.usage.completion_tokens,
             },
+            cache_metrics: None,
         }
     }
 

@@ -131,6 +131,13 @@ impl Tool for GrepTool {
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: GrepInput = serde_json::from_value(input)?;
 
+        // Enforce project boundary on explicit path (T056)
+        if let Some(ref p) = input.path {
+            if let Err(reason) = crate::llm::tools::sandbox::check_path(p, &context.working_directory) {
+                return Ok(ToolResult::error(reason));
+            }
+        }
+
         // Build regex pattern
         let pattern_str = if input.regex {
             input.pattern.clone()

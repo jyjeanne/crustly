@@ -78,18 +78,34 @@ impl AnthropicProvider {
             tools: request.tools,
             stream: Some(request.stream),
             metadata: request.metadata,
+            thinking: request.thinking,
         }
     }
 
     /// Convert Anthropic response to our generic format
     #[allow(clippy::wrong_self_convention)]
     fn from_anthropic_response(&self, response: AnthropicResponse) -> LLMResponse {
+        let cache_metrics = if response.usage.cache_read_input_tokens > 0
+            || response.usage.cache_creation_input_tokens > 0
+        {
+            Some(super::types::CacheMetrics {
+                read_tokens: response.usage.cache_read_input_tokens,
+                creation_tokens: response.usage.cache_creation_input_tokens,
+            })
+        } else {
+            None
+        };
+
         LLMResponse {
             id: response.id,
             model: response.model,
             content: response.content,
             stop_reason: response.stop_reason,
-            usage: response.usage,
+            usage: TokenUsage {
+                input_tokens: response.usage.input_tokens,
+                output_tokens: response.usage.output_tokens,
+            },
+            cache_metrics,
         }
     }
 
@@ -365,6 +381,9 @@ struct AnthropicRequest {
     stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<std::collections::HashMap<String, String>>,
+    /// Extended thinking (claude-3-7-sonnet+ only). When set, temperature must be 1.0.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thinking: Option<ThinkingConfig>,
 }
 
 // Anthropic-specific response format
@@ -374,7 +393,18 @@ struct AnthropicResponse {
     model: String,
     content: Vec<ContentBlock>,
     stop_reason: Option<StopReason>,
-    usage: TokenUsage,
+    usage: AnthropicTokenUsage,
+}
+
+/// Anthropic's extended usage object includes prompt-cache fields.
+#[derive(Debug, Deserialize)]
+struct AnthropicTokenUsage {
+    input_tokens: u32,
+    output_tokens: u32,
+    #[serde(default)]
+    cache_read_input_tokens: u32,
+    #[serde(default)]
+    cache_creation_input_tokens: u32,
 }
 
 // Anthropic error format

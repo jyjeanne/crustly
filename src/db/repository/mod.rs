@@ -2,14 +2,18 @@
 //!
 //! Repository pattern implementations for database access.
 
+pub mod compaction;
 pub mod file;
+pub mod memory;
 pub mod message;
 pub mod plan;
 pub mod session;
 
+pub use compaction::CompactionRecordRepository;
 pub use file::FileRepository;
+pub use memory::EpisodicMemoryRepository;
 pub use message::MessageRepository;
-pub use plan::PlanRepository;
+pub use plan::{PlanRepository, PlanTaskRepository};
 pub use session::{SessionListOptions, SessionRepository};
 
 use anyhow::Result;

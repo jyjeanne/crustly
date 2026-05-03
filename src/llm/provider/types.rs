@@ -73,6 +73,9 @@ pub enum ContentBlock {
         #[serde(skip_serializing_if = "Option::is_none")]
         is_error: Option<bool>,
     },
+    /// Extended thinking block (Anthropic claude-3-7-sonnet+).
+    /// Not rendered as assistant text by default.
+    Thinking { thinking: String },
 }
 
 /// Image source for image content blocks
@@ -83,6 +86,16 @@ pub enum ImageSource {
     Base64 { media_type: String, data: String },
     /// Image URL
     Url { url: String },
+}
+
+/// Extended thinking configuration (Anthropic claude-3-7-sonnet+).
+/// When enabled, temperature MUST be 1.0 — enforced by `with_thinking()`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThinkingConfig {
+    /// Always "enabled".
+    pub r#type: String,
+    /// Token budget for the internal reasoning trace.
+    pub budget_tokens: u32,
 }
 
 /// LLM request parameters
@@ -98,7 +111,7 @@ pub struct LLMRequest {
     /// Available tools
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Tool>>,
-    /// Temperature (0.0-1.0)
+    /// Temperature (0.0-1.0); forced to 1.0 when thinking is active
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     /// Maximum tokens to generate
@@ -110,6 +123,9 @@ pub struct LLMRequest {
     /// Additional metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, String>>,
+    /// Extended thinking configuration (Anthropic only)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<ThinkingConfig>,
 }
 
 impl LLMRequest {
@@ -124,7 +140,21 @@ impl LLMRequest {
             max_tokens: None,
             stream: false,
             metadata: None,
+            thinking: None,
         }
+    }
+
+    /// Enable extended thinking with the given token budget.
+    /// Forces temperature to 1.0 per Anthropic API requirements.
+    pub fn with_thinking(mut self, budget_tokens: u32) -> Self {
+        if budget_tokens > 0 {
+            self.thinking = Some(ThinkingConfig {
+                r#type: "enabled".to_string(),
+                budget_tokens,
+            });
+            self.temperature = Some(1.0);
+        }
+        self
     }
 
     /// Set system prompt
@@ -169,6 +199,23 @@ pub struct Tool {
     pub input_schema: serde_json::Value,
 }
 
+/// Prompt cache metrics reported by Anthropic.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CacheMetrics {
+    /// Tokens read from the prompt cache (saved cost).
+    pub read_tokens: u32,
+    /// Tokens written to create a new cache entry.
+    pub creation_tokens: u32,
+}
+
+impl CacheMetrics {
+    /// Fraction of input tokens that were served from cache (0.0–1.0).
+    pub fn hit_rate(&self) -> f32 {
+        let total = self.read_tokens + self.creation_tokens;
+        if total == 0 { 0.0 } else { self.read_tokens as f32 / total as f32 }
+    }
+}
+
 /// LLM response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LLMResponse {
@@ -182,6 +229,9 @@ pub struct LLMResponse {
     pub stop_reason: Option<StopReason>,
     /// Token usage
     pub usage: TokenUsage,
+    /// Optional prompt cache metrics (Anthropic only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_metrics: Option<CacheMetrics>,
 }
 
 /// Reason why the model stopped generating
@@ -304,5 +354,38 @@ mod tests {
             output_tokens: 200,
         };
         assert_eq!(usage.total(), 300);
+    }
+
+    #[test]
+    fn with_thinking_sets_temperature_and_config() {
+        let req = LLMRequest::new("claude-3-7-sonnet", vec![]).with_thinking(8192);
+        assert_eq!(req.temperature, Some(1.0));
+        let tc = req.thinking.expect("thinking must be set");
+        assert_eq!(tc.r#type, "enabled");
+        assert_eq!(tc.budget_tokens, 8192);
+    }
+
+    #[test]
+    fn with_thinking_sets_temperature() {
+        let req = LLMRequest::new("claude-3-7-sonnet", vec![])
+            .with_thinking(8192);
+        assert_eq!(req.temperature, Some(1.0));
+        let tc = req.thinking.unwrap();
+        assert_eq!(tc.r#type, "enabled");
+        assert_eq!(tc.budget_tokens, 8192);
+    }
+
+    #[test]
+    fn with_thinking_zero_budget_is_noop() {
+        let req = LLMRequest::new("model", vec![]).with_thinking(0);
+        assert!(req.thinking.is_none(), "zero budget should not enable thinking");
+    }
+
+    #[test]
+    fn cache_metrics_hit_rate() {
+        let cm = CacheMetrics { read_tokens: 800, creation_tokens: 200 };
+        assert!((cm.hit_rate() - 0.8).abs() < 0.001);
+        let empty = CacheMetrics::default();
+        assert_eq!(empty.hit_rate(), 0.0);
     }
 }

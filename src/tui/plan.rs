@@ -790,6 +790,145 @@ impl TaskStatus {
     }
 }
 
+// ── Auto-run mode state machine ───────────────────────────────────────────────
+
+/// Auto-run execution mode.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AutoRunMode {
+    /// Approve the plan once, then execute all tasks automatically.
+    AutoPlan,
+    /// Fully autonomous: no approval gate, runs to completion or max iterations.
+    FullAutonomous,
+}
+
+/// Reason why auto-execution paused.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PauseReason {
+    UserRequest,
+    TaskFailed,
+    RiskThresholdExceeded,
+    LoopDetected,
+}
+
+/// Finite-state machine governing plan execution in the TUI.
+///
+/// Transitions are persisted to the `plan_tasks` table so they survive crashes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PlanModeState {
+    Idle,
+    Planning { draft: String },
+    AwaitingApproval { plan_id: uuid::Uuid, tasks: Vec<PlanTask> },
+    Executing { plan_id: uuid::Uuid, task_index: usize, total: usize },
+    AutoExecuting {
+        plan_id: uuid::Uuid,
+        task_index: usize,
+        total: usize,
+        mode: AutoRunMode,
+    },
+    FullAuto {
+        goal: String,
+        iteration: u32,
+        max_iterations: u32,
+    },
+    Paused {
+        plan_id: uuid::Uuid,
+        task_index: usize,
+        reason: PauseReason,
+    },
+    Done { plan_id: uuid::Uuid },
+    Failed { plan_id: uuid::Uuid, task_index: usize, error: String },
+}
+
+impl PlanModeState {
+    /// Returns true if the tool requires user approval in this state.
+    pub fn tool_needs_approval(&self, tool_name: &str, _threshold: u8) -> bool {
+        let is_high_risk = matches!(
+            tool_name,
+            "bash" | "write_file" | "edit_file" | "code_exec"
+        );
+        match self {
+            PlanModeState::AutoExecuting { .. } => is_high_risk,
+            PlanModeState::Executing { .. } => true,
+            _ => false,
+        }
+    }
+
+    /// Transition: user approves a plan.
+    ///
+    /// Returns `AutoExecuting` when auto_plan mode is configured; `Executing` otherwise.
+    pub fn approve(plan_id: uuid::Uuid, tasks: Vec<PlanTask>, auto_plan: bool) -> Self {
+        let total = tasks.len();
+        if auto_plan {
+            PlanModeState::AutoExecuting {
+                plan_id,
+                task_index: 0,
+                total,
+                mode: AutoRunMode::AutoPlan,
+            }
+        } else {
+            PlanModeState::Executing {
+                plan_id,
+                task_index: 0,
+                total,
+            }
+        }
+    }
+
+    /// Advance to the next task, or transition to Done.
+    pub fn advance(self) -> Self {
+        match self {
+            PlanModeState::Executing { plan_id, task_index, total } => {
+                if task_index + 1 >= total {
+                    PlanModeState::Done { plan_id }
+                } else {
+                    PlanModeState::Executing { plan_id, task_index: task_index + 1, total }
+                }
+            }
+            PlanModeState::AutoExecuting { plan_id, task_index, total, mode } => {
+                if task_index + 1 >= total {
+                    PlanModeState::Done { plan_id }
+                } else {
+                    PlanModeState::AutoExecuting { plan_id, task_index: task_index + 1, total, mode }
+                }
+            }
+            other => other,
+        }
+    }
+
+    /// Classify a tool call as high-risk for auto-run threshold checks.
+    pub fn is_high_risk_tool(tool_name: &str) -> bool {
+        matches!(tool_name, "bash" | "write_file" | "edit_file" | "code_exec")
+    }
+}
+
+/// Crash recovery: describe what plan was interrupted.
+#[derive(Debug, Clone)]
+pub struct InterruptedPlan {
+    pub plan_id: uuid::Uuid,
+    /// Index of the task to resume at (the lowest incomplete task_order).
+    pub resume_at_index: usize,
+    pub total_tasks: usize,
+}
+
+impl InterruptedPlan {
+    /// Build from a list of all tasks for the plan.
+    pub fn from_tasks(plan_id: uuid::Uuid, tasks: &[crate::db::models::PlanTask]) -> Option<Self> {
+        let incomplete: Vec<_> = tasks
+            .iter()
+            .filter(|t| t.exec_status().is_incomplete())
+            .collect();
+        if incomplete.is_empty() {
+            return None;
+        }
+        let resume_at = incomplete.iter().map(|t| t.task_order as usize).min().unwrap_or(0);
+        Some(InterruptedPlan {
+            plan_id,
+            resume_at_index: resume_at,
+            total_tasks: tasks.len(),
+        })
+    }
+}
+
 #[cfg(test)]
 #[path = "plan_tests.rs"]
 mod plan_tests;

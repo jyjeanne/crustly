@@ -86,6 +86,13 @@ impl Tool for LsTool {
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: LsInput = serde_json::from_value(input)?;
 
+        // Enforce project boundary on explicit path (T056)
+        if let Some(ref p) = input.path {
+            if let Err(reason) = crate::llm::tools::sandbox::check_path(p, &context.working_directory) {
+                return Ok(ToolResult::error(reason));
+            }
+        }
+
         // Resolve path
         let path = if let Some(ref p) = input.path {
             if PathBuf::from(p).is_absolute() {

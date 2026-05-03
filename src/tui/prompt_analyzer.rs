@@ -203,6 +203,81 @@ impl Default for PromptAnalyzer {
     }
 }
 
+// ── ModelTier classification ──────────────────────────────────────────────────
+
+/// Keywords that signal a Powerful-tier (deep reasoning) request.
+const POWERFUL_KEYWORDS: &[&str] = &[
+    "refactor",
+    "architecture",
+    "design",
+    "race condition",
+    "debug",
+    "which files",
+    "affected by",
+    "dependency",
+    "cross-file",
+    "analyse",
+    "analyze",
+    "security",
+    "audit",
+    "performance",
+    "bottleneck",
+    "why is",
+    "what causes",
+];
+
+/// Keywords that signal a Fast-tier (simple lookup) request.
+const FAST_KEYWORDS: &[&str] = &[
+    "what is",
+    "current file",
+    "hello",
+    "how many",
+    "list",
+    "version",
+    "format",
+    "convert",
+    "summarise",
+    "summarize",
+    "explain briefly",
+    "quick",
+];
+
+impl PromptAnalyzer {
+    /// Classify a prompt into a `ModelTier`.
+    ///
+    /// Rules (evaluated in order):
+    /// 1. Any Powerful keyword → `Powerful`
+    /// 2. Any Fast keyword AND no planning/edit keywords → `Fast`
+    /// 3. Default → `Balanced`
+    pub fn classify_tier(&self, prompt: &str) -> crate::llm::provider::router::ModelTier {
+        use crate::llm::provider::router::ModelTier;
+
+        let lower = prompt.to_lowercase();
+
+        // Check for powerful signals first
+        for kw in POWERFUL_KEYWORDS {
+            if lower.contains(kw) {
+                return ModelTier::Powerful;
+            }
+        }
+
+        // Check for fast signals (only if no plan/write/edit intent)
+        let has_edit_intent = self.write_file_regex.is_match(&lower)
+            || self.edit_file_regex.is_match(&lower)
+            || self.plan_regex.is_match(&lower);
+
+        if !has_edit_intent {
+            for kw in FAST_KEYWORDS {
+                if lower.contains(kw) {
+                    return ModelTier::Fast;
+                }
+            }
+        }
+
+        ModelTier::Balanced
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

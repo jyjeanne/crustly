@@ -4,13 +4,110 @@
 
 use super::{
     anthropic::AnthropicProvider,
+    error::ProviderError,
     openai::OpenAIProvider,
     qwen::{QwenProvider, ToolCallParser},
     Provider,
 };
 use crate::config::{Config, ProviderConfig, QwenProviderConfig};
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
+
+// ── Failover provider ──────────────────────────────────────────────────────────
+
+/// A `Provider` wrapper that retries with secondary providers on transient errors.
+///
+/// On `RateLimitExceeded`, `Timeout`, or 5xx `ApiError`, it logs `[FAILOVER]`
+/// and calls the next provider in the chain.
+pub struct FailoverProvider {
+    chain: Vec<Arc<dyn Provider>>,
+}
+
+impl FailoverProvider {
+    /// Build a failover chain. At least two providers are required.
+    pub fn new(chain: Vec<Arc<dyn Provider>>) -> Self {
+        assert!(!chain.is_empty(), "failover chain must not be empty");
+        Self { chain }
+    }
+
+    fn is_failover_error(err: &ProviderError) -> bool {
+        matches!(
+            err,
+            ProviderError::RateLimitExceeded(_)
+                | ProviderError::Timeout(_)
+                | ProviderError::HttpError(_)
+        ) || matches!(err, ProviderError::ApiError { status, .. } if *status >= 500)
+    }
+}
+
+#[async_trait]
+impl Provider for FailoverProvider {
+    async fn complete(
+        &self,
+        request: super::types::LLMRequest,
+    ) -> super::error::Result<super::types::LLMResponse> {
+        let mut last_err = ProviderError::InvalidRequest("empty failover chain".to_string());
+        for (i, provider) in self.chain.iter().enumerate() {
+            match provider.complete(request.clone()).await {
+                Ok(resp) => return Ok(resp),
+                Err(e) if Self::is_failover_error(&e) => {
+                    tracing::warn!(
+                        "[FAILOVER] provider '{}' (index {}) failed: {}; trying next",
+                        provider.name(), i, e
+                    );
+                    last_err = e;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Err(last_err)
+    }
+
+    async fn stream(
+        &self,
+        request: super::types::LLMRequest,
+    ) -> super::error::Result<super::r#trait::ProviderStream> {
+        let mut last_err = ProviderError::InvalidRequest("empty failover chain".to_string());
+        for (i, provider) in self.chain.iter().enumerate() {
+            match provider.stream(request.clone()).await {
+                Ok(s) => return Ok(s),
+                Err(e) if Self::is_failover_error(&e) => {
+                    tracing::warn!(
+                        "[FAILOVER] provider '{}' (index {}) stream failed: {}; trying next",
+                        provider.name(), i, e
+                    );
+                    last_err = e;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Err(last_err)
+    }
+
+    fn name(&self) -> &str {
+        self.chain.first().map(|p| p.name()).unwrap_or("failover")
+    }
+
+    fn default_model(&self) -> &str {
+        self.chain.first().map(|p| p.default_model()).unwrap_or("")
+    }
+
+    fn supported_models(&self) -> Vec<String> {
+        self.chain.iter().flat_map(|p| p.supported_models()).collect()
+    }
+
+    fn context_window(&self, model: &str) -> Option<u32> {
+        self.chain.first().and_then(|p| p.context_window(model))
+    }
+
+    fn calculate_cost(&self, model: &str, input_tokens: u32, output_tokens: u32) -> f64 {
+        self.chain
+            .first()
+            .map(|p| p.calculate_cost(model, input_tokens, output_tokens))
+            .unwrap_or(0.0)
+    }
+}
 
 /// Create a provider based on configuration with fallback priority
 ///
@@ -172,6 +269,88 @@ fn create_anthropic(config: &Config) -> Result<Arc<dyn Provider>> {
 mod tests {
     use super::*;
     use crate::config::{Config, ProviderConfig, ProviderConfigs, QwenProviderConfig};
+    use super::super::{
+        error::{ProviderError, Result as ProviderResult},
+        r#trait::ProviderStream,
+        types::{ContentBlock, LLMRequest, LLMResponse, StopReason, TokenUsage},
+    };
+    use async_trait::async_trait;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // ── Mock providers for T063 ────────────────────────────────────────────────
+
+    /// Always fails with a rate-limit error.
+    struct RateLimitedProvider;
+
+    #[async_trait]
+    impl Provider for RateLimitedProvider {
+        async fn complete(&self, _req: LLMRequest) -> ProviderResult<LLMResponse> {
+            Err(ProviderError::RateLimitExceeded("mock 429".to_string()))
+        }
+        async fn stream(&self, _req: LLMRequest) -> ProviderResult<ProviderStream> {
+            Err(ProviderError::RateLimitExceeded("mock 429".to_string()))
+        }
+        fn name(&self) -> &str { "mock-primary" }
+        fn default_model(&self) -> &str { "mock" }
+        fn supported_models(&self) -> Vec<String> { vec!["mock".to_string()] }
+        fn context_window(&self, _model: &str) -> Option<u32> { Some(4096) }
+        fn calculate_cost(&self, _model: &str, _in: u32, _out: u32) -> f64 { 0.0 }
+    }
+
+    /// Succeeds and increments a call counter.
+    struct SucceedingProvider {
+        calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl Provider for SucceedingProvider {
+        async fn complete(&self, _req: LLMRequest) -> ProviderResult<LLMResponse> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(LLMResponse {
+                id: "test-id".to_string(),
+                model: "mock-secondary".to_string(),
+                content: vec![ContentBlock::Text { text: "ok".to_string() }],
+                stop_reason: Some(StopReason::EndTurn),
+                usage: TokenUsage { input_tokens: 1, output_tokens: 1 },
+                cache_metrics: None,
+            })
+        }
+        async fn stream(&self, _req: LLMRequest) -> ProviderResult<ProviderStream> {
+            Err(ProviderError::InvalidRequest("streaming not implemented in mock".to_string()))
+        }
+        fn name(&self) -> &str { "mock-secondary" }
+        fn default_model(&self) -> &str { "mock" }
+        fn supported_models(&self) -> Vec<String> { vec!["mock".to_string()] }
+        fn context_window(&self, _model: &str) -> Option<u32> { Some(4096) }
+        fn calculate_cost(&self, _model: &str, _in: u32, _out: u32) -> f64 { 0.0 }
+    }
+
+    #[tokio::test]
+    async fn test_failover_on_rate_limit_tries_next_provider() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let primary: Arc<dyn Provider> = Arc::new(RateLimitedProvider);
+        let secondary: Arc<dyn Provider> = Arc::new(SucceedingProvider { calls: counter.clone() });
+
+        let failover = FailoverProvider::new(vec![primary, secondary]);
+        let req = LLMRequest::new("mock", vec![]);
+
+        let result = failover.complete(req).await;
+
+        assert!(result.is_ok(), "failover should succeed via secondary");
+        assert_eq!(counter.load(Ordering::SeqCst), 1, "secondary must be called once");
+    }
+
+    #[tokio::test]
+    async fn test_failover_all_fail_returns_last_error() {
+        let p1: Arc<dyn Provider> = Arc::new(RateLimitedProvider);
+        let p2: Arc<dyn Provider> = Arc::new(RateLimitedProvider);
+        let failover = FailoverProvider::new(vec![p1, p2]);
+
+        let result = failover.complete(LLMRequest::new("mock", vec![])).await;
+        assert!(result.is_err(), "should propagate error when all providers fail");
+        let err = result.unwrap_err();
+        assert!(matches!(err, ProviderError::RateLimitExceeded(_)));
+    }
 
     #[test]
     fn test_create_provider_with_anthropic() {

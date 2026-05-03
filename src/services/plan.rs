@@ -2,7 +2,8 @@
 //!
 //! Business logic for plan management operations.
 
-use crate::db::repository::PlanRepository;
+use crate::db::models::PlanTaskStatus;
+use crate::db::repository::{PlanRepository, PlanTaskRepository};
 use crate::services::ServiceContext;
 use crate::tui::plan::{PlanDocument, PlanStatus, TaskStatus};
 use anyhow::Result;
@@ -41,6 +42,7 @@ pub struct PlanStatistics {
 #[derive(Clone)]
 pub struct PlanService {
     repo: PlanRepository,
+    task_repo: PlanTaskRepository,
 }
 
 impl PlanService {
@@ -48,7 +50,41 @@ impl PlanService {
     pub fn new(context: ServiceContext) -> Self {
         Self {
             repo: PlanRepository::new(context.pool()),
+            task_repo: PlanTaskRepository::new(context.pool()),
         }
+    }
+
+    /// Mark a task as Running before executing it.
+    ///
+    /// Called by plan executor before any tool calls for the task.
+    pub async fn begin_task(&self, task_id: Uuid) -> Result<()> {
+        self.task_repo
+            .update_task_status(task_id, PlanTaskStatus::Running, None, None)
+            .await
+    }
+
+    /// Mark a task as Done after its output has been fully verified.
+    ///
+    /// Only called when all tool calls succeeded and output is inspected.
+    pub async fn complete_task(&self, task_id: Uuid, output_summary: Option<String>) -> Result<()> {
+        self.task_repo
+            .update_task_status(task_id, PlanTaskStatus::Done, output_summary, None)
+            .await
+    }
+
+    /// Mark a task as Failed with the error text.
+    pub async fn fail_task(&self, task_id: Uuid, error: String) -> Result<()> {
+        self.task_repo
+            .update_task_status(task_id, PlanTaskStatus::Failed, None, Some(error))
+            .await
+    }
+
+    /// Return incomplete tasks for a plan (for crash recovery at session start).
+    pub async fn get_incomplete_tasks(
+        &self,
+        plan_id: Uuid,
+    ) -> Result<Vec<crate::db::models::PlanTask>> {
+        self.task_repo.get_incomplete_tasks(plan_id).await
     }
 
     /// Find plan by ID

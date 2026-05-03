@@ -15,6 +15,171 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Plan execution mode
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanExecMode {
+    /// Ask for approval before every task.
+    Interactive,
+    /// Approve the plan once, then run all tasks automatically.
+    AutoPlan,
+    /// Fully autonomous: no approval gate at all.
+    FullAuto,
+}
+
+impl Default for PlanExecMode {
+    fn default() -> Self { Self::Interactive }
+}
+
+/// Plan mode configuration (`[plan_mode]` section).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PlanModeConfig {
+    #[serde(default)]
+    pub mode: PlanExecMode,
+    /// Risk score (0–100) above which auto-run pauses for approval.
+    #[serde(default = "default_risk_threshold")]
+    pub auto_approval_threshold: u8,
+    /// Maximum iterations for full-auto mode before forcing a stop.
+    #[serde(default = "default_max_iterations")]
+    pub max_auto_iterations: u32,
+}
+
+fn default_risk_threshold() -> u8 { 70 }
+fn default_max_iterations() -> u32 { 20 }
+
+/// Security configuration (`[security]` section).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SecurityConfig {
+    /// Programs permitted in bash tool calls.
+    #[serde(default)]
+    pub allow_bash: Vec<String>,
+    /// Absolute paths that are always denied.
+    #[serde(default)]
+    pub deny_paths: Vec<String>,
+    /// Tool names that are always denied.
+    #[serde(default)]
+    pub deny_tools: Vec<String>,
+}
+
+impl SecurityConfig {
+    /// Build a composable permission policy from this security config.
+    pub fn to_policy(&self) -> Box<dyn crate::llm::tools::sandbox::PermissionPolicy> {
+        use crate::llm::tools::sandbox::{AllowAll, AndPolicy, BashCommandAllowlist, DenyPathPrefixRule, DenyToolRule};
+
+        let mut rules: Vec<Box<dyn crate::llm::tools::sandbox::PermissionPolicy>> = Vec::new();
+
+        if !self.allow_bash.is_empty() {
+            rules.push(Box::new(BashCommandAllowlist {
+                allowed_programs: self.allow_bash.clone(),
+            }));
+        }
+
+        for tool in &self.deny_tools {
+            rules.push(Box::new(DenyToolRule::new(tool)));
+        }
+
+        for path in &self.deny_paths {
+            rules.push(Box::new(DenyPathPrefixRule::new(path)));
+        }
+
+        if rules.is_empty() {
+            Box::new(AllowAll)
+        } else {
+            Box::new(AndPolicy(rules))
+        }
+    }
+}
+
+/// Memory / context configuration (`[memory]` section).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryConfig {
+    /// Maximum token budget for injected episodic memories.
+    #[serde(default = "default_episodic_budget")]
+    pub episodic_budget_tokens: i32,
+    /// Whether to build and maintain the codebase symbol index.
+    #[serde(default = "default_true")]
+    pub enable_codebase_index: bool,
+    /// Context compaction threshold (0.0–1.0).
+    #[serde(default = "default_compaction_threshold")]
+    pub compaction_threshold: f64,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self {
+            episodic_budget_tokens: default_episodic_budget(),
+            enable_codebase_index: true,
+            compaction_threshold: default_compaction_threshold(),
+        }
+    }
+}
+
+fn default_episodic_budget() -> i32 { 2_000 }
+fn default_compaction_threshold() -> f64 { 0.80 }
+fn default_true() -> bool { true }
+
+/// MCP server configuration (`[[mcp.servers]]`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpServerConfig {
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+}
+
+/// Tool result cache configuration (`[tool_cache]` section).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCacheConfig {
+    /// TTL in seconds for `read_file` results. 0 = no cache.
+    #[serde(default = "default_read_file_ttl")]
+    pub read_file_secs: u64,
+    /// TTL in seconds for `glob` results.
+    #[serde(default = "default_glob_ttl")]
+    pub glob_secs: u64,
+    /// TTL in seconds for `grep` results.
+    #[serde(default = "default_grep_ttl")]
+    pub grep_secs: u64,
+    /// TTL in seconds for `web_search` results.
+    #[serde(default = "default_web_search_ttl")]
+    pub web_search_secs: u64,
+}
+
+fn default_read_file_ttl() -> u64 { 60 }
+fn default_glob_ttl() -> u64 { 30 }
+fn default_grep_ttl() -> u64 { 30 }
+fn default_web_search_ttl() -> u64 { 300 }
+
+impl Default for ToolCacheConfig {
+    fn default() -> Self {
+        Self {
+            read_file_secs: default_read_file_ttl(),
+            glob_secs: default_glob_ttl(),
+            grep_secs: default_grep_ttl(),
+            web_search_secs: default_web_search_ttl(),
+        }
+    }
+}
+
+impl ToolCacheConfig {
+    /// Return the TTL in seconds for a given tool name. `0` means "do not cache".
+    pub fn ttl_secs_for(&self, tool_name: &str) -> u64 {
+        match tool_name {
+            "read_file" => self.read_file_secs,
+            "glob" => self.glob_secs,
+            "grep" => self.grep_secs,
+            "web_search" => self.web_search_secs,
+            _ => 0,
+        }
+    }
+}
+
+/// MCP configuration (`[mcp]` section).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct McpConfig {
+    #[serde(default)]
+    pub servers: Vec<McpServerConfig>,
+}
+
 /// Main configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -37,6 +202,26 @@ pub struct Config {
     /// LLM provider configurations
     #[serde(default)]
     pub providers: ProviderConfigs,
+
+    /// Plan execution mode
+    #[serde(default)]
+    pub plan_mode: PlanModeConfig,
+
+    /// Security and permission policy
+    #[serde(default)]
+    pub security: SecurityConfig,
+
+    /// Memory and context management
+    #[serde(default)]
+    pub memory: MemoryConfig,
+
+    /// MCP server connections
+    #[serde(default)]
+    pub mcp: McpConfig,
+
+    /// Tool result cache settings
+    #[serde(default)]
+    pub tool_cache: ToolCacheConfig,
 }
 
 /// Debug configuration options
@@ -202,6 +387,11 @@ impl Default for Config {
             },
             debug: DebugConfig::default(),
             providers: ProviderConfigs::default(),
+            plan_mode: PlanModeConfig::default(),
+            security: SecurityConfig::default(),
+            memory: MemoryConfig::default(),
+            mcp: McpConfig::default(),
+            tool_cache: ToolCacheConfig::default(),
         }
     }
 }
@@ -228,14 +418,20 @@ impl Config {
             }
         }
 
-        // 2. Try to load local config
+        // 2. Try to load project-level config (.crustly/config.toml in cwd or ancestors)
+        if let Some(project_config) = Self::project_config_path() {
+            tracing::debug!("Loading project config from: {:?}", project_config);
+            config = Self::merge_from_file(config, &project_config)?;
+        }
+
+        // 3. Try to load local config
         let local_config_path = Self::local_config_path();
         if local_config_path.exists() {
             tracing::debug!("Loading local config from: {:?}", local_config_path);
             config = Self::merge_from_file(config, &local_config_path)?;
         }
 
-        // 3. Apply environment variable overrides
+        // 4. Apply environment variable overrides
         config = Self::apply_env_overrides(config)?;
 
         tracing::debug!("Configuration loaded successfully");
@@ -274,6 +470,20 @@ impl Config {
         dirs::config_dir().map(|dir| dir.join("crustly").join("config.toml"))
     }
 
+    /// Walk up from cwd looking for `.crustly/config.toml` (project-level config).
+    pub fn project_config_path() -> Option<PathBuf> {
+        let mut dir = std::env::current_dir().ok()?;
+        loop {
+            let candidate = dir.join(".crustly").join("config.toml");
+            if candidate.exists() {
+                return Some(candidate);
+            }
+            if !dir.pop() {
+                return None;
+            }
+        }
+    }
+
     /// Get the local config path: ./crustly.toml
     fn local_config_path() -> PathBuf {
         PathBuf::from("./crustly.toml")
@@ -292,14 +502,17 @@ impl Config {
 
     /// Merge two configs (file_config overwrites base where specified)
     fn merge(_base: Self, overlay: Self) -> Self {
-        // For now, we'll do a simple overlay merge where overlay completely replaces base
-        // In the future, we could make this more sophisticated with field-level merging
         Self {
             crabrace: overlay.crabrace,
             database: overlay.database,
             logging: overlay.logging,
             debug: overlay.debug,
             providers: overlay.providers,
+            plan_mode: overlay.plan_mode,
+            security: overlay.security,
+            memory: overlay.memory,
+            mcp: overlay.mcp,
+            tool_cache: overlay.tool_cache,
         }
     }
 
