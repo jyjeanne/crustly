@@ -254,12 +254,10 @@ impl OpenAIProvider {
         // Map Anthropic-style thinking config to OpenAI/Ollama reasoning_effort.
         // This enables the reasoning trace on thinking-capable models such as
         // DeepSeek-R1, Qwen3, and GPT-OSS served through Ollama.
-        let reasoning_effort = request.thinking.as_ref().map(|t| {
-            match t.budget_tokens {
-                0..=2_000 => "low".to_string(),
-                2_001..=8_000 => "medium".to_string(),
-                _ => "high".to_string(),
-            }
+        let reasoning_effort = request.thinking.as_ref().map(|t| match t.budget_tokens {
+            0..=2_000 => "low".to_string(),
+            2_001..=8_000 => "medium".to_string(),
+            _ => "high".to_string(),
         });
 
         OpenAIRequest {
@@ -333,7 +331,9 @@ impl OpenAIProvider {
         };
 
         if !thinking_text.is_empty() {
-            content_blocks.push(ContentBlock::Thinking { thinking: thinking_text });
+            content_blocks.push(ContentBlock::Thinking {
+                thinking: thinking_text,
+            });
         }
 
         // Add visible text content if present
@@ -389,8 +389,16 @@ impl OpenAIProvider {
             content: content_blocks,
             stop_reason,
             usage: TokenUsage {
-                input_tokens: response.usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
-                output_tokens: response.usage.as_ref().map(|u| u.completion_tokens).unwrap_or(0),
+                input_tokens: response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.prompt_tokens)
+                    .unwrap_or(0),
+                output_tokens: response
+                    .usage
+                    .as_ref()
+                    .map(|u| u.completion_tokens)
+                    .unwrap_or(0),
             },
             cache_metrics: None,
         }
@@ -538,7 +546,9 @@ impl Provider for OpenAIProvider {
         openai_request.stream = Some(true);
         // Request token usage in the final SSE chunk — required for Ollama to
         // report non-zero counts in streaming mode.
-        openai_request.stream_options = Some(OpenAIStreamOptions { include_usage: true });
+        openai_request.stream_options = Some(OpenAIStreamOptions {
+            include_usage: true,
+        });
         let retry_config = RetryConfig::default();
 
         // Retry the stream connection establishment
@@ -784,10 +794,7 @@ impl Provider for OpenAIProvider {
                     stop_sequence: None,
                 },
                 usage: TokenUsage {
-                    input_tokens: stream_usage
-                        .as_ref()
-                        .map(|u| u.prompt_tokens)
-                        .unwrap_or(0),
+                    input_tokens: stream_usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
                     output_tokens: stream_usage
                         .as_ref()
                         .map(|u| u.completion_tokens)

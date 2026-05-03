@@ -166,7 +166,10 @@ async fn drain_stream_to_response(
     let mut thinking_buf = String::new();
     let mut tool_uses: Vec<ContentBlock> = Vec::new();
     let mut stop_reason: Option<StopReason> = None;
-    let mut usage = TokenUsage { input_tokens: 0, output_tokens: 0 };
+    let mut usage = TokenUsage {
+        input_tokens: 0,
+        output_tokens: 0,
+    };
 
     // A ToolUse block assembled from ContentBlockStart + ContentBlockStop.
     let mut pending_tool: Option<ContentBlock> = None;
@@ -243,7 +246,9 @@ async fn drain_stream_to_response(
 
     let mut content: Vec<ContentBlock> = Vec::new();
     if !thinking_buf.is_empty() {
-        content.push(ContentBlock::Thinking { thinking: thinking_buf });
+        content.push(ContentBlock::Thinking {
+            thinking: thinking_buf,
+        });
     }
     if !text_buf.is_empty() {
         content.push(ContentBlock::Text { text: text_buf });
