@@ -204,4 +204,29 @@ mod tests {
         let result = client_for("not a url");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn embeddings_request_serializes_model_and_input() {
+        // Mirrors what `generate_embeddings()` builds internally - verifies
+        // the wire shape without needing a live Ollama server.
+        let request = GenerateEmbeddingsRequest::new(
+            "nomic-embed-text".to_string(),
+            EmbeddingsInput::Multiple(vec!["hello".to_string(), "world".to_string()]),
+        );
+        let value = serde_json::to_value(&request).expect("serialize request");
+        assert_eq!(value["model"], "nomic-embed-text");
+        assert_eq!(value["input"], serde_json::json!(["hello", "world"]));
+    }
+
+    #[test]
+    fn embeddings_request_single_input_is_not_wrapped_in_array() {
+        // EmbeddingsInput::Single serializes as a bare string, not a
+        // one-element array - Ollama's API distinguishes the two shapes.
+        let request = GenerateEmbeddingsRequest::new(
+            "nomic-embed-text".to_string(),
+            EmbeddingsInput::Single("hello".to_string()),
+        );
+        let value = serde_json::to_value(&request).expect("serialize request");
+        assert_eq!(value["input"], serde_json::json!("hello"));
+    }
 }

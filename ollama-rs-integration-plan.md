@@ -1,8 +1,7 @@
 # Plan d'intégration de `ollama-rs`
 
-Statut : **Phases 1, 2 et 3 implémentées et testées** (le panneau "Model
-Info" dans la TUI reste à faire, cf. tableau). **Phase 4 partiellement
-implémentée** (voir détail ci-dessous).
+Statut : **Phases 1, 2, 3 et 4 implémentées et testées** (le panneau "Model
+Info" dans la TUI reste à faire, cf. tableau — seul écart connu restant).
 Branche : `claude/ollama-rs-integration-8an4bc`
 Dépendance : [`ollama-rs`](https://github.com/pepperoni21/ollama-rs) 0.3.5 (crates.io)
 
@@ -13,7 +12,7 @@ Dépendance : [`ollama-rs`](https://github.com/pepperoni21/ollama-rs) 0.3.5 (cra
 | 1 — Provider natif | ✅ Fait | `src/llm/provider/ollama.rs` (`OllamaProvider`), config, factory, tests unitaires. Testé avec `cargo test --features ollama` (418 tests, 0 échec) et sans la feature (403 tests, 0 échec). `cargo clippy --features ollama` et sans la feature : 0 warning. |
 | 2 — Métriques TUI | ✅ Fait | `PerfMetrics` sur `LLMResponse`, propagé via `AgentResponse` → `DisplayMessage`/`Session` → `render.rs` (badge provider + tok/s en en-tête, ligne de métriques sous chaque réponse). Persisté en base (migration `20260701000001_provider_perf_metrics.sql`). |
 | 3 — Gestion de modèles | ✅ Fait (sauf panneau Model Info TUI) | `src/llm/provider/ollama_models.rs` (list/pull/delete/show) + sous-commande CLI `crustly ollama list\|pull\|rm\|show` avec barre de progression terminal. **Dialog interactif dans la TUI** (`Ctrl+D` en mode Chat, `src/tui/ollama_download.rs` + `AppMode::ModelDownload`) : saisie du nom de modèle avec suggestions filtrées (modèles déjà installés + liste curatée), navigation ↑↓, `Tab` pour reprendre une suggestion, `Enter` pour lancer le pull, barre de progression live rendue dans l'interface, `Esc` annule le téléchargement en cours (`JoinHandle::abort()`). Le panneau "Model Info" dans la TUI (§5.4 point 3) n'est pas fait — `crustly ollama show` en CLI reste le seul accès. |
-| 4 — Embeddings | 🟡 Partiel | `ollama_models::generate_embeddings()` + `crustly ollama embed <model> <text>`. **Pas de couche RAG/retrieval à brancher dessus : Crustly n'en a pas** (vérifié — aucune référence à "embedding" dans le code avant cette phase). La capacité brute est exposée pour un usage futur. |
+| 4 — Embeddings | ✅ Fait (capacité brute) | `ollama_models::generate_embeddings()` + `crustly ollama embed <model> <text>`, avec tests de sérialisation de la requête (`EmbeddingsInput::Single` vs `Multiple`). **Pas de couche RAG/retrieval à brancher dessus : Crustly n'en a pas** (vérifié — aucune référence à "embedding" dans le code avant cette phase) ; c'est donc le plafond raisonnable de cette phase tant qu'un tel système n'existe pas ou n'est pas demandé séparément. |
 
 Écarts connus par rapport au plan technique ci-dessous (à noter avant toute
 implémentation ultérieure) :
@@ -601,10 +600,12 @@ pas créer d'attente erronée.
   en direct, sans quitter Crustly. Reste non fait : le panneau "Model Info"
   dans la TUI décrit en §5.4 point 3 (`crustly ollama show` en CLI reste
   le seul moyen de voir license/parameters/template/capabilities).
-- **Phase 4** : ✅ (partiel) `generate_embeddings()` + `crustly ollama embed`
-  exposés comme capacité brute — pas de couche RAG/recherche interne à y
-  brancher, Crustly n'en a pas (vérifié, aucune référence à "embedding"
-  dans le code avant cette phase).
+- **Phase 4 (embeddings)** : ✅ `generate_embeddings()` + `crustly ollama
+  embed <model> <text>`, testé (sérialisation de la requête `Single` vs
+  `Multiple`). Capacité brute exposée, pas branchée sur une couche
+  RAG/recherche interne — Crustly n'en a pas (vérifié, aucune référence à
+  "embedding" dans le code avant cette phase) ; à réévaluer si un tel
+  système est demandé séparément.
 
 ## 9. Points ouverts à trancher avant implémentation
 
