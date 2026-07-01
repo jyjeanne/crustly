@@ -38,6 +38,7 @@ impl SessionService {
             model: None,
             token_count: 0,
             total_cost: 0.0,
+            provider: None,
         };
 
         repo.create(&session)

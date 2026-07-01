@@ -18,6 +18,9 @@ pub struct Session {
     pub archived_at: Option<DateTime<Utc>>,
     pub token_count: i32,
     pub total_cost: f64,
+    /// Name of the LLM provider used (e.g. "ollama", "anthropic"), set lazily
+    /// on the first assistant response, mirroring `model`.
+    pub provider: Option<String>,
 }
 
 /// Message model
@@ -31,6 +34,11 @@ pub struct Message {
     pub created_at: DateTime<Utc>,
     pub token_count: Option<i32>,
     pub cost: Option<f64>,
+    /// Name of the provider that generated this message, if known.
+    pub provider_name: Option<String>,
+    /// Runtime performance metrics (`PerfMetrics`), JSON-serialized. `None`
+    /// for providers that don't expose this level of detail.
+    pub perf_metrics_json: Option<String>,
 }
 
 /// File model
@@ -183,6 +191,7 @@ impl Session {
             archived_at: None,
             token_count: 0,
             total_cost: 0.0,
+            provider: None,
         }
     }
 
@@ -204,6 +213,8 @@ impl Message {
             created_at: Utc::now(),
             token_count: None,
             cost: None,
+            provider_name: None,
+            perf_metrics_json: None,
         }
     }
 }
@@ -242,6 +253,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for Session {
                 .and_then(|ts| DateTime::from_timestamp(ts, 0)),
             token_count: row.try_get("token_count")?,
             total_cost: row.try_get("total_cost")?,
+            provider: row.try_get("provider")?,
         })
     }
 }
@@ -262,6 +274,8 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for Message {
                 .ok_or_else(|| sqlx::Error::Decode("Invalid timestamp for created_at".into()))?,
             token_count: row.try_get("token_count")?,
             cost: row.try_get("cost")?,
+            provider_name: row.try_get("provider_name")?,
+            perf_metrics_json: row.try_get("perf_metrics_json")?,
         })
     }
 }

@@ -25,10 +25,26 @@ pub struct DisplayMessage {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub token_count: Option<i32>,
     pub cost: Option<f64>,
+    /// Name of the provider that generated this message (e.g. "ollama"),
+    /// if known.
+    pub provider_name: Option<String>,
+    /// Runtime performance metrics (load/prefill/generation durations),
+    /// if the provider exposes them.
+    pub perf_metrics: Option<crate::llm::provider::PerfMetrics>,
+    /// Generation throughput in tokens/second, precomputed when the message
+    /// is created (needs the exact output-token count, which isn't
+    /// recoverable from the combined `token_count` stored in the DB - so
+    /// this is `None` again after a session reload).
+    pub tokens_per_second: Option<f64>,
 }
 
 impl From<Message> for DisplayMessage {
     fn from(msg: Message) -> Self {
+        let perf_metrics = msg
+            .perf_metrics_json
+            .as_deref()
+            .and_then(|json| serde_json::from_str(json).ok());
+
         Self {
             id: msg.id,
             role: msg.role,
@@ -38,6 +54,9 @@ impl From<Message> for DisplayMessage {
             timestamp: msg.created_at,
             token_count: msg.token_count,
             cost: msg.cost,
+            provider_name: msg.provider_name,
+            perf_metrics,
+            tokens_per_second: None,
         }
     }
 }
@@ -632,6 +651,9 @@ impl App {
                 timestamp: chrono::Utc::now(),
                 token_count: None,
                 cost: None,
+                provider_name: None,
+                perf_metrics: None,
+                tokens_per_second: None,
             };
             self.messages.push(user_msg);
 
@@ -723,16 +745,30 @@ impl App {
                 response.usage.input_tokens as i32 + response.usage.output_tokens as i32,
             ),
             cost: Some(response.cost),
+            provider_name: Some(response.provider_name.clone()),
+            tokens_per_second: response
+                .perf_metrics
+                .as_ref()
+                .and_then(|pm| pm.tokens_per_second(response.usage.output_tokens)),
+            perf_metrics: response.perf_metrics.clone(),
         };
         self.messages.push(assistant_msg);
 
-        // Update session model if not already set
+        // Update session model/provider if not already set
         if let Some(session) = &mut self.current_session {
+            let mut needs_save = false;
             if session.model.is_none() {
                 session.model = Some(response.model.clone());
+                needs_save = true;
+            }
+            if session.provider.is_none() {
+                session.provider = Some(response.provider_name.clone());
+                needs_save = true;
+            }
+            if needs_save {
                 // Save the updated session to database
                 if let Err(e) = self.session_service.update_session(session).await {
-                    tracing::warn!("Failed to update session model: {}", e);
+                    tracing::warn!("Failed to update session model/provider: {}", e);
                 }
             }
         }
@@ -756,6 +792,9 @@ impl App {
                     timestamp: chrono::Utc::now(),
                     token_count: None,
                     cost: None,
+                    provider_name: None,
+                    perf_metrics: None,
+                    tokens_per_second: None,
                 };
                 self.messages.push(error_msg);
             } else {
@@ -940,6 +979,9 @@ impl App {
                             timestamp: chrono::Utc::now(),
                             token_count: None,
                             cost: None,
+                            provider_name: None,
+                            perf_metrics: None,
+                            tokens_per_second: None,
                         };
 
                         self.messages.push(notification);
@@ -1010,6 +1052,9 @@ impl App {
                                     timestamp: chrono::Utc::now(),
                                     token_count: None,
                                     cost: None,
+                                    provider_name: None,
+                                    perf_metrics: None,
+                                    tokens_per_second: None,
                                 };
 
                                 self.messages.push(notification);
@@ -1249,6 +1294,9 @@ impl App {
                 timestamp: chrono::Utc::now(),
                 token_count: None,
                 cost: None,
+                provider_name: None,
+                perf_metrics: None,
+                tokens_per_second: None,
             };
             self.messages.push(completion_msg);
         } else if let Some(message) = task_message {
@@ -1447,6 +1495,8 @@ mod tests {
             created_at: chrono::Utc::now(),
             token_count: Some(10),
             cost: Some(0.001),
+            provider_name: None,
+            perf_metrics_json: None,
         };
 
         let display_msg: DisplayMessage = msg.into();

@@ -47,8 +47,8 @@ impl SessionRepository {
         sqlx::query(
             r#"
             INSERT INTO sessions (id, title, model, created_at, updated_at,
-                                 archived_at, token_count, total_cost)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                 archived_at, token_count, total_cost, provider)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(session.id.to_string())
@@ -59,6 +59,7 @@ impl SessionRepository {
         .bind(session.archived_at.map(|dt| dt.timestamp()))
         .bind(session.token_count)
         .bind(session.total_cost)
+        .bind(&session.provider)
         .execute(&self.pool)
         .await
         .context("Failed to create session")?;
@@ -73,7 +74,7 @@ impl SessionRepository {
             r#"
             UPDATE sessions
             SET title = ?, model = ?, updated_at = ?,
-                archived_at = ?, token_count = ?, total_cost = ?
+                archived_at = ?, token_count = ?, total_cost = ?, provider = ?
             WHERE id = ?
             "#,
         )
@@ -83,6 +84,7 @@ impl SessionRepository {
         .bind(session.archived_at.map(|dt| dt.timestamp()))
         .bind(session.token_count)
         .bind(session.total_cost)
+        .bind(&session.provider)
         .bind(session.id.to_string())
         .execute(&self.pool)
         .await

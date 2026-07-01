@@ -332,6 +332,7 @@ impl Provider for WorkingMockProvider {
                 output_tokens: 20,
             },
             cache_metrics: None,
+            perf_metrics: None,
         })
     }
 

@@ -68,6 +68,19 @@ pub fn render(f: &mut Frame, app: &App) {
     render_status_bar(f, app, chunks[3]);
 }
 
+/// Purely cosmetic icon shown next to the provider name in the header.
+/// Unknown provider names fall back to a generic robot.
+fn provider_icon(provider_name: &str) -> &'static str {
+    match provider_name {
+        "ollama" => "🦙",
+        "openai" => "🏠",
+        "anthropic" => "🤖",
+        "qwen" => "🌀",
+        "azure" => "☁️",
+        _ => "🤖",
+    }
+}
+
 /// Render the header with session info
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let session_name = app
@@ -81,8 +94,20 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         .as_ref()
         .and_then(|s| s.model.as_deref())
         .unwrap_or("unknown");
+    let provider = app
+        .current_session
+        .as_ref()
+        .and_then(|s| s.provider.as_deref());
     let tokens = app.total_tokens();
     let cost = app.total_cost();
+    // Throughput of the most recent assistant reply, if the active provider
+    // exposes it (currently only the native Ollama provider). Omitted
+    // entirely (not shown as "0 tok/s") when unavailable.
+    let tokens_per_second = app
+        .messages
+        .iter()
+        .rev()
+        .find_map(|m| m.tokens_per_second);
 
     // Format working directory - show relative or full path
     let working_dir = app.working_directory.to_string_lossy().to_string();
@@ -92,7 +117,7 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         working_dir
     };
 
-    let header_line1 = Line::from(vec![
+    let mut header_spans = vec![
         Span::styled(" 📝 Session: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             session_name,
@@ -102,7 +127,15 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
         Span::styled("🤖 Model: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(model, Style::default().fg(Color::Green)),
+    ];
+    if let Some(provider) = provider {
+        header_spans.push(Span::styled(
+            format!("{} ", provider_icon(provider)),
+            Style::default().fg(Color::Green),
+        ));
+    }
+    header_spans.push(Span::styled(model, Style::default().fg(Color::Green)));
+    header_spans.extend([
         Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
         Span::styled("💬 Tokens: ", Style::default().fg(Color::DarkGray)),
         Span::styled(tokens.to_string(), Style::default().fg(Color::Yellow)),
@@ -110,6 +143,18 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("💰 Cost: $", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{:.4}", cost), Style::default().fg(Color::Magenta)),
     ]);
+    if let Some(tps) = tokens_per_second {
+        header_spans.extend([
+            Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("⚡ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:.0} tok/s", tps),
+                Style::default().fg(Color::Cyan),
+            ),
+        ]);
+    }
+
+    let header_line1 = Line::from(header_spans);
 
     let header_line2 = Line::from(vec![
         Span::styled(
@@ -254,6 +299,38 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
         // Parse and render message content as markdown
         let mut content_lines = parse_markdown(&msg.content);
         lines.append(&mut content_lines);
+
+        // Runtime performance metrics footer (currently Ollama only) - shown
+        // only when the provider actually reported them.
+        if let Some(ref perf) = msg.perf_metrics {
+            let mut spans = vec![Span::styled("  ⏱ ", Style::default().fg(Color::DarkGray))];
+            if let Some(eval_ms) = perf.eval_duration_ms {
+                spans.push(Span::styled(
+                    format!("{}ms generation", eval_ms),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            if let Some(tps) = msg.tokens_per_second {
+                spans.push(Span::styled(
+                    format!(" · {:.0} tok/s", tps),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            match perf.model_was_loaded {
+                Some(false) => {
+                    let load_ms = perf.load_duration_ms.unwrap_or(0);
+                    spans.push(Span::styled(
+                        format!(" · 🧊 cold start (model loaded in {}ms)", load_ms),
+                        Style::default().fg(Color::DarkGray),
+                    ));
+                }
+                Some(true) => {
+                    spans.push(Span::styled(" · 🔥 warm", Style::default().fg(Color::DarkGray)));
+                }
+                None => {}
+            }
+            lines.push(Line::from(spans));
+        }
 
         // Add spacing between messages
         lines.push(Line::from(""));

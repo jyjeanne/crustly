@@ -304,6 +304,38 @@ pub struct LLMResponse {
     /// Optional prompt cache metrics (Anthropic only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_metrics: Option<CacheMetrics>,
+    /// Optional runtime performance metrics (local inference backends, e.g. Ollama).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub perf_metrics: Option<PerfMetrics>,
+}
+
+/// Runtime performance metrics reported by local inference backends.
+///
+/// `None` for providers that don't expose this level of detail (Anthropic,
+/// OpenAI, Qwen, Azure) — purely additive, no behavior change for them.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PerfMetrics {
+    /// Time to load/warm the model into memory (ms). `Some(0)` when the
+    /// model was already resident (warm start).
+    pub load_duration_ms: Option<u64>,
+    /// Prefill duration — time spent evaluating the input prompt (ms).
+    pub prompt_eval_duration_ms: Option<u64>,
+    /// Generation duration — time spent producing the output (ms).
+    pub eval_duration_ms: Option<u64>,
+    /// Total wall-clock duration for the request (ms).
+    pub total_duration_ms: Option<u64>,
+    /// `true` if the model was already loaded (warm start), `false` if it
+    /// had to be loaded first (cold start), `None` if unknown/unsupported.
+    pub model_was_loaded: Option<bool>,
+}
+
+impl PerfMetrics {
+    /// Generation throughput in tokens/second, derived from the output
+    /// token count and the measured generation duration.
+    pub fn tokens_per_second(&self, output_tokens: u32) -> Option<f64> {
+        let ms = self.eval_duration_ms?;
+        (ms > 0).then(|| output_tokens as f64 / (ms as f64 / 1000.0))
+    }
 }
 
 /// Reason why the model stopped generating
@@ -509,6 +541,30 @@ mod tests {
         assert!((cm.hit_rate() - 0.8).abs() < 0.001);
         let empty = CacheMetrics::default();
         assert_eq!(empty.hit_rate(), 0.0);
+    }
+
+    #[test]
+    fn perf_metrics_tokens_per_second() {
+        let pm = PerfMetrics {
+            eval_duration_ms: Some(2_000),
+            ..Default::default()
+        };
+        assert_eq!(pm.tokens_per_second(100), Some(50.0));
+    }
+
+    #[test]
+    fn perf_metrics_tokens_per_second_missing_duration() {
+        let pm = PerfMetrics::default();
+        assert_eq!(pm.tokens_per_second(100), None);
+    }
+
+    #[test]
+    fn perf_metrics_tokens_per_second_zero_duration() {
+        let pm = PerfMetrics {
+            eval_duration_ms: Some(0),
+            ..Default::default()
+        };
+        assert_eq!(pm.tokens_per_second(100), None);
     }
 
     #[test]

@@ -283,6 +283,13 @@ pub struct ProviderConfigs {
     /// VertexAI configuration
     #[serde(default)]
     pub vertex: Option<ProviderConfig>,
+
+    /// Native Ollama configuration (via `ollama-rs`, `/api/chat`). Distinct
+    /// from `providers.openai.base_url` pointed at Ollama's OpenAI-compatible
+    /// `/v1` shim - both can be configured, this one unlocks keep_alive,
+    /// num_ctx and runtime performance metrics.
+    #[serde(default)]
+    pub ollama: Option<OllamaProviderConfig>,
 }
 
 /// Individual provider configuration
@@ -339,6 +346,47 @@ pub struct QwenProviderConfig {
     /// DashScope region: "intl" (Singapore) or "cn" (Beijing)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
+}
+
+/// Native Ollama provider configuration (`/api/chat`, via `ollama-rs`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OllamaProviderConfig {
+    /// Provider enabled
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+
+    /// Ollama host, e.g. "http://localhost:11434"
+    #[serde(default = "default_ollama_host")]
+    pub host: String,
+
+    /// Default model to use (e.g. "qwen2.5-coder:7b")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
+
+    /// How long to keep the model loaded in memory: "-1" (indefinitely),
+    /// "0" (unload immediately), or a duration like "5m"/"30s"/"2h".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keep_alive: Option<String>,
+
+    /// Context window size (num_ctx) to request from the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub num_ctx: Option<u32>,
+}
+
+impl Default for OllamaProviderConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_enabled(),
+            host: default_ollama_host(),
+            default_model: None,
+            keep_alive: None,
+            num_ctx: None,
+        }
+    }
+}
+
+fn default_ollama_host() -> String {
+    "http://localhost:11434".to_string()
 }
 
 fn default_enabled() -> bool {
@@ -689,6 +737,26 @@ impl Config {
                 region: None,
             });
             provider.enable_thinking = thinking.parse().unwrap_or(false);
+        }
+
+        // Ollama native provider (distinct from OPENAI_BASE_URL pointed at
+        // Ollama's OpenAI-compatible shim). OLLAMA_HOST matches the official
+        // Ollama CLI's own env var convention.
+        if let Ok(host) = std::env::var("OLLAMA_HOST").or_else(|_| std::env::var("OLLAMA_BASE_URL"))
+        {
+            let provider = config
+                .providers
+                .ollama
+                .get_or_insert_with(OllamaProviderConfig::default);
+            provider.host = host;
+        }
+
+        if let Ok(model) = std::env::var("OLLAMA_MODEL") {
+            let provider = config
+                .providers
+                .ollama
+                .get_or_insert_with(OllamaProviderConfig::default);
+            provider.default_model = Some(model);
         }
 
         Ok(())

@@ -401,6 +401,7 @@ impl OpenAIProvider {
                     .unwrap_or(0),
             },
             cache_metrics: None,
+            perf_metrics: None,
         }
     }
 
@@ -818,29 +819,9 @@ impl Provider for OpenAIProvider {
 
     fn supports_vision(&self) -> bool {
         // Detect common vision-capable model names served through Ollama and
-        // other OpenAI-compatible backends.  The check is intentionally broad
-        // (substring match, case-insensitive) to handle tag variants like
-        // "llava:13b", "llama3.2-vision:11b-instruct-fp16", etc.
-        let model_lc = self
-            .custom_default_model
-            .as_deref()
-            .unwrap_or("")
-            .to_lowercase();
-        let vision_patterns = [
-            "llava",
-            "vision",
-            "minicpm-v",
-            "bakllava",
-            "moondream",
-            "cogvlm",
-            "qwen-vl",
-            "qwenvl",
-            "internvl",
-            "phi-3-vision",
-            "phi3-vision",
-            "idefics",
-        ];
-        vision_patterns.iter().any(|p| model_lc.contains(p))
+        // other OpenAI-compatible backends. Shared with OllamaProvider so both
+        // stay in sync (see `model_hints::is_vision_model`).
+        super::model_hints::is_vision_model(self.custom_default_model.as_deref().unwrap_or(""))
     }
 
     fn name(&self) -> &str {

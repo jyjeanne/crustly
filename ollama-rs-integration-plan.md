@@ -1,8 +1,35 @@
 # Plan d'intégration de `ollama-rs`
 
-Statut : proposition — non implémenté
+Statut : **Phases 1 et 2 implémentées et testées. Phases 3 et 4 partiellement
+implémentées** (voir détail ci-dessous).
 Branche : `claude/ollama-rs-integration-8an4bc`
-Dépendance visée : [`ollama-rs`](https://github.com/pepperoni21/ollama-rs) (crates.io)
+Dépendance : [`ollama-rs`](https://github.com/pepperoni21/ollama-rs) 0.3.5 (crates.io)
+
+## 0. État d'implémentation (résumé honnête)
+
+| Phase | Statut | Détail |
+|---|---|---|
+| 1 — Provider natif | ✅ Fait | `src/llm/provider/ollama.rs` (`OllamaProvider`), config, factory, tests unitaires. Testé avec `cargo test --features ollama` (415 tests, 0 échec) et sans la feature (400 tests, 0 échec). |
+| 2 — Métriques TUI | ✅ Fait | `PerfMetrics` sur `LLMResponse`, propagé via `AgentResponse` → `DisplayMessage`/`Session` → `render.rs` (badge provider + tok/s en en-tête, ligne de métriques sous chaque réponse). Persisté en base (migration `20260701000001_provider_perf_metrics.sql`). |
+| 3 — Gestion de modèles | 🟡 Partiel | `src/llm/provider/ollama_models.rs` (list/pull/delete/show) + sous-commande CLI `crustly ollama list\|pull\|rm\|show` avec barre de progression **en terminal**. **Le dialog interactif dans la TUI décrit en §5.7 (saisie/sélection à l'écran, barre de progression rendue dans l'interface, annulation, suggestions curatées) n'est PAS implémenté** — seul l'équivalent CLI existe à ce stade. |
+| 4 — Embeddings | 🟡 Partiel | `ollama_models::generate_embeddings()` + `crustly ollama embed <model> <text>`. **Pas de couche RAG/retrieval à brancher dessus : Crustly n'en a pas** (vérifié — aucune référence à "embedding" dans le code avant cette phase). La capacité brute est exposée pour un usage futur. |
+
+Écarts connus par rapport au plan technique ci-dessous (à noter avant toute
+implémentation ultérieure) :
+- **Pas de retry automatique** sur `OllamaProvider::complete()`/`stream()` :
+  `ollama-rs` est bâti sur `reqwest` 0.12, incompatible avec le
+  `ProviderError::HttpError(reqwest 0.11)` du reste du crate, donc les
+  erreurs réseau sont mappées en `ApiError{status:0,..}`, jamais retryable
+  par `retry_with_backoff`. Voir le commentaire de module dans `ollama.rs`.
+- Les métriques de performance (`PerfMetrics`) ne sont propagées que sur le
+  chemin **non-streamé** (`complete()`). En streaming, les durées finales
+  sont calculées mais pas encore attachées à un `StreamEvent` (pas de champ
+  prévu dans ce type) — capturées en interne puis ignorées (`let _ =
+  final_perf;` dans `ollama.rs`).
+- `tokens_per_second` sur un message affiché redevient `None` après un
+  rechargement de session depuis la base (la colonne `token_count` stocke
+  input+output combinés, pas le nombre de tokens de sortie seul nécessaire
+  au calcul).
 
 ## 1. Objectif
 

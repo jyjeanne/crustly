@@ -41,6 +41,8 @@ impl MessageService {
             created_at: Utc::now(),
             token_count: None,
             cost: None,
+            provider_name: None,
+            perf_metrics_json: None,
         };
 
         repo.create(&message)
@@ -105,6 +107,32 @@ impl MessageService {
             token_count,
             cost
         );
+        Ok(())
+    }
+
+    /// Record which provider generated this message and, if available, its
+    /// runtime performance metrics (load/prefill/generation durations).
+    /// `perf_metrics` is only populated for providers that expose this level
+    /// of detail (currently the native Ollama provider).
+    pub async fn update_message_metrics(
+        &self,
+        id: Uuid,
+        provider_name: &str,
+        perf_metrics: Option<&crate::llm::provider::PerfMetrics>,
+    ) -> Result<()> {
+        let mut message = self.get_message_required(id).await?;
+        message.provider_name = Some(provider_name.to_string());
+        message.perf_metrics_json = perf_metrics
+            .map(serde_json::to_string)
+            .transpose()
+            .context("Failed to serialize perf_metrics")?;
+
+        let repo = MessageRepository::new(self.context.pool());
+        repo.update(&message)
+            .await
+            .context("Failed to update message metrics")?;
+
+        tracing::debug!("Updated message metrics: {} (provider: {})", id, provider_name);
         Ok(())
     }
 

@@ -328,6 +328,32 @@ The OpenAI provider works with **any OpenAI-compatible API**, including:
 | Cerebras | 📅 Planned | — |
 | Huggingface | 📅 Planned | — |
 
+#### ✅ Native Ollama (via `ollama-rs`)
+
+In addition to the OpenAI-compatible route above (`OPENAI_BASE_URL="http://localhost:11434/v1"`),
+Crustly has a **native** Ollama provider built on [`ollama-rs`](https://github.com/pepperoni21/ollama-rs),
+enabled with `--features ollama` (or `all-llm`). It talks to Ollama's own `/api/chat` protocol instead
+of the OpenAI shim, which unlocks:
+
+- `keep_alive` / `num_ctx` control
+- Runtime performance metrics in the TUI header and under each reply: generation throughput
+  (tokens/sec), model load time, warm vs. cold start — none of this is available through the
+  OpenAI-compatible endpoint
+- Model management from the command line:
+
+  ```bash
+  crustly ollama list                              # locally installed models
+  crustly ollama pull qwen2.5-coder:7b              # download a model, with live progress
+  crustly ollama rm qwen2.5-coder:7b                # delete a model
+  crustly ollama show qwen2.5-coder:7b              # license, parameters, template, capabilities
+  crustly ollama embed nomic-embed-text "some text"  # generate an embedding vector
+  ```
+
+Configure it with `[providers.ollama]` in `config.toml` (see `config.toml.example`) or
+`OLLAMA_HOST`/`OLLAMA_MODEL` environment variables. Both the native and OpenAI-compatible routes to
+Ollama can be configured side by side; see [`ollama-rs-integration-plan.md`](./ollama-rs-integration-plan.md)
+for the full design and current status.
+
 ### Environment Variables
 
 | Variable | Provider | Required |

@@ -68,6 +68,30 @@ default_model = "qwen2.5-coder-7b-instruct"
 # default_model = "qwen-plus"  # qwen-max, qwen-plus, qwen-turbo
 # enable_thinking = false  # Thinking mode for Qwen3 models only
 
+# ========================================
+# Native Ollama Provider (via ollama-rs)
+# ========================================
+# Distinct from providers.openai.base_url pointed at Ollama's OpenAI-compat
+# shim above - this one talks to Ollama's own /api/chat protocol and unlocks
+# keep_alive/num_ctx control plus runtime performance metrics (tokens/sec,
+# model load time) shown in the TUI. Requires building crustly with
+# `--features ollama` (or `all-llm`).
+# [providers.ollama]
+# enabled = true
+# host = "http://localhost:11434"
+# default_model = "qwen2.5-coder:7b"
+# keep_alive = "5m"    # "-1" (never unload), "0" (unload immediately), or "5m"/"30s"/"2h"
+# num_ctx = 8192       # Context window size to request from the model
+#
+# Env var equivalents: OLLAMA_HOST (or OLLAMA_BASE_URL), OLLAMA_MODEL
+#
+# Model management from the command line (list/pull/delete/show/embed):
+#   crustly ollama list
+#   crustly ollama pull qwen2.5-coder:7b
+#   crustly ollama rm qwen2.5-coder:7b
+#   crustly ollama show qwen2.5-coder:7b
+#   crustly ollama embed nomic-embed-text "some text to embed"
+
 # Environment variables for Qwen:
 # - QWEN_BASE_URL: Local endpoint URL
 # - DASHSCOPE_API_KEY: Cloud API key
