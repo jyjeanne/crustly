@@ -361,14 +361,9 @@ Concrètement, dans `src/tui/render.rs` :
    `AppMode::ModelInfo` dans `src/tui/events.rs` (même pattern que
    `AppMode::ToolApproval`/`FilePicker`).
 
-4. **Barre de progression `pull`** : overlay analogue au
-   `render_auto_exec_progress` déjà présent pour l'exécution de plans
-   (`components/dialogs/mod.rs`). `pull_model()` (§4.5) pousse des
-   évènements de progression (`{ digest, total, completed }`) sur un
-   `mpsc::UnboundedSender`, consommé par la boucle d'évènements TUI
-   (`src/tui/events.rs`, même mécanisme que `ToolApprovalRequested`) pour
-   mettre à jour une barre `completed/total` en temps réel pendant le
-   téléchargement d'un modèle lancé depuis `crustly ollama pull`.
+4. **Téléchargement de modèle interactif** : voir §5.7 — dialog dédié pour
+   saisir/choisir un modèle et le télécharger sans quitter la TUI, avec barre
+   de progression en temps réel.
 
 5. **Barre de statut** (`render_status_bar`, ligne ~1381) : en cas d'erreur
    spécifique Ollama (modèle non trouvé, Ollama non démarré), afficher un
@@ -399,6 +394,117 @@ l'implémentation) :
 show_performance_metrics = true   # défaut : true : masque le segment tok/s
                                    # si mis à false, même quand disponible
 ```
+
+### 5.7 Téléchargement de modèle LLM depuis la TUI (`pull` interactif)
+
+Objectif : l'utilisateur ne doit **pas** avoir besoin de sortir de Crustly
+vers un terminal pour faire `ollama pull <model>` — il choisit et télécharge
+le modèle qu'il veut directement depuis la TUI, avec suivi de progression en
+direct.
+
+#### 5.7.1 Contrainte réelle de l'API Ollama (à documenter pour l'utilisateur)
+
+Ollama **n'expose aucune API locale pour parcourir/rechercher le catalogue en
+ligne** (la recherche façon "Ollama Library" n'existe que sur le site
+ollama.com). `ollama-rs` ne peut donc pas offrir de recherche catalogue côté
+API — seulement :
+
+- `list_local_models()` (`GET /api/tags`) → modèles déjà installés localement
+- `pull_model(name, allow_insecure)` (`POST /api/pull`) → télécharge un modèle
+  **si son nom `repo:tag` est déjà connu** (ex. `llama3.2:3b`,
+  `qwen2.5-coder:7b`, `mistral:latest`)
+
+Le "choix du modèle" dans la TUI est donc une **saisie/sélection du nom de
+modèle** (comme le ferait l'utilisateur en CLI avec `ollama pull <name>`),
+assistée par une liste de suggestions, **pas** une recherche plein texte sur
+le hub Ollama. Ce point sera documenté explicitement dans le README pour ne
+pas créer d'attente erronée.
+
+#### 5.7.2 Flux utilisateur (UX)
+
+1. Raccourci dédié en mode `Chat` (proposé : `Ctrl+D` pour "Download" — à
+   confirmer, doit être libre dans `src/tui/events.rs`) ou commande slash
+   `/pull` dans la barre de saisie existante (cohérent avec le reste de la
+   TUI si des commandes slash existent déjà — à vérifier à l'implémentation).
+2. Ouverture d'un nouveau dialog **Model Download**, sur le modèle du
+   `FilePicker` déjà existant (réutilise `tui-textarea`, déjà une dépendance
+   du projet, pour le champ de saisie) :
+   - Un champ texte pour taper librement `repo:tag` (ex. `deepseek-r1:14b`).
+   - Une liste de suggestions au-dessus/à côté, préremplie avec :
+     a) les modèles **déjà installés** (via `list_local_models()`, marqués
+        "✅ installed" et non re-téléchargeables sans confirmation), et
+     b) une liste **curatée statique** reprise du README existant
+        (`qwen2.5-coder:7b`, `gemma3:12b`, `llama3.1:8b`, `mistral`, …,
+        section "Recommended Local Models for Coding") embarquée en constante
+        Rust (`const CURATED_MODELS: &[(&str, &str)]` = nom + courte
+        description), filtrable en tapant (fuzzy-match simple, style
+        `FilePicker`).
+   - Navigation haut/bas pour sélectionner une suggestion, `Tab`/`Enter` pour
+     la copier dans le champ de saisie, `Enter` à nouveau (ou sur champ
+     libre) pour lancer le téléchargement.
+   - `Esc` ferme le dialog sans rien télécharger.
+3. Validation légère avant lancement : format `nom[:tag]` non vide ; si le
+   modèle est déjà dans `list_local_models()`, demander confirmation
+   ("Re-pull llama3.2:3b ? (y/n)") plutôt que de retélécharger silencieusement.
+4. Lancement du pull ⇒ bascule vers un overlay de progression (même famille
+   que `render_auto_exec_progress`) :
+
+   ```
+   ┌─ Downloading qwen2.5-coder:7b ───────────────────────────────┐
+   │ pulling manifest                                              │
+   │ pulling 8934d96d3f08... [████████████████░░░░░░░░]  64%      │
+   │   2.9 GB / 4.5 GB · 38 MB/s · ETA 42s                         │
+   │ verifying sha256 digest                                       │
+   │                                                                │
+   │                              (Esc annule le téléchargement)   │
+   └────────────────────────────────────────────────────────────────┘
+   ```
+
+5. À la fin : message de succès dans le fil de chat/toast
+   (`✅ qwen2.5-coder:7b downloaded — 4.5 GB in 1m58s`), et proposition
+   optionnelle "utiliser ce modèle pour la session courante ?" (met à jour
+   `session.model` + `providers.ollama.default_model` en mémoire, sans
+   redémarrer l'app).
+6. En cas d'échec (nom introuvable côté registre Ollama → 404, disque plein,
+   réseau coupé) : message d'erreur clair dans l'overlay, dialog reste ouvert
+   pour corriger et relancer.
+
+#### 5.7.3 Détails techniques
+
+- **`src/llm/provider/ollama_models.rs`** (§4.5) : `pull_model` prend un
+  `tokio::sync::mpsc::UnboundedSender<PullProgressEvent>` et streame les
+  évènements de progression natifs d'`ollama-rs` (`PullModelStatus { status,
+  digest, total, completed }`) au fur et à mesure. Agrégation multi-couches :
+  Ollama télécharge plusieurs "layers" (blobs) séquentiellement pour un même
+  modèle ; l'overlay doit combiner `completed`/`total` de la couche courante
+  ET une estimation globale (somme des tailles de couches déjà connues, si
+  disponible dans la réponse `/api/pull`, sinon se limiter à la couche
+  courante + un indicateur "couche X").
+- **Annulation** : le pull tourne dans une `tokio::task::JoinHandle` dédiée ;
+  `Esc` envoie un signal d'annulation via un `CancellationToken`
+  (déjà utilisé ailleurs dans le projet ? à vérifier — sinon `tokio_util
+  ::sync::CancellationToken`, `tokio-util` est déjà une dépendance du
+  projet) qui interrompt proprement le stream HTTP en cours.
+- **Concurrence** : un seul pull actif à la fois depuis la TUI (verrou
+  applicatif simple, ex. `app.active_pull: Option<PullHandle>`) — lancer un
+  second téléchargement pendant qu'un premier est en cours affiche un
+  message plutôt que de les empiler.
+- **Nouveau variant** `AppMode::ModelDownload` dans `src/tui/events.rs`
+  (même famille que `FilePicker`/`ToolApproval`), plus un évènement applicatif
+  `AppEvent::PullProgress(PullProgressEvent)` et `AppEvent::PullFinished { ok:
+  bool, model: String }` traités dans la boucle d'évènements existante
+  (à côté de `ToolApprovalRequested`).
+- **Rendu** : nouvelle fonction `render_model_download(f, app, area)` dans
+  `src/tui/components/dialogs/mod.rs`, suivant exactement le style
+  `Clear` + `Block` + `Borders::ALL` déjà utilisé par
+  `render_auto_exec_progress`.
+- **Persistance** : aucune — l'historique des téléchargements n'a pas besoin
+  d'être stocké en base ; seul l'état du modèle localement installé compte,
+  et il est déjà source de vérité côté disque/Ollama (`list_local_models()`
+  interrogé à chaque ouverture du dialog).
+- **CLI équivalente conservée** : `crustly ollama pull <name>` (§4.5) reste
+  disponible pour scripts/CI — le dialog TUI est une surface supplémentaire
+  au-dessus de la même fonction `pull_model()`, pas une réimplémentation.
 
 ## 6. Ce qui NE change PAS
 
@@ -452,8 +558,11 @@ show_performance_metrics = true   # défaut : true : masque le segment tok/s
   badge provider + segment tok/s dans l'en-tête, pied de message avec durée
   de génération. C'est la partie qui bénéficie **aussi** aux providers déjà
   en place (badge provider transverse).
-- **Phase 3 (gestion de modèles)** : `list`/`pull`/`rm`/`show` + sous-commande
-  CLI + panneau "Model Info" + barre de progression `pull` dans la TUI.
+- **Phase 3 (gestion de modèles + téléchargement interactif)** :
+  `list`/`pull`/`rm`/`show` + sous-commande CLI + panneau "Model Info" +
+  **dialog "Model Download" dans la TUI** (§5.7) permettant à l'utilisateur
+  de choisir/saisir un modèle et de le télécharger avec barre de progression
+  en direct, sans quitter Crustly.
 - **Phase 4** : embeddings natifs Ollama, exposés à la couche RAG/recherche
   interne si Crustly en a une (à confirmer selon le code existant).
 
@@ -475,3 +584,17 @@ show_performance_metrics = true   # défaut : true : masque le segment tok/s
    plus de colonnes à faire évoluer) — recommandation : JSON, cohérent avec
    le fait que ces métriques sont avant tout informatives/TUI et non
    utilisées dans des requêtes analytiques pour l'instant.
+6. Raccourci/entrée exacte pour ouvrir le dialog "Model Download" (`Ctrl+D`
+   proposé en §5.7.2, à vérifier vs raccourcis existants dans
+   `src/tui/events.rs`) et son alternative en commande slash (`/pull`,
+   `/download`) — à aligner sur les conventions déjà en place dans la barre
+   de saisie de Crustly (à confirmer si des commandes slash existent déjà).
+7. Faut-il permettre l'annulation propre d'un `pull` en cours (`Esc` →
+   `CancellationToken`), ou accepter que l'utilisateur laisse le
+   téléchargement se terminer en arrière-plan tout en revenant au chat
+   (moins de complexité, mais moins de contrôle utilisateur) ?
+8. La liste curatée de modèles suggérés (§5.7.2) doit-elle être codée en dur
+   dans le binaire (simple, nécessite une recompilation pour la mettre à
+   jour) ou chargée depuis un fichier de config/JSON embarqué modifiable par
+   l'utilisateur (plus flexible, légère complexité en plus) — recommandation :
+   codée en dur pour la v1, réévaluable si demande utilisateur.
