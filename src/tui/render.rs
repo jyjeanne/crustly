@@ -63,6 +63,9 @@ pub fn render(f: &mut Frame, app: &App) {
         AppMode::FilePicker => {
             render_file_picker(f, app, chunks[1]);
         }
+        AppMode::ModelDownload => {
+            render_model_download(f, app, chunks[1]);
+        }
     }
 
     render_status_bar(f, app, chunks[3]);
@@ -1454,6 +1457,167 @@ fn render_file_picker(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(widget, area);
 }
 
+/// Render the Model Download dialog (Ctrl+D): either the model
+/// name input + suggestions list, or a live progress bar while a pull is
+/// in flight.
+fn render_model_download(f: &mut Frame, app: &App, area: Rect) {
+    if app.model_download_running {
+        render_model_download_progress(f, app, area);
+        return;
+    }
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(vec![
+        Span::styled("🦙 Download an Ollama model", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+    ]));
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("  > ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            if app.model_download_input.is_empty() {
+                "type a model name, e.g. qwen2.5-coder:7b"
+            } else {
+                app.model_download_input.as_str()
+            },
+            if app.model_download_input.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    if app.model_download_suggestions.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  No matches - press Enter to pull this name anyway.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, name) in app.model_download_suggestions.iter().enumerate() {
+            let is_selected = idx == app.model_download_selected;
+            let is_installed = app.model_download_installed.iter().any(|m| m == name);
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let prefix = if is_selected { "▶ " } else { "  " };
+            let status = if is_installed { " (installed)" } else { "" };
+            lines.push(Line::from(vec![
+                Span::styled(prefix, style),
+                Span::styled(format!("{}{}", name, status), style),
+            ]));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "[↑↓]",
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Navigate  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Tab]",
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Use suggestion  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Enter]",
+            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Pull  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Esc]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Cancel", Style::default().fg(Color::White)),
+    ]));
+    lines.push(Line::from(Span::styled(
+        "Note: Ollama has no online search API - type any repo:tag you know, or pick a suggestion.",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Download Model ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the live progress view of an in-flight model pull.
+fn render_model_download_progress(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(vec![Span::styled(
+        format!("🦙 Downloading '{}'", app.model_download_input),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(""));
+
+    let status = app.model_download_status.as_deref().unwrap_or("working…");
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", status),
+        Style::default().fg(Color::White),
+    )]));
+
+    if let Some(fraction) = app.model_download_fraction {
+        const BAR_WIDTH: usize = 30;
+        let filled = ((fraction * BAR_WIDTH as f64).round() as usize).min(BAR_WIDTH);
+        let bar = format!(
+            "[{}{}] {:>3.0}%",
+            "█".repeat(filled),
+            "░".repeat(BAR_WIDTH - filled),
+            fraction * 100.0
+        );
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}", bar),
+            Style::default().fg(Color::Green),
+        )]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  (Esc cancels the download)",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(Span::styled(
+                    " Downloading… ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
 /// Render the status bar
 fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let mode_text = match app.mode {
@@ -1465,6 +1629,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::Settings => "SETTINGS",
         AppMode::ToolApproval => "PERMISSION",
         AppMode::FilePicker => "FILE PICKER",
+        AppMode::ModelDownload => "MODEL DOWNLOAD",
     };
 
     let status = if let Some(ref error) = app.error_message {
@@ -1473,7 +1638,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         format!(" [{}] Processing...", mode_text)
     } else {
         format!(
-            " [{}] Ready │ Ctrl+H: Help │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            " [{}] Ready │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
             mode_text
         )
     };

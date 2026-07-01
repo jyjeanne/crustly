@@ -774,6 +774,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create TUI app first (so we can get the event sender)
     tracing::debug!("Creating TUI app");
     let mut app = tui::App::new(agent_service, service_context.clone());
+    app.set_ollama_host(ollama_host(config));
 
     // Get event sender from app
     let event_sender = app.event_sender();
@@ -1063,7 +1064,8 @@ async fn cmd_keyring(operation: KeyringCommands) -> Result<()> {
 }
 
 /// Resolve the configured Ollama host, falling back to the local default.
-#[cfg(feature = "ollama")]
+/// Used both by `crustly ollama <...>` and to point the TUI's Model
+/// Download dialog (Ctrl+D) at the right instance.
 fn ollama_host(config: &crate::config::Config) -> String {
     config
         .providers

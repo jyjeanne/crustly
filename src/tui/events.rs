@@ -56,6 +56,19 @@ pub enum TuiEvent {
 
     /// Tool approval response
     ToolApprovalResponse(ToolApprovalResponse),
+
+    /// Locally-installed Ollama models were (re)loaded for the Model
+    /// Download dialog's suggestion list.
+    OllamaModelsListed(Vec<String>),
+
+    /// Progress update for an in-flight Ollama model pull.
+    OllamaPullProgress(super::ollama_download::ModelPullProgress),
+
+    /// An Ollama model pull finished (`error` is `None` on success).
+    OllamaPullFinished {
+        model: String,
+        error: Option<String>,
+    },
 }
 
 /// Tool approval request details
@@ -129,6 +142,9 @@ pub enum AppMode {
     ToolApproval,
     /// File picker dialog (triggered by @)
     FilePicker,
+    /// Model download dialog (triggered by Ctrl+D) - pick/type an Ollama
+    /// model name and pull it without leaving Crustly.
+    ModelDownload,
 }
 
 /// Event handler for the TUI
@@ -242,6 +258,11 @@ pub mod keys {
     /// Ctrl+P - Toggle Plan mode
     pub fn is_toggle_plan(event: &KeyEvent) -> bool {
         key_matches(event, KeyCode::Char('p'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+D - Open the Model Download dialog (Ollama)
+    pub fn is_model_download(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('d'), KeyModifiers::CONTROL)
     }
 
     /// Ctrl+Enter - Submit

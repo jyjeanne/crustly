@@ -1,7 +1,8 @@
 # Plan d'intégration de `ollama-rs`
 
-Statut : **Phases 1 et 2 implémentées et testées. Phases 3 et 4 partiellement
-implémentées** (voir détail ci-dessous).
+Statut : **Phases 1, 2 et 3 implémentées et testées** (le panneau "Model
+Info" dans la TUI reste à faire, cf. tableau). **Phase 4 partiellement
+implémentée** (voir détail ci-dessous).
 Branche : `claude/ollama-rs-integration-8an4bc`
 Dépendance : [`ollama-rs`](https://github.com/pepperoni21/ollama-rs) 0.3.5 (crates.io)
 
@@ -9,9 +10,9 @@ Dépendance : [`ollama-rs`](https://github.com/pepperoni21/ollama-rs) 0.3.5 (cra
 
 | Phase | Statut | Détail |
 |---|---|---|
-| 1 — Provider natif | ✅ Fait | `src/llm/provider/ollama.rs` (`OllamaProvider`), config, factory, tests unitaires. Testé avec `cargo test --features ollama` (415 tests, 0 échec) et sans la feature (400 tests, 0 échec). |
+| 1 — Provider natif | ✅ Fait | `src/llm/provider/ollama.rs` (`OllamaProvider`), config, factory, tests unitaires. Testé avec `cargo test --features ollama` (418 tests, 0 échec) et sans la feature (403 tests, 0 échec). `cargo clippy --features ollama` et sans la feature : 0 warning. |
 | 2 — Métriques TUI | ✅ Fait | `PerfMetrics` sur `LLMResponse`, propagé via `AgentResponse` → `DisplayMessage`/`Session` → `render.rs` (badge provider + tok/s en en-tête, ligne de métriques sous chaque réponse). Persisté en base (migration `20260701000001_provider_perf_metrics.sql`). |
-| 3 — Gestion de modèles | 🟡 Partiel | `src/llm/provider/ollama_models.rs` (list/pull/delete/show) + sous-commande CLI `crustly ollama list\|pull\|rm\|show` avec barre de progression **en terminal**. **Le dialog interactif dans la TUI décrit en §5.7 (saisie/sélection à l'écran, barre de progression rendue dans l'interface, annulation, suggestions curatées) n'est PAS implémenté** — seul l'équivalent CLI existe à ce stade. |
+| 3 — Gestion de modèles | ✅ Fait (sauf panneau Model Info TUI) | `src/llm/provider/ollama_models.rs` (list/pull/delete/show) + sous-commande CLI `crustly ollama list\|pull\|rm\|show` avec barre de progression terminal. **Dialog interactif dans la TUI** (`Ctrl+D` en mode Chat, `src/tui/ollama_download.rs` + `AppMode::ModelDownload`) : saisie du nom de modèle avec suggestions filtrées (modèles déjà installés + liste curatée), navigation ↑↓, `Tab` pour reprendre une suggestion, `Enter` pour lancer le pull, barre de progression live rendue dans l'interface, `Esc` annule le téléchargement en cours (`JoinHandle::abort()`). Le panneau "Model Info" dans la TUI (§5.4 point 3) n'est pas fait — `crustly ollama show` en CLI reste le seul accès. |
 | 4 — Embeddings | 🟡 Partiel | `ollama_models::generate_embeddings()` + `crustly ollama embed <model> <text>`. **Pas de couche RAG/retrieval à brancher dessus : Crustly n'en a pas** (vérifié — aucune référence à "embedding" dans le code avant cette phase). La capacité brute est exposée pour un usage futur. |
 
 Écarts connus par rapport au plan technique ci-dessous (à noter avant toute
@@ -30,6 +31,14 @@ implémentation ultérieure) :
   rechargement de session depuis la base (la colonne `token_count` stocke
   input+output combinés, pas le nombre de tokens de sortie seul nécessaire
   au calcul).
+- Dialog "Model Download" : la barre de progression suit la **couche
+  courante** téléchargée par Ollama (`completed`/`total` de la réponse
+  `/api/pull`), pas une estimation globale multi-couches agrégée — décrit
+  comme option possible en §5.7.3 mais non implémenté (Ollama ne renvoie pas
+  la taille totale de toutes les couches à l'avance). Pas non plus de
+  confirmation "re-pull ?" si le modèle est déjà installé (§5.7.2 point 3) —
+  le pull est relancé directement ; simplification acceptée pour rester
+  cohérent avec `ollama pull` en CLI qui a le même comportement.
 
 ## 1. Objectif
 
@@ -585,13 +594,17 @@ pas créer d'attente erronée.
   badge provider + segment tok/s dans l'en-tête, pied de message avec durée
   de génération. C'est la partie qui bénéficie **aussi** aux providers déjà
   en place (badge provider transverse).
-- **Phase 3 (gestion de modèles + téléchargement interactif)** :
-  `list`/`pull`/`rm`/`show` + sous-commande CLI + panneau "Model Info" +
-  **dialog "Model Download" dans la TUI** (§5.7) permettant à l'utilisateur
-  de choisir/saisir un modèle et de le télécharger avec barre de progression
-  en direct, sans quitter Crustly.
-- **Phase 4** : embeddings natifs Ollama, exposés à la couche RAG/recherche
-  interne si Crustly en a une (à confirmer selon le code existant).
+- **Phase 3 (gestion de modèles + téléchargement interactif)** : ✅
+  `list`/`pull`/`rm`/`show` + sous-commande CLI, et **dialog "Model
+  Download" dans la TUI** (§5.7, `Ctrl+D`) permettant à l'utilisateur de
+  choisir/saisir un modèle et de le télécharger avec barre de progression
+  en direct, sans quitter Crustly. Reste non fait : le panneau "Model Info"
+  dans la TUI décrit en §5.4 point 3 (`crustly ollama show` en CLI reste
+  le seul moyen de voir license/parameters/template/capabilities).
+- **Phase 4** : ✅ (partiel) `generate_embeddings()` + `crustly ollama embed`
+  exposés comme capacité brute — pas de couche RAG/recherche interne à y
+  brancher, Crustly n'en a pas (vérifié, aucune référence à "embedding"
+  dans le code avant cette phase).
 
 ## 9. Points ouverts à trancher avant implémentation
 
@@ -611,17 +624,19 @@ pas créer d'attente erronée.
    plus de colonnes à faire évoluer) — recommandation : JSON, cohérent avec
    le fait que ces métriques sont avant tout informatives/TUI et non
    utilisées dans des requêtes analytiques pour l'instant.
-6. Raccourci/entrée exacte pour ouvrir le dialog "Model Download" (`Ctrl+D`
-   proposé en §5.7.2, à vérifier vs raccourcis existants dans
-   `src/tui/events.rs`) et son alternative en commande slash (`/pull`,
-   `/download`) — à aligner sur les conventions déjà en place dans la barre
-   de saisie de Crustly (à confirmer si des commandes slash existent déjà).
-7. Faut-il permettre l'annulation propre d'un `pull` en cours (`Esc` →
-   `CancellationToken`), ou accepter que l'utilisateur laisse le
-   téléchargement se terminer en arrière-plan tout en revenant au chat
-   (moins de complexité, mais moins de contrôle utilisateur) ?
+6. ✅ Tranché et implémenté : `Ctrl+D` (mode Chat), libre dans
+   `src/tui/events.rs` (`keys::is_model_download`). Pas de commande slash
+   séparée — Crustly n'a pas de système de commandes slash dans sa barre de
+   saisie, `Ctrl+D` reste donc la seule entrée.
+7. ✅ Tranché et implémenté : annulation via `JoinHandle::abort()` sur la
+   tâche tokio qui exécute `ollama_models::pull_model()` (stockée dans
+   `App::model_download_task`), déclenchée par `Esc`. Pas de
+   `CancellationToken` : `abort()` suffit puisque le stream HTTP tourne
+   entièrement dans cette tâche.
 8. La liste curatée de modèles suggérés (§5.7.2) doit-elle être codée en dur
    dans le binaire (simple, nécessite une recompilation pour la mettre à
    jour) ou chargée depuis un fichier de config/JSON embarqué modifiable par
    l'utilisateur (plus flexible, légère complexité en plus) — recommandation :
-   codée en dur pour la v1, réévaluable si demande utilisateur.
+   codée en dur pour la v1, réévaluable si demande utilisateur. **Tranché :
+   codée en dur** (`ollama_download::CURATED_MODELS`), cohérent avec la
+   recommandation ci-dessus.

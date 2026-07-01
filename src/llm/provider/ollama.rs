@@ -230,6 +230,7 @@ impl OllamaProvider {
 
     /// Convert an `ollama-rs` response into our generic `LLMResponse`,
     /// including `PerfMetrics` derived from the final-chunk timing data.
+    #[allow(clippy::wrong_self_convention)]
     fn from_ollama_response(&self, response: ChatMessageResponse) -> LLMResponse {
         let mut content_blocks = Vec::new();
 

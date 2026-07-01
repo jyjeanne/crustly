@@ -102,6 +102,17 @@ pub struct App {
     pub file_picker_scroll_offset: usize,
     pub file_picker_current_dir: std::path::PathBuf,
 
+    // Model download dialog state (Ctrl+D, native Ollama provider)
+    pub model_download_input: String,
+    pub model_download_suggestions: Vec<String>,
+    pub model_download_selected: usize,
+    pub model_download_installed: Vec<String>,
+    pub model_download_running: bool,
+    pub model_download_status: Option<String>,
+    pub model_download_fraction: Option<f64>,
+    model_download_task: Option<tokio::task::JoinHandle<()>>,
+    ollama_host: String,
+
     // Working directory
     pub working_directory: std::path::PathBuf,
 
@@ -145,6 +156,15 @@ impl App {
             file_picker_selected: 0,
             file_picker_scroll_offset: 0,
             file_picker_current_dir: std::env::current_dir().unwrap_or_default(),
+            model_download_input: String::new(),
+            model_download_suggestions: Vec::new(),
+            model_download_selected: 0,
+            model_download_installed: Vec::new(),
+            model_download_running: false,
+            model_download_status: None,
+            model_download_fraction: None,
+            model_download_task: None,
+            ollama_host: "http://localhost:11434".to_string(),
             working_directory: std::env::current_dir().unwrap_or_default(),
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
@@ -199,6 +219,12 @@ impl App {
     /// Set agent service (used to inject configured agent after app creation)
     pub fn set_agent_service(&mut self, agent_service: Arc<AgentService>) {
         self.agent_service = agent_service;
+    }
+
+    /// Set the Ollama host used by the Model Download dialog (Ctrl+D).
+    /// Defaults to `http://localhost:11434` if never called.
+    pub fn set_ollama_host(&mut self, host: String) {
+        self.ollama_host = host;
     }
 
     /// Receive next event
@@ -288,6 +314,49 @@ impl App {
             TuiEvent::Resize(_, _) | TuiEvent::AgentProcessing => {
                 // These are handled by the render loop
             }
+            TuiEvent::OllamaModelsListed(models) => {
+                self.model_download_installed = models;
+                self.refresh_model_download_suggestions();
+            }
+            TuiEvent::OllamaPullProgress(progress) => {
+                self.model_download_fraction = progress.fraction();
+                self.model_download_status = Some(progress.status);
+            }
+            TuiEvent::OllamaPullFinished { model, error } => {
+                self.model_download_running = false;
+                self.model_download_task = None;
+                self.model_download_status = None;
+                self.model_download_fraction = None;
+
+                let content = match error {
+                    None => format!("✅ Pulled '{}' successfully.", model),
+                    Some(e) => format!("❌ Failed to pull '{}': {}", model, e),
+                };
+                let notification = DisplayMessage {
+                    id: Uuid::new_v4(),
+                    role: "system".to_string(),
+                    content,
+                    thinking_text: None,
+                    thinking_expanded: false,
+                    timestamp: chrono::Utc::now(),
+                    token_count: None,
+                    cost: None,
+                    provider_name: None,
+                    perf_metrics: None,
+                    tokens_per_second: None,
+                };
+                self.messages.push(notification);
+                self.switch_mode(AppMode::Chat).await?;
+
+                // Refresh the installed-models list in the background so the
+                // newly-pulled model shows up next time the dialog opens.
+                let host = self.ollama_host.clone();
+                let sender = self.event_sender();
+                tokio::spawn(async move {
+                    let models = super::ollama_download::fetch_installed_models(host).await;
+                    let _ = sender.send(TuiEvent::OllamaModelsListed(models));
+                });
+            }
         }
         Ok(())
     }
@@ -352,6 +421,11 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_model_download(&event) && self.mode == AppMode::Chat {
+            self.open_model_download().await?;
+            return Ok(());
+        }
+
         // Mode-specific handling
         tracing::trace!("Current mode: {:?}", self.mode);
         match self.mode {
@@ -370,6 +444,7 @@ impl App {
             AppMode::Sessions => self.handle_sessions_key(event).await?,
             AppMode::ToolApproval => self.handle_approval_key(event).await?,
             AppMode::FilePicker => self.handle_file_picker_key(event).await?,
+            AppMode::ModelDownload => self.handle_model_download_key(event).await?,
             AppMode::Help | AppMode::Settings => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
@@ -1473,6 +1548,113 @@ impl App {
                     self.input_buffer.push_str(&path_str);
                     self.switch_mode(AppMode::Chat).await?;
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Open the Model Download dialog (Ctrl+D). Shows curated suggestions
+    /// immediately; the locally-installed list refreshes in the background
+    /// (network call to Ollama) and merges in once it arrives.
+    async fn open_model_download(&mut self) -> Result<()> {
+        self.model_download_input.clear();
+        self.model_download_selected = 0;
+        self.model_download_running = false;
+        self.model_download_status = None;
+        self.model_download_fraction = None;
+        self.refresh_model_download_suggestions();
+
+        let host = self.ollama_host.clone();
+        let sender = self.event_sender();
+        tokio::spawn(async move {
+            let models = super::ollama_download::fetch_installed_models(host).await;
+            let _ = sender.send(TuiEvent::OllamaModelsListed(models));
+        });
+
+        self.switch_mode(AppMode::ModelDownload).await
+    }
+
+    /// Recompute `model_download_suggestions` from the current input text.
+    fn refresh_model_download_suggestions(&mut self) {
+        self.model_download_suggestions = super::ollama_download::filter_suggestions(
+            &self.model_download_input,
+            &self.model_download_installed,
+        );
+        self.model_download_selected = 0;
+    }
+
+    /// Start pulling `model` in the background. No-op if a pull is already
+    /// running (only one at a time from this dialog).
+    async fn start_model_pull(&mut self, model: String) {
+        if self.model_download_running || model.trim().is_empty() {
+            return;
+        }
+
+        self.model_download_running = true;
+        self.model_download_status = Some("starting…".to_string());
+        self.model_download_fraction = None;
+
+        let host = self.ollama_host.clone();
+        let sender = self.event_sender();
+        let handle = super::ollama_download::spawn_pull(host, model, sender).await;
+        self.model_download_task = Some(handle);
+    }
+
+    /// Handle keys in the Model Download dialog.
+    async fn handle_model_download_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+        use crossterm::event::KeyCode;
+
+        if keys::is_cancel(&event) {
+            // Cancel an in-flight pull (if any) and close the dialog.
+            if let Some(handle) = self.model_download_task.take() {
+                handle.abort();
+            }
+            self.model_download_running = false;
+            self.model_download_status = None;
+            self.model_download_fraction = None;
+            self.switch_mode(AppMode::Chat).await?;
+            return Ok(());
+        }
+
+        // While a pull is running, only Esc (handled above) does anything.
+        if self.model_download_running {
+            return Ok(());
+        }
+
+        if keys::is_up(&event) {
+            self.model_download_selected = self.model_download_selected.saturating_sub(1);
+        } else if keys::is_down(&event) {
+            if !self.model_download_suggestions.is_empty() {
+                self.model_download_selected = (self.model_download_selected + 1)
+                    .min(self.model_download_suggestions.len() - 1);
+            }
+        } else if event.code == KeyCode::Tab {
+            // Copy the highlighted suggestion into the input for editing/confirmation.
+            if let Some(suggestion) = self
+                .model_download_suggestions
+                .get(self.model_download_selected)
+            {
+                self.model_download_input = suggestion.clone();
+                self.refresh_model_download_suggestions();
+            }
+        } else if keys::is_enter(&event) {
+            let model = self.model_download_input.trim().to_string();
+            if !model.is_empty() {
+                self.start_model_pull(model).await;
+            }
+        } else {
+            match event.code {
+                KeyCode::Char(c) => {
+                    self.model_download_input.push(c);
+                    self.refresh_model_download_suggestions();
+                }
+                KeyCode::Backspace => {
+                    self.model_download_input.pop();
+                    self.refresh_model_download_suggestions();
+                }
+                _ => {}
             }
         }
 
