@@ -247,6 +247,33 @@ When Claude wants to modify files or execute commands, Crustly pauses and asks f
 - Press `Esc` to cancel
 - No way to bypass (unless explicitly configured)
 
+### Auto Mode (Explicitly Bypassing Approval)
+
+Press `Shift+Tab` to cycle through three levels of autonomy, shown at all
+times in the status bar:
+
+| Level | Behavior |
+|-------|----------|
+| `⚙ Interactive` (default) | Every dangerous tool call prompts, as above. |
+| `⚡ AutoPlan` | Low-risk tools (reads, searches, etc.) run without prompting. `bash`, `write_file`, `edit_file`, and `code_exec` still prompt. |
+| `⚡⚡ FullAuto` | Nothing prompts, including `bash`/`write_file`/`edit_file`/`code_exec`. Use with care. |
+
+Two things stay true no matter which level is active:
+- The `[security]` config policy (`deny_tools`, `deny_paths`, `allow_bash`)
+  is a separate, earlier check and is **never** bypassed by Auto Mode —
+  it's the hard floor.
+- Every auto-approved action is logged identically to a manually-approved
+  one, so there's a full audit trail regardless of which level was active.
+
+Starts at `Interactive` by default; set `[plan_mode].mode` in
+`config.toml` (`"interactive"` / `"auto_plan"` / `"full_auto"`) to change
+the starting level, or just cycle it with `Shift+Tab` mid-session.
+
+`crustly run --yolo`/`crustly run --auto-approve` is a related but
+separate mechanism for the non-interactive CLI path
+(`crustly run "<prompt>"`), not the TUI - it always bypasses everything
+unconditionally, with no `AutoPlan`-style tiering.
+
 ### Example Workflow
 
 ```bash
@@ -2975,6 +3002,9 @@ Try again with correct parameters.
   - `Ctrl+D` - Download an Ollama model (native provider, `--features ollama`)
   - `Ctrl+O` - Show the Model Info panel (provider, model, context window, last response perf metrics)
   - `Ctrl+W` - Switch to a different local Ollama model (native provider, `--features ollama`)
+  - `Ctrl+Y` - Copy last response (or its code block) to clipboard
+  - `Ctrl+V` - Paste from clipboard at cursor
+  - `Shift+Tab` - Cycle Auto Mode: `Interactive` → `AutoPlan` → `FullAuto`
   - `Ctrl+C` - Quit
   - `Escape` - Clear input
   - `Page Up/Down` - Scroll chat history

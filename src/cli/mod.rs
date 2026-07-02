@@ -779,12 +779,40 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Get event sender from app
     let event_sender = app.event_sender();
 
-    // Create approval callback that sends requests to TUI
+    // Shared Auto Mode level (Interactive/AutoPlan/FullAuto), seeded from
+    // config and toggled at runtime by the TUI's Shift+Tab handler
+    // (App::cycle_auto_mode). Cloned into the approval callback below so
+    // toggling it in the TUI takes effect on the very next tool call.
+    let auto_mode = Arc::new(std::sync::Mutex::new(config.plan_mode.mode.clone()));
+    app.set_auto_mode_state(auto_mode.clone());
+
+    // Create approval callback that sends requests to TUI - unless Auto
+    // Mode is active, in which case low-risk tools are approved without
+    // prompting (see PlanExecMode doc comments for exactly what each level
+    // means). High-risk tools (bash/write_file/edit_file/code_exec) still
+    // prompt under AutoPlan; only FullAuto skips the prompt for those too.
+    // This does NOT touch AgentService::auto_approve_tools or the
+    // SecurityConfig policy chain in ToolRegistry::execute - both remain
+    // fully enforced regardless of Auto Mode, so deny-listed tools/paths/
+    // bash patterns stay blocked no matter what, and every auto-approved
+    // call still produces the same "User approved tool" log line as a
+    // manually-approved one (logged downstream in AgentService, not here).
     let approval_callback: crate::llm::agent::ApprovalCallback = Arc::new(move |tool_info| {
         let sender = event_sender.clone();
+        let auto_mode = auto_mode.clone();
         Box::pin(async move {
             use crate::tui::events::{ToolApprovalRequest, TuiEvent};
             use tokio::sync::mpsc;
+
+            let mode = auto_mode.lock().expect("auto_mode mutex poisoned").clone();
+            if auto_mode_bypasses_approval(&mode, &tool_info.tool_name) {
+                tracing::debug!(
+                    "Auto Mode ({:?}) approved tool '{}' without prompting",
+                    mode,
+                    tool_info.tool_name
+                );
+                return Ok(true);
+            }
 
             // Create response channel
             let (response_tx, mut response_rx) = mpsc::unbounded_channel();
@@ -842,6 +870,33 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     println!("\n👋 Goodbye!");
 
     Ok(())
+}
+
+/// Whether the given Auto Mode level should approve `tool_name` without
+/// prompting. Extracted as a pure function (rather than left inline in the
+/// approval callback closure) specifically so this security-relevant
+/// decision has direct unit test coverage independent of the surrounding
+/// channel/TUI plumbing.
+///
+/// - `Interactive`: never bypasses - always prompts.
+/// - `AutoPlan`: bypasses everything except high-risk tools
+///   (`PlanModeState::is_high_risk_tool`: `bash`, `write_file`,
+///   `edit_file`, `code_exec`), which still prompt.
+/// - `FullAuto`: bypasses everything, including high-risk tools.
+///
+/// Callers must not treat this as the only safety layer: the
+/// `SecurityConfig` policy chain (`deny_tools`/`deny_paths`/`allow_bash`)
+/// is evaluated independently in `ToolRegistry::execute()` and stays
+/// enforced regardless of this function's result.
+fn auto_mode_bypasses_approval(mode: &crate::config::PlanExecMode, tool_name: &str) -> bool {
+    use crate::config::PlanExecMode;
+    use crate::tui::plan::PlanModeState;
+
+    match mode {
+        PlanExecMode::Interactive => false,
+        PlanExecMode::AutoPlan => !PlanModeState::is_high_risk_tool(tool_name),
+        PlanExecMode::FullAuto => true,
+    }
 }
 
 /// Run a single command non-interactively
@@ -1396,6 +1451,94 @@ mod tests {
             num_ctx: None,
         });
         assert_eq!(ollama_host(&config), "http://my-ollama-box:11434");
+    }
+
+    #[test]
+    fn auto_mode_bypasses_approval_interactive_never_bypasses() {
+        use crate::config::PlanExecMode;
+
+        for tool in [
+            "read_file",
+            "grep",
+            "bash",
+            "write_file",
+            "edit_file",
+            "code_exec",
+        ] {
+            assert!(
+                !auto_mode_bypasses_approval(&PlanExecMode::Interactive, tool),
+                "Interactive must always prompt, including for {tool}"
+            );
+        }
+    }
+
+    #[test]
+    fn auto_mode_bypasses_approval_autoplan_gates_high_risk_tools_only() {
+        use crate::config::PlanExecMode;
+
+        // Low-risk tools: bypassed without a prompt.
+        for tool in [
+            "read_file",
+            "grep",
+            "glob",
+            "ls",
+            "web_search",
+            "todo_write",
+        ] {
+            assert!(
+                auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool),
+                "AutoPlan should bypass the low-risk tool {tool}"
+            );
+        }
+
+        // High-risk tools: this is the load-bearing safety property of
+        // AutoPlan - these must still prompt.
+        for tool in ["bash", "write_file", "edit_file", "code_exec"] {
+            assert!(
+                !auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool),
+                "AutoPlan must still prompt for the high-risk tool {tool}"
+            );
+        }
+    }
+
+    #[test]
+    fn known_gap_powershell_is_not_classified_as_high_risk() {
+        use crate::config::PlanExecMode;
+
+        // Documents a pre-existing gap (flagged as an open decision in
+        // ergonomy-improvment.md, not something introduced or silently
+        // fixed here): PlanModeState::is_high_risk_tool() only lists
+        // bash/write_file/edit_file/code_exec, so PowerShell - an
+        // equally-capable arbitrary command execution tool on Windows -
+        // is bypassed by AutoPlan the same as a read-only tool. Whether to
+        // add it (and http/notebook) to the high-risk list is left as an
+        // explicit follow-up decision rather than expanded here, since
+        // that shared classification is also used by pre-existing plan
+        // auto-run code this phase didn't otherwise touch.
+        assert!(auto_mode_bypasses_approval(
+            &PlanExecMode::AutoPlan,
+            "powershell"
+        ));
+    }
+
+    #[test]
+    fn auto_mode_bypasses_approval_fullauto_bypasses_everything() {
+        use crate::config::PlanExecMode;
+
+        for tool in [
+            "read_file",
+            "grep",
+            "bash",
+            "write_file",
+            "edit_file",
+            "code_exec",
+            "powershell",
+        ] {
+            assert!(
+                auto_mode_bypasses_approval(&PlanExecMode::FullAuto, tool),
+                "FullAuto should bypass every tool, including {tool}"
+            );
+        }
     }
 
     #[test]

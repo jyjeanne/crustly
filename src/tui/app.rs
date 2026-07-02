@@ -5,11 +5,12 @@
 use super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResponse, TuiEvent};
 use super::plan::PlanDocument;
 use super::prompt_analyzer::PromptAnalyzer;
+use crate::config::PlanExecMode;
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
 use crate::services::{MessageService, PlanService, ServiceContext, SessionService};
 use anyhow::Result;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tui_textarea::{CursorMove, TextArea};
 use uuid::Uuid;
 
@@ -84,6 +85,12 @@ pub struct App {
     /// shown, not which keys are actually handled (`Alt+Enter` always works
     /// as a newline fallback regardless of this flag).
     pub kitty_keyboard_protocol_active: bool,
+    /// Current Auto Mode level (`Interactive`/`AutoPlan`/`FullAuto`),
+    /// cycled with `Shift+Tab`. Shared (`Arc<Mutex<..>>`) with the tool
+    /// approval callback set up in `cli::cmd_chat`, so toggling it here
+    /// takes effect on the very next tool call - off by default
+    /// (`Interactive`) unless overridden by `[plan_mode].mode` in config.
+    pub auto_mode: Arc<Mutex<PlanExecMode>>,
 
     // Streaming state
     pub is_processing: bool,
@@ -157,6 +164,7 @@ impl App {
             selected_session_index: 0,
             should_quit: false,
             kitty_keyboard_protocol_active: false,
+            auto_mode: Arc::new(Mutex::new(PlanExecMode::default())),
             is_processing: false,
             streaming_response: None,
             error_message: None,
@@ -322,6 +330,32 @@ impl App {
     /// protocol, detected once at startup by the runner.
     pub fn set_kitty_keyboard_protocol_active(&mut self, active: bool) {
         self.kitty_keyboard_protocol_active = active;
+    }
+
+    /// Replace the Auto Mode shared cell with one already wired into the
+    /// tool approval callback (`cli::cmd_chat`), so toggling it here in the
+    /// TUI actually affects tool approval rather than talking to an
+    /// isolated copy. Also seeds the starting level from config.
+    pub fn set_auto_mode_state(&mut self, auto_mode: Arc<Mutex<PlanExecMode>>) {
+        self.auto_mode = auto_mode;
+    }
+
+    /// Current Auto Mode level.
+    pub fn auto_mode(&self) -> PlanExecMode {
+        self.auto_mode
+            .lock()
+            .expect("auto_mode mutex poisoned")
+            .clone()
+    }
+
+    /// Cycle `Interactive -> AutoPlan -> FullAuto -> Interactive`.
+    fn cycle_auto_mode(&mut self) {
+        let mut guard = self.auto_mode.lock().expect("auto_mode mutex poisoned");
+        *guard = match *guard {
+            PlanExecMode::Interactive => PlanExecMode::AutoPlan,
+            PlanExecMode::AutoPlan => PlanExecMode::FullAuto,
+            PlanExecMode::FullAuto => PlanExecMode::Interactive,
+        };
     }
 
     /// Receive next event
@@ -521,6 +555,11 @@ impl App {
                 AppMode::Plan => self.switch_mode(AppMode::Chat).await?,
                 _ => {} // Do nothing in other modes
             }
+            return Ok(());
+        }
+
+        if keys::is_toggle_auto_mode(&event) {
+            self.cycle_auto_mode();
             return Ok(());
         }
 
@@ -2342,6 +2381,57 @@ mod tests {
             .error_message
             .as_ref()
             .is_some_and(|e| e.contains("clipboard")));
+    }
+
+    #[tokio::test]
+    async fn auto_mode_defaults_to_interactive() {
+        let app = test_app().await;
+        assert_eq!(app.auto_mode(), PlanExecMode::Interactive);
+    }
+
+    #[tokio::test]
+    async fn shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps() {
+        let mut app = test_app().await;
+
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+        assert_eq!(app.auto_mode(), PlanExecMode::AutoPlan);
+
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+        assert_eq!(app.auto_mode(), PlanExecMode::FullAuto);
+
+        // Wraps back to Interactive - Auto Mode is not a one-way ratchet.
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+        assert_eq!(app.auto_mode(), PlanExecMode::Interactive);
+    }
+
+    #[tokio::test]
+    async fn shift_tab_works_from_any_mode_not_just_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Plan;
+
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+
+        assert_eq!(app.auto_mode(), PlanExecMode::AutoPlan);
+        // Must not have also changed the current screen/dialog mode.
+        assert_eq!(app.mode, AppMode::Plan);
+    }
+
+    #[tokio::test]
+    async fn setting_auto_mode_state_shares_the_same_cell_as_a_clone() {
+        // This is the property the CLI's approval callback relies on:
+        // App::set_auto_mode_state must install the *same* Arc<Mutex<_>>
+        // the callback was built with, not a copy - otherwise toggling
+        // Shift+Tab in the TUI would never affect approval decisions.
+        let mut app = test_app().await;
+        let shared = Arc::new(Mutex::new(PlanExecMode::FullAuto));
+        app.set_auto_mode_state(shared.clone());
+
+        assert_eq!(app.auto_mode(), PlanExecMode::FullAuto);
+
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+
+        // The external handle must observe the change made through `app`.
+        assert_eq!(*shared.lock().unwrap(), PlanExecMode::Interactive);
     }
 
     #[tokio::test]

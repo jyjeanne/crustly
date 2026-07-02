@@ -6,6 +6,7 @@ use super::app::App;
 use super::events::AppMode;
 use super::markdown::parse_markdown;
 use super::splash;
+use crate::config::PlanExecMode;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -606,6 +607,19 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 "Switch to a different local Ollama model",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Shift+Tab    ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Cycle Auto Mode: Interactive → AutoPlan → FullAuto",
                 Style::default().fg(Color::White),
             ),
         ]),
@@ -1915,14 +1929,21 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::ProviderSwitch => "SWITCH PROVIDER",
     };
 
+    let auto_mode = app.auto_mode();
+    let auto_mode_label = match auto_mode {
+        PlanExecMode::Interactive => "⚙ Interactive",
+        PlanExecMode::AutoPlan => "⚡ AutoPlan",
+        PlanExecMode::FullAuto => "⚡⚡ FullAuto",
+    };
+
     let status = if let Some(ref error) = app.error_message {
-        format!(" [{}] ERROR: {}", mode_text, error)
+        format!(" [{}] {} │ ERROR: {}", mode_text, auto_mode_label, error)
     } else if app.is_processing {
-        format!(" [{}] Processing...", mode_text)
+        format!(" [{}] {} │ Processing...", mode_text, auto_mode_label)
     } else {
         format!(
-            " [{}] Ready │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
-            mode_text
+            " [{}] {} │ Shift+Tab: Auto Mode │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            mode_text, auto_mode_label
         )
     };
 
@@ -1931,7 +1952,11 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     } else if app.is_processing {
         Color::Yellow
     } else {
-        Color::Green
+        match auto_mode {
+            PlanExecMode::Interactive => Color::Green,
+            PlanExecMode::AutoPlan => Color::Yellow,
+            PlanExecMode::FullAuto => Color::Red,
+        }
     };
 
     let status_bar =
@@ -2055,6 +2080,34 @@ mod tests {
         app.mode = AppMode::Chat;
         let screen = render_to_string(&app, 100, 20);
         assert!(!screen.contains("tok/s"));
+    }
+
+    #[tokio::test]
+    async fn status_bar_shows_interactive_by_default() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Interactive"));
+    }
+
+    #[tokio::test]
+    async fn status_bar_shows_full_auto_when_active() {
+        use crate::config::PlanExecMode;
+
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.set_auto_mode_state(std::sync::Arc::new(std::sync::Mutex::new(
+            PlanExecMode::FullAuto,
+        )));
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("FullAuto"));
+        // The persistent indicator must survive an error state too - Auto
+        // Mode being active should never become invisible.
+        app.error_message = Some("boom".to_string());
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("FullAuto"));
     }
 
     #[tokio::test]

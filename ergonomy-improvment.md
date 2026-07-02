@@ -142,12 +142,58 @@ terminal query on the startup path (now timeout-bounded via
         hang, so there's no need for a timeout wrapper around it.
 - [ ] **Phase 4b — Auto Mode TUI toggle** *(depends on 1.2 for the
       finalized keybinding scheme)*
-  - [ ] 4b.1 `Shift+Tab` mode-cycle wired to a new `App` field +
-        `ApprovalCallback` using `PlanModeState::tool_needs_approval()`.
-  - [ ] 4b.2 Plan Mode auto-execution path (skip `Ctrl+A`) for
-        `AutoExecuting`/`FullAuto`.
-  - [ ] 4b.3 Resurrect `render_auto_exec_progress`/`render_policy_denial`;
-        persistent status-bar indicator.
+  - [x] 4b.1 `Shift+Tab` mode-cycle wired to a new `App` field +
+        `ApprovalCallback`. **Correction to the original design**: reused
+        `PlanModeState::is_high_risk_tool(tool_name)` (a plain, stateless
+        classifier) rather than `tool_needs_approval(&self, ..)` as
+        originally named - the latter is an instance method keyed off a
+        *specific* `PlanModeState` variant tied to an in-progress plan
+        (`AutoExecuting { task_index, total, .. }` etc.), which isn't
+        generally available for an arbitrary tool call happening outside
+        active plan-task execution (e.g. a normal chat message that
+        triggers a tool call with no plan involved at all). The
+        stateless classifier is the right fit for a global toggle that
+        must work regardless of whether a plan is active.
+      - New `App.auto_mode: Arc<Mutex<PlanExecMode>>`, seeded from
+        `config.plan_mode.mode` and shared (not copied) with the approval
+        callback built in `cli::cmd_chat` - toggling it in the TUI takes
+        effect on the very next tool call, from any `AppMode`.
+      - The core decision (`Interactive` never bypasses; `AutoPlan`
+        bypasses everything except `bash`/`write_file`/`edit_file`/
+        `code_exec`; `FullAuto` bypasses everything) is a pure, directly
+        unit-tested function (`cli::auto_mode_bypasses_approval`), kept
+        separate from the channel/TUI plumbing specifically so this
+        security-relevant logic has isolated test coverage.
+      - Documented, not silently expanded: `is_high_risk_tool()` doesn't
+        include `powershell` (an equally-capable command-execution tool on
+        Windows) - `AutoPlan` will bypass it the same as a read-only tool.
+        Left as the open decision it already was rather than unilaterally
+        widening a classifier also used by pre-existing plan auto-run code
+        this phase didn't otherwise touch.
+      - `SecurityConfig`/`sandbox.rs`'s policy chain is untouched - it's a
+        separate, earlier check in `ToolRegistry::execute()` and stays
+        enforced under every Auto Mode level.
+      - Status bar always shows the current level (`⚙ Interactive` /
+        `⚡ AutoPlan` / `⚡⚡ FullAuto`) with a distinct background color,
+        survives error/processing states, and is documented in the Help
+        screen - satisfies the "persistent, unmissable indicator"
+        requirement from 4b.3 without needing the dead dialog components.
+  - [ ] 4b.2 **Not implemented**: Plan Mode's own approval step
+        (`Ctrl+A`/`R`/`I` in `handle_plan_key`) is untouched - Auto Mode
+        only affects *individual tool-call* approval via the callback, not
+        *plan* approval. A plan the agent creates still requires an
+        explicit `Ctrl+A` before `execute_plan_tasks()` runs, even with
+        `FullAuto` active. Wiring plan-level auto-approval through
+        `PlanModeState::AutoExecuting`/`FullAuto` is separate follow-up
+        work, not bundled into this pass.
+  - [ ] 4b.3 **Partially implemented**: the persistent status-bar
+        indicator is done (see 4b.1 notes above). Resurrecting
+        `render_auto_exec_progress`/`render_policy_denial`
+        (`tui/components/dialogs/mod.rs`, still dead code) as a visible
+        "here's what Auto Mode just did" progress trail is **not** done -
+        auto-approved tool calls currently proceed with no more visual
+        feedback than a normal streamed response gets. Left as a UX
+        follow-up rather than blocking the core safety mechanism on it.
 - [ ] **Phase 5 — `/skills` and `/mcp`**
   - [ ] 5.1 Slash-command interception layer in `handle_chat_key`.
   - [ ] 5.2 Fix MCP config-wiring gap (`register_mcp_server` never called).

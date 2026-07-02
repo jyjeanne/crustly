@@ -299,6 +299,14 @@ pub mod keys {
         key_matches(event, KeyCode::Char('v'), KeyModifiers::CONTROL)
     }
 
+    /// Shift+Tab - Cycle Auto Mode (Interactive -> AutoPlan -> FullAuto ->
+    /// Interactive). Most terminals report Shift+Tab as the distinct
+    /// `KeyCode::BackTab`, not `Tab` with a `SHIFT` modifier bit, so match
+    /// on that rather than `key_matches`.
+    pub fn is_toggle_auto_mode(event: &KeyEvent) -> bool {
+        event.code == KeyCode::BackTab
+    }
+
     /// Enter - Submit (plain Enter sends; Ctrl+Enter, with or without extra
     /// modifiers, is kept as a legacy alias for muscle memory). Shift+Enter
     /// and Alt+Enter are newlines, not submit - see `is_newline`.
@@ -473,6 +481,15 @@ mod tests {
 
         let event = KeyEvent::new(KeyCode::Char('v'), KeyModifiers::empty());
         assert!(!keys::is_paste_clipboard(&event));
+    }
+
+    #[test]
+    fn test_toggle_auto_mode_key() {
+        let event = KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT);
+        assert!(keys::is_toggle_auto_mode(&event));
+
+        let event = KeyEvent::new(KeyCode::Tab, KeyModifiers::empty());
+        assert!(!keys::is_toggle_auto_mode(&event));
     }
 
     #[test]
