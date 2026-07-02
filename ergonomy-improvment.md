@@ -64,6 +64,30 @@ Improve day-to-day usability of the Crustly TUI:
   - If unsupported, fall back to `Alt+Enter` for newline (widely supported
     across terminals without special protocols) and surface which mode is
     active in the status bar / help screen.
+- **This same ambiguity likely already affects today's `Ctrl+Enter` send
+  binding, and is a probable root cause of the original complaint**:
+  without the Kitty protocol / xterm `modifyOtherKeys`, most terminals emit
+  the same raw byte (`0x0D`) for plain Enter and Ctrl+Enter, so
+  `is_submit()`'s `modifiers.contains(CONTROL)` check may simply never be
+  satisfied — `Ctrl+Enter` can silently do nothing in affected terminals
+  today. Worth keeping in mind when validating this phase: the fix isn't
+  just ergonomic preference, it may also fix a binding that doesn't
+  reliably work at all in some environments.
+- **Errata found during review, relevant to keybinding choices elsewhere in
+  this plan**: any `Ctrl+<letter>` binding whose letter has a legacy
+  single-byte control meaning collides with that meaning outside the Kitty
+  protocol — `Ctrl+H` = Backspace (`0x08`), `Ctrl+I` = Tab (`0x09`), `Ctrl+M`
+  = Enter/CR (`0x0D`), `Ctrl+[` = Esc (`0x1B`). This codebase already has a
+  live instance: the existing plan-revision binding
+  (`event.code == KeyCode::Char('i') && modifiers.contains(CONTROL)`,
+  `src/tui/app.rs:577`) is almost certainly non-functional in legacy
+  terminals, since crossterm's non-Kitty parser reports raw `0x09` as
+  `KeyCode::Tab`, never as `Char('i')` + `CONTROL`. This is out of this
+  plan's original scope (pre-existing bug, not introduced here), but is
+  flagged as a candidate fix-while-we're-in-there once the Kitty-protocol
+  detection added by this phase is in place — see Open Decisions. It's also
+  why the Phase 3 candidate keybinding was changed from `Ctrl+M` to `Ctrl+O`
+  (`Ctrl+M` is Enter's own control code — see Phase 3).
 - Update all UI copy referencing the old binding:
   - Input box hint: `src/tui/render.rs:430`.
   - Status bar hint: `src/tui/render.rs:1649`.
@@ -121,7 +145,10 @@ in `ollama-rs-integration-plan.md`.
 - **Model Info panel** (new dialog, modeled on the existing Model Download
   dialog pattern in `src/tui/ollama_download.rs`): shows current model name,
   context window, `keep_alive`, and live `PerfMetrics` (tokens/sec, load
-  time). Candidate keybinding: `Ctrl+M` (currently free).
+  time). Candidate keybinding: `Ctrl+O` (currently free — **not** `Ctrl+M`,
+  which is Enter's own raw control code, `0x0D`, and would be
+  indistinguishable from pressing Enter in legacy terminals; see the Phase 1
+  errata note).
 - **Live streaming perf metrics**: attach perf data to `StreamEvent`
   (`src/llm/provider/types.rs`) during generation so the Model Info panel and
   status bar can show tok/s in real time, not just after completion.
@@ -134,7 +161,7 @@ in `ollama-rs-integration-plan.md`.
 
 ### Acceptance criteria
 
-- `Ctrl+M` opens a panel showing the active model's stats, live-updating
+- `Ctrl+O` opens a panel showing the active model's stats, live-updating
   tok/s while a response streams.
 - User can switch from a cloud provider to a local Ollama model (and back)
   from within a running TUI session, with the change taking effect on the
@@ -366,6 +393,15 @@ rather than building new plumbing from scratch:
    work, but cheap once the underlying functions exist and useful for
    scripting/debugging outside the TUI.
 
+Implementation note: `AppMode` (`src/tui/events.rs:127-148`) has no
+wildcard/catch-all match arms at its call sites, so adding `AppMode::Mcp`
+and `AppMode::Skills` will force the compiler to flag every existing
+`match app.mode`/`match self.mode` site that needs a new arm — at minimum
+the render dispatch in `render()` (`src/tui/render.rs:38-69`) and the
+status-bar mode-label match (`render.rs` around line 1630-1640, not yet
+precisely pinned down). Treat the compiler errors as the checklist rather
+than trying to enumerate every site by hand up front.
+
 ### Acceptance criteria
 
 - Typing `/skills` and pressing `Enter`/submit opens a list view of every
@@ -408,7 +444,8 @@ rather than building new plumbing from scratch:
       `Alt+Enter` (proposed) vs. alternative.
 - [ ] Exact keybinding for "copy last response" and "copy code block"
       (`Ctrl+Y` proposed for copy).
-- [ ] Exact keybinding for Model Info panel (`Ctrl+M` proposed).
+- [ ] Exact keybinding for Model Info panel (`Ctrl+O` proposed — `Ctrl+M`
+      ruled out, see Phase 1 errata).
 - [ ] Whether `Ctrl+Enter` is kept as a legacy send alias after the swap.
 - [ ] Whether `Shift+Tab` cycles through all three `PlanExecMode` variants
       (`Interactive → AutoPlan → FullAuto`) or is a plain two-state toggle
@@ -431,3 +468,13 @@ rather than building new plumbing from scratch:
       (malformed frontmatter) as an error row, or silently skip them.
 - [ ] Whether to add the optional `crustly mcp list` / `crustly skill list`
       CLI subcommands in this phase or defer them.
+- [ ] Whether to fix the pre-existing, out-of-scope `Ctrl+I` plan-revision
+      bug (`src/tui/app.rs:577`, likely non-functional in legacy terminals
+      per the Phase 1 errata) opportunistically while Phase 1 adds Kitty-
+      protocol detection, or file it separately.
+- [ ] Whether `Ctrl+H` (Help) should be re-evaluated too — it collides with
+      Backspace's legacy control code (`0x08`) on terminals/configs that
+      still send `0x08` for the Backspace key (most modern terminals send
+      `0x7F`/DEL instead, so this is narrower than the `Ctrl+M`/`Ctrl+I`
+      cases, but worth a quick check rather than assuming it's fine
+      everywhere).
