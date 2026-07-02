@@ -172,6 +172,7 @@ Crustly now speaks Ollama's native `/api/chat` protocol directly (via [`ollama-r
 
 - **Runtime performance metrics** — generation throughput (tokens/sec), model load time, and warm/cold-start status shown live in the TUI header and under each reply
 - **`Ctrl+D` Model Download dialog** — type or pick an Ollama model from suggested/installed names, pull it with a live progress bar, and cancel mid-download with `Esc`, all without leaving the TUI
+- **`Ctrl+O` Model Info panel** — active provider/model, context window, and the last response's performance metrics (load/prefill/generation/total time, tokens/sec), all without leaving the TUI
 - **Model management CLI** — `crustly ollama list|pull|rm|show|embed`
 - **`keep_alive` / `num_ctx` control** and provider identity (badge + icon) shown in the header for every configured provider, not just Ollama
 
@@ -2961,6 +2962,7 @@ Try again with correct parameters.
   - `Ctrl+L` - List sessions
   - `Ctrl+H` - Show help (📚 **Press Ctrl+H from anywhere to see all commands!**)
   - `Ctrl+D` - Download an Ollama model (native provider, `--features ollama`)
+  - `Ctrl+O` - Show the Model Info panel (provider, model, context window, last response perf metrics)
   - `Ctrl+C` - Quit
   - `Escape` - Clear input
   - `Page Up/Down` - Scroll chat history

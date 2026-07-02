@@ -66,6 +66,9 @@ pub fn render(f: &mut Frame, app: &App) {
         AppMode::ModelDownload => {
             render_model_download(f, app, chunks[1]);
         }
+        AppMode::ModelInfo => {
+            render_model_info(f, app, chunks[1]);
+        }
     }
 
     render_status_bar(f, app, chunks[3]);
@@ -1478,6 +1481,100 @@ fn render_file_picker(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(widget, area);
 }
 
+/// Render the Model Info panel (Ctrl+O): active provider/model, context
+/// window, and the last response's performance metrics, if any.
+fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(vec![
+        Span::styled("Provider: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{} {}", provider_icon(app.provider_name()), app.provider_name()),
+            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+        ),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled("Model:    ", Style::default().fg(Color::DarkGray)),
+        Span::styled(app.provider_model(), Style::default().fg(Color::White)),
+    ]));
+    let context_window = app
+        .provider_context_window()
+        .map(|n| format!("{n} tokens"))
+        .unwrap_or_else(|| "unknown".to_string());
+    lines.push(Line::from(vec![
+        Span::styled("Context:  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(context_window, Style::default().fg(Color::White)),
+    ]));
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Last response performance",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )));
+
+    match app.last_assistant_message().and_then(|m| m.perf_metrics.as_ref()) {
+        Some(perf) => {
+            let ms = |v: Option<u64>| {
+                v.map(|ms| format!("{ms} ms"))
+                    .unwrap_or_else(|| "n/a".to_string())
+            };
+            let start = match perf.model_was_loaded {
+                Some(true) => " (warm start)",
+                Some(false) => " (cold start)",
+                None => "",
+            };
+            lines.push(Line::from(format!(
+                "  Load:      {}{}",
+                ms(perf.load_duration_ms),
+                start
+            )));
+            lines.push(Line::from(format!(
+                "  Prefill:   {}",
+                ms(perf.prompt_eval_duration_ms)
+            )));
+            lines.push(Line::from(format!(
+                "  Generation:{}",
+                ms(perf.eval_duration_ms)
+            )));
+            lines.push(Line::from(format!(
+                "  Total:     {}",
+                ms(perf.total_duration_ms)
+            )));
+            if let Some(tps) = app.last_assistant_message().and_then(|m| m.tokens_per_second) {
+                lines.push(Line::from(format!("  Throughput: {tps:.1} tok/s")));
+            }
+        }
+        None => {
+            lines.push(Line::from(Span::styled(
+                "  No performance metrics yet — send a message to see stats.",
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Esc to close",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Model Info ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
 /// Render the Model Download dialog (Ctrl+D): either the model
 /// name input + suggestions list, or a live progress bar while a pull is
 /// in flight.
@@ -1660,6 +1757,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::ToolApproval => "PERMISSION",
         AppMode::FilePicker => "FILE PICKER",
         AppMode::ModelDownload => "MODEL DOWNLOAD",
+        AppMode::ModelInfo => "MODEL INFO",
     };
 
     let status = if let Some(ref error) = app.error_message {
@@ -1828,5 +1926,55 @@ mod tests {
         assert!(screen.contains("Downloading 'qwen2.5-coder:7b'"));
         assert!(screen.contains("pulling abc123"));
         assert!(screen.contains("50%"));
+    }
+
+    #[tokio::test]
+    async fn model_info_panel_shows_provider_model_and_context_window() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelInfo;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("dummy"));
+        assert!(screen.contains("dummy-model"));
+        assert!(screen.contains("4096 tokens"));
+        assert!(screen.contains("No performance metrics yet"));
+    }
+
+    #[tokio::test]
+    async fn model_info_panel_shows_last_response_perf_metrics() {
+        use crate::llm::provider::PerfMetrics;
+
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelInfo;
+        app.messages.push(DisplayMessage {
+            id: uuid::Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "hi".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: Some(30),
+            cost: Some(0.0),
+            provider_name: Some("dummy".to_string()),
+            perf_metrics: Some(PerfMetrics {
+                load_duration_ms: Some(120),
+                prompt_eval_duration_ms: Some(45),
+                eval_duration_ms: Some(900),
+                total_duration_ms: Some(1065),
+                model_was_loaded: Some(true),
+            }),
+            tokens_per_second: Some(42.5),
+        });
+
+        // Taller terminal than the other tests: the panel has enough lines
+        // (provider/model/context + 5 perf metric rows) that a 20-row
+        // frame clips the bottom of the content area.
+        let screen = render_to_string(&app, 100, 30);
+        assert!(screen.contains("120 ms"));
+        assert!(screen.contains("warm start"));
+        assert!(screen.contains("45 ms"));
+        assert!(screen.contains("900 ms"));
+        assert!(screen.contains("1065 ms"));
+        assert!(screen.contains("42.5 tok/s"));
     }
 }

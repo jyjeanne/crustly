@@ -355,6 +355,12 @@ impl AgentService {
         self.provider.default_model()
     }
 
+    /// Get the context window (in tokens) for the active provider/model,
+    /// if known.
+    pub fn provider_context_window(&self) -> Option<u32> {
+        self.provider.context_window(self.provider.default_model())
+    }
+
     /// Send a message and get a response
     ///
     /// This will:

@@ -192,6 +192,18 @@ impl App {
         self.agent_service.provider_model()
     }
 
+    /// Get the context window (in tokens) for the active provider/model,
+    /// if known.
+    pub fn provider_context_window(&self) -> Option<u32> {
+        self.agent_service.provider_context_window()
+    }
+
+    /// Get the most recent assistant message, if any - used by the Model
+    /// Info panel to show the last response's performance metrics.
+    pub fn last_assistant_message(&self) -> Option<&DisplayMessage> {
+        self.messages.iter().rev().find(|m| m.role == "assistant")
+    }
+
     /// Initialize the app by loading or creating a session
     pub async fn initialize(&mut self) -> Result<()> {
         // Try to load most recent session
@@ -439,6 +451,11 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_model_info(&event) && self.mode == AppMode::Chat {
+            self.switch_mode(AppMode::ModelInfo).await?;
+            return Ok(());
+        }
+
         // Mode-specific handling
         tracing::trace!("Current mode: {:?}", self.mode);
         match self.mode {
@@ -458,7 +475,7 @@ impl App {
             AppMode::ToolApproval => self.handle_approval_key(event).await?,
             AppMode::FilePicker => self.handle_file_picker_key(event).await?,
             AppMode::ModelDownload => self.handle_model_download_key(event).await?,
-            AppMode::Help | AppMode::Settings => {
+            AppMode::Help | AppMode::Settings | AppMode::ModelInfo => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
                 }
@@ -1962,6 +1979,68 @@ mod tests {
 
         assert!(app.input_buffer.is_empty());
         assert!(app.messages.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ctrl_o_opens_model_info_panel_and_esc_closes_it() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_key_event(key_mod(KeyCode::Char('o'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+        assert_eq!(app.mode, AppMode::ModelInfo);
+
+        app.handle_key_event(key(KeyCode::Esc)).await.unwrap();
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn last_assistant_message_finds_most_recent_assistant_reply() {
+        let mut app = test_app().await;
+        assert!(app.last_assistant_message().is_none());
+
+        app.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "user".to_string(),
+            content: "hi".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+        app.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "first".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+        app.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "second".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+
+        assert_eq!(app.last_assistant_message().unwrap().content, "second");
     }
 
     #[tokio::test]

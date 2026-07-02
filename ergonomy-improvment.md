@@ -30,10 +30,19 @@ items.
         in `cmd_autoplan`) remains a separate, larger feature, deferred to
         Phase 4b alongside the TUI `Shift+Tab` mode cycle.
 - [ ] **Phase 3 — Ollama-in-TUI Polish**
-  - [ ] 3.1 Model Info panel (`Ctrl+O`) — static fields first (model name,
-        context window, `keep_alive`).
+  - [x] 3.1 Model Info panel (`Ctrl+O`) — provider, model, context window
+        (via new `AgentService::provider_context_window()` /
+        `Provider::context_window()`), and the last assistant message's
+        `PerfMetrics` (load/prefill/generation/total duration, warm/cold
+        start, tokens/sec). `keep_alive` deliberately **deferred**: it's a
+        private field on `OllamaProvider` behind `Arc<dyn Provider>`, not
+        reachable without either a new `Provider` trait method or plumbing
+        `Config` into `App` just for this label — not worth it for 3.1's
+        scope; revisit if/when Phase 3.3's provider switcher needs
+        provider-specific config access anyway.
   - [ ] 3.2 Live streaming perf metrics wired into `StreamEvent` and shown
-        in the panel/status bar.
+        in the panel/status bar (today the panel only reflects the *last
+        completed* response, not the in-flight one).
   - [ ] 3.3 In-TUI provider/model quick-switch dialog.
 - [ ] **Phase 2 — Copy / Paste Ergonomics**
   - [ ] 2.1 Migrate `input_buffer` from raw `String` to `tui-textarea`.

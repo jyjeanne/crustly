@@ -145,6 +145,10 @@ pub enum AppMode {
     /// Model download dialog (triggered by Ctrl+D) - pick/type an Ollama
     /// model name and pull it without leaving Crustly.
     ModelDownload,
+    /// Model Info panel (triggered by Ctrl+O) - shows the active
+    /// provider/model, context window, and last response's performance
+    /// metrics.
+    ModelInfo,
 }
 
 /// Event handler for the TUI
@@ -263,6 +267,11 @@ pub mod keys {
     /// Ctrl+D - Open the Model Download dialog (Ollama)
     pub fn is_model_download(event: &KeyEvent) -> bool {
         key_matches(event, KeyCode::Char('d'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+O - Open the Model Info panel
+    pub fn is_model_info(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('o'), KeyModifiers::CONTROL)
     }
 
     /// Enter - Submit (plain Enter sends; Ctrl+Enter is kept as a legacy
@@ -391,6 +400,15 @@ mod tests {
         // Not an Enter key at all.
         let event = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty());
         assert!(!keys::is_submit(&event));
+    }
+
+    #[test]
+    fn test_model_info_key() {
+        let event = KeyEvent::new(KeyCode::Char('o'), KeyModifiers::CONTROL);
+        assert!(keys::is_model_info(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('o'), KeyModifiers::empty());
+        assert!(!keys::is_model_info(&event));
     }
 
     #[test]
