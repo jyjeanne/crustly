@@ -215,15 +215,23 @@ rather than building new plumbing from scratch:
    so `--yolo`/`--auto-approve` and `autoplan` behave as documented. Cheap,
    high-value, and unblocks testing the rest of this phase from the CLI
    before the TUI toggle exists.
-2. **TUI runtime toggle**: new keybinding (candidate: `Ctrl+U`, currently
-   unbound) that flips a new `App` field (mirroring
-   `AgentService::auto_approve_tools`) and swaps in an `ApprovalCallback`
-   that consults `PlanModeState::tool_needs_approval()`
-   (`tui/plan.rs:858-866`) instead of showing the interactive dialog —
-   reusing the existing risk-tiering function rather than inventing a new
-   one. Startup default comes from `PlanModeConfig.mode`
-   (`config/mod.rs:31-49`, already has `Interactive`/`AutoPlan`/`FullAuto`);
-   the keybinding overrides it per-session.
+2. **TUI runtime toggle**: `Shift+Tab` (crossterm `KeyCode::BackTab`,
+   confirmed free — only plain `Tab` is bound, and only inside the Model
+   Download dialog, `src/tui/app.rs:1633`) cycles the mode, mirroring the
+   same convention used by Claude Code itself for switching permission
+   modes. Proposed cycle: `Interactive → AutoPlan → FullAuto → Interactive`,
+   matching the existing `PlanExecMode` variants (`config/mod.rs:18-29`)
+   one-to-one rather than a plain on/off toggle — so `Shift+Tab` steps
+   through increasing autonomy instead of a binary switch. Each step flips
+   a new `App` field (mirroring `AgentService::auto_approve_tools`) and
+   swaps in an `ApprovalCallback` that consults
+   `PlanModeState::tool_needs_approval()` (`tui/plan.rs:858-866`) instead of
+   showing the interactive dialog — reusing the existing risk-tiering
+   function rather than inventing a new one. Startup default comes from
+   `PlanModeConfig.mode` (`config/mod.rs:31-49`); `Shift+Tab` overrides it
+   per-session. Bound globally (like the other `Ctrl+*` shortcuts) so it
+   works whether focus is in the chat input or elsewhere — needs a check
+   that it doesn't collide with any future widget-level tab-focus-cycling.
 3. **Plan Mode integration**: when Auto Mode is active, submitted plans
    skip `Ctrl+A` and go straight to `execute_plan_tasks()`
    (`app.rs:1277+`), using the already-defined `PlanModeState::AutoExecuting`/
@@ -254,8 +262,11 @@ rather than building new plumbing from scratch:
 
 - `crustly run --yolo "..."` actually skips approval prompts end-to-end
   (fixes the current silent-deny bug).
-- Enabling Auto Mode in the TUI suppresses the tool-approval dialog and the
-  Plan Mode approval step for tools below the risk threshold.
+- `Shift+Tab` cycles `Interactive → AutoPlan → FullAuto → Interactive` at
+  any time during a session; the status bar always shows the current mode
+  name, not just an on/off badge.
+- In `AutoPlan`/`FullAuto`, the TUI suppresses the tool-approval dialog and
+  the Plan Mode approval step for tools below the risk threshold.
 - High-risk tools (`bash`, `write_file`, `edit_file`, `code_exec`) still
   prompt by default under `AutoPlan`; only `FullAuto` (or an explicit
   threshold override) bypasses them too.
@@ -291,7 +302,10 @@ rather than building new plumbing from scratch:
       (`Ctrl+Y` proposed for copy).
 - [ ] Exact keybinding for Model Info panel (`Ctrl+M` proposed).
 - [ ] Whether `Ctrl+Enter` is kept as a legacy send alias after the swap.
-- [ ] Exact toggle keybinding for Auto Mode (`Ctrl+U` proposed).
+- [ ] Whether `Shift+Tab` cycles through all three `PlanExecMode` variants
+      (`Interactive → AutoPlan → FullAuto`) or is a plain two-state toggle
+      (`Interactive ↔ last-used-auto-mode`) — cycling is proposed since the
+      config already models three distinct levels.
 - [ ] Whether the default high-risk list stays exactly
       `is_high_risk_tool()`'s current set (`bash`, `write_file`,
       `edit_file`, `code_exec`, `tui/plan.rs:929-931`) or should also cover
