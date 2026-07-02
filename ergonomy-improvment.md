@@ -15,6 +15,8 @@ Improve day-to-day usability of the Crustly TUI:
    inside the TUI (not just via config file + `Ctrl+D` download dialog).
 4. Add an opt-in "Auto Mode" that bypasses manual tool-call / plan approval
    prompts for users who want the agent to run unattended.
+5. Add `/skills` and `/mcp` slash commands to list installed skills and
+   configured MCP servers from inside the TUI.
 
 ## Current State (as of this plan)
 
@@ -279,6 +281,105 @@ rather than building new plumbing from scratch:
 - Every auto-approved action still appears in logs/history identically to a
   manually-approved one.
 
+## Phase 5 — `/skills` and `/mcp` Discovery Commands
+
+### Current state
+
+- **No slash-command layer exists at all** — confirmed by reading
+  `handle_chat_key`/`send_message` in full
+  (`src/tui/app.rs:459-509,706-783`): every character typed is pushed
+  verbatim into `input_buffer`, and on submit the *entire* buffer is passed
+  straight to `AgentService::send_message_with_tools_and_mode_streaming`
+  after only `PromptAnalyzer::analyze_and_transform`
+  (`src/tui/prompt_analyzer.rs:127`, which adds tool-usage hints, not
+  command parsing). There's no `starts_with('/')` check anywhere, no
+  `AppMode::Command` variant, no command registry. `/skills` and `/mcp`
+  need a brand-new interception point.
+- **MCP is half-wired**: `McpServerConfig`/`McpConfig`
+  (`src/config/mod.rs:130-137,193-198`, `Config.mcp: McpConfig`) is a real,
+  parsed config section (`[[mcp.servers]]` in TOML), and
+  `ToolRegistry::register_mcp_server()` (`src/llm/tools/registry.rs:119-146`)
+  fully implements connect + `tools/list` discovery + tool registration.
+  **But nothing ever calls it** — grepping the whole codebase for
+  `register_mcp_server`/`config.mcp` shows `Config.mcp.servers` is parsed
+  and then never consumed. Configured MCP servers currently have zero
+  runtime effect. There's also no status/enumeration API (connected?, tool
+  count?) — only `MCPClient::is_healthy()`/`server_name()`
+  (`src/mcp/client.rs:142-148`) exist, and only for a client already
+  connected and held somewhere, which nothing does today.
+- **Skills have no list function**: `src/llm/tools/skill.rs` defines a
+  well-specified discovery order for a single named skill
+  (`resolve_skill_path`, line 137-174, walking
+  `.crustly/skills/`, `.claude/skills/`,
+  `~/.config/crustly/skills/`, `~/.claude/skills/`, then legacy flat
+  `<name>.md`), but only resolves one name at a time. The private
+  `skill_lookup_roots` (line 177-203) builds the ordered root-directory
+  list but nothing enumerates all `SKILL.md` files within those roots.
+  Frontmatter parsing (`parse_skill_frontmatter_value`, line 218, handles
+  `name`/`description`) is already reusable for a list view.
+- **Dialog pattern is well-established and lightweight** — every existing
+  dialog (Sessions/`Ctrl+L`, Help/`Ctrl+H`, Model Download/`Ctrl+D`) is just
+  three pieces: an `AppMode` variant (`src/tui/events.rs:127-148`), an
+  `open_*`/`handle_*_key` pair in `src/tui/app.rs` (e.g.
+  `handle_sessions_key`, lines 512-530), and a `render_*` function in
+  `src/tui/render.rs` (e.g. `render_sessions`, lines 457-503) wired into
+  the `match app.mode` dispatch. No separate "dialog" trait/abstraction
+  exists — `/skills` and `/mcp` views should follow this exact shape.
+- No `crustly mcp list` / `crustly skill list` CLI subcommands exist either
+  (`Commands` enum, `src/cli/mod.rs:123-196`) — nothing to reuse there, but
+  worth adding symmetrically (see Design) following the existing
+  `Ollama { operation: OllamaCommands }` subcommand shape
+  (`cli/mod.rs:192-225`) as precedent for a shared service module backing
+  both CLI and TUI.
+
+### Design
+
+1. **Slash-command interception**: in `handle_chat_key`
+   (`src/tui/app.rs:459-509`), before falling through to normal character
+   input, or in `send_message` (`app.rs:706-783`) before the buffer is
+   forwarded to the LLM — detect `input_buffer.starts_with('/')` on submit
+   and dispatch to a small command table (`/skills`, `/mcp`, room for more
+   later, e.g. `/help` as an alias for `Ctrl+H`) instead of sending it as a
+   chat message. Unrecognized `/word` falls through to the LLM as before
+   (don't break messages that legitimately start with `/`, e.g. paths).
+2. **Fix the MCP wiring gap**: at startup (wherever `ToolRegistry` is
+   built, e.g. `cli/mod.rs` around the existing tool-registration calls),
+   iterate `config.mcp.servers` and call `register_mcp_server()` for each
+   — this is a real bug fix (config silently doing nothing today),
+   independent of and smaller than the `/mcp` view itself.
+3. **`/mcp` view**: new `AppMode::Mcp`, `handle_mcp_key`, `render_mcp`
+   modeled on `render_sessions`. Add a small status-tracking layer (e.g.
+   `ToolRegistry` keeps `Vec<(McpServerConfig, connected: bool, tool_count: usize)>`
+   after Step 2's wiring) so the view can show each configured server's
+   name, command, connection status, and discovered tool count — not just
+   the static config list.
+4. **`/skills` view**: new `AppMode::Skills`, `handle_skills_key`,
+   `render_skills`. Requires adding a new `pub(crate)` enumeration function
+   in `skill.rs` (expose `skill_lookup_roots`, scan each root directory for
+   `*/SKILL.md` and legacy `*.md`, parse frontmatter via the existing
+   helper) to list every discoverable skill with its name, source root, and
+   description. Selecting a skill in the list can show its description /
+   prompt preview, reusing the existing `execute()` read path.
+5. **Optional CLI symmetry**: add `crustly mcp list` / `crustly skill list`
+   subcommands backed by the same new enumeration functions, following the
+   `Ollama { operation }` precedent — not required for the TUI feature to
+   work, but cheap once the underlying functions exist and useful for
+   scripting/debugging outside the TUI.
+
+### Acceptance criteria
+
+- Typing `/skills` and pressing `Enter`/submit opens a list view of every
+  discoverable skill (project-local and user-global, both `.crustly` and
+  `.claude` roots), not just ones already invoked this session.
+- Typing `/mcp` opens a list view of every configured MCP server with live
+  connection status and discovered tool count.
+- Configuring an MCP server in `config.toml` actually connects it at
+  startup (fixes the current silent no-op).
+- A message that happens to start with `/` but isn't a recognized command
+  (e.g. a file path) is still sent to the LLM normally, not swallowed.
+- Both views follow the existing dialog conventions: `Esc` closes,
+  `Up`/`Down` navigate, consistent styling with Sessions/Help.
+
 ## Suggested Execution Order
 
 1. Phase 1 (keybinding swap) — small, self-contained, immediately visible.
@@ -293,6 +394,13 @@ rather than building new plumbing from scratch:
    finalized keybinding scheme (Phase 1) and ideally the Model Info/
    status-bar work (Phase 3) so the "Auto Mode active" indicator has an
    established place to live in the UI.
+5. Phase 5 (`/skills`, `/mcp`) — the MCP wiring bug fix (Step 2) can land
+   anytime, independently, like the Auto Mode CLI fix. The slash-command
+   interception layer it introduces is also the natural foundation for
+   exposing other future commands (e.g. `/help`, `/clear`), so doing this
+   phase before further keybinding work is worth considering if more
+   commands are anticipated — otherwise it's independent of Phases 1-4 and
+   can be done in any order.
 
 ## Open Decisions
 
@@ -316,3 +424,10 @@ rather than building new plumbing from scratch:
 - [ ] Whether Auto Mode persists across sessions via `PlanModeConfig.mode`
       in `config.toml` or defaults to session-only (must be re-enabled each
       launch).
+- [ ] Whether `/mcp` should trigger a fresh connect-and-discover for
+      not-yet-connected servers when opened (live check), or only show
+      last-known status from startup (cheaper, possibly stale).
+- [ ] Whether `/skills` should also show skills that fail to parse
+      (malformed frontmatter) as an error row, or silently skip them.
+- [ ] Whether to add the optional `crustly mcp list` / `crustly skill list`
+      CLI subcommands in this phase or defer them.
