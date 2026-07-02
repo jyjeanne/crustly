@@ -426,8 +426,13 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::DarkGray),
         )
     } else {
+        let newline_hint = if app.kitty_keyboard_protocol_active {
+            "Shift+Enter for newline"
+        } else {
+            "Alt+Enter for newline"
+        };
         Span::styled(
-            " ✏️  Type your message (Ctrl+Enter to send, Esc to clear) ",
+            format!(" ✏️  Type your message (Enter to send, {newline_hint}, Esc to clear) "),
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
@@ -503,7 +508,7 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
 }
 
 /// Render the help screen
-fn render_help(f: &mut Frame, _app: &App, area: Rect) {
+fn render_help(f: &mut Frame, app: &App, area: Rect) {
     let help_text = vec![
         Line::from(vec![
             Span::styled("🥐 ", Style::default().fg(Color::Rgb(218, 165, 32))),
@@ -584,7 +589,7 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "  Ctrl+Enter   ",
+                "  Enter        ",
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
@@ -594,7 +599,11 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled(
-                "  Enter        ",
+                if app.kitty_keyboard_protocol_active {
+                    "  Shift+Enter "
+                } else {
+                    "  Alt+Enter   "
+                },
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
@@ -602,6 +611,19 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 "New line in message (multi-line input)",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+Enter   ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Send message (legacy alias)",
                 Style::default().fg(Color::White),
             ),
         ]),

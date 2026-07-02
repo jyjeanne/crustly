@@ -7,9 +7,15 @@ use super::events::EventHandler;
 use super::render;
 use anyhow::Result;
 use crossterm::{
-    event::{DisableBracketedPaste, EnableBracketedPaste},
+    event::{
+        DisableBracketedPaste, EnableBracketedPaste, KeyboardEnhancementFlags,
+        PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, supports_keyboard_enhancement, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -23,6 +29,18 @@ pub async fn run(mut app: App) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableBracketedPaste)?;
+
+    // Query whether the terminal supports the Kitty keyboard protocol
+    // (needed to disambiguate Shift+Enter from plain Enter). Must run after
+    // raw mode is enabled since it reads a synchronous response from stdin.
+    let kitty_keyboard_supported = supports_keyboard_enhancement().unwrap_or(false);
+    if kitty_keyboard_supported {
+        execute!(
+            stdout,
+            PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        )?;
+    }
+    app.set_kitty_keyboard_protocol_active(kitty_keyboard_supported);
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -38,6 +56,9 @@ pub async fn run(mut app: App) -> Result<()> {
     let result = run_loop(&mut terminal, &mut app).await;
 
     // Restore terminal
+    if kitty_keyboard_supported {
+        let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
+    }
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),

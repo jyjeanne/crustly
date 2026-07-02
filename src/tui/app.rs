@@ -74,6 +74,12 @@ pub struct App {
     pub scroll_offset: usize,
     pub selected_session_index: usize,
     pub should_quit: bool,
+    /// Whether the terminal supports the Kitty keyboard enhancement
+    /// protocol (needed to disambiguate `Shift+Enter` from plain `Enter`).
+    /// Set once at startup by the runner; only affects which key hints are
+    /// shown, not which keys are actually handled (`Alt+Enter` always works
+    /// as a newline fallback regardless of this flag).
+    pub kitty_keyboard_protocol_active: bool,
 
     // Streaming state
     pub is_processing: bool,
@@ -141,6 +147,7 @@ impl App {
             scroll_offset: 0,
             selected_session_index: 0,
             should_quit: false,
+            kitty_keyboard_protocol_active: false,
             is_processing: false,
             streaming_response: None,
             error_message: None,
@@ -225,6 +232,12 @@ impl App {
     /// Defaults to `http://localhost:11434` if never called.
     pub fn set_ollama_host(&mut self, host: String) {
         self.ollama_host = host;
+    }
+
+    /// Record whether the terminal supports the Kitty keyboard enhancement
+    /// protocol, detected once at startup by the runner.
+    pub fn set_kitty_keyboard_protocol_active(&mut self, active: bool) {
+        self.kitty_keyboard_protocol_active = active;
     }
 
     /// Receive next event
@@ -464,6 +477,8 @@ impl App {
             let content = self.input_buffer.clone();
             self.input_buffer.clear();
             self.send_message(content).await?;
+        } else if keys::is_newline(&event) {
+            self.input_buffer.push('\n');
         } else if keys::is_cancel(&event) {
             self.input_buffer.clear();
             self.error_message = None;
@@ -497,9 +512,6 @@ impl App {
                 }
                 KeyCode::Backspace => {
                     self.input_buffer.pop();
-                }
-                KeyCode::Enter => {
-                    self.input_buffer.push('\n');
                 }
                 _ => {}
             }
@@ -1896,5 +1908,71 @@ mod tests {
             .iter()
             .any(|m| m.content.contains("Failed to pull 'bogus-model'")
                 && m.content.contains("model not found")));
+    }
+
+    fn key_mod(code: KeyCode, modifiers: KeyModifiers) -> crossterm::event::KeyEvent {
+        crossterm::event::KeyEvent::new(code, modifiers)
+    }
+
+    #[tokio::test]
+    async fn chat_shift_enter_inserts_newline_instead_of_submitting() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.handle_chat_key(key(KeyCode::Char('h'))).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Char('i'))).await.unwrap();
+        app.handle_chat_key(key_mod(KeyCode::Enter, KeyModifiers::SHIFT))
+            .await
+            .unwrap();
+        app.handle_chat_key(key(KeyCode::Char('!'))).await.unwrap();
+
+        assert_eq!(app.input_buffer, "hi\n!");
+        assert_eq!(app.mode, AppMode::Chat, "Shift+Enter must not submit");
+    }
+
+    #[tokio::test]
+    async fn chat_alt_enter_inserts_newline_as_non_kitty_fallback() {
+        let mut app = test_app().await;
+        app.handle_chat_key(key(KeyCode::Char('x'))).await.unwrap();
+        app.handle_chat_key(key_mod(KeyCode::Enter, KeyModifiers::ALT))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_buffer, "x\n");
+    }
+
+    #[tokio::test]
+    async fn chat_plain_enter_submits_and_clears_buffer() {
+        let mut app = test_app().await;
+        app.handle_chat_key(key(KeyCode::Char('h'))).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Char('i'))).await.unwrap();
+
+        // Plain Enter now sends (no session is set up in this harness, so
+        // send_message() is a no-op, but the input buffer must still clear
+        // as soon as submit is triggered).
+        app.handle_chat_key(key(KeyCode::Enter)).await.unwrap();
+
+        assert!(app.input_buffer.is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_plain_enter_on_empty_buffer_does_nothing() {
+        let mut app = test_app().await;
+
+        app.handle_chat_key(key(KeyCode::Enter)).await.unwrap();
+
+        assert!(app.input_buffer.is_empty());
+        assert!(app.messages.is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_ctrl_enter_still_submits_as_legacy_alias() {
+        let mut app = test_app().await;
+        app.handle_chat_key(key(KeyCode::Char('h'))).await.unwrap();
+
+        app.handle_chat_key(key_mod(KeyCode::Enter, KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert!(app.input_buffer.is_empty());
     }
 }

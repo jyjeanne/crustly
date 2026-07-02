@@ -492,7 +492,8 @@ cargo run
 
 3. **Start chatting:**
    - Type your message
-   - Press `Ctrl+Enter` to send
+   - Press `Enter` to send (`Shift+Enter`/`Alt+Enter` for a new line,
+     `Ctrl+Enter` still works too)
    - Press `Ctrl+H` to see all available commands and help
    - Press `Ctrl+C` to quit
 
@@ -2241,8 +2242,9 @@ Code snippets are beautifully rendered:
 
 #### 4. **Multi-line Input**
 Write or paste long code snippets naturally:
-- Press `Enter` for new lines
-- `Ctrl+Enter` to send
+- Press `Shift+Enter` (or `Alt+Enter` on terminals without Kitty keyboard
+  protocol support) for new lines
+- `Enter` to send (`Ctrl+Enter` still works too)
 - Perfect for pasting entire functions or classes
 
 #### 5. **Session-Based Context**
@@ -2409,17 +2411,18 @@ $ crustly
 
 4. **Keyboard Shortcuts:**
    ```
-   Ctrl+Enter  - Send message
-   Ctrl+H      - Help (full command list)
-   Ctrl+N      - New session (new feature)
-   Ctrl+L      - Switch sessions (different projects)
+   Enter        - Send message (Ctrl+Enter still works too)
+   Shift+Enter  - New line (Alt+Enter on non-Kitty terminals)
+   Ctrl+H       - Help (full command list)
+   Ctrl+N       - New session (new feature)
+   Ctrl+L       - Switch sessions (different projects)
    Page Up/Down - Scroll through long code outputs
    ```
 
 5. **Multi-line for Code:**
    - Paste entire functions
-   - Press Enter for newlines
-   - `Ctrl+Enter` when ready to send
+   - Press Shift+Enter (or Alt+Enter) for newlines
+   - `Enter` when ready to send
 
 6. **Markdown for Formatting:**
    - Use triple backticks for code blocks
@@ -2951,7 +2954,9 @@ Try again with correct parameters.
   - Emoji indicators (📝 Session, 🤖 Model, 💬 Tokens, 💰 Cost)
   - Beautiful croissant splash screen on startup
 - **Keyboard Shortcuts** - Efficient navigation and control
-  - `Ctrl+Enter` - Send message
+  - `Enter` - Send message (`Ctrl+Enter` still works as a legacy alias)
+  - `Shift+Enter` - New line (`Alt+Enter` on terminals without Kitty
+    keyboard protocol support)
   - `Ctrl+N` - New session
   - `Ctrl+L` - List sessions
   - `Ctrl+H` - Show help (📚 **Press Ctrl+H from anywhere to see all commands!**)
@@ -3128,7 +3133,7 @@ cargo run
 Hello! Can you introduce yourself?
 ```
 
-4. Press `Ctrl+Enter` to send
+4. Press `Enter` to send (`Ctrl+Enter` still works too)
 
 5. **Expected:**
    - Your message appears in blue
@@ -3198,7 +3203,7 @@ cargo run -- run --format markdown "Explain async/await in 2 sentences"
 ```bash
 cargo run
 # Type: "This is my first conversation"
-# Ctrl+Enter to send
+# Enter to send (Ctrl+Enter still works too)
 # Wait for response
 # Ctrl+C to quit
 ```
@@ -3207,7 +3212,7 @@ cargo run
 ```bash
 cargo run
 # Type: "This is a different conversation"
-# Ctrl+Enter
+# Enter to send
 # Wait for response
 ```
 

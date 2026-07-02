@@ -11,14 +11,14 @@ can land incrementally instead of one large change per phase. Check items
 off as they land; leave a one-line note (commit hash) next to completed
 items.
 
-- [ ] **Phase 1 — Send / Newline Keybinding Swap**
-  - [ ] 1.1 Kitty keyboard protocol detection at startup (`runner.rs`), with
+- [x] **Phase 1 — Send / Newline Keybinding Swap**
+  - [x] 1.1 Kitty keyboard protocol detection at startup (`runner.rs`), with
         graceful push/pop and no-op on unsupported terminals.
-  - [ ] 1.2 Swap `is_submit`/newline logic in `events.rs`/`app.rs`
+  - [x] 1.2 Swap `is_submit`/newline logic in `events.rs`/`app.rs`
         (`Enter`=send, `Shift+Enter`=newline, `Ctrl+Enter` kept as legacy
         alias, `Alt+Enter` as non-Kitty newline fallback).
-  - [ ] 1.3 Update UI copy (input hint, status bar, help screen) and README
-        shortcut tables to reflect the new binding + active fallback mode.
+  - [x] 1.3 Update UI copy (input hint, help screen) and README shortcut
+        tables to reflect the new binding + active fallback mode.
 - [ ] **Phase 4a — Auto Mode CLI bug fix** *(pulled forward: small,
       isolated, independent of all other phases)*
   - [ ] 4a.1 Wire `--auto-approve`/`--yolo` in `cmd_run` to actually call
