@@ -69,6 +69,10 @@ pub enum TuiEvent {
         model: String,
         error: Option<String>,
     },
+
+    /// Locally-installed Ollama models were (re)loaded for the Provider
+    /// Switch dialog's model list.
+    ProviderSwitchModelsListed(Vec<String>),
 }
 
 /// Tool approval request details
@@ -149,6 +153,9 @@ pub enum AppMode {
     /// provider/model, context window, and last response's performance
     /// metrics.
     ModelInfo,
+    /// Provider/model quick-switch dialog (triggered by Ctrl+W) - pick a
+    /// locally-installed Ollama model and switch to it without restarting.
+    ProviderSwitch,
 }
 
 /// Event handler for the TUI
@@ -272,6 +279,11 @@ pub mod keys {
     /// Ctrl+O - Open the Model Info panel
     pub fn is_model_info(event: &KeyEvent) -> bool {
         key_matches(event, KeyCode::Char('o'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+W - Open the Provider Switch dialog
+    pub fn is_provider_switch(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('w'), KeyModifiers::CONTROL)
     }
 
     /// Enter - Submit (plain Enter sends; Ctrl+Enter, with or without extra
@@ -421,6 +433,15 @@ mod tests {
 
         let event = KeyEvent::new(KeyCode::Char('o'), KeyModifiers::empty());
         assert!(!keys::is_model_info(&event));
+    }
+
+    #[test]
+    fn test_provider_switch_key() {
+        let event = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL);
+        assert!(keys::is_provider_switch(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::empty());
+        assert!(!keys::is_provider_switch(&event));
     }
 
     #[test]

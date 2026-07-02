@@ -119,6 +119,11 @@ pub struct App {
     model_download_task: Option<tokio::task::JoinHandle<()>>,
     ollama_host: String,
 
+    // Provider Switch dialog state (Ctrl+W, native Ollama provider)
+    pub provider_switch_models: Vec<String>,
+    pub provider_switch_selected: usize,
+    pub provider_switch_loading: bool,
+
     // Working directory
     pub working_directory: std::path::PathBuf,
 
@@ -172,6 +177,9 @@ impl App {
             model_download_fraction: None,
             model_download_task: None,
             ollama_host: "http://localhost:11434".to_string(),
+            provider_switch_models: Vec::new(),
+            provider_switch_selected: 0,
+            provider_switch_loading: false,
             working_directory: std::env::current_dir().unwrap_or_default(),
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
@@ -343,6 +351,11 @@ impl App {
                 self.model_download_installed = models;
                 self.refresh_model_download_suggestions();
             }
+            TuiEvent::ProviderSwitchModelsListed(models) => {
+                self.provider_switch_loading = false;
+                self.provider_switch_models = models;
+                self.provider_switch_selected = 0;
+            }
             TuiEvent::OllamaPullProgress(progress) => {
                 self.model_download_fraction = progress.fraction();
                 self.model_download_status = Some(progress.status);
@@ -456,6 +469,11 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_provider_switch(&event) && self.mode == AppMode::Chat {
+            self.open_provider_switch().await?;
+            return Ok(());
+        }
+
         // Mode-specific handling
         tracing::trace!("Current mode: {:?}", self.mode);
         match self.mode {
@@ -475,6 +493,7 @@ impl App {
             AppMode::ToolApproval => self.handle_approval_key(event).await?,
             AppMode::FilePicker => self.handle_file_picker_key(event).await?,
             AppMode::ModelDownload => self.handle_model_download_key(event).await?,
+            AppMode::ProviderSwitch => self.handle_provider_switch_key(event).await?,
             AppMode::Help | AppMode::Settings | AppMode::ModelInfo => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
@@ -1689,6 +1708,108 @@ impl App {
 
         Ok(())
     }
+
+    /// Open the Provider Switch dialog (Ctrl+W). Fetches the list of
+    /// locally-installed Ollama models in the background; the dialog opens
+    /// immediately showing a loading state until they arrive.
+    async fn open_provider_switch(&mut self) -> Result<()> {
+        self.provider_switch_selected = 0;
+        self.provider_switch_models.clear();
+        self.provider_switch_loading = true;
+
+        let host = self.ollama_host.clone();
+        let sender = self.event_sender();
+        tokio::spawn(async move {
+            let models = super::ollama_download::fetch_installed_models(host).await;
+            let _ = sender.send(TuiEvent::ProviderSwitchModelsListed(models));
+        });
+
+        self.switch_mode(AppMode::ProviderSwitch).await
+    }
+
+    /// Handle keys in the Provider Switch dialog.
+    async fn handle_provider_switch_key(
+        &mut self,
+        event: crossterm::event::KeyEvent,
+    ) -> Result<()> {
+        use super::events::keys;
+
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+            return Ok(());
+        }
+
+        // While the model list is still loading, only Esc (handled above)
+        // does anything.
+        if self.provider_switch_loading {
+            return Ok(());
+        }
+
+        if keys::is_up(&event) {
+            self.provider_switch_selected = self.provider_switch_selected.saturating_sub(1);
+        } else if keys::is_down(&event) {
+            if !self.provider_switch_models.is_empty() {
+                self.provider_switch_selected =
+                    (self.provider_switch_selected + 1).min(self.provider_switch_models.len() - 1);
+            }
+        } else if keys::is_enter(&event) {
+            if let Some(model) = self
+                .provider_switch_models
+                .get(self.provider_switch_selected)
+                .cloned()
+            {
+                self.switch_provider_to_ollama_model(model).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Switch the active provider to the native Ollama provider running
+    /// `model` on `self.ollama_host`, in place - preserving the tool
+    /// registry, approval callback, and every other `AgentService` setting
+    /// (see `AgentService::set_provider`, which mutates the provider field
+    /// only rather than rebuilding the service from scratch).
+    ///
+    /// Fails safely with a visible error instead of switching if a request
+    /// is currently in flight: a background task may be holding a clone of
+    /// `agent_service` at that moment, in which case `Arc::get_mut` simply
+    /// returns `None` rather than allowing an unsafe in-place mutation.
+    async fn switch_provider_to_ollama_model(&mut self, model: String) -> Result<()> {
+        match super::ollama_download::build_ollama_provider(&self.ollama_host, &model) {
+            Ok(provider) => match Arc::get_mut(&mut self.agent_service) {
+                Some(service) => {
+                    service.set_provider(provider);
+                    let notification = DisplayMessage {
+                        id: Uuid::new_v4(),
+                        role: "system".to_string(),
+                        content: format!("✅ Switched to Ollama model '{model}'."),
+                        thinking_text: None,
+                        thinking_expanded: false,
+                        timestamp: chrono::Utc::now(),
+                        token_count: None,
+                        cost: None,
+                        provider_name: None,
+                        perf_metrics: None,
+                        tokens_per_second: None,
+                    };
+                    self.messages.push(notification);
+                    self.switch_mode(AppMode::Chat).await?;
+                }
+                None => {
+                    self.error_message = Some(
+                        "Can't switch provider while a response is in progress - try again once it finishes."
+                            .to_string(),
+                    );
+                }
+            },
+            Err(e) => {
+                self.error_message = Some(e);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -2053,5 +2174,117 @@ mod tests {
             .unwrap();
 
         assert!(app.input_buffer.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ctrl_w_opens_provider_switch_dialog_in_loading_state() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_key_event(key_mod(KeyCode::Char('w'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert_eq!(app.mode, AppMode::ProviderSwitch);
+        assert!(app.provider_switch_loading);
+        assert!(app.provider_switch_models.is_empty());
+    }
+
+    #[tokio::test]
+    async fn provider_switch_models_listed_clears_loading_state() {
+        let mut app = test_app().await;
+        app.provider_switch_loading = true;
+
+        app.handle_event(TuiEvent::ProviderSwitchModelsListed(vec![
+            "qwen2.5-coder:7b".to_string(),
+            "llama3.2:3b".to_string(),
+        ]))
+        .await
+        .unwrap();
+
+        assert!(!app.provider_switch_loading);
+        assert_eq!(app.provider_switch_models.len(), 2);
+        assert_eq!(app.provider_switch_selected, 0);
+    }
+
+    #[tokio::test]
+    async fn provider_switch_up_down_navigation_clamps_at_bounds() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ProviderSwitch;
+        app.provider_switch_loading = false;
+        app.provider_switch_models = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+
+        // Up from index 0 stays at 0.
+        app.handle_provider_switch_key(key(KeyCode::Up))
+            .await
+            .unwrap();
+        assert_eq!(app.provider_switch_selected, 0);
+
+        app.handle_provider_switch_key(key(KeyCode::Down))
+            .await
+            .unwrap();
+        app.handle_provider_switch_key(key(KeyCode::Down))
+            .await
+            .unwrap();
+        assert_eq!(app.provider_switch_selected, 2);
+
+        // Down at the last index stays at the last index.
+        app.handle_provider_switch_key(key(KeyCode::Down))
+            .await
+            .unwrap();
+        assert_eq!(app.provider_switch_selected, 2);
+    }
+
+    #[tokio::test]
+    async fn provider_switch_esc_returns_to_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ProviderSwitch;
+        app.provider_switch_loading = true;
+
+        app.handle_provider_switch_key(key(KeyCode::Esc))
+            .await
+            .unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[cfg(not(feature = "ollama"))]
+    #[tokio::test]
+    async fn switch_provider_without_ollama_feature_shows_clear_error() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ProviderSwitch;
+
+        app.switch_provider_to_ollama_model("qwen2.5-coder:7b".to_string())
+            .await
+            .unwrap();
+
+        assert!(app
+            .error_message
+            .as_ref()
+            .is_some_and(|e| e.contains("--features ollama")));
+        // Must not silently pretend to switch mode/post a success message.
+        assert_eq!(app.mode, AppMode::ProviderSwitch);
+    }
+
+    #[cfg(feature = "ollama")]
+    #[tokio::test]
+    async fn switch_provider_with_ollama_feature_swaps_provider_in_place() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ProviderSwitch;
+        let original_provider_name = app.provider_name().to_string();
+
+        app.switch_provider_to_ollama_model("qwen2.5-coder:7b".to_string())
+            .await
+            .unwrap();
+
+        assert!(app.error_message.is_none());
+        assert_eq!(app.mode, AppMode::Chat);
+        assert_eq!(app.provider_name(), "ollama");
+        assert_ne!(app.provider_name(), original_provider_name);
+        assert_eq!(app.provider_model(), "qwen2.5-coder:7b");
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Switched to Ollama model")));
     }
 }

@@ -69,6 +69,9 @@ pub fn render(f: &mut Frame, app: &App) {
         AppMode::ModelInfo => {
             render_model_info(f, app, chunks[1]);
         }
+        AppMode::ProviderSwitch => {
+            render_provider_switch(f, app, chunks[1]);
+        }
     }
 
     render_status_bar(f, app, chunks[3]);
@@ -594,6 +597,19 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 "Show Model Info panel (provider, model, context, perf)",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+W       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Switch to a different local Ollama model",
                 Style::default().fg(Color::White),
             ),
         ]),
@@ -1607,6 +1623,61 @@ fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(widget, area);
 }
 
+/// Render the Provider Switch dialog (Ctrl+W): pick a locally-installed
+/// Ollama model and switch the active provider to it without restarting.
+fn render_provider_switch(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(Span::styled(
+        "Switch to a locally-installed Ollama model (↑/↓ navigate, Enter to switch, Esc to cancel)",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    if app.provider_switch_loading {
+        lines.push(Line::from(Span::styled(
+            "Loading installed Ollama models…",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else if app.provider_switch_models.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "No Ollama models installed. Use Ctrl+D to download one first.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, model) in app.provider_switch_models.iter().enumerate() {
+            let is_selected = idx == app.provider_switch_selected;
+            let prefix = if is_selected { "> " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            lines.push(Line::from(Span::styled(format!("{prefix}{model}"), style)));
+        }
+    }
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Switch Provider ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
 /// Render the Model Download dialog (Ctrl+D): either the model
 /// name input + suggestions list, or a live progress bar while a pull is
 /// in flight.
@@ -1790,6 +1861,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::FilePicker => "FILE PICKER",
         AppMode::ModelDownload => "MODEL DOWNLOAD",
         AppMode::ModelInfo => "MODEL INFO",
+        AppMode::ProviderSwitch => "SWITCH PROVIDER",
     };
 
     let status = if let Some(ref error) = app.error_message {
@@ -1798,7 +1870,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         format!(" [{}] Processing...", mode_text)
     } else {
         format!(
-            " [{}] Ready │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+O: Model Info │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            " [{}] Ready │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
             mode_text
         )
     };

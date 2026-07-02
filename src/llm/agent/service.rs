@@ -351,6 +351,15 @@ impl AgentService {
         self
     }
 
+    /// Swap the active provider in place, keeping every other setting
+    /// (tool registry, approval callback, working directory, cache, etc.)
+    /// untouched. Used by the TUI's runtime provider-switch dialog, which
+    /// must not silently drop the approval callback or tool registry the
+    /// way constructing a fresh `AgentService` from scratch would.
+    pub fn set_provider(&mut self, provider: Arc<dyn Provider>) {
+        self.provider = provider;
+    }
+
     /// Get the provider name
     pub fn provider_name(&self) -> &str {
         self.provider.name()

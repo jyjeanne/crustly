@@ -73,7 +73,29 @@ terminal query on the startup path (now timeout-bounded via
         from chunk arrival timing, clearly labeled as approximate. Deferred
         as a separate, smaller enhancement rather than bundled into this
         bug fix.
-  - [ ] 3.3 In-TUI provider/model quick-switch dialog.
+  - [x] 3.3 In-TUI provider/model quick-switch dialog, scoped to **switching
+        between locally-installed Ollama models** (`Ctrl+W`), not full
+        cross-provider switching. Reasoning: `App` has no `Config` access
+        today (only used transiently at startup to build the initial
+        `AgentService`, then dropped) and `Config` is where cloud-provider
+        API keys live - enumerating/switching to e.g. a configured
+        Anthropic or OpenAI provider would need `Config` plumbed into
+        `App` as a new field, a bigger and separately-reviewable change.
+        Ollama needs no secrets and already has `App.ollama_host` +
+        `ollama_models::list_models()` wired for the Model Download
+        dialog, reused here directly. Also found and fixed a correctness
+        trap during design: `AgentService` isn't `Clone` and has no
+        in-place provider setter, so naively rebuilding it via
+        `AgentService::new(new_provider, context)` would silently drop the
+        tool registry (back to empty), the approval callback (silently
+        disabling interactive tool approval), the compaction pool, and the
+        session's tool-result cache. Fixed by adding a genuine
+        `AgentService::set_provider(&mut self, ...)` mutator and swapping
+        it in place via `Arc::get_mut(&mut self.agent_service)`, which
+        fails safely (visible error, no swap) rather than corrupting state
+        if a background task is holding a clone during an in-flight
+        request. Full cross-provider switching (with secrets) is a
+        separate follow-up, not scoped here.
   - [ ] 3.4 (new, optional) Client-side "~N tok/s (live)" estimate during
         active streaming, derived from chunk arrival timing, replaced by
         the authoritative number once the response completes.
