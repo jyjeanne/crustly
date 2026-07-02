@@ -19,12 +19,16 @@ items.
         alias, `Alt+Enter` as non-Kitty newline fallback).
   - [x] 1.3 Update UI copy (input hint, help screen) and README shortcut
         tables to reflect the new binding + active fallback mode.
-- [ ] **Phase 4a — Auto Mode CLI bug fix** *(pulled forward: small,
+- [x] **Phase 4a — Auto Mode CLI bug fix** *(pulled forward: small,
       isolated, independent of all other phases)*
-  - [ ] 4a.1 Wire `--auto-approve`/`--yolo` in `cmd_run` to actually call
+  - [x] 4a.1 Wire `--auto-approve`/`--yolo` in `cmd_run` to actually call
         `.with_auto_approve_tools()`.
-  - [ ] 4a.2 Fix `cmd_autoplan`'s discarded `PlanModeState::FullAuto` so it
-        has the same real effect as the CLI flag.
+  - [x] 4a.2 `cmd_autoplan` already delegates to `cmd_run(..., true, ...)`,
+        so it inherits the 4a.1 fix automatically - no separate change
+        needed for the CLI flag to have real effect. The richer
+        `PlanModeState::FullAuto` multi-iteration loop (the `let _ = state`
+        in `cmd_autoplan`) remains a separate, larger feature, deferred to
+        Phase 4b alongside the TUI `Shift+Tab` mode cycle.
 - [ ] **Phase 3 — Ollama-in-TUI Polish**
   - [ ] 3.1 Model Info panel (`Ctrl+O`) — static fields first (model name,
         context window, `keep_alive`).

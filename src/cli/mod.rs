@@ -910,7 +910,8 @@ async fn cmd_run(
     let agent_service = AgentService::new(provider.clone(), service_context.clone())
         .with_tool_registry(Arc::new(tool_registry))
         .with_system_prompt(SYSTEM_PROMPT.to_string())
-        .with_max_tool_iterations(20);
+        .with_max_tool_iterations(20)
+        .with_auto_approve_tools(auto_approve);
 
     // Create or get session
     let session_service = SessionService::new(service_context);
