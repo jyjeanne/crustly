@@ -244,6 +244,38 @@ impl App {
         self.textarea.insert_str(text);
     }
 
+    /// Copy the last assistant response to the system clipboard - just its
+    /// last fenced code block if it has one (usually what's actually
+    /// wanted), otherwise the full response text. Fails silently into
+    /// `error_message` rather than panicking: headless environments and
+    /// some terminals/multiplexers have no working clipboard backend.
+    fn copy_last_response_to_clipboard(&mut self) {
+        let Some(content) = self.last_assistant_message().map(|m| m.content.clone()) else {
+            self.error_message = Some("No response to copy yet.".to_string());
+            return;
+        };
+
+        let text = super::markdown::last_code_block(&content).unwrap_or(content);
+
+        if let Err(e) = arboard::Clipboard::new().and_then(|mut cb| cb.set_text(text)) {
+            self.error_message = Some(format!("Couldn't copy to clipboard: {e}"));
+        }
+    }
+
+    /// Paste from the system clipboard at the cursor. An explicit fallback
+    /// alongside bracketed paste (`TuiEvent::Paste`) for terminals/
+    /// multiplexers where bracketed paste doesn't work.
+    fn paste_from_clipboard(&mut self) {
+        match arboard::Clipboard::new().and_then(|mut cb| cb.get_text()) {
+            Ok(text) => {
+                self.textarea.insert_str(&text);
+            }
+            Err(e) => {
+                self.error_message = Some(format!("Couldn't read clipboard: {e}"));
+            }
+        }
+    }
+
     /// Initialize the app by loading or creating a session
     pub async fn initialize(&mut self) -> Result<()> {
         // Try to load most recent session
@@ -558,6 +590,10 @@ impl App {
             // Scroll down (toward bottom) to see newer messages
             // When we reach 0, we're at the bottom (auto-scroll mode)
             self.scroll_offset = self.scroll_offset.saturating_sub(10);
+        } else if keys::is_copy_response(&event) {
+            self.copy_last_response_to_clipboard();
+        } else if keys::is_paste_clipboard(&event) {
+            self.paste_from_clipboard();
         } else {
             let ctrl = event.modifiers.contains(KeyModifiers::CONTROL);
             match event.code {
@@ -2241,6 +2277,71 @@ mod tests {
             .unwrap();
 
         assert_eq!(app.input_text(), "line one\nline two");
+    }
+
+    #[tokio::test]
+    async fn ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_chat_key(key_mod(KeyCode::Char('y'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.error_message.as_deref(),
+            Some("No response to copy yet.")
+        );
+    }
+
+    #[tokio::test]
+    async fn ctrl_y_copies_last_code_block_when_present() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "Here you go:\n\n```rust\nfn main() {}\n```".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+
+        // This environment has no clipboard backend (headless container),
+        // so the real assertion is that this doesn't panic and reports a
+        // clipboard-specific failure rather than the "no response" one.
+        app.handle_chat_key(key_mod(KeyCode::Char('y'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert!(app
+            .error_message
+            .as_ref()
+            .is_some_and(|e| e.contains("clipboard")));
+    }
+
+    #[tokio::test]
+    async fn ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        // Headless environment: no clipboard backend, so this must fail
+        // gracefully into error_message rather than panic, and must not
+        // insert anything into the input.
+        app.handle_chat_key(key_mod(KeyCode::Char('v'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert!(app.textarea.is_empty());
+        assert!(app
+            .error_message
+            .as_ref()
+            .is_some_and(|e| e.contains("clipboard")));
     }
 
     #[tokio::test]

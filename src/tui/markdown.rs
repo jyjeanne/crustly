@@ -200,6 +200,36 @@ pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
     lines
 }
 
+/// Extract the raw content of the last fenced or indented code block in
+/// `markdown`, if any. Used by the "copy last response" action to copy just
+/// the code rather than the surrounding prose, since that's usually what's
+/// wanted. Returns `None` if the message has no code blocks.
+pub fn last_code_block(markdown: &str) -> Option<String> {
+    let parser = Parser::new(markdown);
+    let mut in_code_block = false;
+    let mut current = String::new();
+    let mut last: Option<String> = None;
+
+    for event in parser {
+        match event {
+            Event::Start(Tag::CodeBlock(_)) => {
+                in_code_block = true;
+                current.clear();
+            }
+            Event::End(Tag::CodeBlock(_)) => {
+                in_code_block = false;
+                last = Some(std::mem::take(&mut current));
+            }
+            Event::Text(text) if in_code_block => {
+                current.push_str(&text);
+            }
+            _ => {}
+        }
+    }
+
+    last.map(|s| s.trim_end_matches('\n').to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +253,28 @@ mod tests {
         let md = "```rust\nfn main() {}\n```";
         let lines = parse_markdown(md);
         assert!(lines.len() > 2); // Header, code, footer
+    }
+
+    #[test]
+    fn last_code_block_extracts_fenced_content() {
+        let md =
+            "Here's a function:\n\n```rust\nfn main() {\n    println!(\"hi\");\n}\n```\n\nDone.";
+        assert_eq!(
+            last_code_block(md).unwrap(),
+            "fn main() {\n    println!(\"hi\");\n}"
+        );
+    }
+
+    #[test]
+    fn last_code_block_returns_the_last_of_multiple_blocks() {
+        let md = "```rust\nfirst\n```\n\nsome text\n\n```python\nsecond\n```";
+        assert_eq!(last_code_block(md).unwrap(), "second");
+    }
+
+    #[test]
+    fn last_code_block_returns_none_without_any_code() {
+        let md = "Just plain prose, no code here.";
+        assert!(last_code_block(md).is_none());
     }
 
     #[test]

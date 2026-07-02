@@ -127,8 +127,19 @@ terminal query on the startup path (now timeout-bounded via
         always appending at the end. `render_input` clones the `TextArea`
         per frame (keeping `render_*` functions read-only like every other
         one) to apply block/style before calling `.widget()`.
-  - [ ] 2.2 Add `arboard`, wire copy-out keybinding for last response.
-  - [ ] 2.3 Copy-code-block action; clipboard-paste fallback action.
+  - [x] 2.2/2.3 Added `arboard`. `Ctrl+Y` copies the last assistant
+        response to the system clipboard - combined the two planned
+        actions into one smart keybinding rather than two separate ones:
+        if the response has a fenced code block, only the *last* code
+        block's raw content is copied (new `markdown::last_code_block()`,
+        reusing `pulldown_cmark` rather than hand-rolling fence matching);
+        otherwise the full response text is copied. `Ctrl+V` is the
+        clipboard-paste fallback, inserting at the cursor alongside the
+        existing bracketed-paste path. Both fail gracefully into
+        `error_message` instead of panicking or hanging - verified
+        empirically in this headless sandbox (no X11/Wayland) that
+        `arboard::Clipboard::new()` fails in ~3ms, not a multi-second
+        hang, so there's no need for a timeout wrapper around it.
 - [ ] **Phase 4b — Auto Mode TUI toggle** *(depends on 1.2 for the
       finalized keybinding scheme)*
   - [ ] 4b.1 `Shift+Tab` mode-cycle wired to a new `App` field +

@@ -286,6 +286,19 @@ pub mod keys {
         key_matches(event, KeyCode::Char('w'), KeyModifiers::CONTROL)
     }
 
+    /// Ctrl+Y - Copy the last assistant response (or its last code block,
+    /// if it has one) to the system clipboard.
+    pub fn is_copy_response(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('y'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+V - Paste from the system clipboard at the cursor. An explicit
+    /// fallback alongside bracketed paste for terminals/multiplexers where
+    /// bracketed paste is unreliable.
+    pub fn is_paste_clipboard(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('v'), KeyModifiers::CONTROL)
+    }
+
     /// Enter - Submit (plain Enter sends; Ctrl+Enter, with or without extra
     /// modifiers, is kept as a legacy alias for muscle memory). Shift+Enter
     /// and Alt+Enter are newlines, not submit - see `is_newline`.
@@ -442,6 +455,24 @@ mod tests {
 
         let event = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::empty());
         assert!(!keys::is_provider_switch(&event));
+    }
+
+    #[test]
+    fn test_copy_response_key() {
+        let event = KeyEvent::new(KeyCode::Char('y'), KeyModifiers::CONTROL);
+        assert!(keys::is_copy_response(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty());
+        assert!(!keys::is_copy_response(&event));
+    }
+
+    #[test]
+    fn test_paste_clipboard_key() {
+        let event = KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL);
+        assert!(keys::is_paste_clipboard(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('v'), KeyModifiers::empty());
+        assert!(!keys::is_paste_clipboard(&event));
     }
 
     #[test]

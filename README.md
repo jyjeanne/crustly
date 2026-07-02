@@ -2253,6 +2253,10 @@ Write or paste long code snippets naturally:
 - `Ctrl+Backspace`/`Ctrl+Delete` to delete a whole word at a time
 - Pasted text (including multi-line) is inserted at the cursor, not always
   appended at the end
+- `Ctrl+Y` copies the last response to the system clipboard - just its
+  code block if it has one, otherwise the full text
+- `Ctrl+V` pastes from the system clipboard at the cursor, as a fallback
+  alongside automatic bracketed paste
 - Perfect for pasting entire functions or classes
 
 #### 5. **Session-Based Context**
