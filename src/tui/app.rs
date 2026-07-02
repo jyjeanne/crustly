@@ -2452,17 +2452,24 @@ mod tests {
             tokens_per_second: None,
         });
 
-        // This environment has no clipboard backend (headless container),
-        // so the real assertion is that this doesn't panic and reports a
-        // clipboard-specific failure rather than the "no response" one.
         app.handle_chat_key(key_mod(KeyCode::Char('y'), KeyModifiers::CONTROL))
             .await
             .unwrap();
 
-        assert!(app
-            .error_message
-            .as_ref()
-            .is_some_and(|e| e.contains("clipboard")));
+        // Clipboard availability is platform/environment-dependent: headless
+        // Linux CI has no backend and must fail gracefully with a
+        // clipboard-specific error (not the "no response" one); macOS/
+        // Windows CI runners typically have a real system clipboard, in
+        // which case the extracted code block must actually be there.
+        match &app.error_message {
+            Some(err) => assert!(err.contains("clipboard"), "unexpected error: {err}"),
+            None => {
+                let copied = arboard::Clipboard::new()
+                    .and_then(|mut cb| cb.get_text())
+                    .expect("clipboard copy just succeeded, so read-back must too");
+                assert_eq!(copied, "fn main() {}");
+            }
+        }
     }
 
     #[tokio::test]
@@ -2470,18 +2477,21 @@ mod tests {
         let mut app = test_app().await;
         app.mode = AppMode::Chat;
 
-        // Headless environment: no clipboard backend, so this must fail
-        // gracefully into error_message rather than panic, and must not
-        // insert anything into the input.
         app.handle_chat_key(key_mod(KeyCode::Char('v'), KeyModifiers::CONTROL))
             .await
             .unwrap();
 
-        assert!(app.textarea.is_empty());
-        assert!(app
-            .error_message
-            .as_ref()
-            .is_some_and(|e| e.contains("clipboard")));
+        // Clipboard availability is platform/environment-dependent (see
+        // ctrl_y_copies_last_code_block_when_present). On a headless Linux
+        // CI runner with no backend, this must fail gracefully into
+        // error_message rather than panic, and must not insert anything
+        // into the input. On macOS/Windows CI, a real clipboard read
+        // succeeds (with whatever text happens to be there) and the only
+        // requirement is that it doesn't panic.
+        if let Some(err) = &app.error_message {
+            assert!(err.contains("clipboard"), "unexpected error: {err}");
+            assert!(app.textarea.is_empty());
+        }
     }
 
     #[tokio::test]
