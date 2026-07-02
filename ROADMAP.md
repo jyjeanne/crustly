@@ -37,6 +37,14 @@
 - Phase 4 tools: `web_fetch`, `todo_write`, `ask_user`, `skill`, `agent`, `powershell`
 - `SubAgentLauncher` trait — decoupled sub-agent spawning with recursion guard
 
+### v0.4.2 — Native Ollama Integration
+- Native Ollama provider (`--features ollama`, built on [`ollama-rs`](https://github.com/pepperoni21/ollama-rs)) talking directly to `/api/chat`, alongside the existing OpenAI-compatible route
+- Runtime performance metrics — tokens/sec, model load time, warm/cold-start — surfaced in the TUI header and under each reply; provider identity badge in the header for every configured provider
+- `Ctrl+D` **Model Download dialog** — pick or type a model, pull with a live progress bar, cancel with `Esc`, without leaving the TUI
+- Model management CLI: `crustly ollama list|pull|rm|show|embed`
+- `keep_alive` / `num_ctx` control; `OLLAMA_HOST`/`OLLAMA_MODEL` env vars
+- See [`ollama-rs-integration-plan.md`](./ollama-rs-integration-plan.md) for the full design and implementation status
+
 ---
 
 ## Upcoming Milestones
@@ -95,7 +103,7 @@
 
 | Item | Notes |
 |------|-------|
-| RAG / vector store | Semantic search over the codebase; integrate with the existing codebase index |
+| RAG / vector store | Semantic search over the codebase; integrate with the existing codebase index. Raw embedding generation is already available via the native Ollama provider (`crustly ollama embed`) — no retrieval layer wired up yet |
 | Multi-pane TUI | Chat + file preview split; tabs for multiple conversations |
 | Web interface | Optional `crustly serve` command exposing a browser UI |
 | Multi-user / team | Shared sessions, role-based approval, audit log export |
