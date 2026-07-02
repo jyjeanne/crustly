@@ -54,10 +54,29 @@ terminal query on the startup path (now timeout-bounded via
         `Config` into `App` just for this label — not worth it for 3.1's
         scope; revisit if/when Phase 3.3's provider switcher needs
         provider-specific config access anyway.
-  - [ ] 3.2 Live streaming perf metrics wired into `StreamEvent` and shown
-        in the panel/status bar (today the panel only reflects the *last
-        completed* response, not the in-flight one).
+  - [x] 3.2 Investigation found this was actually a **bug**, not just a
+        missing feature: since the TUI only ever uses the streaming path
+        (never `Provider::complete()`), and `StreamEvent` had no slot for
+        `PerfMetrics`, the Model Info panel built in 3.1 was reading fields
+        that were *always* `None` in real usage - Ollama's `stream()`
+        computed `final_perf` correctly but explicitly discarded it
+        (`let _ = final_perf;`), and `drain_stream_to_response` hardcoded
+        `perf_metrics: None`. Fixed by adding `perf_metrics: Option<PerfMetrics>`
+        to `StreamEvent::MessageDelta` (types.rs) and threading it through
+        Ollama's `stream()` → `drain_stream_to_response` (service.rs) →
+        `LLMResponse`/`AgentResponse` → `DisplayMessage`, closing the loop
+        so the panel now reflects real data after each response. **True
+        mid-stream (before `done`) throughput remains structurally
+        unavailable for every wired provider** (Ollama/OpenAI/Anthropic/
+        Qwen all only report token counts/timing on the final chunk) - a
+        genuinely "live" indicator would have to be a client-side estimate
+        from chunk arrival timing, clearly labeled as approximate. Deferred
+        as a separate, smaller enhancement rather than bundled into this
+        bug fix.
   - [ ] 3.3 In-TUI provider/model quick-switch dialog.
+  - [ ] 3.4 (new, optional) Client-side "~N tok/s (live)" estimate during
+        active streaming, derived from chunk arrival timing, replaced by
+        the authoritative number once the response completes.
 - [ ] **Phase 2 — Copy / Paste Ergonomics**
   - [ ] 2.1 Migrate `input_buffer` from raw `String` to `tui-textarea`.
   - [ ] 2.2 Add `arboard`, wire copy-out keybinding for last response.

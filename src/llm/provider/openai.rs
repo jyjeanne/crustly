@@ -801,6 +801,7 @@ impl Provider for OpenAIProvider {
                         .map(|u| u.completion_tokens)
                         .unwrap_or(0),
                 },
+                perf_metrics: None,
             });
         }
         events.push(StreamEvent::MessageStop);

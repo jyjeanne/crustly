@@ -387,6 +387,10 @@ pub enum StreamEvent {
     MessageDelta {
         delta: MessageDelta,
         usage: TokenUsage,
+        /// Runtime performance metrics for this response, if the provider
+        /// reports them (currently Ollama only; `None` elsewhere).
+        #[serde(default)]
+        perf_metrics: Option<PerfMetrics>,
     },
     /// Stream finished
     MessageStop,

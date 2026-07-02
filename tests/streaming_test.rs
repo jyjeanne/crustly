@@ -64,6 +64,7 @@ impl StreamingMockProvider {
                 input_tokens: 10,
                 output_tokens: 20,
             },
+            perf_metrics: None,
         });
 
         // Add message stop
