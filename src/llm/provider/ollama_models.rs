@@ -229,4 +229,121 @@ mod tests {
         let value = serde_json::to_value(&request).expect("serialize request");
         assert_eq!(value["input"], serde_json::json!("hello"));
     }
+
+    /// Spin up a one-shot local HTTP server that replies with a fixed body
+    /// to the first request it receives, then closes. Mirrors the raw-TCP
+    /// mocking technique `ollama-rs` itself uses in its own test suite, so
+    /// no extra HTTP-mocking dependency is needed here.
+    async fn mock_server(body: String) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind mock server");
+        let addr = listener.local_addr().expect("mock server addr");
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept request");
+
+            let mut request = Vec::new();
+            let mut buf = [0u8; 1024];
+            loop {
+                let n = socket.read(&mut buf).await.expect("read request");
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buf[..n]);
+                if request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    break;
+                }
+            }
+
+            let response = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket
+                .write_all(response.as_bytes())
+                .await
+                .expect("write response");
+        });
+
+        format!("http://{addr}")
+    }
+
+    #[tokio::test]
+    async fn list_models_parses_tags_response() {
+        let host = mock_server(
+            r#"{"models":[{"name":"qwen2.5-coder:7b","modified_at":"2026-01-01T00:00:00Z","size":4500000000}]}"#
+                .to_string(),
+        )
+        .await;
+
+        let models = list_models(&host).await.expect("list_models succeeds");
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].name, "qwen2.5-coder:7b");
+        assert_eq!(models[0].size_bytes, 4_500_000_000);
+    }
+
+    #[tokio::test]
+    async fn show_model_parses_minimal_response() {
+        let host = mock_server(
+            r#"{"license":"MIT","parameters":"num_ctx 4096","template":"{{ .Prompt }}","capabilities":["completion"]}"#
+                .to_string(),
+        )
+        .await;
+
+        let info = show_model(&host, "qwen2.5-coder:7b")
+            .await
+            .expect("show_model succeeds");
+        assert_eq!(info.license, "MIT");
+        assert_eq!(info.capabilities, vec!["completion".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn delete_model_succeeds_on_2xx() {
+        let host = mock_server("{}".to_string()).await;
+        delete_model(&host, "qwen2.5-coder:7b")
+            .await
+            .expect("delete_model succeeds");
+    }
+
+    #[tokio::test]
+    async fn pull_model_forwards_progress_and_completes() {
+        let body = concat!(
+            r#"{"status":"pulling manifest"}"#,
+            "\n",
+            r#"{"status":"pulling abc123","digest":"abc123","total":100,"completed":50}"#,
+            "\n",
+            r#"{"status":"success"}"#,
+            "\n",
+        );
+        let host = mock_server(body.to_string()).await;
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        pull_model(&host, "qwen2.5-coder:7b", tx)
+            .await
+            .expect("pull_model succeeds");
+
+        let mut updates = Vec::new();
+        while let Ok(update) = rx.try_recv() {
+            updates.push(update);
+        }
+
+        assert_eq!(updates.len(), 3);
+        assert_eq!(updates[0].status, "pulling manifest");
+        assert_eq!(updates[1].fraction(), Some(0.5));
+        assert!(updates[2].is_success());
+    }
+
+    #[tokio::test]
+    async fn generate_embeddings_parses_response() {
+        let host = mock_server(r#"{"embeddings":[[0.1,0.2,0.3]]}"#.to_string()).await;
+
+        let embeddings = generate_embeddings(&host, "nomic-embed-text", vec!["hello".to_string()])
+            .await
+            .expect("generate_embeddings succeeds");
+        assert_eq!(embeddings, vec![vec![0.1, 0.2, 0.3]]);
+    }
 }

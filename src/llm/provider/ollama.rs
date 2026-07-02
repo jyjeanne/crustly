@@ -729,4 +729,244 @@ mod tests {
         assert_eq!(ollama_request.messages[0].role, MessageRole::System);
         assert_eq!(ollama_request.messages[1].role, MessageRole::User);
     }
+
+    fn mock_response(message: ChatMessage, done: bool) -> ChatMessageResponse {
+        ChatMessageResponse {
+            model: "llama3.2".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            message,
+            logprobs: None,
+            done,
+            final_data: None,
+        }
+    }
+
+    #[test]
+    fn from_ollama_response_plain_text_with_final_data() {
+        let provider = OllamaProvider::default_local();
+        let mut response = mock_response(ChatMessage::assistant("hello there".to_string()), true);
+        response.final_data = Some(ChatMessageFinalResponseData {
+            total_duration: 2_000_000_000,
+            load_duration: 0,
+            prompt_eval_count: 10,
+            prompt_eval_duration: 100_000_000,
+            eval_count: 20,
+            eval_duration: 1_000_000_000,
+        });
+
+        let llm_response = provider.from_ollama_response(response);
+        assert_eq!(llm_response.model, "llama3.2");
+        assert_eq!(llm_response.stop_reason, Some(StopReason::EndTurn));
+        assert_eq!(llm_response.usage.input_tokens, 10);
+        assert_eq!(llm_response.usage.output_tokens, 20);
+        assert!(llm_response.perf_metrics.is_some());
+        assert_eq!(llm_response.content.len(), 1);
+        assert!(matches!(
+            &llm_response.content[0],
+            ContentBlock::Text { text } if text == "hello there"
+        ));
+    }
+
+    #[test]
+    fn from_ollama_response_without_final_data_has_zero_usage_and_no_perf() {
+        let provider = OllamaProvider::default_local();
+        // Mid-stream chunk: done=false, no final_data yet.
+        let response = mock_response(ChatMessage::assistant("partial".to_string()), false);
+
+        let llm_response = provider.from_ollama_response(response);
+        assert_eq!(llm_response.stop_reason, None);
+        assert_eq!(llm_response.usage.input_tokens, 0);
+        assert_eq!(llm_response.usage.output_tokens, 0);
+        assert!(llm_response.perf_metrics.is_none());
+    }
+
+    #[test]
+    fn from_ollama_response_extracts_tool_calls() {
+        let provider = OllamaProvider::default_local();
+        let mut message = ChatMessage::assistant(String::new());
+        message.tool_calls = vec![ToolCall {
+            function: ToolCallFunction {
+                name: "read_file".to_string(),
+                arguments: serde_json::json!({"path": "src/main.rs"}),
+            },
+        }];
+        let response = mock_response(message, true);
+
+        let llm_response = provider.from_ollama_response(response);
+        assert_eq!(llm_response.stop_reason, Some(StopReason::ToolUse));
+        assert_eq!(llm_response.content.len(), 1);
+        match &llm_response.content[0] {
+            ContentBlock::ToolUse { name, input, .. } => {
+                assert_eq!(name, "read_file");
+                assert_eq!(input["path"], "src/main.rs");
+            }
+            other => panic!("expected ToolUse block, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_ollama_response_uses_explicit_thinking_field() {
+        let provider = OllamaProvider::default_local();
+        let mut message = ChatMessage::assistant("the answer is 42".to_string());
+        message.thinking = Some("reasoning about the question".to_string());
+        let response = mock_response(message, true);
+
+        let llm_response = provider.from_ollama_response(response);
+        assert_eq!(llm_response.content.len(), 2);
+        assert!(matches!(
+            &llm_response.content[0],
+            ContentBlock::Thinking { thinking } if thinking == "reasoning about the question"
+        ));
+        assert!(matches!(
+            &llm_response.content[1],
+            ContentBlock::Text { text } if text == "the answer is 42"
+        ));
+    }
+
+    #[test]
+    fn from_ollama_response_falls_back_to_think_tags() {
+        let provider = OllamaProvider::default_local();
+        // No explicit `thinking` field - reasoning embedded as <think> tags
+        // in the visible text (DeepSeek-R1/QwQ style models via Ollama).
+        let message =
+            ChatMessage::assistant("<think>let me work this out</think>final answer".to_string());
+        let response = mock_response(message, true);
+
+        let llm_response = provider.from_ollama_response(response);
+        assert!(matches!(
+            &llm_response.content[0],
+            ContentBlock::Thinking { thinking } if thinking == "let me work this out"
+        ));
+        assert!(matches!(
+            &llm_response.content[1],
+            ContentBlock::Text { text } if text == "final answer"
+        ));
+    }
+
+    #[test]
+    fn to_ollama_tool_converts_valid_schema() {
+        let tool = Tool {
+            name: "read_file".to_string(),
+            description: "Reads a file".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": { "path": { "type": "string" } }
+            }),
+        };
+
+        let info = to_ollama_tool(&tool);
+        assert_eq!(info.function.name, "read_file");
+        assert_eq!(info.function.description, "Reads a file");
+    }
+
+    #[test]
+    fn to_ollama_tool_falls_back_on_invalid_schema() {
+        // A bare string is neither a JSON object nor a bool, so
+        // `Schema::try_from` fails and we fall back to an empty schema
+        // instead of propagating the error.
+        let tool = Tool {
+            name: "broken".to_string(),
+            description: "d".to_string(),
+            input_schema: serde_json::json!("not a schema"),
+        };
+
+        let info = to_ollama_tool(&tool);
+        assert_eq!(info.function.name, "broken");
+    }
+
+    #[test]
+    fn to_ollama_format_json_object_marker() {
+        let value = serde_json::json!({"type": "json_object"});
+        assert!(matches!(to_ollama_format(&value), Some(FormatType::Json)));
+    }
+
+    #[test]
+    fn to_ollama_format_structured_schema() {
+        let value = serde_json::json!({
+            "type": "object",
+            "properties": { "answer": { "type": "string" } }
+        });
+        assert!(matches!(
+            to_ollama_format(&value),
+            Some(FormatType::StructuredJson(_))
+        ));
+    }
+
+    #[test]
+    fn to_ollama_request_maps_tool_messages() {
+        let provider = OllamaProvider::default_local();
+        let request = LLMRequest::new(
+            "llama3.2",
+            vec![
+                Message {
+                    role: Role::Assistant,
+                    content: vec![ContentBlock::ToolUse {
+                        id: "call_1".to_string(),
+                        name: "read_file".to_string(),
+                        input: serde_json::json!({"path": "a.rs"}),
+                    }],
+                },
+                Message {
+                    role: Role::User,
+                    content: vec![ContentBlock::ToolResult {
+                        tool_use_id: "call_1".to_string(),
+                        content: "file contents".to_string(),
+                        is_error: None,
+                    }],
+                },
+            ],
+        );
+
+        let ollama_request = provider.to_ollama_request(request);
+        assert_eq!(ollama_request.messages.len(), 2);
+        assert_eq!(ollama_request.messages[0].tool_calls.len(), 1);
+        assert_eq!(
+            ollama_request.messages[0].tool_calls[0].function.name,
+            "read_file"
+        );
+        assert_eq!(ollama_request.messages[1].role, MessageRole::Tool);
+        assert_eq!(ollama_request.messages[1].content, "file contents");
+    }
+
+    #[test]
+    fn to_ollama_request_maps_thinking_and_response_format() {
+        let provider = OllamaProvider::default_local();
+        let request = LLMRequest::new("llama3.2", vec![Message::user("hi")])
+            .with_thinking(4_000)
+            .with_response_format(serde_json::json!({"type": "json_object"}));
+
+        let ollama_request = provider.to_ollama_request(request);
+        assert!(matches!(ollama_request.think, Some(ThinkType::Medium)));
+        assert!(matches!(ollama_request.format, Some(FormatType::Json)));
+    }
+
+    #[test]
+    fn to_ollama_request_embeds_base64_image() {
+        let provider = OllamaProvider::default_local();
+        let request = LLMRequest::new(
+            "llava:13b",
+            vec![Message {
+                role: Role::User,
+                content: vec![
+                    ContentBlock::Text {
+                        text: "what is this?".to_string(),
+                    },
+                    ContentBlock::Image {
+                        source: ImageSource::Base64 {
+                            media_type: "image/png".to_string(),
+                            data: "aGVsbG8=".to_string(),
+                        },
+                    },
+                ],
+            }],
+        );
+
+        let ollama_request = provider.to_ollama_request(request);
+        let images = ollama_request.messages[0]
+            .images
+            .as_ref()
+            .expect("image should be attached");
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0].to_base64(), "aGVsbG8=");
+    }
 }

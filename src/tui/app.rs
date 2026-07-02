@@ -1685,4 +1685,216 @@ mod tests {
         assert_eq!(display_msg.role, "user");
         assert_eq!(display_msg.content, "Hello");
     }
+
+    use crate::db::Database;
+    use crate::llm::provider::{
+        LLMRequest, LLMResponse, Provider, ProviderStream, Result as ProviderResult,
+    };
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    /// Minimal `Provider` stub - these tests only exercise the Model
+    /// Download dialog's state machine, never an actual chat request.
+    struct DummyProvider;
+
+    #[async_trait::async_trait]
+    impl Provider for DummyProvider {
+        async fn complete(&self, _request: LLMRequest) -> ProviderResult<LLMResponse> {
+            unimplemented!("dialog tests never call complete()")
+        }
+        async fn stream(&self, _request: LLMRequest) -> ProviderResult<ProviderStream> {
+            unimplemented!("dialog tests never call stream()")
+        }
+        fn name(&self) -> &str {
+            "dummy"
+        }
+        fn default_model(&self) -> &str {
+            "dummy-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["dummy-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(4096)
+        }
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    async fn test_app() -> App {
+        let db = Database::connect_in_memory().await.expect("in-memory db");
+        db.run_migrations().await.expect("run migrations");
+        let context = ServiceContext::new(db.pool().clone());
+        let agent_service = Arc::new(AgentService::new(Arc::new(DummyProvider), context.clone()));
+        App::new(agent_service, context)
+    }
+
+    fn key(code: KeyCode) -> crossterm::event::KeyEvent {
+        crossterm::event::KeyEvent::new(code, KeyModifiers::empty())
+    }
+
+    #[tokio::test]
+    async fn open_model_download_switches_mode_and_seeds_suggestions() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+
+        assert_eq!(app.mode, AppMode::ModelDownload);
+        assert!(app.model_download_input.is_empty());
+        assert!(
+            !app.model_download_suggestions.is_empty(),
+            "curated models should seed the suggestion list immediately"
+        );
+    }
+
+    #[tokio::test]
+    async fn model_download_typing_filters_suggestions() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+
+        app.handle_model_download_key(key(KeyCode::Char('l')))
+            .await
+            .unwrap();
+        app.handle_model_download_key(key(KeyCode::Char('l')))
+            .await
+            .unwrap();
+
+        assert_eq!(app.model_download_input, "ll");
+        assert!(app
+            .model_download_suggestions
+            .iter()
+            .all(|s| s.to_lowercase().contains("ll")));
+    }
+
+    #[tokio::test]
+    async fn model_download_backspace_removes_last_char() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        app.handle_model_download_key(key(KeyCode::Char('a')))
+            .await
+            .unwrap();
+        app.handle_model_download_key(key(KeyCode::Backspace))
+            .await
+            .unwrap();
+        assert!(app.model_download_input.is_empty());
+    }
+
+    #[tokio::test]
+    async fn model_download_tab_adopts_highlighted_suggestion() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        let first_suggestion = app.model_download_suggestions[0].clone();
+
+        app.handle_model_download_key(key(KeyCode::Tab))
+            .await
+            .unwrap();
+
+        assert_eq!(app.model_download_input, first_suggestion);
+    }
+
+    #[tokio::test]
+    async fn model_download_esc_closes_dialog_without_running_pull() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+
+        app.handle_model_download_key(key(KeyCode::Esc))
+            .await
+            .unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
+        assert!(!app.model_download_running);
+    }
+
+    #[tokio::test]
+    async fn model_download_enter_starts_pull_then_esc_aborts_it() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        app.model_download_input = "qwen2.5-coder:7b".to_string();
+
+        app.handle_model_download_key(key(KeyCode::Enter))
+            .await
+            .unwrap();
+        assert!(app.model_download_running);
+
+        // Esc while a pull is running must abort it and return to chat,
+        // rather than just closing the dialog.
+        app.handle_model_download_key(key(KeyCode::Esc))
+            .await
+            .unwrap();
+        assert!(!app.model_download_running);
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_models_listed_updates_installed_list() {
+        let mut app = test_app().await;
+        app.handle_event(TuiEvent::OllamaModelsListed(vec![
+            "custom-model:1b".to_string()
+        ]))
+        .await
+        .unwrap();
+
+        assert_eq!(
+            app.model_download_installed,
+            vec!["custom-model:1b".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_pull_progress_updates_status_and_fraction() {
+        let mut app = test_app().await;
+        app.handle_event(TuiEvent::OllamaPullProgress(
+            super::super::ollama_download::ModelPullProgress {
+                status: "pulling abc123".to_string(),
+                total: Some(100),
+                completed: Some(50),
+            },
+        ))
+        .await
+        .unwrap();
+
+        assert_eq!(
+            app.model_download_status,
+            Some("pulling abc123".to_string())
+        );
+        assert_eq!(app.model_download_fraction, Some(0.5));
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_pull_finished_success_posts_chat_message() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_running = true;
+
+        app.handle_event(TuiEvent::OllamaPullFinished {
+            model: "qwen2.5-coder:7b".to_string(),
+            error: None,
+        })
+        .await
+        .unwrap();
+
+        assert!(!app.model_download_running);
+        assert_eq!(app.mode, AppMode::Chat);
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Pulled 'qwen2.5-coder:7b'")));
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_pull_finished_failure_posts_error_message() {
+        let mut app = test_app().await;
+
+        app.handle_event(TuiEvent::OllamaPullFinished {
+            model: "bogus-model".to_string(),
+            error: Some("model not found".to_string()),
+        })
+        .await
+        .unwrap();
+
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Failed to pull 'bogus-model'")
+                && m.content.contains("model not found")));
+    }
 }

@@ -1377,4 +1377,34 @@ mod tests {
         use clap::CommandFactory;
         Cli::command().debug_assert();
     }
+
+    #[test]
+    fn test_ollama_host_defaults_when_unconfigured() {
+        let config = crate::config::Config::default();
+        assert_eq!(ollama_host(&config), "http://localhost:11434");
+    }
+
+    #[test]
+    fn test_ollama_host_uses_configured_value() {
+        let mut config = crate::config::Config::default();
+        config.providers.ollama = Some(crate::config::OllamaProviderConfig {
+            enabled: true,
+            host: "http://my-ollama-box:11434".to_string(),
+            default_model: None,
+            keep_alive: None,
+            num_ctx: None,
+        });
+        assert_eq!(ollama_host(&config), "http://my-ollama-box:11434");
+    }
+
+    #[test]
+    fn test_ollama_command_parses() {
+        let cli = Cli::parse_from(["crustly", "ollama", "pull", "qwen2.5-coder:7b"]);
+        match cli.command {
+            Some(Commands::Ollama {
+                operation: OllamaCommands::Pull { model },
+            }) => assert_eq!(model, "qwen2.5-coder:7b"),
+            other => panic!("expected Ollama Pull command, got {other:?}"),
+        }
+    }
 }

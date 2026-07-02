@@ -1664,3 +1664,147 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
 
     f.render_widget(status_bar, area);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use crate::llm::agent::AgentService;
+    use crate::llm::provider::{
+        LLMRequest, LLMResponse, Provider, ProviderStream, Result as ProviderResult,
+    };
+    use crate::services::ServiceContext;
+    use crate::tui::app::DisplayMessage;
+    use async_trait::async_trait;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use std::sync::Arc;
+
+    /// Minimal `Provider` stub - these tests only exercise rendering, never
+    /// an actual `complete()`/`stream()` call.
+    struct DummyProvider;
+
+    #[async_trait]
+    impl Provider for DummyProvider {
+        async fn complete(&self, _request: LLMRequest) -> ProviderResult<LLMResponse> {
+            unimplemented!("rendering tests never call complete()")
+        }
+        async fn stream(&self, _request: LLMRequest) -> ProviderResult<ProviderStream> {
+            unimplemented!("rendering tests never call stream()")
+        }
+        fn name(&self) -> &str {
+            "dummy"
+        }
+        fn default_model(&self) -> &str {
+            "dummy-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["dummy-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(4096)
+        }
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    async fn test_app() -> App {
+        let db = Database::connect_in_memory().await.expect("in-memory db");
+        db.run_migrations().await.expect("run migrations");
+        let context = ServiceContext::new(db.pool().clone());
+        let agent_service = Arc::new(AgentService::new(Arc::new(DummyProvider), context.clone()));
+        App::new(agent_service, context)
+    }
+
+    /// Render `app` into a small offscreen buffer and return its text
+    /// content as a single string, for substring assertions.
+    fn render_to_string(app: &App, width: u16, height: u16) -> String {
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).expect("create terminal");
+        terminal.draw(|f| render(f, app)).expect("draw frame");
+
+        let buffer = terminal.backend().buffer();
+        let mut out = String::new();
+        for y in 0..buffer.area.height {
+            for x in 0..buffer.area.width {
+                out.push_str(buffer.get(x, y).symbol());
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    #[tokio::test]
+    async fn header_shows_ollama_provider_badge_and_tokens_per_second() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.current_session = Some(crate::db::models::Session {
+            id: uuid::Uuid::new_v4(),
+            title: Some("Test session".to_string()),
+            model: Some("qwen2.5-coder:7b".to_string()),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            archived_at: None,
+            token_count: 0,
+            total_cost: 0.0,
+            provider: Some("ollama".to_string()),
+        });
+        app.messages.push(DisplayMessage {
+            id: uuid::Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "hi".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: Some(30),
+            cost: Some(0.0),
+            provider_name: Some("ollama".to_string()),
+            perf_metrics: None,
+            tokens_per_second: Some(42.0),
+        });
+
+        // Wide terminal: the header is a single un-wrapped line, so it must
+        // be wide enough to fit session/model/tokens/cost/tok-per-sec.
+        let screen = render_to_string(&app, 160, 20);
+        assert!(screen.contains("qwen2.5-coder:7b"));
+        assert!(screen.contains("🦙"));
+        assert!(screen.contains("42 tok/s"));
+    }
+
+    #[tokio::test]
+    async fn header_omits_tokens_per_second_when_unavailable() {
+        // Non-Ollama providers (or providers without perf metrics) must not
+        // show a fabricated "0 tok/s".
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        let screen = render_to_string(&app, 100, 20);
+        assert!(!screen.contains("tok/s"));
+    }
+
+    #[tokio::test]
+    async fn model_download_dialog_shows_prompt_and_suggestions() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_suggestions = vec!["qwen2.5-coder:7b".to_string()];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Download an Ollama model"));
+        assert!(screen.contains("qwen2.5-coder:7b"));
+    }
+
+    #[tokio::test]
+    async fn model_download_progress_shows_status_and_bar() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_input = "qwen2.5-coder:7b".to_string();
+        app.model_download_running = true;
+        app.model_download_status = Some("pulling abc123".to_string());
+        app.model_download_fraction = Some(0.5);
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Downloading 'qwen2.5-coder:7b'"));
+        assert!(screen.contains("pulling abc123"));
+        assert!(screen.contains("50%"));
+    }
+}

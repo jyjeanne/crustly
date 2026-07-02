@@ -53,6 +53,7 @@ perf.data.old
 coverage/
 *.profraw
 *.profdata
+cobertura.xml
 
 # Documentation build
 /book/

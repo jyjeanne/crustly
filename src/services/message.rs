@@ -310,6 +310,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_update_message_metrics_with_perf_data() {
+        use crate::llm::provider::PerfMetrics;
+
+        let (message_service, session_service) = create_test_service().await;
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
+        let message = message_service
+            .create_message(session.id, "assistant".to_string(), "Hi".to_string())
+            .await
+            .unwrap();
+
+        let perf = PerfMetrics {
+            load_duration_ms: Some(0),
+            prompt_eval_duration_ms: Some(50),
+            eval_duration_ms: Some(400),
+            total_duration_ms: Some(450),
+            model_was_loaded: Some(true),
+        };
+        message_service
+            .update_message_metrics(message.id, "ollama", Some(&perf))
+            .await
+            .unwrap();
+
+        let updated = message_service
+            .get_message_required(message.id)
+            .await
+            .unwrap();
+        assert_eq!(updated.provider_name, Some("ollama".to_string()));
+        let stored: PerfMetrics =
+            serde_json::from_str(&updated.perf_metrics_json.unwrap()).unwrap();
+        assert_eq!(stored.eval_duration_ms, Some(400));
+    }
+
+    #[tokio::test]
+    async fn test_update_message_metrics_without_perf_data() {
+        let (message_service, session_service) = create_test_service().await;
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
+        let message = message_service
+            .create_message(session.id, "assistant".to_string(), "Hi".to_string())
+            .await
+            .unwrap();
+
+        message_service
+            .update_message_metrics(message.id, "anthropic", None)
+            .await
+            .unwrap();
+
+        let updated = message_service
+            .get_message_required(message.id)
+            .await
+            .unwrap();
+        assert_eq!(updated.provider_name, Some("anthropic".to_string()));
+        assert_eq!(updated.perf_metrics_json, None);
+    }
+
+    #[tokio::test]
     async fn test_delete_message() {
         let (message_service, session_service) = create_test_service().await;
         let session = session_service
