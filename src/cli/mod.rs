@@ -186,6 +186,42 @@ pub enum Commands {
         #[arg(short, long, default_value = "20")]
         max_iterations: u32,
     },
+
+    /// Manage local Ollama models (native provider, requires the crate's
+    /// 'ollama' build feature)
+    Ollama {
+        #[command(subcommand)]
+        operation: OllamaCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum OllamaCommands {
+    /// List models already pulled/installed locally
+    List,
+    /// Pull (download) a model by name, e.g. `qwen2.5-coder:7b`
+    Pull {
+        /// Model name/tag, exactly as understood by `ollama pull <name>`
+        model: String,
+    },
+    /// Delete a locally-installed model
+    Rm {
+        /// Model name/tag to delete
+        model: String,
+    },
+    /// Show details about a model (license, parameters, template, capabilities)
+    Show {
+        /// Model name/tag to inspect
+        model: String,
+    },
+    /// Generate an embedding vector for a piece of text using an
+    /// embedding-capable model (e.g. `nomic-embed-text`)
+    Embed {
+        /// Embedding model name/tag
+        model: String,
+        /// Text to embed
+        text: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -289,6 +325,7 @@ pub async fn run() -> Result<()> {
             goal,
             max_iterations,
         }) => cmd_autoplan(&config, goal, max_iterations).await,
+        Some(Commands::Ollama { operation }) => cmd_ollama(&config, operation).await,
     }
 }
 
@@ -737,6 +774,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create TUI app first (so we can get the event sender)
     tracing::debug!("Creating TUI app");
     let mut app = tui::App::new(agent_service, service_context.clone());
+    app.set_ollama_host(ollama_host(config));
 
     // Get event sender from app
     let event_sender = app.event_sender();
@@ -1025,6 +1063,120 @@ async fn cmd_keyring(operation: KeyringCommands) -> Result<()> {
     }
 }
 
+/// Resolve the configured Ollama host, falling back to the local default.
+/// Used both by `crustly ollama <...>` and to point the TUI's Model
+/// Download dialog (Ctrl+D) at the right instance.
+fn ollama_host(config: &crate::config::Config) -> String {
+    config
+        .providers
+        .ollama
+        .as_ref()
+        .map(|c| c.host.clone())
+        .unwrap_or_else(|| "http://localhost:11434".to_string())
+}
+
+#[cfg(feature = "ollama")]
+async fn cmd_ollama(config: &crate::config::Config, operation: OllamaCommands) -> Result<()> {
+    use crate::llm::provider::ollama_models;
+
+    let host = ollama_host(config);
+
+    match operation {
+        OllamaCommands::List => {
+            println!("🦙 Models installed at {}\n", host);
+            let models = ollama_models::list_models(&host).await?;
+
+            if models.is_empty() {
+                println!("  (none) - pull one with: crustly ollama pull <model>");
+            } else {
+                for m in models {
+                    let size_gb = m.size_bytes as f64 / 1_073_741_824.0;
+                    println!("  {:<30} {:>7.2} GB   {}", m.name, size_gb, m.modified_at);
+                }
+            }
+            Ok(())
+        }
+
+        OllamaCommands::Pull { model } => {
+            println!("🦙 Pulling '{}' from {}...\n", model, host);
+
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            let host_clone = host.clone();
+            let model_clone = model.clone();
+            let pull_task = tokio::spawn(async move {
+                ollama_models::pull_model(&host_clone, &model_clone, tx).await
+            });
+
+            let mut last_status = String::new();
+            while let Some(progress) = rx.recv().await {
+                if progress.status != last_status {
+                    println!("  {}", progress.status);
+                    last_status = progress.status.clone();
+                }
+                if let Some(fraction) = progress.fraction() {
+                    print!("\r  {:.0}%", fraction * 100.0);
+                    use std::io::Write as _;
+                    let _ = std::io::stdout().flush();
+                }
+            }
+            println!();
+
+            pull_task
+                .await
+                .context("Pull task panicked")?
+                .with_context(|| format!("Failed to pull model '{}'", model))?;
+
+            println!("✅ Pulled '{}'", model);
+            Ok(())
+        }
+
+        OllamaCommands::Rm { model } => {
+            ollama_models::delete_model(&host, &model).await?;
+            println!("✅ Deleted '{}'", model);
+            Ok(())
+        }
+
+        OllamaCommands::Show { model } => {
+            let info = ollama_models::show_model(&host, &model).await?;
+            println!("🦙 {}\n", model);
+            println!("License:\n{}\n", info.license);
+            println!("Parameters:\n{}\n", info.parameters);
+            println!("Template:\n{}\n", info.template);
+            println!("Capabilities: {}", info.capabilities.join(", "));
+            Ok(())
+        }
+
+        OllamaCommands::Embed { model, text } => {
+            let embeddings = ollama_models::generate_embeddings(&host, &model, vec![text]).await?;
+            let embedding = embeddings
+                .into_iter()
+                .next()
+                .context("Ollama returned no embedding vector")?;
+
+            println!(
+                "🦙 Embedding from '{}' ({} dimensions)\n",
+                model,
+                embedding.len()
+            );
+            let preview: Vec<String> = embedding
+                .iter()
+                .take(8)
+                .map(|v| format!("{v:.4}"))
+                .collect();
+            println!("[{}, ...]", preview.join(", "));
+            Ok(())
+        }
+    }
+}
+
+#[cfg(not(feature = "ollama"))]
+async fn cmd_ollama(_config: &crate::config::Config, _operation: OllamaCommands) -> Result<()> {
+    anyhow::bail!(
+        "This build of crustly was compiled without the 'ollama' feature. \
+         Rebuild with `--features ollama` (or `all-llm`) to use `crustly ollama`."
+    );
+}
+
 /// FullAuto plan mode: no approval gates, runs to completion or max_iterations.
 async fn cmd_autoplan(
     config: &crate::config::Config,
@@ -1224,5 +1376,35 @@ mod tests {
     fn test_cli_parse() {
         use clap::CommandFactory;
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn test_ollama_host_defaults_when_unconfigured() {
+        let config = crate::config::Config::default();
+        assert_eq!(ollama_host(&config), "http://localhost:11434");
+    }
+
+    #[test]
+    fn test_ollama_host_uses_configured_value() {
+        let mut config = crate::config::Config::default();
+        config.providers.ollama = Some(crate::config::OllamaProviderConfig {
+            enabled: true,
+            host: "http://my-ollama-box:11434".to_string(),
+            default_model: None,
+            keep_alive: None,
+            num_ctx: None,
+        });
+        assert_eq!(ollama_host(&config), "http://my-ollama-box:11434");
+    }
+
+    #[test]
+    fn test_ollama_command_parses() {
+        let cli = Cli::parse_from(["crustly", "ollama", "pull", "qwen2.5-coder:7b"]);
+        match cli.command {
+            Some(Commands::Ollama {
+                operation: OllamaCommands::Pull { model },
+            }) => assert_eq!(model, "qwen2.5-coder:7b"),
+            other => panic!("expected Ollama Pull command, got {other:?}"),
+        }
     }
 }

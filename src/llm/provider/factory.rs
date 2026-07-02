@@ -120,11 +120,21 @@ impl Provider for FailoverProvider {
 ///
 /// Priority order:
 /// 1. Qwen (if configured with credentials)
-/// 2. OpenAI (if configured with credentials)
-/// 3. Anthropic (default fallback)
+/// 2. Ollama native (if `providers.ollama` is configured)
+/// 3. OpenAI / OpenAI-compatible local (LM Studio, Ollama via `/v1`, LocalAI)
+/// 4. Anthropic (default fallback)
+///
+/// Ollama sits between Qwen and OpenAI so that existing setups using only
+/// `providers.openai.base_url` (LM Studio, Ollama-via-compat) keep resolving
+/// exactly as before when `providers.ollama` is absent.
 pub fn create_provider(config: &Config) -> Result<Arc<dyn Provider>> {
     // Try Qwen first
     if let Some(provider) = try_create_qwen(config)? {
+        return Ok(provider);
+    }
+
+    // Try native Ollama
+    if let Some(provider) = try_create_ollama(config)? {
         return Ok(provider);
     }
 
@@ -135,6 +145,49 @@ pub fn create_provider(config: &Config) -> Result<Arc<dyn Provider>> {
 
     // Fall back to Anthropic
     create_anthropic(config)
+}
+
+/// Try to create the native Ollama provider if `providers.ollama` is configured.
+#[cfg(feature = "ollama")]
+fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
+    use super::ollama::OllamaProvider;
+
+    let ollama_config = match &config.providers.ollama {
+        Some(cfg) if cfg.enabled => cfg,
+        _ => return Ok(None),
+    };
+
+    tracing::info!("Using native Ollama at: {}", ollama_config.host);
+    println!("🦙 Using native Ollama at: {}\n", ollama_config.host);
+
+    let mut provider = OllamaProvider::new(ollama_config.host.clone());
+    if let Some(model) = &ollama_config.default_model {
+        tracing::info!("Using custom default model: {}", model);
+        println!("📦 Model: {}\n", model);
+        provider = provider.with_default_model(model.clone());
+    }
+    if let Some(keep_alive) = &ollama_config.keep_alive {
+        provider = provider.with_keep_alive(keep_alive);
+    }
+    if let Some(num_ctx) = ollama_config.num_ctx {
+        provider = provider.with_num_ctx(num_ctx);
+    }
+
+    Ok(Some(Arc::new(provider)))
+}
+
+/// Without the `ollama` feature compiled in, a configured `providers.ollama`
+/// section is not silently ignored - it's a clear error pointing at the
+/// missing feature, rather than an unexplained fallback to another provider.
+#[cfg(not(feature = "ollama"))]
+fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
+    if config.providers.ollama.is_some() {
+        anyhow::bail!(
+            "providers.ollama is configured, but this build of crustly was compiled \
+             without the 'ollama' feature. Rebuild with `--features ollama` (or `all-llm`)."
+        );
+    }
+    Ok(None)
 }
 
 /// Try to create Qwen provider if configured
@@ -335,6 +388,7 @@ mod tests {
                     output_tokens: 1,
                 },
                 cache_metrics: None,
+                perf_metrics: None,
             })
         }
         async fn stream(&self, _req: LLMRequest) -> ProviderResult<ProviderStream> {

@@ -167,6 +167,16 @@ Configure external MCP tool servers in `.crustly/config.toml` under `[[mcp.serve
 ### AWS Bedrock Support
 AWS Bedrock is now a supported provider. Enable it with `--features aws-bedrock` and configure your AWS credentials as usual.
 
+### Native Ollama Provider & Model Download Dialog
+Crustly now speaks Ollama's native `/api/chat` protocol directly (via [`ollama-rs`](https://github.com/pepperoni21/ollama-rs), `--features ollama`), alongside the existing OpenAI-compatible route. This unlocks:
+
+- **Runtime performance metrics** — generation throughput (tokens/sec), model load time, and warm/cold-start status shown live in the TUI header and under each reply
+- **`Ctrl+D` Model Download dialog** — type or pick an Ollama model from suggested/installed names, pull it with a live progress bar, and cancel mid-download with `Esc`, all without leaving the TUI
+- **Model management CLI** — `crustly ollama list|pull|rm|show|embed`
+- **`keep_alive` / `num_ctx` control** and provider identity (badge + icon) shown in the header for every configured provider, not just Ollama
+
+Both the native (`providers.ollama`) and OpenAI-compatible (`providers.openai.base_url`) routes to Ollama can be configured side by side — see the "Native Ollama" section under Providers below, and [`ollama-rs-integration-plan.md`](./ollama-rs-integration-plan.md) for the full design.
+
 ---
 
 ### 🆚 **Why Choose Crustly?**
@@ -328,6 +338,36 @@ The OpenAI provider works with **any OpenAI-compatible API**, including:
 | Cerebras | 📅 Planned | — |
 | Huggingface | 📅 Planned | — |
 
+#### ✅ Native Ollama (via `ollama-rs`)
+
+In addition to the OpenAI-compatible route above (`OPENAI_BASE_URL="http://localhost:11434/v1"`),
+Crustly has a **native** Ollama provider built on [`ollama-rs`](https://github.com/pepperoni21/ollama-rs),
+enabled with `--features ollama` (or `all-llm`). It talks to Ollama's own `/api/chat` protocol instead
+of the OpenAI shim, which unlocks:
+
+- `keep_alive` / `num_ctx` control
+- Runtime performance metrics in the TUI header and under each reply: generation throughput
+  (tokens/sec), model load time, warm vs. cold start — none of this is available through the
+  OpenAI-compatible endpoint
+- **`Ctrl+D` Model Download dialog** — pull a model without leaving the TUI: type a name or pick
+  from suggestions (already-installed models plus a curated list), watch a live progress bar, and
+  cancel with `Esc` if you change your mind. Ollama has no online search API, so suggestions are a
+  starting point, not a catalog search — you can always type any `repo:tag` you know.
+- Model management from the command line:
+
+  ```bash
+  crustly ollama list                              # locally installed models
+  crustly ollama pull qwen2.5-coder:7b              # download a model, with live progress
+  crustly ollama rm qwen2.5-coder:7b                # delete a model
+  crustly ollama show qwen2.5-coder:7b              # license, parameters, template, capabilities
+  crustly ollama embed nomic-embed-text "some text"  # generate an embedding vector
+  ```
+
+Configure it with `[providers.ollama]` in `config.toml` (see `config.toml.example`) or
+`OLLAMA_HOST`/`OLLAMA_MODEL` environment variables. Both the native and OpenAI-compatible routes to
+Ollama can be configured side by side; see [`ollama-rs-integration-plan.md`](./ollama-rs-integration-plan.md)
+for the full design and current status.
+
 ### Environment Variables
 
 | Variable | Provider | Required |
@@ -335,6 +375,8 @@ The OpenAI provider works with **any OpenAI-compatible API**, including:
 | `ANTHROPIC_API_KEY` | Anthropic Claude | ✅ For Anthropic |
 | `OPENAI_API_KEY` | OpenAI / Compatible APIs | ✅ For OpenAI |
 | `OPENAI_BASE_URL` | OpenAI-compatible APIs | Optional (for custom endpoints) |
+| `OLLAMA_HOST` (or `OLLAMA_BASE_URL`) | Native Ollama (`--features ollama`) | Optional (default: `http://localhost:11434`) |
+| `OLLAMA_MODEL` | Native Ollama (`--features ollama`) | Optional (default model override) |
 
 ### Example Configuration
 
@@ -2913,6 +2955,7 @@ Try again with correct parameters.
   - `Ctrl+N` - New session
   - `Ctrl+L` - List sessions
   - `Ctrl+H` - Show help (📚 **Press Ctrl+H from anywhere to see all commands!**)
+  - `Ctrl+D` - Download an Ollama model (native provider, `--features ollama`)
   - `Ctrl+C` - Quit
   - `Escape` - Clear input
   - `Page Up/Down` - Scroll chat history

@@ -810,6 +810,7 @@ impl QwenProvider {
                 output_tokens: response.usage.completion_tokens,
             },
             cache_metrics: None,
+            perf_metrics: None,
         }
     }
 

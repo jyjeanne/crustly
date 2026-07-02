@@ -52,6 +52,15 @@ shellexpand = "3.1"
 reqwest = { version = "0.11", features = ["json", "native-tls", "stream"], default-features = false }
 async-openai = { version = "0.20", optional = true }
 aws-sdk-bedrockruntime = { version = "1.15", optional = true }
+# Native Ollama provider. Pulls its own reqwest 0.12 client internally (ollama-rs
+# is built against reqwest 0.12, incompatible with the reqwest 0.11 client used
+# by the rest of this crate) - the two major versions coexist in the dependency
+# tree, they are not shared/reused across providers.
+ollama-rs = { version = "0.3", optional = true, features = ["stream"] }
+# Needed to build ollama-rs's `ToolInfo`/`FormatType` schemas from our generic
+# serde_json::Value tool definitions. Version must track ollama-rs's own
+# schemars dependency (currently 1.2.x).
+schemars = { version = "1.2", optional = true, features = ["preserve_order"] }
 
 # Provider Registry (Crabrace - replaces Catwalk)
 crabrace = "0.1.0"
@@ -131,7 +140,8 @@ default = []
 profiling = []
 openai = ["async-openai"]
 aws-bedrock = ["aws-sdk-bedrockruntime"]
-all-llm = ["openai", "aws-bedrock"]
+ollama = ["dep:ollama-rs", "dep:schemars"]
+all-llm = ["openai", "aws-bedrock", "ollama"]
 
 [profile.dev]
 opt-level = 0

@@ -267,6 +267,7 @@ async fn drain_stream_to_response(
         stop_reason,
         usage,
         cache_metrics: None,
+        perf_metrics: None,
     })
 }
 
@@ -404,6 +405,17 @@ impl AgentService {
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
+        // Record which provider answered and, if available, its perf metrics
+        // (load/prefill/generation durations) - currently only Ollama.
+        message_service
+            .update_message_metrics(
+                assistant_db_msg.id,
+                self.provider.name(),
+                response.perf_metrics.as_ref(),
+            )
+            .await
+            .map_err(|e| AgentError::Database(e.to_string()))?;
+
         // Update session token usage
         session_service
             .update_session_usage(session_id, total_tokens as i32, cost)
@@ -418,6 +430,8 @@ impl AgentService {
             usage: response.usage,
             cost,
             model: response.model,
+            provider_name: self.provider.name().to_string(),
+            perf_metrics: response.perf_metrics,
         })
     }
 
@@ -1159,6 +1173,16 @@ impl AgentService {
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
+        // Record which provider answered and, if available, its perf metrics.
+        message_service
+            .update_message_metrics(
+                assistant_db_msg.id,
+                self.provider.name(),
+                response.perf_metrics.as_ref(),
+            )
+            .await
+            .map_err(|e| AgentError::Database(e.to_string()))?;
+
         // Update session token usage
         session_service
             .update_session_usage(session_id, total_tokens as i32, cost)
@@ -1176,6 +1200,8 @@ impl AgentService {
             },
             cost,
             model: response.model,
+            provider_name: self.provider.name().to_string(),
+            perf_metrics: response.perf_metrics,
         })
     }
 
@@ -1325,6 +1351,14 @@ pub struct AgentResponse {
 
     /// Model used
     pub model: String,
+
+    /// Name of the provider that served this response (e.g. "ollama",
+    /// "openai", "anthropic"). Lets the TUI show which backend answered.
+    pub provider_name: String,
+
+    /// Runtime performance metrics, if the provider exposes them
+    /// (currently only the native Ollama provider).
+    pub perf_metrics: Option<crate::llm::provider::PerfMetrics>,
 }
 
 /// Streaming response from the agent
@@ -1452,6 +1486,7 @@ mod tests {
                     output_tokens: 20,
                 },
                 cache_metrics: None,
+                perf_metrics: None,
             })
         }
 
@@ -1582,6 +1617,7 @@ mod tests {
                         output_tokens: 20,
                     },
                     cache_metrics: None,
+                    perf_metrics: None,
                 })
             } else {
                 // Second call: final response after tool execution
@@ -1597,6 +1633,7 @@ mod tests {
                         output_tokens: 25,
                     },
                     cache_metrics: None,
+                    perf_metrics: None,
                 })
             }
         }

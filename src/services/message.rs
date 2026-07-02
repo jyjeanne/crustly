@@ -41,6 +41,8 @@ impl MessageService {
             created_at: Utc::now(),
             token_count: None,
             cost: None,
+            provider_name: None,
+            perf_metrics_json: None,
         };
 
         repo.create(&message)
@@ -104,6 +106,36 @@ impl MessageService {
             id,
             token_count,
             cost
+        );
+        Ok(())
+    }
+
+    /// Record which provider generated this message and, if available, its
+    /// runtime performance metrics (load/prefill/generation durations).
+    /// `perf_metrics` is only populated for providers that expose this level
+    /// of detail (currently the native Ollama provider).
+    pub async fn update_message_metrics(
+        &self,
+        id: Uuid,
+        provider_name: &str,
+        perf_metrics: Option<&crate::llm::provider::PerfMetrics>,
+    ) -> Result<()> {
+        let mut message = self.get_message_required(id).await?;
+        message.provider_name = Some(provider_name.to_string());
+        message.perf_metrics_json = perf_metrics
+            .map(serde_json::to_string)
+            .transpose()
+            .context("Failed to serialize perf_metrics")?;
+
+        let repo = MessageRepository::new(self.context.pool());
+        repo.update(&message)
+            .await
+            .context("Failed to update message metrics")?;
+
+        tracing::debug!(
+            "Updated message metrics: {} (provider: {})",
+            id,
+            provider_name
         );
         Ok(())
     }
@@ -275,6 +307,67 @@ mod tests {
             .unwrap();
         assert_eq!(updated.token_count, Some(100));
         assert_eq!(updated.cost, Some(0.05));
+    }
+
+    #[tokio::test]
+    async fn test_update_message_metrics_with_perf_data() {
+        use crate::llm::provider::PerfMetrics;
+
+        let (message_service, session_service) = create_test_service().await;
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
+        let message = message_service
+            .create_message(session.id, "assistant".to_string(), "Hi".to_string())
+            .await
+            .unwrap();
+
+        let perf = PerfMetrics {
+            load_duration_ms: Some(0),
+            prompt_eval_duration_ms: Some(50),
+            eval_duration_ms: Some(400),
+            total_duration_ms: Some(450),
+            model_was_loaded: Some(true),
+        };
+        message_service
+            .update_message_metrics(message.id, "ollama", Some(&perf))
+            .await
+            .unwrap();
+
+        let updated = message_service
+            .get_message_required(message.id)
+            .await
+            .unwrap();
+        assert_eq!(updated.provider_name, Some("ollama".to_string()));
+        let stored: PerfMetrics =
+            serde_json::from_str(&updated.perf_metrics_json.unwrap()).unwrap();
+        assert_eq!(stored.eval_duration_ms, Some(400));
+    }
+
+    #[tokio::test]
+    async fn test_update_message_metrics_without_perf_data() {
+        let (message_service, session_service) = create_test_service().await;
+        let session = session_service
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap();
+        let message = message_service
+            .create_message(session.id, "assistant".to_string(), "Hi".to_string())
+            .await
+            .unwrap();
+
+        message_service
+            .update_message_metrics(message.id, "anthropic", None)
+            .await
+            .unwrap();
+
+        let updated = message_service
+            .get_message_required(message.id)
+            .await
+            .unwrap();
+        assert_eq!(updated.provider_name, Some("anthropic".to_string()));
+        assert_eq!(updated.perf_metrics_json, None);
     }
 
     #[tokio::test]

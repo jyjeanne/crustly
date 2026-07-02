@@ -63,9 +63,25 @@ pub fn render(f: &mut Frame, app: &App) {
         AppMode::FilePicker => {
             render_file_picker(f, app, chunks[1]);
         }
+        AppMode::ModelDownload => {
+            render_model_download(f, app, chunks[1]);
+        }
     }
 
     render_status_bar(f, app, chunks[3]);
+}
+
+/// Purely cosmetic icon shown next to the provider name in the header.
+/// Unknown provider names fall back to a generic robot.
+fn provider_icon(provider_name: &str) -> &'static str {
+    match provider_name {
+        "ollama" => "🦙",
+        "openai" => "🏠",
+        "anthropic" => "🤖",
+        "qwen" => "🌀",
+        "azure" => "☁️",
+        _ => "🤖",
+    }
 }
 
 /// Render the header with session info
@@ -81,8 +97,16 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         .as_ref()
         .and_then(|s| s.model.as_deref())
         .unwrap_or("unknown");
+    let provider = app
+        .current_session
+        .as_ref()
+        .and_then(|s| s.provider.as_deref());
     let tokens = app.total_tokens();
     let cost = app.total_cost();
+    // Throughput of the most recent assistant reply, if the active provider
+    // exposes it (currently only the native Ollama provider). Omitted
+    // entirely (not shown as "0 tok/s") when unavailable.
+    let tokens_per_second = app.messages.iter().rev().find_map(|m| m.tokens_per_second);
 
     // Format working directory - show relative or full path
     let working_dir = app.working_directory.to_string_lossy().to_string();
@@ -92,7 +116,7 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         working_dir
     };
 
-    let header_line1 = Line::from(vec![
+    let mut header_spans = vec![
         Span::styled(" 📝 Session: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             session_name,
@@ -102,7 +126,15 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
         Span::styled("🤖 Model: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(model, Style::default().fg(Color::Green)),
+    ];
+    if let Some(provider) = provider {
+        header_spans.push(Span::styled(
+            format!("{} ", provider_icon(provider)),
+            Style::default().fg(Color::Green),
+        ));
+    }
+    header_spans.push(Span::styled(model, Style::default().fg(Color::Green)));
+    header_spans.extend([
         Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
         Span::styled("💬 Tokens: ", Style::default().fg(Color::DarkGray)),
         Span::styled(tokens.to_string(), Style::default().fg(Color::Yellow)),
@@ -110,6 +142,18 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("💰 Cost: $", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{:.4}", cost), Style::default().fg(Color::Magenta)),
     ]);
+    if let Some(tps) = tokens_per_second {
+        header_spans.extend([
+            Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("⚡ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:.0} tok/s", tps),
+                Style::default().fg(Color::Cyan),
+            ),
+        ]);
+    }
+
+    let header_line1 = Line::from(header_spans);
 
     let header_line2 = Line::from(vec![
         Span::styled(
@@ -254,6 +298,41 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
         // Parse and render message content as markdown
         let mut content_lines = parse_markdown(&msg.content);
         lines.append(&mut content_lines);
+
+        // Runtime performance metrics footer (currently Ollama only) - shown
+        // only when the provider actually reported them.
+        if let Some(ref perf) = msg.perf_metrics {
+            let mut spans = vec![Span::styled("  ⏱ ", Style::default().fg(Color::DarkGray))];
+            if let Some(eval_ms) = perf.eval_duration_ms {
+                spans.push(Span::styled(
+                    format!("{}ms generation", eval_ms),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            if let Some(tps) = msg.tokens_per_second {
+                spans.push(Span::styled(
+                    format!(" · {:.0} tok/s", tps),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            match perf.model_was_loaded {
+                Some(false) => {
+                    let load_ms = perf.load_duration_ms.unwrap_or(0);
+                    spans.push(Span::styled(
+                        format!(" · 🧊 cold start (model loaded in {}ms)", load_ms),
+                        Style::default().fg(Color::DarkGray),
+                    ));
+                }
+                Some(true) => {
+                    spans.push(Span::styled(
+                        " · 🔥 warm",
+                        Style::default().fg(Color::DarkGray),
+                    ));
+                }
+                None => {}
+            }
+            lines.push(Line::from(spans));
+        }
 
         // Add spacing between messages
         lines.push(Line::from(""));
@@ -1377,6 +1456,176 @@ fn render_file_picker(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(widget, area);
 }
 
+/// Render the Model Download dialog (Ctrl+D): either the model
+/// name input + suggestions list, or a live progress bar while a pull is
+/// in flight.
+fn render_model_download(f: &mut Frame, app: &App, area: Rect) {
+    if app.model_download_running {
+        render_model_download_progress(f, app, area);
+        return;
+    }
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(vec![Span::styled(
+        "🦙 Download an Ollama model",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("  > ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            if app.model_download_input.is_empty() {
+                "type a model name, e.g. qwen2.5-coder:7b"
+            } else {
+                app.model_download_input.as_str()
+            },
+            if app.model_download_input.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    if app.model_download_suggestions.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  No matches - press Enter to pull this name anyway.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, name) in app.model_download_suggestions.iter().enumerate() {
+            let is_selected = idx == app.model_download_selected;
+            let is_installed = app.model_download_installed.iter().any(|m| m == name);
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let prefix = if is_selected { "▶ " } else { "  " };
+            let status = if is_installed { " (installed)" } else { "" };
+            lines.push(Line::from(vec![
+                Span::styled(prefix, style),
+                Span::styled(format!("{}{}", name, status), style),
+            ]));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "[↑↓]",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Navigate  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Tab]",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Use suggestion  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Enter]",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Pull  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Esc]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Cancel", Style::default().fg(Color::White)),
+    ]));
+    lines.push(Line::from(Span::styled(
+        "Note: Ollama has no online search API - type any repo:tag you know, or pick a suggestion.",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Download Model ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the live progress view of an in-flight model pull.
+fn render_model_download_progress(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(vec![Span::styled(
+        format!("🦙 Downloading '{}'", app.model_download_input),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(""));
+
+    let status = app.model_download_status.as_deref().unwrap_or("working…");
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", status),
+        Style::default().fg(Color::White),
+    )]));
+
+    if let Some(fraction) = app.model_download_fraction {
+        const BAR_WIDTH: usize = 30;
+        let filled = ((fraction * BAR_WIDTH as f64).round() as usize).min(BAR_WIDTH);
+        let bar = format!(
+            "[{}{}] {:>3.0}%",
+            "█".repeat(filled),
+            "░".repeat(BAR_WIDTH - filled),
+            fraction * 100.0
+        );
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}", bar),
+            Style::default().fg(Color::Green),
+        )]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  (Esc cancels the download)",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(Span::styled(
+                    " Downloading… ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
 /// Render the status bar
 fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let mode_text = match app.mode {
@@ -1388,6 +1637,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::Settings => "SETTINGS",
         AppMode::ToolApproval => "PERMISSION",
         AppMode::FilePicker => "FILE PICKER",
+        AppMode::ModelDownload => "MODEL DOWNLOAD",
     };
 
     let status = if let Some(ref error) = app.error_message {
@@ -1396,7 +1646,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         format!(" [{}] Processing...", mode_text)
     } else {
         format!(
-            " [{}] Ready │ Ctrl+H: Help │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            " [{}] Ready │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
             mode_text
         )
     };
@@ -1413,4 +1663,148 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         Paragraph::new(status).style(Style::default().fg(Color::Black).bg(status_color));
 
     f.render_widget(status_bar, area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use crate::llm::agent::AgentService;
+    use crate::llm::provider::{
+        LLMRequest, LLMResponse, Provider, ProviderStream, Result as ProviderResult,
+    };
+    use crate::services::ServiceContext;
+    use crate::tui::app::DisplayMessage;
+    use async_trait::async_trait;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use std::sync::Arc;
+
+    /// Minimal `Provider` stub - these tests only exercise rendering, never
+    /// an actual `complete()`/`stream()` call.
+    struct DummyProvider;
+
+    #[async_trait]
+    impl Provider for DummyProvider {
+        async fn complete(&self, _request: LLMRequest) -> ProviderResult<LLMResponse> {
+            unimplemented!("rendering tests never call complete()")
+        }
+        async fn stream(&self, _request: LLMRequest) -> ProviderResult<ProviderStream> {
+            unimplemented!("rendering tests never call stream()")
+        }
+        fn name(&self) -> &str {
+            "dummy"
+        }
+        fn default_model(&self) -> &str {
+            "dummy-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["dummy-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(4096)
+        }
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    async fn test_app() -> App {
+        let db = Database::connect_in_memory().await.expect("in-memory db");
+        db.run_migrations().await.expect("run migrations");
+        let context = ServiceContext::new(db.pool().clone());
+        let agent_service = Arc::new(AgentService::new(Arc::new(DummyProvider), context.clone()));
+        App::new(agent_service, context)
+    }
+
+    /// Render `app` into a small offscreen buffer and return its text
+    /// content as a single string, for substring assertions.
+    fn render_to_string(app: &App, width: u16, height: u16) -> String {
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).expect("create terminal");
+        terminal.draw(|f| render(f, app)).expect("draw frame");
+
+        let buffer = terminal.backend().buffer();
+        let mut out = String::new();
+        for y in 0..buffer.area.height {
+            for x in 0..buffer.area.width {
+                out.push_str(buffer.get(x, y).symbol());
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    #[tokio::test]
+    async fn header_shows_ollama_provider_badge_and_tokens_per_second() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.current_session = Some(crate::db::models::Session {
+            id: uuid::Uuid::new_v4(),
+            title: Some("Test session".to_string()),
+            model: Some("qwen2.5-coder:7b".to_string()),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            archived_at: None,
+            token_count: 0,
+            total_cost: 0.0,
+            provider: Some("ollama".to_string()),
+        });
+        app.messages.push(DisplayMessage {
+            id: uuid::Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "hi".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: Some(30),
+            cost: Some(0.0),
+            provider_name: Some("ollama".to_string()),
+            perf_metrics: None,
+            tokens_per_second: Some(42.0),
+        });
+
+        // Wide terminal: the header is a single un-wrapped line, so it must
+        // be wide enough to fit session/model/tokens/cost/tok-per-sec.
+        let screen = render_to_string(&app, 160, 20);
+        assert!(screen.contains("qwen2.5-coder:7b"));
+        assert!(screen.contains("🦙"));
+        assert!(screen.contains("42 tok/s"));
+    }
+
+    #[tokio::test]
+    async fn header_omits_tokens_per_second_when_unavailable() {
+        // Non-Ollama providers (or providers without perf metrics) must not
+        // show a fabricated "0 tok/s".
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        let screen = render_to_string(&app, 100, 20);
+        assert!(!screen.contains("tok/s"));
+    }
+
+    #[tokio::test]
+    async fn model_download_dialog_shows_prompt_and_suggestions() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_suggestions = vec!["qwen2.5-coder:7b".to_string()];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Download an Ollama model"));
+        assert!(screen.contains("qwen2.5-coder:7b"));
+    }
+
+    #[tokio::test]
+    async fn model_download_progress_shows_status_and_bar() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_input = "qwen2.5-coder:7b".to_string();
+        app.model_download_running = true;
+        app.model_download_status = Some("pulling abc123".to_string());
+        app.model_download_fraction = Some(0.5);
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Downloading 'qwen2.5-coder:7b'"));
+        assert!(screen.contains("pulling abc123"));
+        assert!(screen.contains("50%"));
+    }
 }

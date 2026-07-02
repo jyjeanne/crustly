@@ -25,10 +25,26 @@ pub struct DisplayMessage {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub token_count: Option<i32>,
     pub cost: Option<f64>,
+    /// Name of the provider that generated this message (e.g. "ollama"),
+    /// if known.
+    pub provider_name: Option<String>,
+    /// Runtime performance metrics (load/prefill/generation durations),
+    /// if the provider exposes them.
+    pub perf_metrics: Option<crate::llm::provider::PerfMetrics>,
+    /// Generation throughput in tokens/second, precomputed when the message
+    /// is created (needs the exact output-token count, which isn't
+    /// recoverable from the combined `token_count` stored in the DB - so
+    /// this is `None` again after a session reload).
+    pub tokens_per_second: Option<f64>,
 }
 
 impl From<Message> for DisplayMessage {
     fn from(msg: Message) -> Self {
+        let perf_metrics = msg
+            .perf_metrics_json
+            .as_deref()
+            .and_then(|json| serde_json::from_str(json).ok());
+
         Self {
             id: msg.id,
             role: msg.role,
@@ -38,6 +54,9 @@ impl From<Message> for DisplayMessage {
             timestamp: msg.created_at,
             token_count: msg.token_count,
             cost: msg.cost,
+            provider_name: msg.provider_name,
+            perf_metrics,
+            tokens_per_second: None,
         }
     }
 }
@@ -83,6 +102,17 @@ pub struct App {
     pub file_picker_scroll_offset: usize,
     pub file_picker_current_dir: std::path::PathBuf,
 
+    // Model download dialog state (Ctrl+D, native Ollama provider)
+    pub model_download_input: String,
+    pub model_download_suggestions: Vec<String>,
+    pub model_download_selected: usize,
+    pub model_download_installed: Vec<String>,
+    pub model_download_running: bool,
+    pub model_download_status: Option<String>,
+    pub model_download_fraction: Option<f64>,
+    model_download_task: Option<tokio::task::JoinHandle<()>>,
+    ollama_host: String,
+
     // Working directory
     pub working_directory: std::path::PathBuf,
 
@@ -126,6 +156,15 @@ impl App {
             file_picker_selected: 0,
             file_picker_scroll_offset: 0,
             file_picker_current_dir: std::env::current_dir().unwrap_or_default(),
+            model_download_input: String::new(),
+            model_download_suggestions: Vec::new(),
+            model_download_selected: 0,
+            model_download_installed: Vec::new(),
+            model_download_running: false,
+            model_download_status: None,
+            model_download_fraction: None,
+            model_download_task: None,
+            ollama_host: "http://localhost:11434".to_string(),
             working_directory: std::env::current_dir().unwrap_or_default(),
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
@@ -180,6 +219,12 @@ impl App {
     /// Set agent service (used to inject configured agent after app creation)
     pub fn set_agent_service(&mut self, agent_service: Arc<AgentService>) {
         self.agent_service = agent_service;
+    }
+
+    /// Set the Ollama host used by the Model Download dialog (Ctrl+D).
+    /// Defaults to `http://localhost:11434` if never called.
+    pub fn set_ollama_host(&mut self, host: String) {
+        self.ollama_host = host;
     }
 
     /// Receive next event
@@ -269,6 +314,49 @@ impl App {
             TuiEvent::Resize(_, _) | TuiEvent::AgentProcessing => {
                 // These are handled by the render loop
             }
+            TuiEvent::OllamaModelsListed(models) => {
+                self.model_download_installed = models;
+                self.refresh_model_download_suggestions();
+            }
+            TuiEvent::OllamaPullProgress(progress) => {
+                self.model_download_fraction = progress.fraction();
+                self.model_download_status = Some(progress.status);
+            }
+            TuiEvent::OllamaPullFinished { model, error } => {
+                self.model_download_running = false;
+                self.model_download_task = None;
+                self.model_download_status = None;
+                self.model_download_fraction = None;
+
+                let content = match error {
+                    None => format!("✅ Pulled '{}' successfully.", model),
+                    Some(e) => format!("❌ Failed to pull '{}': {}", model, e),
+                };
+                let notification = DisplayMessage {
+                    id: Uuid::new_v4(),
+                    role: "system".to_string(),
+                    content,
+                    thinking_text: None,
+                    thinking_expanded: false,
+                    timestamp: chrono::Utc::now(),
+                    token_count: None,
+                    cost: None,
+                    provider_name: None,
+                    perf_metrics: None,
+                    tokens_per_second: None,
+                };
+                self.messages.push(notification);
+                self.switch_mode(AppMode::Chat).await?;
+
+                // Refresh the installed-models list in the background so the
+                // newly-pulled model shows up next time the dialog opens.
+                let host = self.ollama_host.clone();
+                let sender = self.event_sender();
+                tokio::spawn(async move {
+                    let models = super::ollama_download::fetch_installed_models(host).await;
+                    let _ = sender.send(TuiEvent::OllamaModelsListed(models));
+                });
+            }
         }
         Ok(())
     }
@@ -333,6 +421,11 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_model_download(&event) && self.mode == AppMode::Chat {
+            self.open_model_download().await?;
+            return Ok(());
+        }
+
         // Mode-specific handling
         tracing::trace!("Current mode: {:?}", self.mode);
         match self.mode {
@@ -351,6 +444,7 @@ impl App {
             AppMode::Sessions => self.handle_sessions_key(event).await?,
             AppMode::ToolApproval => self.handle_approval_key(event).await?,
             AppMode::FilePicker => self.handle_file_picker_key(event).await?,
+            AppMode::ModelDownload => self.handle_model_download_key(event).await?,
             AppMode::Help | AppMode::Settings => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
@@ -632,6 +726,9 @@ impl App {
                 timestamp: chrono::Utc::now(),
                 token_count: None,
                 cost: None,
+                provider_name: None,
+                perf_metrics: None,
+                tokens_per_second: None,
             };
             self.messages.push(user_msg);
 
@@ -723,16 +820,30 @@ impl App {
                 response.usage.input_tokens as i32 + response.usage.output_tokens as i32,
             ),
             cost: Some(response.cost),
+            provider_name: Some(response.provider_name.clone()),
+            tokens_per_second: response
+                .perf_metrics
+                .as_ref()
+                .and_then(|pm| pm.tokens_per_second(response.usage.output_tokens)),
+            perf_metrics: response.perf_metrics.clone(),
         };
         self.messages.push(assistant_msg);
 
-        // Update session model if not already set
+        // Update session model/provider if not already set
         if let Some(session) = &mut self.current_session {
+            let mut needs_save = false;
             if session.model.is_none() {
                 session.model = Some(response.model.clone());
+                needs_save = true;
+            }
+            if session.provider.is_none() {
+                session.provider = Some(response.provider_name.clone());
+                needs_save = true;
+            }
+            if needs_save {
                 // Save the updated session to database
                 if let Err(e) = self.session_service.update_session(session).await {
-                    tracing::warn!("Failed to update session model: {}", e);
+                    tracing::warn!("Failed to update session model/provider: {}", e);
                 }
             }
         }
@@ -756,6 +867,9 @@ impl App {
                     timestamp: chrono::Utc::now(),
                     token_count: None,
                     cost: None,
+                    provider_name: None,
+                    perf_metrics: None,
+                    tokens_per_second: None,
                 };
                 self.messages.push(error_msg);
             } else {
@@ -940,6 +1054,9 @@ impl App {
                             timestamp: chrono::Utc::now(),
                             token_count: None,
                             cost: None,
+                            provider_name: None,
+                            perf_metrics: None,
+                            tokens_per_second: None,
                         };
 
                         self.messages.push(notification);
@@ -1010,6 +1127,9 @@ impl App {
                                     timestamp: chrono::Utc::now(),
                                     token_count: None,
                                     cost: None,
+                                    provider_name: None,
+                                    perf_metrics: None,
+                                    tokens_per_second: None,
                                 };
 
                                 self.messages.push(notification);
@@ -1249,6 +1369,9 @@ impl App {
                 timestamp: chrono::Utc::now(),
                 token_count: None,
                 cost: None,
+                provider_name: None,
+                perf_metrics: None,
+                tokens_per_second: None,
             };
             self.messages.push(completion_msg);
         } else if let Some(message) = task_message {
@@ -1430,6 +1553,113 @@ impl App {
 
         Ok(())
     }
+
+    /// Open the Model Download dialog (Ctrl+D). Shows curated suggestions
+    /// immediately; the locally-installed list refreshes in the background
+    /// (network call to Ollama) and merges in once it arrives.
+    async fn open_model_download(&mut self) -> Result<()> {
+        self.model_download_input.clear();
+        self.model_download_selected = 0;
+        self.model_download_running = false;
+        self.model_download_status = None;
+        self.model_download_fraction = None;
+        self.refresh_model_download_suggestions();
+
+        let host = self.ollama_host.clone();
+        let sender = self.event_sender();
+        tokio::spawn(async move {
+            let models = super::ollama_download::fetch_installed_models(host).await;
+            let _ = sender.send(TuiEvent::OllamaModelsListed(models));
+        });
+
+        self.switch_mode(AppMode::ModelDownload).await
+    }
+
+    /// Recompute `model_download_suggestions` from the current input text.
+    fn refresh_model_download_suggestions(&mut self) {
+        self.model_download_suggestions = super::ollama_download::filter_suggestions(
+            &self.model_download_input,
+            &self.model_download_installed,
+        );
+        self.model_download_selected = 0;
+    }
+
+    /// Start pulling `model` in the background. No-op if a pull is already
+    /// running (only one at a time from this dialog).
+    async fn start_model_pull(&mut self, model: String) {
+        if self.model_download_running || model.trim().is_empty() {
+            return;
+        }
+
+        self.model_download_running = true;
+        self.model_download_status = Some("starting…".to_string());
+        self.model_download_fraction = None;
+
+        let host = self.ollama_host.clone();
+        let sender = self.event_sender();
+        let handle = super::ollama_download::spawn_pull(host, model, sender).await;
+        self.model_download_task = Some(handle);
+    }
+
+    /// Handle keys in the Model Download dialog.
+    async fn handle_model_download_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+        use crossterm::event::KeyCode;
+
+        if keys::is_cancel(&event) {
+            // Cancel an in-flight pull (if any) and close the dialog.
+            if let Some(handle) = self.model_download_task.take() {
+                handle.abort();
+            }
+            self.model_download_running = false;
+            self.model_download_status = None;
+            self.model_download_fraction = None;
+            self.switch_mode(AppMode::Chat).await?;
+            return Ok(());
+        }
+
+        // While a pull is running, only Esc (handled above) does anything.
+        if self.model_download_running {
+            return Ok(());
+        }
+
+        if keys::is_up(&event) {
+            self.model_download_selected = self.model_download_selected.saturating_sub(1);
+        } else if keys::is_down(&event) {
+            if !self.model_download_suggestions.is_empty() {
+                self.model_download_selected = (self.model_download_selected + 1)
+                    .min(self.model_download_suggestions.len() - 1);
+            }
+        } else if event.code == KeyCode::Tab {
+            // Copy the highlighted suggestion into the input for editing/confirmation.
+            if let Some(suggestion) = self
+                .model_download_suggestions
+                .get(self.model_download_selected)
+            {
+                self.model_download_input = suggestion.clone();
+                self.refresh_model_download_suggestions();
+            }
+        } else if keys::is_enter(&event) {
+            let model = self.model_download_input.trim().to_string();
+            if !model.is_empty() {
+                self.start_model_pull(model).await;
+            }
+        } else {
+            match event.code {
+                KeyCode::Char(c) => {
+                    self.model_download_input.push(c);
+                    self.refresh_model_download_suggestions();
+                }
+                KeyCode::Backspace => {
+                    self.model_download_input.pop();
+                    self.refresh_model_download_suggestions();
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1447,10 +1677,224 @@ mod tests {
             created_at: chrono::Utc::now(),
             token_count: Some(10),
             cost: Some(0.001),
+            provider_name: None,
+            perf_metrics_json: None,
         };
 
         let display_msg: DisplayMessage = msg.into();
         assert_eq!(display_msg.role, "user");
         assert_eq!(display_msg.content, "Hello");
+    }
+
+    use crate::db::Database;
+    use crate::llm::provider::{
+        LLMRequest, LLMResponse, Provider, ProviderStream, Result as ProviderResult,
+    };
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    /// Minimal `Provider` stub - these tests only exercise the Model
+    /// Download dialog's state machine, never an actual chat request.
+    struct DummyProvider;
+
+    #[async_trait::async_trait]
+    impl Provider for DummyProvider {
+        async fn complete(&self, _request: LLMRequest) -> ProviderResult<LLMResponse> {
+            unimplemented!("dialog tests never call complete()")
+        }
+        async fn stream(&self, _request: LLMRequest) -> ProviderResult<ProviderStream> {
+            unimplemented!("dialog tests never call stream()")
+        }
+        fn name(&self) -> &str {
+            "dummy"
+        }
+        fn default_model(&self) -> &str {
+            "dummy-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["dummy-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(4096)
+        }
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    async fn test_app() -> App {
+        let db = Database::connect_in_memory().await.expect("in-memory db");
+        db.run_migrations().await.expect("run migrations");
+        let context = ServiceContext::new(db.pool().clone());
+        let agent_service = Arc::new(AgentService::new(Arc::new(DummyProvider), context.clone()));
+        App::new(agent_service, context)
+    }
+
+    fn key(code: KeyCode) -> crossterm::event::KeyEvent {
+        crossterm::event::KeyEvent::new(code, KeyModifiers::empty())
+    }
+
+    #[tokio::test]
+    async fn open_model_download_switches_mode_and_seeds_suggestions() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+
+        assert_eq!(app.mode, AppMode::ModelDownload);
+        assert!(app.model_download_input.is_empty());
+        assert!(
+            !app.model_download_suggestions.is_empty(),
+            "curated models should seed the suggestion list immediately"
+        );
+    }
+
+    #[tokio::test]
+    async fn model_download_typing_filters_suggestions() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+
+        app.handle_model_download_key(key(KeyCode::Char('l')))
+            .await
+            .unwrap();
+        app.handle_model_download_key(key(KeyCode::Char('l')))
+            .await
+            .unwrap();
+
+        assert_eq!(app.model_download_input, "ll");
+        assert!(app
+            .model_download_suggestions
+            .iter()
+            .all(|s| s.to_lowercase().contains("ll")));
+    }
+
+    #[tokio::test]
+    async fn model_download_backspace_removes_last_char() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        app.handle_model_download_key(key(KeyCode::Char('a')))
+            .await
+            .unwrap();
+        app.handle_model_download_key(key(KeyCode::Backspace))
+            .await
+            .unwrap();
+        assert!(app.model_download_input.is_empty());
+    }
+
+    #[tokio::test]
+    async fn model_download_tab_adopts_highlighted_suggestion() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        let first_suggestion = app.model_download_suggestions[0].clone();
+
+        app.handle_model_download_key(key(KeyCode::Tab))
+            .await
+            .unwrap();
+
+        assert_eq!(app.model_download_input, first_suggestion);
+    }
+
+    #[tokio::test]
+    async fn model_download_esc_closes_dialog_without_running_pull() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+
+        app.handle_model_download_key(key(KeyCode::Esc))
+            .await
+            .unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
+        assert!(!app.model_download_running);
+    }
+
+    #[tokio::test]
+    async fn model_download_enter_starts_pull_then_esc_aborts_it() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        app.model_download_input = "qwen2.5-coder:7b".to_string();
+
+        app.handle_model_download_key(key(KeyCode::Enter))
+            .await
+            .unwrap();
+        assert!(app.model_download_running);
+
+        // Esc while a pull is running must abort it and return to chat,
+        // rather than just closing the dialog.
+        app.handle_model_download_key(key(KeyCode::Esc))
+            .await
+            .unwrap();
+        assert!(!app.model_download_running);
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_models_listed_updates_installed_list() {
+        let mut app = test_app().await;
+        app.handle_event(TuiEvent::OllamaModelsListed(vec![
+            "custom-model:1b".to_string()
+        ]))
+        .await
+        .unwrap();
+
+        assert_eq!(
+            app.model_download_installed,
+            vec!["custom-model:1b".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_pull_progress_updates_status_and_fraction() {
+        let mut app = test_app().await;
+        app.handle_event(TuiEvent::OllamaPullProgress(
+            super::super::ollama_download::ModelPullProgress {
+                status: "pulling abc123".to_string(),
+                total: Some(100),
+                completed: Some(50),
+            },
+        ))
+        .await
+        .unwrap();
+
+        assert_eq!(
+            app.model_download_status,
+            Some("pulling abc123".to_string())
+        );
+        assert_eq!(app.model_download_fraction, Some(0.5));
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_pull_finished_success_posts_chat_message() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_running = true;
+
+        app.handle_event(TuiEvent::OllamaPullFinished {
+            model: "qwen2.5-coder:7b".to_string(),
+            error: None,
+        })
+        .await
+        .unwrap();
+
+        assert!(!app.model_download_running);
+        assert_eq!(app.mode, AppMode::Chat);
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Pulled 'qwen2.5-coder:7b'")));
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_pull_finished_failure_posts_error_message() {
+        let mut app = test_app().await;
+
+        app.handle_event(TuiEvent::OllamaPullFinished {
+            model: "bogus-model".to_string(),
+            error: Some("model not found".to_string()),
+        })
+        .await
+        .unwrap();
+
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Failed to pull 'bogus-model'")
+                && m.content.contains("model not found")));
     }
 }

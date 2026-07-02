@@ -106,6 +106,7 @@ impl AnthropicProvider {
                 output_tokens: response.usage.output_tokens,
             },
             cache_metrics,
+            perf_metrics: None,
         }
     }
 

@@ -3,6 +3,7 @@
 //! Provides a unified interface for interacting with different LLM providers.
 
 pub mod error;
+pub mod model_hints;
 pub mod retry;
 pub mod router;
 #[allow(clippy::module_inception)]
@@ -18,11 +19,17 @@ pub use types::*;
 pub mod anthropic;
 pub mod azure;
 pub mod factory;
+#[cfg(feature = "ollama")]
+pub mod ollama;
+#[cfg(feature = "ollama")]
+pub mod ollama_models;
 pub mod openai;
 pub mod qwen;
 
 pub use anthropic::AnthropicProvider;
 pub use azure::AzureOpenAIProvider;
 pub use factory::create_provider;
+#[cfg(feature = "ollama")]
+pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;
 pub use qwen::{QwenProvider, ThinkingConfig, ToolCallParser};
