@@ -11,6 +11,20 @@ can land incrementally instead of one large change per phase. Check items
 off as they land; leave a one-line note (commit hash) next to completed
 items.
 
+**Post-implementation review**: after landing Phase 1, 4a, and 3.1, a
+high-effort code review (7 parallel finder angles + direct verification)
+found and fixed 10 issues, most notably a real regression where
+`Ctrl+Shift+Enter` silently inserted a newline instead of submitting (fixed
+by excluding `CONTROL` from `is_newline`), and a terminal-state leak where a
+failure during startup (after the Kitty protocol flags were pushed) would
+skip cleanup entirely, leaving the user's terminal stuck in raw/alternate-
+screen mode. Also fixed: a duplicated linear scan over `app.messages` per
+render, several formatting inconsistencies in the new Model Info panel
+(duration/tokens-per-second precision, close-hint styling) versus existing
+UI conventions, a misaligned help-screen row, and a synchronous/unbounded
+terminal query on the startup path (now timeout-bounded via
+`spawn_blocking`). See commit history for details.
+
 - [x] **Phase 1 — Send / Newline Keybinding Swap**
   - [x] 1.1 Kitty keyboard protocol detection at startup (`runner.rs`), with
         graceful push/pop and no-op on unsupported terminals.

@@ -274,20 +274,23 @@ pub mod keys {
         key_matches(event, KeyCode::Char('o'), KeyModifiers::CONTROL)
     }
 
-    /// Enter - Submit (plain Enter sends; Ctrl+Enter is kept as a legacy
-    /// alias for muscle memory). Shift+Enter and Alt+Enter are newlines,
-    /// not submit - see `is_newline`.
+    /// Enter - Submit (plain Enter sends; Ctrl+Enter, with or without extra
+    /// modifiers, is kept as a legacy alias for muscle memory). Shift+Enter
+    /// and Alt+Enter are newlines, not submit - see `is_newline`.
     pub fn is_submit(event: &KeyEvent) -> bool {
         event.code == KeyCode::Enter
-            && (event.modifiers.is_empty() || event.modifiers == KeyModifiers::CONTROL)
+            && (event.modifiers.is_empty() || event.modifiers.contains(KeyModifiers::CONTROL))
     }
 
     /// Shift+Enter or Alt+Enter - insert a newline in the message input.
-    /// Shift+Enter only disambiguates from plain Enter on terminals with
-    /// the Kitty keyboard protocol enabled; Alt+Enter works everywhere as
-    /// the reliable fallback (see `App::kitty_keyboard_protocol_active`).
+    /// Excludes chords that also hold Ctrl (e.g. Ctrl+Shift+Enter), which
+    /// `is_submit` claims instead, so the two never disagree. Shift+Enter
+    /// only disambiguates from plain Enter on terminals with the Kitty
+    /// keyboard protocol enabled; Alt+Enter works everywhere as the
+    /// reliable fallback (see `App::kitty_keyboard_protocol_active`).
     pub fn is_newline(event: &KeyEvent) -> bool {
         event.code == KeyCode::Enter
+            && !event.modifiers.contains(KeyModifiers::CONTROL)
             && (event.modifiers.contains(KeyModifiers::SHIFT)
                 || event.modifiers.contains(KeyModifiers::ALT))
     }
@@ -397,6 +400,15 @@ mod tests {
         let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT);
         assert!(!keys::is_submit(&event));
 
+        // Ctrl+Shift+Enter and Ctrl+Alt+Enter still submit (Ctrl wins over
+        // an incidental extra Shift/Alt bit) rather than silently becoming
+        // a newline.
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::SHIFT);
+        assert!(keys::is_submit(&event));
+
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::ALT);
+        assert!(keys::is_submit(&event));
+
         // Not an Enter key at all.
         let event = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty());
         assert!(!keys::is_submit(&event));
@@ -425,6 +437,15 @@ mod tests {
         assert!(!keys::is_newline(&event));
 
         let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL);
+        assert!(!keys::is_newline(&event));
+
+        // Ctrl+Shift+Enter and Ctrl+Alt+Enter are submit (via is_submit),
+        // not newline - Ctrl must win over an incidental extra Shift/Alt
+        // bit so the two predicates never both match the same event.
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::SHIFT);
+        assert!(!keys::is_newline(&event));
+
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::ALT);
         assert!(!keys::is_newline(&event));
     }
 }

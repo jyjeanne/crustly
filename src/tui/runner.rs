@@ -33,41 +33,64 @@ pub async fn run(mut app: App) -> Result<()> {
     // Query whether the terminal supports the Kitty keyboard protocol
     // (needed to disambiguate Shift+Enter from plain Enter). Must run after
     // raw mode is enabled since it reads a synchronous response from stdin.
-    let kitty_keyboard_supported = supports_keyboard_enhancement().unwrap_or(false);
+    // Run on a blocking-pool thread with an explicit timeout: on a
+    // terminal/multiplexer that never answers the query, this must not
+    // hang startup or block the async runtime thread indefinitely.
+    let kitty_keyboard_supported = match tokio::time::timeout(
+        std::time::Duration::from_millis(1000),
+        tokio::task::spawn_blocking(supports_keyboard_enhancement),
+    )
+    .await
+    {
+        Ok(Ok(Ok(supported))) => supported,
+        _ => false,
+    };
     if kitty_keyboard_supported {
-        execute!(
+        // Fall back to no keyboard enhancement on failure rather than
+        // propagating the error - bailing out here would leave the
+        // terminal in raw/alternate-screen mode with no cleanup.
+        if let Err(e) = execute!(
             stdout,
             PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
-        )?;
+        ) {
+            tracing::warn!("Failed to enable Kitty keyboard protocol: {e}");
+        }
     }
     app.set_kitty_keyboard_protocol_active(kitty_keyboard_supported);
 
+    // Run everything else and capture the result instead of using `?`, so
+    // the terminal is always restored below regardless of whether setup
+    // (Terminal::new, app.initialize()) or the main loop itself fails.
+    let result = run_inner(stdout, &mut app).await;
+
+    // Restore terminal unconditionally.
+    if kitty_keyboard_supported {
+        let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
+    }
+    let _ = disable_raw_mode();
+    let _ = execute!(
+        io::stdout(),
+        LeaveAlternateScreen,
+        DisableBracketedPaste,
+        crossterm::cursor::Show
+    );
+
+    result
+}
+
+/// Create the terminal, initialize the app, and run the main loop. Split out
+/// from `run()` so terminal state can always be restored by the caller
+/// regardless of whether this succeeds or fails partway through.
+async fn run_inner(stdout: io::Stdout, app: &mut App) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Initialize app
     app.initialize().await?;
 
-    // Start terminal event listener
     let event_sender = app.event_sender();
     EventHandler::start_terminal_listener(event_sender);
 
-    // Run main loop
-    let result = run_loop(&mut terminal, &mut app).await;
-
-    // Restore terminal
-    if kitty_keyboard_supported {
-        let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
-    }
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableBracketedPaste
-    )?;
-    terminal.show_cursor()?;
-
-    result
+    run_loop(&mut terminal, app).await
 }
 
 /// Main event loop

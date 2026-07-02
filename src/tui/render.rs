@@ -584,6 +584,19 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::White),
             ),
         ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+O       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Show Model Info panel (provider, model, context, perf)",
+                Style::default().fg(Color::White),
+            ),
+        ]),
         Line::from(""),
         Line::from(Span::styled(
             "╭─ CHAT MODE ───────────────────────────────────────────────╮",
@@ -603,9 +616,9 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![
             Span::styled(
                 if app.kitty_keyboard_protocol_active {
-                    "  Shift+Enter "
+                    "  Shift+Enter  "
                 } else {
-                    "  Alt+Enter   "
+                    "  Alt+Enter    "
                 },
                 Style::default()
                     .fg(Color::Green)
@@ -1489,8 +1502,14 @@ fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
     lines.push(Line::from(vec![
         Span::styled("Provider: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
-            format!("{} {}", provider_icon(app.provider_name()), app.provider_name()),
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            format!(
+                "{} {}",
+                provider_icon(app.provider_name()),
+                app.provider_name()
+            ),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
         ),
     ]));
     lines.push(Line::from(vec![
@@ -1509,39 +1528,49 @@ fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "Last response performance",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
     )));
 
-    match app.last_assistant_message().and_then(|m| m.perf_metrics.as_ref()) {
+    // Look up the last assistant message once and reuse it, rather than
+    // scanning app.messages twice (once for perf_metrics, once for
+    // tokens_per_second) on every render.
+    let last_msg = app.last_assistant_message();
+    match last_msg.and_then(|m| m.perf_metrics.as_ref()) {
         Some(perf) => {
+            // Matches the `{ms}ms` (no space) convention used by the
+            // per-message performance footer in render_chat.
             let ms = |v: Option<u64>| {
-                v.map(|ms| format!("{ms} ms"))
+                v.map(|ms| format!("{ms}ms"))
                     .unwrap_or_else(|| "n/a".to_string())
             };
             let start = match perf.model_was_loaded {
-                Some(true) => " (warm start)",
-                Some(false) => " (cold start)",
+                Some(true) => " · 🔥 warm start",
+                Some(false) => " · 🧊 cold start",
                 None => "",
             };
             lines.push(Line::from(format!(
-                "  Load:      {}{}",
+                "  Load: {}{}",
                 ms(perf.load_duration_ms),
                 start
             )));
             lines.push(Line::from(format!(
-                "  Prefill:   {}",
+                "  Prefill: {}",
                 ms(perf.prompt_eval_duration_ms)
             )));
             lines.push(Line::from(format!(
-                "  Generation:{}",
+                "  Generation: {}",
                 ms(perf.eval_duration_ms)
             )));
             lines.push(Line::from(format!(
-                "  Total:     {}",
+                "  Total: {}",
                 ms(perf.total_duration_ms)
             )));
-            if let Some(tps) = app.last_assistant_message().and_then(|m| m.tokens_per_second) {
-                lines.push(Line::from(format!("  Throughput: {tps:.1} tok/s")));
+            if let Some(tps) = last_msg.and_then(|m| m.tokens_per_second) {
+                // Matches the integer-precision convention used by the
+                // header and per-message footer for tokens/sec.
+                lines.push(Line::from(format!("  Throughput: {tps:.0} tok/s")));
             }
         }
         None => {
@@ -1553,10 +1582,13 @@ fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Esc to close",
-        Style::default().fg(Color::DarkGray),
-    )));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "[Esc]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Close", Style::default().fg(Color::White)),
+    ]));
 
     let widget = Paragraph::new(lines)
         .block(
@@ -1766,7 +1798,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         format!(" [{}] Processing...", mode_text)
     } else {
         format!(
-            " [{}] Ready │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            " [{}] Ready │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+O: Model Info │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
             mode_text
         )
     };
@@ -1963,18 +1995,18 @@ mod tests {
                 total_duration_ms: Some(1065),
                 model_was_loaded: Some(true),
             }),
-            tokens_per_second: Some(42.5),
+            tokens_per_second: Some(43.0),
         });
 
         // Taller terminal than the other tests: the panel has enough lines
         // (provider/model/context + 5 perf metric rows) that a 20-row
         // frame clips the bottom of the content area.
         let screen = render_to_string(&app, 100, 30);
-        assert!(screen.contains("120 ms"));
+        assert!(screen.contains("120ms"));
         assert!(screen.contains("warm start"));
-        assert!(screen.contains("45 ms"));
-        assert!(screen.contains("900 ms"));
-        assert!(screen.contains("1065 ms"));
-        assert!(screen.contains("42.5 tok/s"));
+        assert!(screen.contains("45ms"));
+        assert!(screen.contains("900ms"));
+        assert!(screen.contains("1065ms"));
+        assert!(screen.contains("43 tok/s"));
     }
 }
