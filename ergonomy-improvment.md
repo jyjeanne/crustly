@@ -13,6 +13,8 @@ Improve day-to-day usability of the Crustly TUI:
 2. Make copy/paste into and out of the TUI reliable and ergonomic.
 3. Expose the existing native Ollama integration (`ollama-rs`) more directly
    inside the TUI (not just via config file + `Ctrl+D` download dialog).
+4. Add an opt-in "Auto Mode" that bypasses manual tool-call / plan approval
+   prompts for users who want the agent to run unattended.
 
 ## Current State (as of this plan)
 
@@ -136,6 +138,63 @@ in `ollama-rs-integration-plan.md`.
   from within a running TUI session, with the change taking effect on the
   next message.
 
+## Phase 4 — Auto Mode (bypass manual approval)
+
+Today, agent tool calls (bash, write, edit, powershell, etc.) block on a
+manual approve/deny dialog (`A`/`Y` approve, `D`/`N` deny, `V` view details
+— documented `README.md:2994`), and Plan Mode requires an explicit
+approve/reject/revise step (`Ctrl+A`/`Ctrl+R`/`Ctrl+I`,
+`src/tui/app.rs:544,563,577`). There is no existing "auto-approve" /
+unattended mode anywhere in the codebase or config
+(`src/config/mod.rs`). Goal: add an explicit, visible, opt-in mode that lets
+the agent run tool calls and plans without waiting for manual confirmation,
+for users who trust it to act autonomously.
+
+### Design
+
+- **Toggle**: a new keybinding to flip Auto Mode on/off mid-session
+  (candidate: `Ctrl+U`, currently unbound), plus a config option
+  (`auto_mode` / `permission_mode` in `config.toml`) and a CLI flag for
+  non-interactive/scripted runs (candidate: `--auto`; naming TBD, cf.
+  "Open Decisions").
+- **Not all-or-nothing**: reuse/extend the tool registry
+  (`src/llm/tools/registry.rs`, `src/llm/tools/trait.rs`) to classify tools
+  by risk (read-only: `read`, `grep`, `glob`, `ls`, `web_fetch` vs.
+  mutating/destructive: `bash`, `powershell`, `write`, `edit`, `sandbox`).
+  Auto Mode bypasses approval for allow-listed tools by default; a
+  configurable deny-list keeps the highest-risk tools gated even when Auto
+  Mode is on.
+- **Plan Mode**: when Auto Mode is active, a submitted plan is
+  auto-approved and executed immediately instead of waiting on `Ctrl+A`.
+- **Enforcement point**: the approval wait currently sits in the agent
+  execution loop (`src/llm/agent/service.rs`) between "LLM requests tool
+  call" and "tool executes" — Auto Mode short-circuits that wait for
+  allow-listed tools rather than removing the approval mechanism itself, so
+  manual mode keeps working unchanged.
+- **Safety guardrails** (non-negotiable, since this removes a safety net):
+  - Off by default; must be explicitly enabled.
+  - Persistent, unmissable UI indicator while active (e.g. a `⚡ AUTO`
+    badge in the status bar) — the user must always know the agent can act
+    unattended.
+  - All auto-approved actions remain fully logged/audited exactly as
+    manually-approved ones are today — only the interactive block is
+    skipped, not the record.
+  - `Esc` / `Ctrl+C` still interrupt in-flight execution immediately.
+  - One keypress disables Auto Mode instantly.
+
+### Acceptance criteria
+
+- Enabling Auto Mode suppresses the tool-approval dialog and the Plan Mode
+  approval step for allow-listed tools/actions.
+- A high-risk tool on the deny-list still prompts for manual approval even
+  with Auto Mode on.
+- The status bar/help screen shows Auto Mode is active at all times while
+  enabled, with no way to miss it.
+- Disabling Auto Mode mid-session immediately restores manual prompts for
+  the next tool call.
+- Every auto-approved action still appears in logs/history identically to a
+  manually-approved one.
+
 ## Suggested Execution Order
 
 1. Phase 1 (keybinding swap) — small, self-contained, immediately visible.
@@ -144,6 +203,10 @@ in `ollama-rs-integration-plan.md`.
 3. Phase 2 (tui-textarea migration + clipboard) — largest change, touches
    input handling broadly; sequenced last so it only needs to account for
    the final Phase 1 keybinding scheme once.
+4. Phase 4 (Auto Mode) — sequenced last: it should build on the finalized
+   keybinding scheme (Phase 1) and ideally the Model Info/status-bar work
+   (Phase 3) so the "Auto Mode active" indicator has an established place to
+   live in the UI.
 
 ## Open Decisions
 
@@ -153,3 +216,10 @@ in `ollama-rs-integration-plan.md`.
       (`Ctrl+Y` proposed for copy).
 - [ ] Exact keybinding for Model Info panel (`Ctrl+M` proposed).
 - [ ] Whether `Ctrl+Enter` is kept as a legacy send alias after the swap.
+- [ ] Exact toggle keybinding for Auto Mode (`Ctrl+U` proposed).
+- [ ] Default deny-list of tools that always require approval even in Auto
+      Mode (`bash`/`powershell`/destructive `write`/`edit` ops proposed).
+- [ ] CLI flag name for Auto Mode (`--auto` vs `--yolo` vs
+      `--dangerously-skip-permissions`).
+- [ ] Whether Auto Mode persists across sessions via config or defaults to
+      session-only (must be re-enabled each launch).
