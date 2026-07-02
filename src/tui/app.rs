@@ -91,6 +91,9 @@ pub struct App {
     /// takes effect on the very next tool call - off by default
     /// (`Interactive`) unless overridden by `[plan_mode].mode` in config.
     pub auto_mode: Arc<Mutex<PlanExecMode>>,
+    /// Configured MCP servers' connection status, snapshotted once at
+    /// startup by `cli::cmd_chat` (see `crate::mcp::McpServerStatus`).
+    pub mcp_status: Vec<crate::mcp::McpServerStatus>,
 
     // Streaming state
     pub is_processing: bool,
@@ -135,6 +138,13 @@ pub struct App {
     pub provider_switch_selected: usize,
     pub provider_switch_loading: bool,
 
+    // `/skills` slash command state
+    pub skills_list: Vec<crate::llm::tools::skill::SkillListing>,
+    pub skills_selected: usize,
+
+    // `/mcp` slash command state
+    pub mcp_selected: usize,
+
     // Working directory
     pub working_directory: std::path::PathBuf,
 
@@ -165,6 +175,7 @@ impl App {
             should_quit: false,
             kitty_keyboard_protocol_active: false,
             auto_mode: Arc::new(Mutex::new(PlanExecMode::default())),
+            mcp_status: Vec::new(),
             is_processing: false,
             streaming_response: None,
             error_message: None,
@@ -192,6 +203,9 @@ impl App {
             provider_switch_models: Vec::new(),
             provider_switch_selected: 0,
             provider_switch_loading: false,
+            skills_list: Vec::new(),
+            skills_selected: 0,
+            mcp_selected: 0,
             working_directory: std::env::current_dir().unwrap_or_default(),
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
@@ -356,6 +370,12 @@ impl App {
             PlanExecMode::AutoPlan => PlanExecMode::FullAuto,
             PlanExecMode::FullAuto => PlanExecMode::Interactive,
         };
+    }
+
+    /// Record the configured MCP servers' connection status, snapshotted
+    /// once at startup by `cli::cmd_chat`, for the `/mcp` view.
+    pub fn set_mcp_status(&mut self, status: Vec<crate::mcp::McpServerStatus>) {
+        self.mcp_status = status;
     }
 
     /// Receive next event
@@ -598,6 +618,8 @@ impl App {
             AppMode::FilePicker => self.handle_file_picker_key(event).await?,
             AppMode::ModelDownload => self.handle_model_download_key(event).await?,
             AppMode::ProviderSwitch => self.handle_provider_switch_key(event).await?,
+            AppMode::Skills => self.handle_skills_key(event).await?,
+            AppMode::Mcp => self.handle_mcp_key(event).await?,
             AppMode::Help | AppMode::Settings | AppMode::ModelInfo => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
@@ -616,7 +638,9 @@ impl App {
         if keys::is_submit(&event) && !self.input_is_blank() {
             let content = self.input_text();
             self.clear_input();
-            self.send_message(content).await?;
+            if !self.try_handle_slash_command(&content).await? {
+                self.send_message(content).await?;
+            }
         } else if keys::is_newline(&event) {
             self.textarea.insert_newline();
         } else if keys::is_cancel(&event) {
@@ -712,6 +736,83 @@ impl App {
         }
 
         Ok(())
+    }
+
+    /// Open the `/skills` list view. Scans the filesystem synchronously
+    /// (cheap - a handful of directory reads, not a network call) rather
+    /// than spawning a background task the way the Ollama-backed dialogs
+    /// do, then switches mode.
+    async fn open_skills(&mut self) -> Result<()> {
+        self.skills_list = crate::llm::tools::skill::list_skills(&self.working_directory);
+        self.skills_selected = 0;
+        self.switch_mode(AppMode::Skills).await
+    }
+
+    /// Handle keys in the `/skills` list view.
+    async fn handle_skills_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+        } else if keys::is_up(&event) {
+            self.skills_selected = self.skills_selected.saturating_sub(1);
+        } else if keys::is_down(&event) && !self.skills_list.is_empty() {
+            self.skills_selected = (self.skills_selected + 1).min(self.skills_list.len() - 1);
+        }
+
+        Ok(())
+    }
+
+    /// Open the `/mcp` list view. Shows the status snapshot taken once at
+    /// startup (`App::mcp_status`, set via `set_mcp_status`) rather than
+    /// reconnecting live - see the "Open Decisions" note in
+    /// ergonomy-improvment.md about deferring live reconnect-on-open.
+    async fn open_mcp(&mut self) -> Result<()> {
+        self.mcp_selected = 0;
+        self.switch_mode(AppMode::Mcp).await
+    }
+
+    /// Handle keys in the `/mcp` list view.
+    async fn handle_mcp_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+        } else if keys::is_up(&event) {
+            self.mcp_selected = self.mcp_selected.saturating_sub(1);
+        } else if keys::is_down(&event) && !self.mcp_status.is_empty() {
+            self.mcp_selected = (self.mcp_selected + 1).min(self.mcp_status.len() - 1);
+        }
+
+        Ok(())
+    }
+
+    /// Try to interpret `content` (the just-submitted chat input) as a
+    /// slash command. Returns `true` if it was recognized and handled (the
+    /// caller must NOT also forward it to the LLM), `false` otherwise - an
+    /// unrecognized `/word` (e.g. a file path pasted into the input) falls
+    /// through to a normal chat message, exactly as before this existed.
+    async fn try_handle_slash_command(&mut self, content: &str) -> Result<bool> {
+        let trimmed = content.trim();
+        if !trimmed.starts_with('/') {
+            return Ok(false);
+        }
+        let command = trimmed.split_whitespace().next().unwrap_or(trimmed);
+        match command {
+            "/skills" => {
+                self.open_skills().await?;
+                Ok(true)
+            }
+            "/mcp" => {
+                self.open_mcp().await?;
+                Ok(true)
+            }
+            "/help" => {
+                self.switch_mode(AppMode::Help).await?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 
     /// Handle keys in plan mode
@@ -2432,6 +2533,161 @@ mod tests {
 
         // The external handle must observe the change made through `app`.
         assert_eq!(*shared.lock().unwrap(), PlanExecMode::Interactive);
+    }
+
+    #[tokio::test]
+    async fn slash_skills_command_opens_skills_view() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.working_directory = std::env::temp_dir();
+
+        assert!(app.try_handle_slash_command("/skills").await.unwrap());
+
+        assert_eq!(app.mode, AppMode::Skills);
+    }
+
+    #[tokio::test]
+    async fn slash_mcp_command_opens_mcp_view() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.mcp_status = vec![crate::mcp::McpServerStatus {
+            name: "test-server".to_string(),
+            command: "echo".to_string(),
+            connected: true,
+            tool_count: 3,
+            error: None,
+        }];
+
+        assert!(app.try_handle_slash_command("/mcp").await.unwrap());
+
+        assert_eq!(app.mode, AppMode::Mcp);
+    }
+
+    #[tokio::test]
+    async fn slash_help_command_opens_help_view() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        assert!(app.try_handle_slash_command("/help").await.unwrap());
+
+        assert_eq!(app.mode, AppMode::Help);
+    }
+
+    #[tokio::test]
+    async fn unrecognized_slash_word_falls_through_instead_of_being_swallowed() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        // A file path, not a command - must not be recognized/consumed.
+        let handled = app
+            .try_handle_slash_command("/usr/local/bin/cargo")
+            .await
+            .unwrap();
+
+        assert!(!handled);
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn non_slash_message_is_never_treated_as_a_command() {
+        let mut app = test_app().await;
+        let handled = app
+            .try_handle_slash_command("just a normal message")
+            .await
+            .unwrap();
+        assert!(!handled);
+    }
+
+    #[tokio::test]
+    async fn typing_and_submitting_slash_skills_opens_the_dialog_end_to_end() {
+        // Exercises the real path: typing characters into the textarea and
+        // pressing Enter, not calling try_handle_slash_command directly.
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.working_directory = std::env::temp_dir();
+
+        for c in "/skills".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        app.handle_chat_key(key(KeyCode::Enter)).await.unwrap();
+
+        assert_eq!(app.mode, AppMode::Skills);
+        // Must not have left the command text sitting in the input.
+        assert!(app.textarea.is_empty());
+    }
+
+    #[tokio::test]
+    async fn skills_view_up_down_navigation_clamps_at_bounds() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Skills;
+        app.skills_list = vec![
+            crate::llm::tools::skill::SkillListing {
+                name: "a".to_string(),
+                description: None,
+                root: std::path::PathBuf::new(),
+            },
+            crate::llm::tools::skill::SkillListing {
+                name: "b".to_string(),
+                description: None,
+                root: std::path::PathBuf::new(),
+            },
+        ];
+
+        app.handle_skills_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.skills_selected, 0);
+
+        app.handle_skills_key(key(KeyCode::Down)).await.unwrap();
+        app.handle_skills_key(key(KeyCode::Down)).await.unwrap();
+        assert_eq!(app.skills_selected, 1);
+    }
+
+    #[tokio::test]
+    async fn skills_view_esc_returns_to_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Skills;
+
+        app.handle_skills_key(key(KeyCode::Esc)).await.unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn mcp_view_up_down_navigation_clamps_at_bounds() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+        app.mcp_status = vec![
+            crate::mcp::McpServerStatus {
+                name: "a".to_string(),
+                command: "cmd-a".to_string(),
+                connected: true,
+                tool_count: 1,
+                error: None,
+            },
+            crate::mcp::McpServerStatus {
+                name: "b".to_string(),
+                command: "cmd-b".to_string(),
+                connected: false,
+                tool_count: 0,
+                error: Some("failed to spawn".to_string()),
+            },
+        ];
+
+        app.handle_mcp_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.mcp_selected, 0);
+
+        app.handle_mcp_key(key(KeyCode::Down)).await.unwrap();
+        app.handle_mcp_key(key(KeyCode::Down)).await.unwrap();
+        assert_eq!(app.mcp_selected, 1);
+    }
+
+    #[tokio::test]
+    async fn mcp_view_esc_returns_to_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+
+        app.handle_mcp_key(key(KeyCode::Esc)).await.unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
     }
 
     #[tokio::test]

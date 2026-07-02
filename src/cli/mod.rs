@@ -757,6 +757,46 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(AgentTool));
     tool_registry.register(Arc::new(PowerShellTool));
 
+    // Connect to configured MCP servers (`[[mcp.servers]]`) and register
+    // their tools. Fixes a real gap: config.mcp.servers was previously
+    // parsed but never consumed anywhere, so configured servers had zero
+    // runtime effect. Failures are caught per-server (recorded in the
+    // status snapshot for the TUI's `/mcp` view) rather than aborting
+    // startup - one broken MCP server shouldn't block the whole TUI.
+    let mut mcp_status = Vec::new();
+    for server in &config.mcp.servers {
+        let args: Vec<&str> = server.args.iter().map(String::as_str).collect();
+        match tool_registry
+            .register_mcp_server(&server.name, &server.command, &args)
+            .await
+        {
+            Ok(tool_count) => {
+                tracing::info!(
+                    "Connected to MCP server '{}' ({} tools)",
+                    server.name,
+                    tool_count
+                );
+                mcp_status.push(crate::mcp::McpServerStatus {
+                    name: server.name.clone(),
+                    command: server.command.clone(),
+                    connected: true,
+                    tool_count,
+                    error: None,
+                });
+            }
+            Err(e) => {
+                tracing::warn!("Failed to connect to MCP server '{}': {}", server.name, e);
+                mcp_status.push(crate::mcp::McpServerStatus {
+                    name: server.name.clone(),
+                    command: server.command.clone(),
+                    connected: false,
+                    tool_count: 0,
+                    error: Some(e.to_string()),
+                });
+            }
+        }
+    }
+
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
 
@@ -775,6 +815,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tracing::debug!("Creating TUI app");
     let mut app = tui::App::new(agent_service, service_context.clone());
     app.set_ollama_host(ollama_host(config));
+    app.set_mcp_status(mcp_status);
 
     // Get event sender from app
     let event_sender = app.event_sender();
@@ -959,6 +1000,29 @@ async fn cmd_run(
     tool_registry.register(Arc::new(SkillTool));
     tool_registry.register(Arc::new(AgentTool));
     tool_registry.register(Arc::new(PowerShellTool));
+
+    // Connect to configured MCP servers, same as cmd_chat - see its
+    // comment for why this needs to happen at all (config.mcp.servers was
+    // previously parsed but never consumed). No status snapshot needed
+    // here since there's no TUI to display it in.
+    for server in &config.mcp.servers {
+        let args: Vec<&str> = server.args.iter().map(String::as_str).collect();
+        match tool_registry
+            .register_mcp_server(&server.name, &server.command, &args)
+            .await
+        {
+            Ok(tool_count) => {
+                tracing::info!(
+                    "Connected to MCP server '{}' ({} tools)",
+                    server.name,
+                    tool_count
+                );
+            }
+            Err(e) => {
+                tracing::warn!("Failed to connect to MCP server '{}': {}", server.name, e);
+            }
+        }
+    }
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());

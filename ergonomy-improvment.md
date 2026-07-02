@@ -1,6 +1,7 @@
 # TUI Ergonomics Improvement Plan
 
-Status: In Progress — see Implementation Tracking
+Status: All 5 phases landed — see Implementation Tracking for sub-items
+explicitly deferred as follow-up work (4b.2, 4b.3 partial, 5.5)
 Owner: TUI team
 Related: `ollama-rs-integration-plan.md` (native Ollama provider, already implemented)
 
@@ -194,12 +195,39 @@ terminal query on the startup path (now timeout-bounded via
         auto-approved tool calls currently proceed with no more visual
         feedback than a normal streamed response gets. Left as a UX
         follow-up rather than blocking the core safety mechanism on it.
-- [ ] **Phase 5 — `/skills` and `/mcp`**
-  - [ ] 5.1 Slash-command interception layer in `handle_chat_key`.
-  - [ ] 5.2 Fix MCP config-wiring gap (`register_mcp_server` never called).
-  - [ ] 5.3 `/mcp` list view with connection status + tool count.
-  - [ ] 5.4 Skill enumeration function + `/skills` list view.
-  - [ ] 5.5 Optional CLI symmetry (`crustly mcp list`, `crustly skill list`).
+- [x] **Phase 5 — `/skills` and `/mcp`**
+  - [x] 5.1 Slash-command interception layer (`App::try_handle_slash_command`,
+        called from `handle_chat_key` on submit, before falling through to
+        `send_message`). Recognizes `/skills`, `/mcp`, `/help`; any other
+        `/...` input that doesn't match a known command is sent to the LLM
+        as a normal chat message rather than silently swallowed.
+  - [x] 5.2 Fixed the MCP config-wiring gap: `cmd_chat` and `cmd_run` now
+        iterate `config.mcp.servers` and call
+        `tool_registry.register_mcp_server(...)` for each configured
+        server at startup (previously `[[mcp.servers]]` entries in config
+        were parsed but never connected — MCP tools were unreachable no
+        matter what was configured). `cmd_chat` also builds an
+        `McpServerStatus` snapshot (name/command/connected/tool_count/error)
+        consumed by the `/mcp` view; `cmd_run` just logs since there's no
+        TUI to show it in.
+  - [x] 5.3 `/mcp` list view (`AppMode::Mcp`, `render_mcp`): shows the
+        startup-time connection snapshot per server — connected/error
+        state and tool count. Deliberately **not** a live reconnect on
+        open (see Open Decisions) — matches the "snapshot taken once at
+        startup" note already in the code.
+  - [x] 5.4 `crate::llm::tools::skill::list_skills(cwd)` enumerates skills
+        from the same lookup roots the skill tool itself uses (walks
+        `cwd.ancestors()` for `.claude/skills/*/SKILL.md`, dedupes by
+        lowercased name, sorts alphabetically), plus `AppMode::Skills` /
+        `render_skills` list view (`/skills`) showing name + description
+        parsed from each `SKILL.md`'s frontmatter.
+  - [ ] 5.5 **Deferred**: CLI symmetry (`crustly mcp list` / `crustly skill
+        list` as standalone subcommands outside the TUI) was not
+        implemented. The original motivation — being able to see what's
+        configured/discovered without opening the TUI — is only partially
+        needed now since `cmd_run`/`cmd_chat` already log MCP connection
+        results at startup; a dedicated subcommand remains a reasonable
+        follow-up but wasn't bundled into this pass.
 
 ## Goal
 

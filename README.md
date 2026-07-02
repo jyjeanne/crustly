@@ -162,7 +162,15 @@ Summaries from past sessions are injected into new conversation contexts within 
 A file watcher (powered by the `notify` crate) re-indexes Rust source files automatically on save. The symbol index supports `query_symbol` and `fts_search` for functions, structs, enums, traits, consts, and more.
 
 ### MCP Tool Server Integration
-Configure external MCP tool servers in `.crustly/config.toml` under `[[mcp.servers]]`. They are auto-registered as tools at startup. Built-in tool names take precedence. Crashed or unreachable MCP servers return graceful errors — no panics, no hangs.
+Configure external MCP tool servers in `.crustly/config.toml` under `[[mcp.servers]]`. They are auto-registered as tools at startup. Built-in tool names take precedence. Crashed or unreachable MCP servers return graceful errors — no panics, no hangs. Type `/mcp` in the chat input to see each configured server's connection status and discovered tool count without leaving the TUI.
+
+### `/skills` and `/mcp` Discovery Commands
+Type `/skills` or `/mcp` and press Enter in the chat input to open a list view — these are intercepted before being sent to the LLM, so a message that happens to start with `/` for any other reason (e.g. a file path) is still sent normally.
+
+- **`/skills`** — lists every discoverable skill (project-local `.crustly/skills/`/`.claude/skills/` and user-global `~/.config/crustly/skills/`/`~/.claude/skills/`) with its name and description, parsed from each `SKILL.md`'s frontmatter.
+- **`/mcp`** — lists every configured `[[mcp.servers]]` entry with its connection status and discovered tool count, as of startup.
+
+Both views follow the existing dialog conventions: `Esc` closes, `Up`/`Down` navigate.
 
 ### AWS Bedrock Support
 AWS Bedrock is now a supported provider. Enable it with `--features aws-bedrock` and configure your AWS credentials as usual.

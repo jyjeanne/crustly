@@ -156,6 +156,12 @@ pub enum AppMode {
     /// Provider/model quick-switch dialog (triggered by Ctrl+W) - pick a
     /// locally-installed Ollama model and switch to it without restarting.
     ProviderSwitch,
+    /// `/skills` slash command - lists every discoverable skill (project-
+    /// local and user-global).
+    Skills,
+    /// `/mcp` slash command - lists configured MCP servers and their
+    /// connection status.
+    Mcp,
 }
 
 /// Event handler for the TUI

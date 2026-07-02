@@ -73,6 +73,12 @@ pub fn render(f: &mut Frame, app: &App) {
         AppMode::ProviderSwitch => {
             render_provider_switch(f, app, chunks[1]);
         }
+        AppMode::Skills => {
+            render_skills(f, app, chunks[1]);
+        }
+        AppMode::Mcp => {
+            render_mcp(f, app, chunks[1]);
+        }
     }
 
     render_status_bar(f, app, chunks[3]);
@@ -508,6 +514,129 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
         .wrap(Wrap { trim: false });
 
     f.render_widget(sessions, area);
+}
+
+/// Render the `/skills` list view.
+fn render_skills(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(Span::styled(
+        "Discoverable skills (↑/↓ to navigate, Esc to close)",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    if app.skills_list.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "No skills found in .crustly/skills, .claude/skills, or their user-global equivalents.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, skill) in app.skills_list.iter().enumerate() {
+            let is_selected = idx == app.skills_selected;
+            let prefix = if is_selected { "> " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+
+            lines.push(Line::from(Span::styled(
+                format!("{prefix}{}", skill.name),
+                style,
+            )));
+            if let Some(desc) = &skill.description {
+                lines.push(Line::from(Span::styled(
+                    format!("      {desc}"),
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+        }
+    }
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " /skills ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the `/mcp` list view.
+fn render_mcp(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(Span::styled(
+        "Configured MCP servers (↑/↓ to navigate, Esc to close)",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    if app.mcp_status.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "No MCP servers configured. Add entries under [[mcp.servers]] in config.toml.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, server) in app.mcp_status.iter().enumerate() {
+            let is_selected = idx == app.mcp_selected;
+            let prefix = if is_selected { "> " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let status = if server.connected {
+                format!("connected, {} tools", server.tool_count)
+            } else {
+                "not connected".to_string()
+            };
+
+            lines.push(Line::from(Span::styled(
+                format!("{prefix}{} — {} ({status})", server.name, server.command),
+                style,
+            )));
+            if let Some(err) = &server.error {
+                lines.push(Line::from(Span::styled(
+                    format!("      {err}"),
+                    Style::default().fg(Color::Red),
+                )));
+            }
+        }
+    }
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " /mcp ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
 }
 
 /// Render the help screen
@@ -1927,6 +2056,8 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::ModelDownload => "MODEL DOWNLOAD",
         AppMode::ModelInfo => "MODEL INFO",
         AppMode::ProviderSwitch => "SWITCH PROVIDER",
+        AppMode::Skills => "/SKILLS",
+        AppMode::Mcp => "/MCP",
     };
 
     let auto_mode = app.auto_mode();
@@ -2108,6 +2239,74 @@ mod tests {
         app.error_message = Some("boom".to_string());
         let screen = render_to_string(&app, 100, 20);
         assert!(screen.contains("FullAuto"));
+    }
+
+    #[tokio::test]
+    async fn skills_view_shows_name_and_description() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Skills;
+        app.skills_list = vec![crate::llm::tools::skill::SkillListing {
+            name: "my-skill".to_string(),
+            description: Some("Does something cool".to_string()),
+            root: std::path::PathBuf::new(),
+        }];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("my-skill"));
+        assert!(screen.contains("Does something cool"));
+    }
+
+    #[tokio::test]
+    async fn skills_view_shows_empty_state_message() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Skills;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("No skills found"));
+    }
+
+    #[tokio::test]
+    async fn mcp_view_shows_connected_server_with_tool_count() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+        app.mcp_status = vec![crate::mcp::McpServerStatus {
+            name: "my-server".to_string(),
+            command: "my-mcp-binary".to_string(),
+            connected: true,
+            tool_count: 5,
+            error: None,
+        }];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("my-server"));
+        assert!(screen.contains("connected, 5 tools"));
+    }
+
+    #[tokio::test]
+    async fn mcp_view_shows_connection_error() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+        app.mcp_status = vec![crate::mcp::McpServerStatus {
+            name: "broken-server".to_string(),
+            command: "nonexistent-binary".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("No such file or directory".to_string()),
+        }];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("broken-server"));
+        assert!(screen.contains("not connected"));
+        assert!(screen.contains("No such file or directory"));
+    }
+
+    #[tokio::test]
+    async fn mcp_view_shows_empty_state_message() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("No MCP servers configured"));
     }
 
     #[tokio::test]

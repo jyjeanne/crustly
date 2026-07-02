@@ -325,4 +325,28 @@ mod tests {
             .unwrap();
         assert!(result.success);
     }
+
+    #[tokio::test]
+    async fn register_mcp_server_with_nonexistent_command_fails_gracefully() {
+        let mut registry = ToolRegistry::new();
+
+        // Bounded with a timeout as a defensive check: a bad command
+        // should fail fast (process spawn error), not hang the caller -
+        // this is the exact path cli::cmd_chat now depends on at startup
+        // for every configured [[mcp.servers]] entry.
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            registry.register_mcp_server(
+                "test-server",
+                "definitely-not-a-real-binary-xyz-crustly-test",
+                &[],
+            ),
+        )
+        .await
+        .expect("register_mcp_server must not hang on a bad command");
+
+        assert!(result.is_err());
+        // No tools should have been registered from a failed connection.
+        assert_eq!(registry.count(), 0);
+    }
 }
