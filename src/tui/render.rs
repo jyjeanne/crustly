@@ -412,20 +412,12 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(chat, area);
 }
 
-/// Render the input box
+/// Render the input box. Clones `app.textarea` rather than mutating it in
+/// place, since every other `render_*` function takes `app: &App` and this
+/// keeps that read-only convention intact (`TextArea::set_block`/
+/// `set_cursor_style` need `&mut self`, but only to apply per-frame
+/// styling, not to change the actual buffer contents).
 fn render_input(f: &mut Frame, app: &App, area: Rect) {
-    let mut input_text = app.input_buffer.clone();
-
-    // Add cursor indicator
-    if !app.is_processing {
-        input_text.push('█');
-    }
-
-    let input_lines: Vec<Line> = input_text
-        .lines()
-        .map(|line| Line::from(line.to_string()))
-        .collect();
-
     let title = if app.is_processing {
         Span::styled(
             " ⏸️  Input (waiting for response...) ",
@@ -451,17 +443,21 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
         Style::default().fg(Color::Cyan)
     };
 
-    let input = Paragraph::new(input_lines)
-        .style(Style::default().fg(Color::White))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(title)
-                .border_style(border_style),
-        )
-        .wrap(Wrap { trim: false });
+    let mut textarea = app.textarea.clone();
+    textarea.set_style(Style::default().fg(Color::White));
+    if app.is_processing {
+        // No visible cursor while a response is in flight, matching the
+        // previous behavior of not appending a cursor glyph.
+        textarea.set_cursor_style(Style::default());
+    }
+    textarea.set_block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .border_style(border_style),
+    );
 
-    f.render_widget(input, area);
+    f.render_widget(textarea.widget(), area);
 }
 
 /// Render the sessions list
@@ -2030,6 +2026,17 @@ mod tests {
         assert!(screen.contains("Downloading 'qwen2.5-coder:7b'"));
         assert!(screen.contains("pulling abc123"));
         assert!(screen.contains("50%"));
+    }
+
+    #[tokio::test]
+    async fn chat_input_renders_textarea_contents_and_hint() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.textarea.insert_str("hi");
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("hi"));
+        assert!(screen.contains("Enter to send"));
     }
 
     #[tokio::test]

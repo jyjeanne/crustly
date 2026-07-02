@@ -10,6 +10,7 @@ use crate::llm::agent::AgentService;
 use crate::services::{MessageService, PlanService, ServiceContext, SessionService};
 use anyhow::Result;
 use std::sync::Arc;
+use tui_textarea::{CursorMove, TextArea};
 use uuid::Uuid;
 
 /// Display message for UI rendering
@@ -70,7 +71,10 @@ pub struct App {
 
     // UI state
     pub mode: AppMode,
-    pub input_buffer: String,
+    /// Chat message input. A `tui-textarea` widget rather than a raw
+    /// `String` so the user gets real cursor movement, mid-buffer editing,
+    /// and paste-at-cursor instead of append/pop-only editing.
+    pub textarea: TextArea<'static>,
     pub scroll_offset: usize,
     pub selected_session_index: usize,
     pub should_quit: bool,
@@ -148,7 +152,7 @@ impl App {
             messages: Vec::new(),
             sessions: Vec::new(),
             mode: AppMode::Splash,
-            input_buffer: String::new(),
+            textarea: TextArea::default(),
             scroll_offset: 0,
             selected_session_index: 0,
             should_quit: false,
@@ -212,6 +216,34 @@ impl App {
         self.messages.iter().rev().find(|m| m.role == "assistant")
     }
 
+    /// The chat input's full text, joining multi-line content with `\n`.
+    pub fn input_text(&self) -> String {
+        self.textarea.lines().join("\n")
+    }
+
+    /// Whether the chat input is empty once whitespace is trimmed (matches
+    /// the old `String::trim().is_empty()` submit guard - a buffer that's
+    /// just whitespace still shouldn't submit).
+    fn input_is_blank(&self) -> bool {
+        self.textarea
+            .lines()
+            .iter()
+            .all(|line| line.trim().is_empty())
+    }
+
+    /// Reset the chat input to empty.
+    fn clear_input(&mut self) {
+        self.textarea = TextArea::default();
+    }
+
+    /// Replace the chat input's entire contents with `text` (used for the
+    /// Plan Mode revision-request pre-fill, which overwrites rather than
+    /// appends).
+    fn set_input_text(&mut self, text: &str) {
+        self.textarea = TextArea::default();
+        self.textarea.insert_str(text);
+    }
+
     /// Initialize the app by loading or creating a session
     pub async fn initialize(&mut self) -> Result<()> {
         // Try to load most recent session
@@ -272,9 +304,10 @@ impl App {
                 self.handle_key_event(key_event).await?;
             }
             TuiEvent::Paste(text) => {
-                // Handle paste events - only in Chat mode
+                // Handle paste events - only in Chat mode. Inserted at the
+                // cursor position rather than blindly appended.
                 if self.mode == AppMode::Chat {
-                    self.input_buffer.push_str(&text);
+                    self.textarea.insert_str(&text);
                 }
             }
             TuiEvent::MessageSubmitted(content) => {
@@ -507,16 +540,16 @@ impl App {
     /// Handle keys in chat mode
     async fn handle_chat_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
         use super::events::keys;
-        use crossterm::event::KeyCode;
+        use crossterm::event::{KeyCode, KeyModifiers};
 
-        if keys::is_submit(&event) && !self.input_buffer.trim().is_empty() {
-            let content = self.input_buffer.clone();
-            self.input_buffer.clear();
+        if keys::is_submit(&event) && !self.input_is_blank() {
+            let content = self.input_text();
+            self.clear_input();
             self.send_message(content).await?;
         } else if keys::is_newline(&event) {
-            self.input_buffer.push('\n');
+            self.textarea.insert_newline();
         } else if keys::is_cancel(&event) {
-            self.input_buffer.clear();
+            self.clear_input();
             self.error_message = None;
         } else if keys::is_page_up(&event) {
             // Scroll up (away from bottom) to see older messages
@@ -526,13 +559,13 @@ impl App {
             // When we reach 0, we're at the bottom (auto-scroll mode)
             self.scroll_offset = self.scroll_offset.saturating_sub(10);
         } else {
-            // Regular character input
+            let ctrl = event.modifiers.contains(KeyModifiers::CONTROL);
             match event.code {
                 KeyCode::Char('@') => {
                     // Trigger file picker mode
                     self.open_file_picker().await?;
                 }
-                KeyCode::Char('t') if self.input_buffer.is_empty() => {
+                KeyCode::Char('t') if self.textarea.is_empty() => {
                     // Toggle thinking block on the most recent assistant message
                     if let Some(msg) = self
                         .messages
@@ -543,13 +576,42 @@ impl App {
                         msg.thinking_expanded = !msg.thinking_expanded;
                     }
                 }
-                KeyCode::Char(c) => {
-                    self.input_buffer.push(c);
+                // Cursor movement - word-wise with Ctrl, char/line-wise
+                // otherwise. tui-textarea's own `input()` keymap is
+                // deliberately bypassed below (via `input_without_shortcuts`)
+                // because its Emacs-style Ctrl+<letter> bindings collide with
+                // crustly's own global shortcuts (Ctrl+W, Ctrl+P, etc.), so
+                // navigation is wired explicitly here instead.
+                KeyCode::Left if ctrl => self.textarea.move_cursor(CursorMove::WordBack),
+                KeyCode::Right if ctrl => self.textarea.move_cursor(CursorMove::WordForward),
+                KeyCode::Left => self.textarea.move_cursor(CursorMove::Back),
+                KeyCode::Right => self.textarea.move_cursor(CursorMove::Forward),
+                KeyCode::Up => self.textarea.move_cursor(CursorMove::Up),
+                KeyCode::Down => self.textarea.move_cursor(CursorMove::Down),
+                KeyCode::Home => self.textarea.move_cursor(CursorMove::Head),
+                KeyCode::End => self.textarea.move_cursor(CursorMove::End),
+                KeyCode::Backspace if ctrl => {
+                    self.textarea.delete_word();
                 }
-                KeyCode::Backspace => {
-                    self.input_buffer.pop();
+                KeyCode::Delete if ctrl => {
+                    self.textarea.delete_next_word();
                 }
-                _ => {}
+                KeyCode::Delete => {
+                    self.textarea.delete_next_char();
+                }
+                // Enter reaches here only when is_submit rejected it (blank
+                // buffer) and is_newline didn't match either (no Shift/Alt)
+                // - i.e. plain Enter on empty input, which must do nothing.
+                // Without this arm it would fall to the catch-all below,
+                // and tui-textarea's own `input_without_shortcuts` inserts
+                // a newline for any Enter unconditionally - resurrecting
+                // the exact bug fixed in Phase 1.
+                KeyCode::Enter => {}
+                // Plain character input, Tab, and Backspace - everything
+                // else that needs no app-specific handling.
+                _ => {
+                    self.textarea.input_without_shortcuts(event);
+                }
             }
         }
 
@@ -642,10 +704,10 @@ impl App {
                 self.switch_mode(AppMode::Chat).await?;
 
                 // Pre-fill input with revision request
-                self.input_buffer = format!(
+                self.set_input_text(&format!(
                     "Please revise this plan:\n\n{}\n\nRequested changes: ",
                     plan_summary
-                );
+                ));
 
                 // Keep plan in memory for reference (don't clear it)
             }
@@ -1591,9 +1653,9 @@ impl App {
                     // Refresh file list
                     self.open_file_picker().await?;
                 } else {
-                    // Insert file path into input buffer
+                    // Insert file path into input buffer, at the cursor.
                     let path_str = selected_path.to_string_lossy().to_string();
-                    self.input_buffer.push_str(&path_str);
+                    self.textarea.insert_str(&path_str);
                     self.switch_mode(AppMode::Chat).await?;
                 }
             }
@@ -2063,7 +2125,7 @@ mod tests {
             .unwrap();
         app.handle_chat_key(key(KeyCode::Char('!'))).await.unwrap();
 
-        assert_eq!(app.input_buffer, "hi\n!");
+        assert_eq!(app.input_text(), "hi\n!");
         assert_eq!(app.mode, AppMode::Chat, "Shift+Enter must not submit");
     }
 
@@ -2075,7 +2137,110 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(app.input_buffer, "x\n");
+        assert_eq!(app.input_text(), "x\n");
+    }
+
+    #[tokio::test]
+    async fn chat_left_arrow_moves_cursor_for_mid_buffer_insert() {
+        let mut app = test_app().await;
+        for c in "helo".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        // Cursor is after "helo"; move back 1 to sit between 'l' and 'o',
+        // then insert 'l' - a real cursor means this edits mid-buffer
+        // instead of always appending at the end.
+        app.handle_chat_key(key(KeyCode::Left)).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Char('l'))).await.unwrap();
+
+        assert_eq!(app.input_text(), "hello");
+    }
+
+    #[tokio::test]
+    async fn chat_backspace_deletes_at_cursor_not_always_the_last_char() {
+        let mut app = test_app().await;
+        for c in "helllo".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        // Cursor is after the trailing "o"; move back 2 to sit right after
+        // the extra 'l' (index: h-e-l-l-l-o, cursor after 4th char "helll"),
+        // then backspace should remove that extra 'l', not the trailing 'o'.
+        app.handle_chat_key(key(KeyCode::Left)).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Left)).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Backspace)).await.unwrap();
+
+        assert_eq!(app.input_text(), "hello");
+    }
+
+    #[tokio::test]
+    async fn chat_home_and_end_move_cursor_to_line_boundaries() {
+        let mut app = test_app().await;
+        for c in "hello".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        assert_eq!(app.textarea.cursor(), (0, 5));
+
+        app.handle_chat_key(key(KeyCode::Home)).await.unwrap();
+        assert_eq!(app.textarea.cursor(), (0, 0));
+
+        app.handle_chat_key(key(KeyCode::End)).await.unwrap();
+        assert_eq!(app.textarea.cursor(), (0, 5));
+    }
+
+    #[tokio::test]
+    async fn chat_ctrl_left_right_jump_by_word() {
+        let mut app = test_app().await;
+        for c in "hello world".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        assert_eq!(app.textarea.cursor(), (0, 11));
+
+        app.handle_chat_key(key_mod(KeyCode::Left, KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+        // Cursor should now sit at the start of "world", not just move one
+        // character back.
+        assert_eq!(app.textarea.cursor(), (0, 6));
+    }
+
+    #[tokio::test]
+    async fn chat_ctrl_backspace_deletes_whole_word() {
+        let mut app = test_app().await;
+        for c in "hello world".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        app.handle_chat_key(key_mod(KeyCode::Backspace, KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_text(), "hello ");
+    }
+
+    #[tokio::test]
+    async fn paste_inserts_at_cursor_not_always_appended_at_the_end() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        for c in "helo".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        app.handle_chat_key(key(KeyCode::Left)).await.unwrap();
+
+        app.handle_event(TuiEvent::Paste("l".to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_text(), "hello");
+    }
+
+    #[tokio::test]
+    async fn paste_with_embedded_newline_produces_multiple_lines() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_event(TuiEvent::Paste("line one\nline two".to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_text(), "line one\nline two");
     }
 
     #[tokio::test]
@@ -2089,7 +2254,7 @@ mod tests {
         // as soon as submit is triggered).
         app.handle_chat_key(key(KeyCode::Enter)).await.unwrap();
 
-        assert!(app.input_buffer.is_empty());
+        assert!(app.textarea.is_empty());
     }
 
     #[tokio::test]
@@ -2098,7 +2263,7 @@ mod tests {
 
         app.handle_chat_key(key(KeyCode::Enter)).await.unwrap();
 
-        assert!(app.input_buffer.is_empty());
+        assert!(app.textarea.is_empty());
         assert!(app.messages.is_empty());
     }
 
@@ -2173,7 +2338,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(app.input_buffer.is_empty());
+        assert!(app.textarea.is_empty());
     }
 
     #[tokio::test]

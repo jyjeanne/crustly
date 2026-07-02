@@ -2242,11 +2242,17 @@ Code snippets are beautifully rendered:
 ╰────────────────────────╯
 ```
 
-#### 4. **Multi-line Input**
+#### 4. **Multi-line Input with Real Cursor Editing**
 Write or paste long code snippets naturally:
 - Press `Shift+Enter` (or `Alt+Enter` on terminals without Kitty keyboard
   protocol support) for new lines
 - `Enter` to send (`Ctrl+Enter` still works too)
+- Real cursor movement (arrow keys, `Ctrl+Left`/`Right` to jump by word,
+  `Home`/`End`) and mid-buffer editing - fix a typo in the middle of a long
+  message without deleting everything after it
+- `Ctrl+Backspace`/`Ctrl+Delete` to delete a whole word at a time
+- Pasted text (including multi-line) is inserted at the cursor, not always
+  appended at the end
 - Perfect for pasting entire functions or classes
 
 #### 5. **Session-Based Context**

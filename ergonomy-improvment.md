@@ -100,7 +100,33 @@ terminal query on the startup path (now timeout-bounded via
         active streaming, derived from chunk arrival timing, replaced by
         the authoritative number once the response completes.
 - [ ] **Phase 2 — Copy / Paste Ergonomics**
-  - [ ] 2.1 Migrate `input_buffer` from raw `String` to `tui-textarea`.
+  - [x] 2.1 Migrate chat input from `String` to `tui-textarea::TextArea`.
+        **Found and fixed a blocking dependency issue first**: `Cargo.lock`
+        was gitignored despite this being a binary crate, and a fresh
+        resolve put `tui-textarea` (and the already-unused `ratatui-image`)
+        on `ratatui 0.30.2` while crustly itself pins `0.26` - two
+        incompatible copies of the `Widget` trait in the same build, which
+        would have made `f.render_widget(textarea.widget(), area)` fail to
+        compile. Fixed via `cargo update -p ratatui@0.30.2 --precise
+        0.26.3` (both dependencies declare wide-open ranges like `>=0.23`
+        that 0.26.3 already satisfies) and committing the resulting
+        lockfile so the fix is durable, not a one-off local state.
+        Migration itself: `App.textarea: TextArea<'static>` replaces
+        `input_buffer: String`; `handle_chat_key` now wires explicit
+        cursor movement (arrows, Ctrl+Left/Right word-jump, Home/End) and
+        word-delete (Ctrl+Backspace/Delete) rather than using
+        `TextArea::input()`'s built-in Emacs-style keymap, since that
+        keymap's `Ctrl+<letter>` bindings collide with crustly's own
+        global shortcuts (its `Ctrl+W` is "delete word", crustly's is
+        Provider Switch, etc.) - `input_without_shortcuts()` handles plain
+        character/Backspace/Delete/Enter insertion instead, with an
+        explicit `KeyCode::Enter => {}` no-op arm to stop it from
+        resurrecting the Phase-1 "blank-buffer Enter inserts a newline"
+        bug through its own unconditional Enter handling. Paste and the
+        Plan Mode revision pre-fill now insert at the cursor instead of
+        always appending at the end. `render_input` clones the `TextArea`
+        per frame (keeping `render_*` functions read-only like every other
+        one) to apply block/style before calling `.widget()`.
   - [ ] 2.2 Add `arboard`, wire copy-out keybinding for last response.
   - [ ] 2.3 Copy-code-block action; clipboard-paste fallback action.
 - [ ] **Phase 4b — Auto Mode TUI toggle** *(depends on 1.2 for the
