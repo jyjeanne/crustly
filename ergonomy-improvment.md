@@ -1,8 +1,54 @@
 # TUI Ergonomics Improvement Plan
 
-Status: Draft / Specification
+Status: In Progress — see Implementation Tracking
 Owner: TUI team
 Related: `ollama-rs-integration-plan.md` (native Ollama provider, already implemented)
+
+## Implementation Tracking
+
+Each phase is split into small, independently-committable steps so progress
+can land incrementally instead of one large change per phase. Check items
+off as they land; leave a one-line note (commit hash) next to completed
+items.
+
+- [ ] **Phase 1 — Send / Newline Keybinding Swap**
+  - [ ] 1.1 Kitty keyboard protocol detection at startup (`runner.rs`), with
+        graceful push/pop and no-op on unsupported terminals.
+  - [ ] 1.2 Swap `is_submit`/newline logic in `events.rs`/`app.rs`
+        (`Enter`=send, `Shift+Enter`=newline, `Ctrl+Enter` kept as legacy
+        alias, `Alt+Enter` as non-Kitty newline fallback).
+  - [ ] 1.3 Update UI copy (input hint, status bar, help screen) and README
+        shortcut tables to reflect the new binding + active fallback mode.
+- [ ] **Phase 4a — Auto Mode CLI bug fix** *(pulled forward: small,
+      isolated, independent of all other phases)*
+  - [ ] 4a.1 Wire `--auto-approve`/`--yolo` in `cmd_run` to actually call
+        `.with_auto_approve_tools()`.
+  - [ ] 4a.2 Fix `cmd_autoplan`'s discarded `PlanModeState::FullAuto` so it
+        has the same real effect as the CLI flag.
+- [ ] **Phase 3 — Ollama-in-TUI Polish**
+  - [ ] 3.1 Model Info panel (`Ctrl+O`) — static fields first (model name,
+        context window, `keep_alive`).
+  - [ ] 3.2 Live streaming perf metrics wired into `StreamEvent` and shown
+        in the panel/status bar.
+  - [ ] 3.3 In-TUI provider/model quick-switch dialog.
+- [ ] **Phase 2 — Copy / Paste Ergonomics**
+  - [ ] 2.1 Migrate `input_buffer` from raw `String` to `tui-textarea`.
+  - [ ] 2.2 Add `arboard`, wire copy-out keybinding for last response.
+  - [ ] 2.3 Copy-code-block action; clipboard-paste fallback action.
+- [ ] **Phase 4b — Auto Mode TUI toggle** *(depends on 1.2 for the
+      finalized keybinding scheme)*
+  - [ ] 4b.1 `Shift+Tab` mode-cycle wired to a new `App` field +
+        `ApprovalCallback` using `PlanModeState::tool_needs_approval()`.
+  - [ ] 4b.2 Plan Mode auto-execution path (skip `Ctrl+A`) for
+        `AutoExecuting`/`FullAuto`.
+  - [ ] 4b.3 Resurrect `render_auto_exec_progress`/`render_policy_denial`;
+        persistent status-bar indicator.
+- [ ] **Phase 5 — `/skills` and `/mcp`**
+  - [ ] 5.1 Slash-command interception layer in `handle_chat_key`.
+  - [ ] 5.2 Fix MCP config-wiring gap (`register_mcp_server` never called).
+  - [ ] 5.3 `/mcp` list view with connection status + tool count.
+  - [ ] 5.4 Skill enumeration function + `/skills` list view.
+  - [ ] 5.5 Optional CLI symmetry (`crustly mcp list`, `crustly skill list`).
 
 ## Goal
 
