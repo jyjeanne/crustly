@@ -150,7 +150,13 @@ mod tests {
         // installed models first, deduplicated against curated overlap
         assert_eq!(suggestions[0], "qwen2.5-coder:7b");
         assert_eq!(suggestions[1], "llava:13b");
-        assert!(suggestions.iter().filter(|s| *s == "qwen2.5-coder:7b").count() == 1);
+        assert!(
+            suggestions
+                .iter()
+                .filter(|s| *s == "qwen2.5-coder:7b")
+                .count()
+                == 1
+        );
     }
 
     #[test]

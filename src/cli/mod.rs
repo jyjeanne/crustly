@@ -1153,8 +1153,16 @@ async fn cmd_ollama(config: &crate::config::Config, operation: OllamaCommands) -
                 .next()
                 .context("Ollama returned no embedding vector")?;
 
-            println!("🦙 Embedding from '{}' ({} dimensions)\n", model, embedding.len());
-            let preview: Vec<String> = embedding.iter().take(8).map(|v| format!("{v:.4}")).collect();
+            println!(
+                "🦙 Embedding from '{}' ({} dimensions)\n",
+                model,
+                embedding.len()
+            );
+            let preview: Vec<String> = embedding
+                .iter()
+                .take(8)
+                .map(|v| format!("{v:.4}"))
+                .collect();
             println!("[{}, ...]", preview.join(", "));
             Ok(())
         }

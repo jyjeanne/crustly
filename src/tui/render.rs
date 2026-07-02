@@ -106,11 +106,7 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     // Throughput of the most recent assistant reply, if the active provider
     // exposes it (currently only the native Ollama provider). Omitted
     // entirely (not shown as "0 tok/s") when unavailable.
-    let tokens_per_second = app
-        .messages
-        .iter()
-        .rev()
-        .find_map(|m| m.tokens_per_second);
+    let tokens_per_second = app.messages.iter().rev().find_map(|m| m.tokens_per_second);
 
     // Format working directory - show relative or full path
     let working_dir = app.working_directory.to_string_lossy().to_string();
@@ -328,7 +324,10 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
                     ));
                 }
                 Some(true) => {
-                    spans.push(Span::styled(" · 🔥 warm", Style::default().fg(Color::DarkGray)));
+                    spans.push(Span::styled(
+                        " · 🔥 warm",
+                        Style::default().fg(Color::DarkGray),
+                    ));
                 }
                 None => {}
             }
@@ -1468,9 +1467,12 @@ fn render_model_download(f: &mut Frame, app: &App, area: Rect) {
 
     let mut lines: Vec<Line> = Vec::new();
 
-    lines.push(Line::from(vec![
-        Span::styled("🦙 Download an Ollama model", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        "🦙 Download an Ollama model",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]));
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled("  > ", Style::default().fg(Color::DarkGray)),
@@ -1521,17 +1523,23 @@ fn render_model_download(f: &mut Frame, app: &App, area: Rect) {
     lines.push(Line::from(vec![
         Span::styled(
             "[↑↓]",
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(" Navigate  ", Style::default().fg(Color::White)),
         Span::styled(
             "[Tab]",
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(" Use suggestion  ", Style::default().fg(Color::White)),
         Span::styled(
             "[Enter]",
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(" Pull  ", Style::default().fg(Color::White)),
         Span::styled(

@@ -210,8 +210,7 @@ impl OllamaProvider {
             _ => ThinkType::High,
         });
 
-        let mut ollama_request =
-            ChatMessageRequest::new(request.model, messages).options(options);
+        let mut ollama_request = ChatMessageRequest::new(request.model, messages).options(options);
         if !tools.is_empty() {
             ollama_request = ollama_request.tools(tools);
         }
@@ -238,11 +237,7 @@ impl OllamaProvider {
         // Priority: explicit `message.thinking` field (native reasoning
         // models); fall back to `<think>...</think>` tags embedded in the
         // visible text (DeepSeek-R1/QwQ served through Ollama).
-        let explicit_thinking = response
-            .message
-            .thinking
-            .clone()
-            .filter(|t| !t.is_empty());
+        let explicit_thinking = response.message.thinking.clone().filter(|t| !t.is_empty());
         let (tag_thinking, visible_text) = match &explicit_thinking {
             Some(_) => (String::new(), response.message.content.clone()),
             None => extract_think_tags(&response.message.content),

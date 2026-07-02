@@ -132,7 +132,11 @@ impl MessageService {
             .await
             .context("Failed to update message metrics")?;
 
-        tracing::debug!("Updated message metrics: {} (provider: {})", id, provider_name);
+        tracing::debug!(
+            "Updated message metrics: {} (provider: {})",
+            id,
+            provider_name
+        );
         Ok(())
     }
 
