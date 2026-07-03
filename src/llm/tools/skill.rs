@@ -208,6 +208,67 @@ fn push_if_dir(roots: &mut Vec<PathBuf>, path: PathBuf) {
     }
 }
 
+/// One discoverable skill, for the `/skills` TUI list view.
+#[derive(Debug, Clone)]
+pub struct SkillListing {
+    pub name: String,
+    pub description: Option<String>,
+    pub root: PathBuf,
+}
+
+/// Enumerate every skill discoverable from `cwd`, across all lookup roots
+/// (project-local and user-global, `.crustly` and `.claude`). Deduplicated
+/// by name using the same first-root-wins precedence `resolve_skill_path`
+/// uses, so this list matches what invoking each name would actually
+/// resolve to. Sorted alphabetically (case-insensitive) for stable display.
+pub(crate) fn list_skills(cwd: &Path) -> Vec<SkillListing> {
+    let mut seen = std::collections::HashSet::new();
+    let mut skills = Vec::new();
+
+    for root in skill_lookup_roots(cwd) {
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let skill_md = path.join("SKILL.md");
+                if !skill_md.is_file() {
+                    continue;
+                }
+                let dir_name = entry.file_name().to_string_lossy().to_string();
+                let contents = std::fs::read_to_string(&skill_md).unwrap_or_default();
+                let name = parse_skill_frontmatter_value(&contents, "name").unwrap_or(dir_name);
+                if !seen.insert(name.to_lowercase()) {
+                    continue;
+                }
+                skills.push(SkillListing {
+                    description: parse_skill_frontmatter_value(&contents, "description"),
+                    name,
+                    root: root.clone(),
+                });
+            } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
+                // Legacy flat layout: <root>/<name>.md
+                let Some(stem) = path.file_stem().map(|s| s.to_string_lossy().to_string()) else {
+                    continue;
+                };
+                if !seen.insert(stem.to_lowercase()) {
+                    continue;
+                }
+                let contents = std::fs::read_to_string(&path).unwrap_or_default();
+                skills.push(SkillListing {
+                    description: parse_skill_frontmatter_value(&contents, "description"),
+                    name: stem,
+                    root: root.clone(),
+                });
+            }
+        }
+    }
+
+    skills.sort_by_key(|a| a.name.to_lowercase());
+    skills
+}
+
 fn frontmatter_name_matches(path: &Path, requested: &str) -> bool {
     std::fs::read_to_string(path)
         .ok()
@@ -300,5 +361,99 @@ mod tests {
         let tool = SkillTool;
         let result = tool.validate_input(&serde_json::json!({ "skill": "evil\0name" }));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn list_skills_discovers_project_local_skills_with_frontmatter() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skill_dir = tmp.path().join(".crustly").join("skills").join("my-skill");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\nname: my-skill\ndescription: Does something cool\n---\n\nBody.",
+        )
+        .unwrap();
+
+        let skills = list_skills(tmp.path());
+
+        let found = skills
+            .iter()
+            .find(|s| s.name == "my-skill")
+            .expect("my-skill should be discovered");
+        assert_eq!(found.description.as_deref(), Some("Does something cool"));
+    }
+
+    #[test]
+    fn list_skills_falls_back_to_directory_name_without_frontmatter_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skill_dir = tmp
+            .path()
+            .join(".crustly")
+            .join("skills")
+            .join("no-frontmatter-name");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), "Just a body, no frontmatter.").unwrap();
+
+        let skills = list_skills(tmp.path());
+        assert!(skills.iter().any(|s| s.name == "no-frontmatter-name"));
+    }
+
+    #[test]
+    fn list_skills_discovers_legacy_flat_md_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skills_dir = tmp.path().join(".crustly").join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        std::fs::write(
+            skills_dir.join("legacy.md"),
+            "---\ndescription: Old style\n---\nBody.",
+        )
+        .unwrap();
+
+        let skills = list_skills(tmp.path());
+        let found = skills
+            .iter()
+            .find(|s| s.name == "legacy")
+            .expect("legacy.md skill should be discovered");
+        assert_eq!(found.description.as_deref(), Some("Old style"));
+    }
+
+    #[test]
+    fn list_skills_is_sorted_alphabetically_case_insensitive() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skills_dir = tmp.path().join(".crustly").join("skills");
+        for name in ["Zebra", "apple", "Banana"] {
+            let dir = skills_dir.join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("SKILL.md"), "Body.").unwrap();
+        }
+
+        let skills = list_skills(tmp.path());
+        let names: Vec<_> = skills
+            .iter()
+            .map(|s| s.name.clone())
+            .filter(|n| ["Zebra", "apple", "Banana"].contains(&n.as_str()))
+            .collect();
+        assert_eq!(names, vec!["apple", "Banana", "Zebra"]);
+    }
+
+    #[test]
+    fn list_skills_deduplicates_same_name_across_roots() {
+        let tmp = tempfile::tempdir().unwrap();
+        for dir_name in [".crustly", ".claude"] {
+            let skill_dir = tmp.path().join(dir_name).join("skills").join("dup");
+            std::fs::create_dir_all(&skill_dir).unwrap();
+            std::fs::write(skill_dir.join("SKILL.md"), "Body.").unwrap();
+        }
+
+        let skills = list_skills(tmp.path());
+        assert_eq!(skills.iter().filter(|s| s.name == "dup").count(), 1);
+    }
+
+    #[test]
+    fn list_skills_does_not_panic_on_a_directory_with_no_skills_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        // No .crustly/ or .claude/ under tmp.path() at all - just confirms
+        // this doesn't panic when there's nothing to find.
+        let _ = list_skills(tmp.path());
     }
 }

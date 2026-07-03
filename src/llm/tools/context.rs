@@ -304,7 +304,7 @@ impl Tool for ContextTool {
                     return Ok(ToolResult::success("No variables found".to_string()));
                 }
 
-                filtered_vars.sort_by(|a, b| a.key.cmp(&b.key));
+                filtered_vars.sort_by_key(|e| e.key.clone());
 
                 let mut output = format!("Found {} variables:\n\n", filtered_vars.len());
                 for entry in filtered_vars {

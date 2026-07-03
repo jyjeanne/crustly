@@ -69,6 +69,10 @@ pub enum TuiEvent {
         model: String,
         error: Option<String>,
     },
+
+    /// Locally-installed Ollama models were (re)loaded for the Provider
+    /// Switch dialog's model list.
+    ProviderSwitchModelsListed(Vec<String>),
 }
 
 /// Tool approval request details
@@ -145,6 +149,19 @@ pub enum AppMode {
     /// Model download dialog (triggered by Ctrl+D) - pick/type an Ollama
     /// model name and pull it without leaving Crustly.
     ModelDownload,
+    /// Model Info panel (triggered by Ctrl+O) - shows the active
+    /// provider/model, context window, and last response's performance
+    /// metrics.
+    ModelInfo,
+    /// Provider/model quick-switch dialog (triggered by Ctrl+W) - pick a
+    /// locally-installed Ollama model and switch to it without restarting.
+    ProviderSwitch,
+    /// `/skills` slash command - lists every discoverable skill (project-
+    /// local and user-global).
+    Skills,
+    /// `/mcp` slash command - lists configured MCP servers and their
+    /// connection status.
+    Mcp,
 }
 
 /// Event handler for the TUI
@@ -265,9 +282,56 @@ pub mod keys {
         key_matches(event, KeyCode::Char('d'), KeyModifiers::CONTROL)
     }
 
-    /// Ctrl+Enter - Submit
+    /// Ctrl+O - Open the Model Info panel
+    pub fn is_model_info(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('o'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+W - Open the Provider Switch dialog
+    pub fn is_provider_switch(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('w'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+Y - Copy the last assistant response (or its last code block,
+    /// if it has one) to the system clipboard.
+    pub fn is_copy_response(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('y'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+V - Paste from the system clipboard at the cursor. An explicit
+    /// fallback alongside bracketed paste for terminals/multiplexers where
+    /// bracketed paste is unreliable.
+    pub fn is_paste_clipboard(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('v'), KeyModifiers::CONTROL)
+    }
+
+    /// Shift+Tab - Cycle Auto Mode (Interactive -> AutoPlan -> FullAuto ->
+    /// Interactive). Most terminals report Shift+Tab as the distinct
+    /// `KeyCode::BackTab`, not `Tab` with a `SHIFT` modifier bit, so match
+    /// on that rather than `key_matches`.
+    pub fn is_toggle_auto_mode(event: &KeyEvent) -> bool {
+        event.code == KeyCode::BackTab
+    }
+
+    /// Enter - Submit (plain Enter sends; Ctrl+Enter, with or without extra
+    /// modifiers, is kept as a legacy alias for muscle memory). Shift+Enter
+    /// and Alt+Enter are newlines, not submit - see `is_newline`.
     pub fn is_submit(event: &KeyEvent) -> bool {
-        event.code == KeyCode::Enter && event.modifiers.contains(KeyModifiers::CONTROL)
+        event.code == KeyCode::Enter
+            && (event.modifiers.is_empty() || event.modifiers.contains(KeyModifiers::CONTROL))
+    }
+
+    /// Shift+Enter or Alt+Enter - insert a newline in the message input.
+    /// Excludes chords that also hold Ctrl (e.g. Ctrl+Shift+Enter), which
+    /// `is_submit` claims instead, so the two never disagree. Shift+Enter
+    /// only disambiguates from plain Enter on terminals with the Kitty
+    /// keyboard protocol enabled; Alt+Enter works everywhere as the
+    /// reliable fallback (see `App::kitty_keyboard_protocol_active`).
+    pub fn is_newline(event: &KeyEvent) -> bool {
+        event.code == KeyCode::Enter
+            && !event.modifiers.contains(KeyModifiers::CONTROL)
+            && (event.modifiers.contains(KeyModifiers::SHIFT)
+                || event.modifiers.contains(KeyModifiers::ALT))
     }
 
     /// Escape - Cancel/Back
@@ -360,10 +424,103 @@ mod tests {
 
     #[test]
     fn test_submit_key() {
+        // Plain Enter sends the message.
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::empty());
+        assert!(keys::is_submit(&event));
+
+        // Ctrl+Enter is kept as a legacy alias for muscle memory.
         let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL);
         assert!(keys::is_submit(&event));
 
-        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::empty());
+        // Shift+Enter and Alt+Enter are newlines, not submit.
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::SHIFT);
         assert!(!keys::is_submit(&event));
+
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT);
+        assert!(!keys::is_submit(&event));
+
+        // Ctrl+Shift+Enter and Ctrl+Alt+Enter still submit (Ctrl wins over
+        // an incidental extra Shift/Alt bit) rather than silently becoming
+        // a newline.
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::SHIFT);
+        assert!(keys::is_submit(&event));
+
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::ALT);
+        assert!(keys::is_submit(&event));
+
+        // Not an Enter key at all.
+        let event = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty());
+        assert!(!keys::is_submit(&event));
+    }
+
+    #[test]
+    fn test_model_info_key() {
+        let event = KeyEvent::new(KeyCode::Char('o'), KeyModifiers::CONTROL);
+        assert!(keys::is_model_info(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('o'), KeyModifiers::empty());
+        assert!(!keys::is_model_info(&event));
+    }
+
+    #[test]
+    fn test_provider_switch_key() {
+        let event = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL);
+        assert!(keys::is_provider_switch(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::empty());
+        assert!(!keys::is_provider_switch(&event));
+    }
+
+    #[test]
+    fn test_copy_response_key() {
+        let event = KeyEvent::new(KeyCode::Char('y'), KeyModifiers::CONTROL);
+        assert!(keys::is_copy_response(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty());
+        assert!(!keys::is_copy_response(&event));
+    }
+
+    #[test]
+    fn test_paste_clipboard_key() {
+        let event = KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL);
+        assert!(keys::is_paste_clipboard(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('v'), KeyModifiers::empty());
+        assert!(!keys::is_paste_clipboard(&event));
+    }
+
+    #[test]
+    fn test_toggle_auto_mode_key() {
+        let event = KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT);
+        assert!(keys::is_toggle_auto_mode(&event));
+
+        let event = KeyEvent::new(KeyCode::Tab, KeyModifiers::empty());
+        assert!(!keys::is_toggle_auto_mode(&event));
+    }
+
+    #[test]
+    fn test_newline_key() {
+        // Shift+Enter and Alt+Enter insert a newline.
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::SHIFT);
+        assert!(keys::is_newline(&event));
+
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT);
+        assert!(keys::is_newline(&event));
+
+        // Plain Enter and Ctrl+Enter are submit, not newline.
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::empty());
+        assert!(!keys::is_newline(&event));
+
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL);
+        assert!(!keys::is_newline(&event));
+
+        // Ctrl+Shift+Enter and Ctrl+Alt+Enter are submit (via is_submit),
+        // not newline - Ctrl must win over an incidental extra Shift/Alt
+        // bit so the two predicates never both match the same event.
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::SHIFT);
+        assert!(!keys::is_newline(&event));
+
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::ALT);
+        assert!(!keys::is_newline(&event));
     }
 }

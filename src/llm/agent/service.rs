@@ -7,8 +7,8 @@ use super::context::AgentContext;
 use super::error::{AgentError, Result};
 use crate::llm::provider::router::ModelRouter;
 use crate::llm::provider::{
-    ContentBlock, ContentDelta, LLMRequest, LLMResponse, Message, Provider, ProviderStream,
-    StopReason, StreamEvent, TokenUsage,
+    ContentBlock, ContentDelta, LLMRequest, LLMResponse, Message, PerfMetrics, Provider,
+    ProviderStream, StopReason, StreamEvent, TokenUsage,
 };
 use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
 use crate::llm::tools::{ToolExecutionContext, ToolRegistry};
@@ -175,6 +175,7 @@ async fn drain_stream_to_response(
         input_tokens: 0,
         output_tokens: 0,
     };
+    let mut perf_metrics: Option<PerfMetrics> = None;
 
     // A ToolUse block assembled from ContentBlockStart + ContentBlockStop.
     let mut pending_tool: Option<ContentBlock> = None;
@@ -217,9 +218,14 @@ async fn drain_stream_to_response(
                 }
                 _ => {}
             },
-            StreamEvent::MessageDelta { delta, usage: u } => {
+            StreamEvent::MessageDelta {
+                delta,
+                usage: u,
+                perf_metrics: pm,
+            } => {
                 stop_reason = delta.stop_reason;
                 usage = u;
+                perf_metrics = pm;
             }
             StreamEvent::MessageStop => break,
             // Propagate provider-emitted error events as hard errors.
@@ -267,7 +273,7 @@ async fn drain_stream_to_response(
         stop_reason,
         usage,
         cache_metrics: None,
-        perf_metrics: None,
+        perf_metrics,
     })
 }
 
@@ -345,6 +351,15 @@ impl AgentService {
         self
     }
 
+    /// Swap the active provider in place, keeping every other setting
+    /// (tool registry, approval callback, working directory, cache, etc.)
+    /// untouched. Used by the TUI's runtime provider-switch dialog, which
+    /// must not silently drop the approval callback or tool registry the
+    /// way constructing a fresh `AgentService` from scratch would.
+    pub fn set_provider(&mut self, provider: Arc<dyn Provider>) {
+        self.provider = provider;
+    }
+
     /// Get the provider name
     pub fn provider_name(&self) -> &str {
         self.provider.name()
@@ -353,6 +368,12 @@ impl AgentService {
     /// Get the default model for this provider
     pub fn provider_model(&self) -> &str {
         self.provider.default_model()
+    }
+
+    /// Get the context window (in tokens) for the active provider/model,
+    /// if known.
+    pub fn provider_context_window(&self) -> Option<u32> {
+        self.provider.context_window(self.provider.default_model())
     }
 
     /// Send a message and get a response
@@ -1753,5 +1774,60 @@ mod tests {
         assert!(!is_parallelizable("bash"));
         assert!(!is_parallelizable("write_file"));
         assert!(!is_parallelizable("edit_file"));
+    }
+
+    #[tokio::test]
+    async fn drain_stream_to_response_carries_perf_metrics_through() {
+        use crate::llm::provider::types::MessageDelta;
+        use crate::llm::provider::ContentDelta;
+
+        let events: Vec<crate::llm::provider::Result<StreamEvent>> = vec![
+            Ok(StreamEvent::ContentBlockStart {
+                index: 0,
+                content_block: ContentBlock::Text {
+                    text: String::new(),
+                },
+            }),
+            Ok(StreamEvent::ContentBlockDelta {
+                index: 0,
+                delta: ContentDelta::TextDelta {
+                    text: "hi".to_string(),
+                },
+            }),
+            Ok(StreamEvent::ContentBlockStop { index: 0 }),
+            Ok(StreamEvent::MessageDelta {
+                delta: MessageDelta {
+                    stop_reason: Some(StopReason::EndTurn),
+                    stop_sequence: None,
+                },
+                usage: TokenUsage {
+                    input_tokens: 5,
+                    output_tokens: 10,
+                },
+                perf_metrics: Some(PerfMetrics {
+                    load_duration_ms: Some(50),
+                    prompt_eval_duration_ms: Some(20),
+                    eval_duration_ms: Some(200),
+                    total_duration_ms: Some(270),
+                    model_was_loaded: Some(true),
+                }),
+            }),
+            Ok(StreamEvent::MessageStop),
+        ];
+        let stream: ProviderStream = Box::pin(futures::stream::iter(events));
+
+        let response = drain_stream_to_response(stream, None, "mock-model")
+            .await
+            .unwrap();
+
+        // This is the regression this test guards against: PerfMetrics
+        // reported mid-stream by the provider must survive
+        // drain_stream_to_response instead of being discarded (previously
+        // hardcoded to `None` regardless of what the stream carried).
+        let perf = response
+            .perf_metrics
+            .expect("perf metrics should survive draining the stream");
+        assert_eq!(perf.eval_duration_ms, Some(200));
+        assert_eq!(perf.model_was_loaded, Some(true));
     }
 }

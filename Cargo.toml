@@ -31,6 +31,7 @@ tui-textarea = "0.4"
 tui-tree-widget = "0.19"
 ratatui-image = "1.0"
 viuer = "0.7"
+arboard = "3.4"
 
 # Database
 sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "sqlite", "chrono", "uuid"] }

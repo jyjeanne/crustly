@@ -162,7 +162,15 @@ Summaries from past sessions are injected into new conversation contexts within 
 A file watcher (powered by the `notify` crate) re-indexes Rust source files automatically on save. The symbol index supports `query_symbol` and `fts_search` for functions, structs, enums, traits, consts, and more.
 
 ### MCP Tool Server Integration
-Configure external MCP tool servers in `.crustly/config.toml` under `[[mcp.servers]]`. They are auto-registered as tools at startup. Built-in tool names take precedence. Crashed or unreachable MCP servers return graceful errors — no panics, no hangs.
+Configure external MCP tool servers in `.crustly/config.toml` under `[[mcp.servers]]`. They are auto-registered as tools at startup. Built-in tool names take precedence. Crashed or unreachable MCP servers return graceful errors — no panics, no hangs. Type `/mcp` in the chat input to see each configured server's connection status and discovered tool count without leaving the TUI.
+
+### `/skills` and `/mcp` Discovery Commands
+Type `/skills` or `/mcp` and press Enter in the chat input to open a list view — these are intercepted before being sent to the LLM, so a message that happens to start with `/` for any other reason (e.g. a file path) is still sent normally.
+
+- **`/skills`** — lists every discoverable skill (project-local `.crustly/skills/`/`.claude/skills/` and user-global `~/.config/crustly/skills/`/`~/.claude/skills/`) with its name and description, parsed from each `SKILL.md`'s frontmatter.
+- **`/mcp`** — lists every configured `[[mcp.servers]]` entry with its connection status and discovered tool count, as of startup.
+
+Both views follow the existing dialog conventions: `Esc` closes, `Up`/`Down` navigate.
 
 ### AWS Bedrock Support
 AWS Bedrock is now a supported provider. Enable it with `--features aws-bedrock` and configure your AWS credentials as usual.
@@ -172,6 +180,8 @@ Crustly now speaks Ollama's native `/api/chat` protocol directly (via [`ollama-r
 
 - **Runtime performance metrics** — generation throughput (tokens/sec), model load time, and warm/cold-start status shown live in the TUI header and under each reply
 - **`Ctrl+D` Model Download dialog** — type or pick an Ollama model from suggested/installed names, pull it with a live progress bar, and cancel mid-download with `Esc`, all without leaving the TUI
+- **`Ctrl+O` Model Info panel** — active provider/model, context window, and the last response's performance metrics (load/prefill/generation/total time, tokens/sec), all without leaving the TUI
+- **`Ctrl+W` Provider Switch dialog** — switch to a different locally-installed Ollama model at runtime, without editing config.toml or restarting the app
 - **Model management CLI** — `crustly ollama list|pull|rm|show|embed`
 - **`keep_alive` / `num_ctx` control** and provider identity (badge + icon) shown in the header for every configured provider, not just Ollama
 
@@ -244,6 +254,33 @@ When Claude wants to modify files or execute commands, Crustly pauses and asks f
 - Press `D` or `N` to deny
 - Press `Esc` to cancel
 - No way to bypass (unless explicitly configured)
+
+### Auto Mode (Explicitly Bypassing Approval)
+
+Press `Shift+Tab` to cycle through three levels of autonomy, shown at all
+times in the status bar:
+
+| Level | Behavior |
+|-------|----------|
+| `⚙ Interactive` (default) | Every dangerous tool call prompts, as above. |
+| `⚡ AutoPlan` | Low-risk tools (reads, searches, etc.) run without prompting. `bash`, `write_file`, `edit_file`, and `code_exec` still prompt. |
+| `⚡⚡ FullAuto` | Nothing prompts, including `bash`/`write_file`/`edit_file`/`code_exec`. Use with care. |
+
+Two things stay true no matter which level is active:
+- The `[security]` config policy (`deny_tools`, `deny_paths`, `allow_bash`)
+  is a separate, earlier check and is **never** bypassed by Auto Mode —
+  it's the hard floor.
+- Every auto-approved action is logged identically to a manually-approved
+  one, so there's a full audit trail regardless of which level was active.
+
+Starts at `Interactive` by default; set `[plan_mode].mode` in
+`config.toml` (`"interactive"` / `"auto_plan"` / `"full_auto"`) to change
+the starting level, or just cycle it with `Shift+Tab` mid-session.
+
+`crustly run --yolo`/`crustly run --auto-approve` is a related but
+separate mechanism for the non-interactive CLI path
+(`crustly run "<prompt>"`), not the TUI - it always bypasses everything
+unconditionally, with no `AutoPlan`-style tiering.
 
 ### Example Workflow
 
@@ -492,7 +529,8 @@ cargo run
 
 3. **Start chatting:**
    - Type your message
-   - Press `Ctrl+Enter` to send
+   - Press `Enter` to send (`Shift+Enter`/`Alt+Enter` for a new line,
+     `Ctrl+Enter` still works too)
    - Press `Ctrl+H` to see all available commands and help
    - Press `Ctrl+C` to quit
 
@@ -2239,10 +2277,21 @@ Code snippets are beautifully rendered:
 ╰────────────────────────╯
 ```
 
-#### 4. **Multi-line Input**
+#### 4. **Multi-line Input with Real Cursor Editing**
 Write or paste long code snippets naturally:
-- Press `Enter` for new lines
-- `Ctrl+Enter` to send
+- Press `Shift+Enter` (or `Alt+Enter` on terminals without Kitty keyboard
+  protocol support) for new lines
+- `Enter` to send (`Ctrl+Enter` still works too)
+- Real cursor movement (arrow keys, `Ctrl+Left`/`Right` to jump by word,
+  `Home`/`End`) and mid-buffer editing - fix a typo in the middle of a long
+  message without deleting everything after it
+- `Ctrl+Backspace`/`Ctrl+Delete` to delete a whole word at a time
+- Pasted text (including multi-line) is inserted at the cursor, not always
+  appended at the end
+- `Ctrl+Y` copies the last response to the system clipboard - just its
+  code block if it has one, otherwise the full text
+- `Ctrl+V` pastes from the system clipboard at the cursor, as a fallback
+  alongside automatic bracketed paste
 - Perfect for pasting entire functions or classes
 
 #### 5. **Session-Based Context**
@@ -2409,17 +2458,18 @@ $ crustly
 
 4. **Keyboard Shortcuts:**
    ```
-   Ctrl+Enter  - Send message
-   Ctrl+H      - Help (full command list)
-   Ctrl+N      - New session (new feature)
-   Ctrl+L      - Switch sessions (different projects)
+   Enter        - Send message (Ctrl+Enter still works too)
+   Shift+Enter  - New line (Alt+Enter on non-Kitty terminals)
+   Ctrl+H       - Help (full command list)
+   Ctrl+N       - New session (new feature)
+   Ctrl+L       - Switch sessions (different projects)
    Page Up/Down - Scroll through long code outputs
    ```
 
 5. **Multi-line for Code:**
    - Paste entire functions
-   - Press Enter for newlines
-   - `Ctrl+Enter` when ready to send
+   - Press Shift+Enter (or Alt+Enter) for newlines
+   - `Enter` when ready to send
 
 6. **Markdown for Formatting:**
    - Use triple backticks for code blocks
@@ -2951,11 +3001,18 @@ Try again with correct parameters.
   - Emoji indicators (📝 Session, 🤖 Model, 💬 Tokens, 💰 Cost)
   - Beautiful croissant splash screen on startup
 - **Keyboard Shortcuts** - Efficient navigation and control
-  - `Ctrl+Enter` - Send message
+  - `Enter` - Send message (`Ctrl+Enter` still works as a legacy alias)
+  - `Shift+Enter` - New line (`Alt+Enter` on terminals without Kitty
+    keyboard protocol support)
   - `Ctrl+N` - New session
   - `Ctrl+L` - List sessions
   - `Ctrl+H` - Show help (📚 **Press Ctrl+H from anywhere to see all commands!**)
   - `Ctrl+D` - Download an Ollama model (native provider, `--features ollama`)
+  - `Ctrl+O` - Show the Model Info panel (provider, model, context window, last response perf metrics)
+  - `Ctrl+W` - Switch to a different local Ollama model (native provider, `--features ollama`)
+  - `Ctrl+Y` - Copy last response (or its code block) to clipboard
+  - `Ctrl+V` - Paste from clipboard at cursor
+  - `Shift+Tab` - Cycle Auto Mode: `Interactive` → `AutoPlan` → `FullAuto`
   - `Ctrl+C` - Quit
   - `Escape` - Clear input
   - `Page Up/Down` - Scroll chat history
@@ -3128,7 +3185,7 @@ cargo run
 Hello! Can you introduce yourself?
 ```
 
-4. Press `Ctrl+Enter` to send
+4. Press `Enter` to send (`Ctrl+Enter` still works too)
 
 5. **Expected:**
    - Your message appears in blue
@@ -3198,7 +3255,7 @@ cargo run -- run --format markdown "Explain async/await in 2 sentences"
 ```bash
 cargo run
 # Type: "This is my first conversation"
-# Ctrl+Enter to send
+# Enter to send (Ctrl+Enter still works too)
 # Wait for response
 # Ctrl+C to quit
 ```
@@ -3207,7 +3264,7 @@ cargo run
 ```bash
 cargo run
 # Type: "This is a different conversation"
-# Ctrl+Enter
+# Enter to send
 # Wait for response
 ```
 

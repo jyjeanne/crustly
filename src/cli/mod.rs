@@ -757,6 +757,46 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(AgentTool));
     tool_registry.register(Arc::new(PowerShellTool));
 
+    // Connect to configured MCP servers (`[[mcp.servers]]`) and register
+    // their tools. Fixes a real gap: config.mcp.servers was previously
+    // parsed but never consumed anywhere, so configured servers had zero
+    // runtime effect. Failures are caught per-server (recorded in the
+    // status snapshot for the TUI's `/mcp` view) rather than aborting
+    // startup - one broken MCP server shouldn't block the whole TUI.
+    let mut mcp_status = Vec::new();
+    for server in &config.mcp.servers {
+        let args: Vec<&str> = server.args.iter().map(String::as_str).collect();
+        match tool_registry
+            .register_mcp_server(&server.name, &server.command, &args)
+            .await
+        {
+            Ok(tool_count) => {
+                tracing::info!(
+                    "Connected to MCP server '{}' ({} tools)",
+                    server.name,
+                    tool_count
+                );
+                mcp_status.push(crate::mcp::McpServerStatus {
+                    name: server.name.clone(),
+                    command: server.command.clone(),
+                    connected: true,
+                    tool_count,
+                    error: None,
+                });
+            }
+            Err(e) => {
+                tracing::warn!("Failed to connect to MCP server '{}': {}", server.name, e);
+                mcp_status.push(crate::mcp::McpServerStatus {
+                    name: server.name.clone(),
+                    command: server.command.clone(),
+                    connected: false,
+                    tool_count: 0,
+                    error: Some(e.to_string()),
+                });
+            }
+        }
+    }
+
     // Create service context
     let service_context = ServiceContext::new(db.pool().clone());
 
@@ -775,16 +815,45 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tracing::debug!("Creating TUI app");
     let mut app = tui::App::new(agent_service, service_context.clone());
     app.set_ollama_host(ollama_host(config));
+    app.set_mcp_status(mcp_status);
 
     // Get event sender from app
     let event_sender = app.event_sender();
 
-    // Create approval callback that sends requests to TUI
+    // Shared Auto Mode level (Interactive/AutoPlan/FullAuto), seeded from
+    // config and toggled at runtime by the TUI's Shift+Tab handler
+    // (App::cycle_auto_mode). Cloned into the approval callback below so
+    // toggling it in the TUI takes effect on the very next tool call.
+    let auto_mode = Arc::new(std::sync::Mutex::new(config.plan_mode.mode.clone()));
+    app.set_auto_mode_state(auto_mode.clone());
+
+    // Create approval callback that sends requests to TUI - unless Auto
+    // Mode is active, in which case low-risk tools are approved without
+    // prompting (see PlanExecMode doc comments for exactly what each level
+    // means). High-risk tools (bash/write_file/edit_file/code_exec) still
+    // prompt under AutoPlan; only FullAuto skips the prompt for those too.
+    // This does NOT touch AgentService::auto_approve_tools or the
+    // SecurityConfig policy chain in ToolRegistry::execute - both remain
+    // fully enforced regardless of Auto Mode, so deny-listed tools/paths/
+    // bash patterns stay blocked no matter what, and every auto-approved
+    // call still produces the same "User approved tool" log line as a
+    // manually-approved one (logged downstream in AgentService, not here).
     let approval_callback: crate::llm::agent::ApprovalCallback = Arc::new(move |tool_info| {
         let sender = event_sender.clone();
+        let auto_mode = auto_mode.clone();
         Box::pin(async move {
             use crate::tui::events::{ToolApprovalRequest, TuiEvent};
             use tokio::sync::mpsc;
+
+            let mode = auto_mode.lock().expect("auto_mode mutex poisoned").clone();
+            if auto_mode_bypasses_approval(&mode, &tool_info.tool_name) {
+                tracing::debug!(
+                    "Auto Mode ({:?}) approved tool '{}' without prompting",
+                    mode,
+                    tool_info.tool_name
+                );
+                return Ok(true);
+            }
 
             // Create response channel
             let (response_tx, mut response_rx) = mpsc::unbounded_channel();
@@ -842,6 +911,33 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     println!("\n👋 Goodbye!");
 
     Ok(())
+}
+
+/// Whether the given Auto Mode level should approve `tool_name` without
+/// prompting. Extracted as a pure function (rather than left inline in the
+/// approval callback closure) specifically so this security-relevant
+/// decision has direct unit test coverage independent of the surrounding
+/// channel/TUI plumbing.
+///
+/// - `Interactive`: never bypasses - always prompts.
+/// - `AutoPlan`: bypasses everything except high-risk tools
+///   (`PlanModeState::is_high_risk_tool`: `bash`, `write_file`,
+///   `edit_file`, `code_exec`), which still prompt.
+/// - `FullAuto`: bypasses everything, including high-risk tools.
+///
+/// Callers must not treat this as the only safety layer: the
+/// `SecurityConfig` policy chain (`deny_tools`/`deny_paths`/`allow_bash`)
+/// is evaluated independently in `ToolRegistry::execute()` and stays
+/// enforced regardless of this function's result.
+fn auto_mode_bypasses_approval(mode: &crate::config::PlanExecMode, tool_name: &str) -> bool {
+    use crate::config::PlanExecMode;
+    use crate::tui::plan::PlanModeState;
+
+    match mode {
+        PlanExecMode::Interactive => false,
+        PlanExecMode::AutoPlan => !PlanModeState::is_high_risk_tool(tool_name),
+        PlanExecMode::FullAuto => true,
+    }
 }
 
 /// Run a single command non-interactively
@@ -905,12 +1001,36 @@ async fn cmd_run(
     tool_registry.register(Arc::new(AgentTool));
     tool_registry.register(Arc::new(PowerShellTool));
 
+    // Connect to configured MCP servers, same as cmd_chat - see its
+    // comment for why this needs to happen at all (config.mcp.servers was
+    // previously parsed but never consumed). No status snapshot needed
+    // here since there's no TUI to display it in.
+    for server in &config.mcp.servers {
+        let args: Vec<&str> = server.args.iter().map(String::as_str).collect();
+        match tool_registry
+            .register_mcp_server(&server.name, &server.command, &args)
+            .await
+        {
+            Ok(tool_count) => {
+                tracing::info!(
+                    "Connected to MCP server '{}' ({} tools)",
+                    server.name,
+                    tool_count
+                );
+            }
+            Err(e) => {
+                tracing::warn!("Failed to connect to MCP server '{}': {}", server.name, e);
+            }
+        }
+    }
+
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());
     let agent_service = AgentService::new(provider.clone(), service_context.clone())
         .with_tool_registry(Arc::new(tool_registry))
         .with_system_prompt(SYSTEM_PROMPT.to_string())
-        .with_max_tool_iterations(20);
+        .with_max_tool_iterations(20)
+        .with_auto_approve_tools(auto_approve);
 
     // Create or get session
     let session_service = SessionService::new(service_context);
@@ -1395,6 +1515,94 @@ mod tests {
             num_ctx: None,
         });
         assert_eq!(ollama_host(&config), "http://my-ollama-box:11434");
+    }
+
+    #[test]
+    fn auto_mode_bypasses_approval_interactive_never_bypasses() {
+        use crate::config::PlanExecMode;
+
+        for tool in [
+            "read_file",
+            "grep",
+            "bash",
+            "write_file",
+            "edit_file",
+            "code_exec",
+        ] {
+            assert!(
+                !auto_mode_bypasses_approval(&PlanExecMode::Interactive, tool),
+                "Interactive must always prompt, including for {tool}"
+            );
+        }
+    }
+
+    #[test]
+    fn auto_mode_bypasses_approval_autoplan_gates_high_risk_tools_only() {
+        use crate::config::PlanExecMode;
+
+        // Low-risk tools: bypassed without a prompt.
+        for tool in [
+            "read_file",
+            "grep",
+            "glob",
+            "ls",
+            "web_search",
+            "todo_write",
+        ] {
+            assert!(
+                auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool),
+                "AutoPlan should bypass the low-risk tool {tool}"
+            );
+        }
+
+        // High-risk tools: this is the load-bearing safety property of
+        // AutoPlan - these must still prompt.
+        for tool in ["bash", "write_file", "edit_file", "code_exec"] {
+            assert!(
+                !auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool),
+                "AutoPlan must still prompt for the high-risk tool {tool}"
+            );
+        }
+    }
+
+    #[test]
+    fn known_gap_powershell_is_not_classified_as_high_risk() {
+        use crate::config::PlanExecMode;
+
+        // Documents a pre-existing gap (flagged as an open decision in
+        // ergonomy-improvment.md, not something introduced or silently
+        // fixed here): PlanModeState::is_high_risk_tool() only lists
+        // bash/write_file/edit_file/code_exec, so PowerShell - an
+        // equally-capable arbitrary command execution tool on Windows -
+        // is bypassed by AutoPlan the same as a read-only tool. Whether to
+        // add it (and http/notebook) to the high-risk list is left as an
+        // explicit follow-up decision rather than expanded here, since
+        // that shared classification is also used by pre-existing plan
+        // auto-run code this phase didn't otherwise touch.
+        assert!(auto_mode_bypasses_approval(
+            &PlanExecMode::AutoPlan,
+            "powershell"
+        ));
+    }
+
+    #[test]
+    fn auto_mode_bypasses_approval_fullauto_bypasses_everything() {
+        use crate::config::PlanExecMode;
+
+        for tool in [
+            "read_file",
+            "grep",
+            "bash",
+            "write_file",
+            "edit_file",
+            "code_exec",
+            "powershell",
+        ] {
+            assert!(
+                auto_mode_bypasses_approval(&PlanExecMode::FullAuto, tool),
+                "FullAuto should bypass every tool, including {tool}"
+            );
+        }
     }
 
     #[test]

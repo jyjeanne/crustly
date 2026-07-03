@@ -5,11 +5,13 @@
 use super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResponse, TuiEvent};
 use super::plan::PlanDocument;
 use super::prompt_analyzer::PromptAnalyzer;
+use crate::config::PlanExecMode;
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
 use crate::services::{MessageService, PlanService, ServiceContext, SessionService};
 use anyhow::Result;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use tui_textarea::{CursorMove, TextArea};
 use uuid::Uuid;
 
 /// Display message for UI rendering
@@ -70,10 +72,28 @@ pub struct App {
 
     // UI state
     pub mode: AppMode,
-    pub input_buffer: String,
+    /// Chat message input. A `tui-textarea` widget rather than a raw
+    /// `String` so the user gets real cursor movement, mid-buffer editing,
+    /// and paste-at-cursor instead of append/pop-only editing.
+    pub textarea: TextArea<'static>,
     pub scroll_offset: usize,
     pub selected_session_index: usize,
     pub should_quit: bool,
+    /// Whether the terminal supports the Kitty keyboard enhancement
+    /// protocol (needed to disambiguate `Shift+Enter` from plain `Enter`).
+    /// Set once at startup by the runner; only affects which key hints are
+    /// shown, not which keys are actually handled (`Alt+Enter` always works
+    /// as a newline fallback regardless of this flag).
+    pub kitty_keyboard_protocol_active: bool,
+    /// Current Auto Mode level (`Interactive`/`AutoPlan`/`FullAuto`),
+    /// cycled with `Shift+Tab`. Shared (`Arc<Mutex<..>>`) with the tool
+    /// approval callback set up in `cli::cmd_chat`, so toggling it here
+    /// takes effect on the very next tool call - off by default
+    /// (`Interactive`) unless overridden by `[plan_mode].mode` in config.
+    pub auto_mode: Arc<Mutex<PlanExecMode>>,
+    /// Configured MCP servers' connection status, snapshotted once at
+    /// startup by `cli::cmd_chat` (see `crate::mcp::McpServerStatus`).
+    pub mcp_status: Vec<crate::mcp::McpServerStatus>,
 
     // Streaming state
     pub is_processing: bool,
@@ -113,6 +133,18 @@ pub struct App {
     model_download_task: Option<tokio::task::JoinHandle<()>>,
     ollama_host: String,
 
+    // Provider Switch dialog state (Ctrl+W, native Ollama provider)
+    pub provider_switch_models: Vec<String>,
+    pub provider_switch_selected: usize,
+    pub provider_switch_loading: bool,
+
+    // `/skills` slash command state
+    pub skills_list: Vec<crate::llm::tools::skill::SkillListing>,
+    pub skills_selected: usize,
+
+    // `/mcp` slash command state
+    pub mcp_selected: usize,
+
     // Working directory
     pub working_directory: std::path::PathBuf,
 
@@ -137,10 +169,13 @@ impl App {
             messages: Vec::new(),
             sessions: Vec::new(),
             mode: AppMode::Splash,
-            input_buffer: String::new(),
+            textarea: TextArea::default(),
             scroll_offset: 0,
             selected_session_index: 0,
             should_quit: false,
+            kitty_keyboard_protocol_active: false,
+            auto_mode: Arc::new(Mutex::new(PlanExecMode::default())),
+            mcp_status: Vec::new(),
             is_processing: false,
             streaming_response: None,
             error_message: None,
@@ -165,6 +200,12 @@ impl App {
             model_download_fraction: None,
             model_download_task: None,
             ollama_host: "http://localhost:11434".to_string(),
+            provider_switch_models: Vec::new(),
+            provider_switch_selected: 0,
+            provider_switch_loading: false,
+            skills_list: Vec::new(),
+            skills_selected: 0,
+            mcp_selected: 0,
             working_directory: std::env::current_dir().unwrap_or_default(),
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
@@ -183,6 +224,78 @@ impl App {
     /// Get the provider model
     pub fn provider_model(&self) -> &str {
         self.agent_service.provider_model()
+    }
+
+    /// Get the context window (in tokens) for the active provider/model,
+    /// if known.
+    pub fn provider_context_window(&self) -> Option<u32> {
+        self.agent_service.provider_context_window()
+    }
+
+    /// Get the most recent assistant message, if any - used by the Model
+    /// Info panel to show the last response's performance metrics.
+    pub fn last_assistant_message(&self) -> Option<&DisplayMessage> {
+        self.messages.iter().rev().find(|m| m.role == "assistant")
+    }
+
+    /// The chat input's full text, joining multi-line content with `\n`.
+    pub fn input_text(&self) -> String {
+        self.textarea.lines().join("\n")
+    }
+
+    /// Whether the chat input is empty once whitespace is trimmed (matches
+    /// the old `String::trim().is_empty()` submit guard - a buffer that's
+    /// just whitespace still shouldn't submit).
+    fn input_is_blank(&self) -> bool {
+        self.textarea
+            .lines()
+            .iter()
+            .all(|line| line.trim().is_empty())
+    }
+
+    /// Reset the chat input to empty.
+    fn clear_input(&mut self) {
+        self.textarea = TextArea::default();
+    }
+
+    /// Replace the chat input's entire contents with `text` (used for the
+    /// Plan Mode revision-request pre-fill, which overwrites rather than
+    /// appends).
+    fn set_input_text(&mut self, text: &str) {
+        self.textarea = TextArea::default();
+        self.textarea.insert_str(text);
+    }
+
+    /// Copy the last assistant response to the system clipboard - just its
+    /// last fenced code block if it has one (usually what's actually
+    /// wanted), otherwise the full response text. Fails silently into
+    /// `error_message` rather than panicking: headless environments and
+    /// some terminals/multiplexers have no working clipboard backend.
+    fn copy_last_response_to_clipboard(&mut self) {
+        let Some(content) = self.last_assistant_message().map(|m| m.content.clone()) else {
+            self.error_message = Some("No response to copy yet.".to_string());
+            return;
+        };
+
+        let text = super::markdown::last_code_block(&content).unwrap_or(content);
+
+        if let Err(e) = arboard::Clipboard::new().and_then(|mut cb| cb.set_text(text)) {
+            self.error_message = Some(format!("Couldn't copy to clipboard: {e}"));
+        }
+    }
+
+    /// Paste from the system clipboard at the cursor. An explicit fallback
+    /// alongside bracketed paste (`TuiEvent::Paste`) for terminals/
+    /// multiplexers where bracketed paste doesn't work.
+    fn paste_from_clipboard(&mut self) {
+        match arboard::Clipboard::new().and_then(|mut cb| cb.get_text()) {
+            Ok(text) => {
+                self.textarea.insert_str(&text);
+            }
+            Err(e) => {
+                self.error_message = Some(format!("Couldn't read clipboard: {e}"));
+            }
+        }
     }
 
     /// Initialize the app by loading or creating a session
@@ -227,6 +340,44 @@ impl App {
         self.ollama_host = host;
     }
 
+    /// Record whether the terminal supports the Kitty keyboard enhancement
+    /// protocol, detected once at startup by the runner.
+    pub fn set_kitty_keyboard_protocol_active(&mut self, active: bool) {
+        self.kitty_keyboard_protocol_active = active;
+    }
+
+    /// Replace the Auto Mode shared cell with one already wired into the
+    /// tool approval callback (`cli::cmd_chat`), so toggling it here in the
+    /// TUI actually affects tool approval rather than talking to an
+    /// isolated copy. Also seeds the starting level from config.
+    pub fn set_auto_mode_state(&mut self, auto_mode: Arc<Mutex<PlanExecMode>>) {
+        self.auto_mode = auto_mode;
+    }
+
+    /// Current Auto Mode level.
+    pub fn auto_mode(&self) -> PlanExecMode {
+        self.auto_mode
+            .lock()
+            .expect("auto_mode mutex poisoned")
+            .clone()
+    }
+
+    /// Cycle `Interactive -> AutoPlan -> FullAuto -> Interactive`.
+    fn cycle_auto_mode(&mut self) {
+        let mut guard = self.auto_mode.lock().expect("auto_mode mutex poisoned");
+        *guard = match *guard {
+            PlanExecMode::Interactive => PlanExecMode::AutoPlan,
+            PlanExecMode::AutoPlan => PlanExecMode::FullAuto,
+            PlanExecMode::FullAuto => PlanExecMode::Interactive,
+        };
+    }
+
+    /// Record the configured MCP servers' connection status, snapshotted
+    /// once at startup by `cli::cmd_chat`, for the `/mcp` view.
+    pub fn set_mcp_status(&mut self, status: Vec<crate::mcp::McpServerStatus>) {
+        self.mcp_status = status;
+    }
+
     /// Receive next event
     pub async fn next_event(&mut self) -> Option<TuiEvent> {
         self.event_handler.next().await
@@ -239,9 +390,10 @@ impl App {
                 self.handle_key_event(key_event).await?;
             }
             TuiEvent::Paste(text) => {
-                // Handle paste events - only in Chat mode
+                // Handle paste events - only in Chat mode. Inserted at the
+                // cursor position rather than blindly appended.
                 if self.mode == AppMode::Chat {
-                    self.input_buffer.push_str(&text);
+                    self.textarea.insert_str(&text);
                 }
             }
             TuiEvent::MessageSubmitted(content) => {
@@ -317,6 +469,11 @@ impl App {
             TuiEvent::OllamaModelsListed(models) => {
                 self.model_download_installed = models;
                 self.refresh_model_download_suggestions();
+            }
+            TuiEvent::ProviderSwitchModelsListed(models) => {
+                self.provider_switch_loading = false;
+                self.provider_switch_models = models;
+                self.provider_switch_selected = 0;
             }
             TuiEvent::OllamaPullProgress(progress) => {
                 self.model_download_fraction = progress.fraction();
@@ -421,8 +578,23 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_toggle_auto_mode(&event) {
+            self.cycle_auto_mode();
+            return Ok(());
+        }
+
         if keys::is_model_download(&event) && self.mode == AppMode::Chat {
             self.open_model_download().await?;
+            return Ok(());
+        }
+
+        if keys::is_model_info(&event) && self.mode == AppMode::Chat {
+            self.switch_mode(AppMode::ModelInfo).await?;
+            return Ok(());
+        }
+
+        if keys::is_provider_switch(&event) && self.mode == AppMode::Chat {
+            self.open_provider_switch().await?;
             return Ok(());
         }
 
@@ -445,7 +617,10 @@ impl App {
             AppMode::ToolApproval => self.handle_approval_key(event).await?,
             AppMode::FilePicker => self.handle_file_picker_key(event).await?,
             AppMode::ModelDownload => self.handle_model_download_key(event).await?,
-            AppMode::Help | AppMode::Settings => {
+            AppMode::ProviderSwitch => self.handle_provider_switch_key(event).await?,
+            AppMode::Skills => self.handle_skills_key(event).await?,
+            AppMode::Mcp => self.handle_mcp_key(event).await?,
+            AppMode::Help | AppMode::Settings | AppMode::ModelInfo => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
                 }
@@ -458,14 +633,18 @@ impl App {
     /// Handle keys in chat mode
     async fn handle_chat_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
         use super::events::keys;
-        use crossterm::event::KeyCode;
+        use crossterm::event::{KeyCode, KeyModifiers};
 
-        if keys::is_submit(&event) && !self.input_buffer.trim().is_empty() {
-            let content = self.input_buffer.clone();
-            self.input_buffer.clear();
-            self.send_message(content).await?;
+        if keys::is_submit(&event) && !self.input_is_blank() {
+            let content = self.input_text();
+            self.clear_input();
+            if !self.try_handle_slash_command(&content).await? {
+                self.send_message(content).await?;
+            }
+        } else if keys::is_newline(&event) {
+            self.textarea.insert_newline();
         } else if keys::is_cancel(&event) {
-            self.input_buffer.clear();
+            self.clear_input();
             self.error_message = None;
         } else if keys::is_page_up(&event) {
             // Scroll up (away from bottom) to see older messages
@@ -474,14 +653,18 @@ impl App {
             // Scroll down (toward bottom) to see newer messages
             // When we reach 0, we're at the bottom (auto-scroll mode)
             self.scroll_offset = self.scroll_offset.saturating_sub(10);
+        } else if keys::is_copy_response(&event) {
+            self.copy_last_response_to_clipboard();
+        } else if keys::is_paste_clipboard(&event) {
+            self.paste_from_clipboard();
         } else {
-            // Regular character input
+            let ctrl = event.modifiers.contains(KeyModifiers::CONTROL);
             match event.code {
                 KeyCode::Char('@') => {
                     // Trigger file picker mode
                     self.open_file_picker().await?;
                 }
-                KeyCode::Char('t') if self.input_buffer.is_empty() => {
+                KeyCode::Char('t') if self.textarea.is_empty() => {
                     // Toggle thinking block on the most recent assistant message
                     if let Some(msg) = self
                         .messages
@@ -492,16 +675,42 @@ impl App {
                         msg.thinking_expanded = !msg.thinking_expanded;
                     }
                 }
-                KeyCode::Char(c) => {
-                    self.input_buffer.push(c);
+                // Cursor movement - word-wise with Ctrl, char/line-wise
+                // otherwise. tui-textarea's own `input()` keymap is
+                // deliberately bypassed below (via `input_without_shortcuts`)
+                // because its Emacs-style Ctrl+<letter> bindings collide with
+                // crustly's own global shortcuts (Ctrl+W, Ctrl+P, etc.), so
+                // navigation is wired explicitly here instead.
+                KeyCode::Left if ctrl => self.textarea.move_cursor(CursorMove::WordBack),
+                KeyCode::Right if ctrl => self.textarea.move_cursor(CursorMove::WordForward),
+                KeyCode::Left => self.textarea.move_cursor(CursorMove::Back),
+                KeyCode::Right => self.textarea.move_cursor(CursorMove::Forward),
+                KeyCode::Up => self.textarea.move_cursor(CursorMove::Up),
+                KeyCode::Down => self.textarea.move_cursor(CursorMove::Down),
+                KeyCode::Home => self.textarea.move_cursor(CursorMove::Head),
+                KeyCode::End => self.textarea.move_cursor(CursorMove::End),
+                KeyCode::Backspace if ctrl => {
+                    self.textarea.delete_word();
                 }
-                KeyCode::Backspace => {
-                    self.input_buffer.pop();
+                KeyCode::Delete if ctrl => {
+                    self.textarea.delete_next_word();
                 }
-                KeyCode::Enter => {
-                    self.input_buffer.push('\n');
+                KeyCode::Delete => {
+                    self.textarea.delete_next_char();
                 }
-                _ => {}
+                // Enter reaches here only when is_submit rejected it (blank
+                // buffer) and is_newline didn't match either (no Shift/Alt)
+                // - i.e. plain Enter on empty input, which must do nothing.
+                // Without this arm it would fall to the catch-all below,
+                // and tui-textarea's own `input_without_shortcuts` inserts
+                // a newline for any Enter unconditionally - resurrecting
+                // the exact bug fixed in Phase 1.
+                KeyCode::Enter => {}
+                // Plain character input, Tab, and Backspace - everything
+                // else that needs no app-specific handling.
+                _ => {
+                    self.textarea.input_without_shortcuts(event);
+                }
             }
         }
 
@@ -527,6 +736,83 @@ impl App {
         }
 
         Ok(())
+    }
+
+    /// Open the `/skills` list view. Scans the filesystem synchronously
+    /// (cheap - a handful of directory reads, not a network call) rather
+    /// than spawning a background task the way the Ollama-backed dialogs
+    /// do, then switches mode.
+    async fn open_skills(&mut self) -> Result<()> {
+        self.skills_list = crate::llm::tools::skill::list_skills(&self.working_directory);
+        self.skills_selected = 0;
+        self.switch_mode(AppMode::Skills).await
+    }
+
+    /// Handle keys in the `/skills` list view.
+    async fn handle_skills_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+        } else if keys::is_up(&event) {
+            self.skills_selected = self.skills_selected.saturating_sub(1);
+        } else if keys::is_down(&event) && !self.skills_list.is_empty() {
+            self.skills_selected = (self.skills_selected + 1).min(self.skills_list.len() - 1);
+        }
+
+        Ok(())
+    }
+
+    /// Open the `/mcp` list view. Shows the status snapshot taken once at
+    /// startup (`App::mcp_status`, set via `set_mcp_status`) rather than
+    /// reconnecting live - see the "Open Decisions" note in
+    /// ergonomy-improvment.md about deferring live reconnect-on-open.
+    async fn open_mcp(&mut self) -> Result<()> {
+        self.mcp_selected = 0;
+        self.switch_mode(AppMode::Mcp).await
+    }
+
+    /// Handle keys in the `/mcp` list view.
+    async fn handle_mcp_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+        } else if keys::is_up(&event) {
+            self.mcp_selected = self.mcp_selected.saturating_sub(1);
+        } else if keys::is_down(&event) && !self.mcp_status.is_empty() {
+            self.mcp_selected = (self.mcp_selected + 1).min(self.mcp_status.len() - 1);
+        }
+
+        Ok(())
+    }
+
+    /// Try to interpret `content` (the just-submitted chat input) as a
+    /// slash command. Returns `true` if it was recognized and handled (the
+    /// caller must NOT also forward it to the LLM), `false` otherwise - an
+    /// unrecognized `/word` (e.g. a file path pasted into the input) falls
+    /// through to a normal chat message, exactly as before this existed.
+    async fn try_handle_slash_command(&mut self, content: &str) -> Result<bool> {
+        let trimmed = content.trim();
+        if !trimmed.starts_with('/') {
+            return Ok(false);
+        }
+        let command = trimmed.split_whitespace().next().unwrap_or(trimmed);
+        match command {
+            "/skills" => {
+                self.open_skills().await?;
+                Ok(true)
+            }
+            "/mcp" => {
+                self.open_mcp().await?;
+                Ok(true)
+            }
+            "/help" => {
+                self.switch_mode(AppMode::Help).await?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 
     /// Handle keys in plan mode
@@ -594,10 +880,10 @@ impl App {
                 self.switch_mode(AppMode::Chat).await?;
 
                 // Pre-fill input with revision request
-                self.input_buffer = format!(
+                self.set_input_text(&format!(
                     "Please revise this plan:\n\n{}\n\nRequested changes: ",
                     plan_summary
-                );
+                ));
 
                 // Keep plan in memory for reference (don't clear it)
             }
@@ -1543,9 +1829,9 @@ impl App {
                     // Refresh file list
                     self.open_file_picker().await?;
                 } else {
-                    // Insert file path into input buffer
+                    // Insert file path into input buffer, at the cursor.
                     let path_str = selected_path.to_string_lossy().to_string();
-                    self.input_buffer.push_str(&path_str);
+                    self.textarea.insert_str(&path_str);
                     self.switch_mode(AppMode::Chat).await?;
                 }
             }
@@ -1655,6 +1941,108 @@ impl App {
                     self.refresh_model_download_suggestions();
                 }
                 _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Open the Provider Switch dialog (Ctrl+W). Fetches the list of
+    /// locally-installed Ollama models in the background; the dialog opens
+    /// immediately showing a loading state until they arrive.
+    async fn open_provider_switch(&mut self) -> Result<()> {
+        self.provider_switch_selected = 0;
+        self.provider_switch_models.clear();
+        self.provider_switch_loading = true;
+
+        let host = self.ollama_host.clone();
+        let sender = self.event_sender();
+        tokio::spawn(async move {
+            let models = super::ollama_download::fetch_installed_models(host).await;
+            let _ = sender.send(TuiEvent::ProviderSwitchModelsListed(models));
+        });
+
+        self.switch_mode(AppMode::ProviderSwitch).await
+    }
+
+    /// Handle keys in the Provider Switch dialog.
+    async fn handle_provider_switch_key(
+        &mut self,
+        event: crossterm::event::KeyEvent,
+    ) -> Result<()> {
+        use super::events::keys;
+
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+            return Ok(());
+        }
+
+        // While the model list is still loading, only Esc (handled above)
+        // does anything.
+        if self.provider_switch_loading {
+            return Ok(());
+        }
+
+        if keys::is_up(&event) {
+            self.provider_switch_selected = self.provider_switch_selected.saturating_sub(1);
+        } else if keys::is_down(&event) {
+            if !self.provider_switch_models.is_empty() {
+                self.provider_switch_selected =
+                    (self.provider_switch_selected + 1).min(self.provider_switch_models.len() - 1);
+            }
+        } else if keys::is_enter(&event) {
+            if let Some(model) = self
+                .provider_switch_models
+                .get(self.provider_switch_selected)
+                .cloned()
+            {
+                self.switch_provider_to_ollama_model(model).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Switch the active provider to the native Ollama provider running
+    /// `model` on `self.ollama_host`, in place - preserving the tool
+    /// registry, approval callback, and every other `AgentService` setting
+    /// (see `AgentService::set_provider`, which mutates the provider field
+    /// only rather than rebuilding the service from scratch).
+    ///
+    /// Fails safely with a visible error instead of switching if a request
+    /// is currently in flight: a background task may be holding a clone of
+    /// `agent_service` at that moment, in which case `Arc::get_mut` simply
+    /// returns `None` rather than allowing an unsafe in-place mutation.
+    async fn switch_provider_to_ollama_model(&mut self, model: String) -> Result<()> {
+        match super::ollama_download::build_ollama_provider(&self.ollama_host, &model) {
+            Ok(provider) => match Arc::get_mut(&mut self.agent_service) {
+                Some(service) => {
+                    service.set_provider(provider);
+                    let notification = DisplayMessage {
+                        id: Uuid::new_v4(),
+                        role: "system".to_string(),
+                        content: format!("✅ Switched to Ollama model '{model}'."),
+                        thinking_text: None,
+                        thinking_expanded: false,
+                        timestamp: chrono::Utc::now(),
+                        token_count: None,
+                        cost: None,
+                        provider_name: None,
+                        perf_metrics: None,
+                        tokens_per_second: None,
+                    };
+                    self.messages.push(notification);
+                    self.switch_mode(AppMode::Chat).await?;
+                }
+                None => {
+                    self.error_message = Some(
+                        "Can't switch provider while a response is in progress - try again once it finishes."
+                            .to_string(),
+                    );
+                }
+            },
+            Err(e) => {
+                self.error_message = Some(e);
             }
         }
 
@@ -1896,5 +2284,629 @@ mod tests {
             .iter()
             .any(|m| m.content.contains("Failed to pull 'bogus-model'")
                 && m.content.contains("model not found")));
+    }
+
+    fn key_mod(code: KeyCode, modifiers: KeyModifiers) -> crossterm::event::KeyEvent {
+        crossterm::event::KeyEvent::new(code, modifiers)
+    }
+
+    #[tokio::test]
+    async fn chat_shift_enter_inserts_newline_instead_of_submitting() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.handle_chat_key(key(KeyCode::Char('h'))).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Char('i'))).await.unwrap();
+        app.handle_chat_key(key_mod(KeyCode::Enter, KeyModifiers::SHIFT))
+            .await
+            .unwrap();
+        app.handle_chat_key(key(KeyCode::Char('!'))).await.unwrap();
+
+        assert_eq!(app.input_text(), "hi\n!");
+        assert_eq!(app.mode, AppMode::Chat, "Shift+Enter must not submit");
+    }
+
+    #[tokio::test]
+    async fn chat_alt_enter_inserts_newline_as_non_kitty_fallback() {
+        let mut app = test_app().await;
+        app.handle_chat_key(key(KeyCode::Char('x'))).await.unwrap();
+        app.handle_chat_key(key_mod(KeyCode::Enter, KeyModifiers::ALT))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_text(), "x\n");
+    }
+
+    #[tokio::test]
+    async fn chat_left_arrow_moves_cursor_for_mid_buffer_insert() {
+        let mut app = test_app().await;
+        for c in "helo".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        // Cursor is after "helo"; move back 1 to sit between 'l' and 'o',
+        // then insert 'l' - a real cursor means this edits mid-buffer
+        // instead of always appending at the end.
+        app.handle_chat_key(key(KeyCode::Left)).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Char('l'))).await.unwrap();
+
+        assert_eq!(app.input_text(), "hello");
+    }
+
+    #[tokio::test]
+    async fn chat_backspace_deletes_at_cursor_not_always_the_last_char() {
+        let mut app = test_app().await;
+        for c in "helllo".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        // Cursor is after the trailing "o"; move back 2 to sit right after
+        // the extra 'l' (index: h-e-l-l-l-o, cursor after 4th char "helll"),
+        // then backspace should remove that extra 'l', not the trailing 'o'.
+        app.handle_chat_key(key(KeyCode::Left)).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Left)).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Backspace)).await.unwrap();
+
+        assert_eq!(app.input_text(), "hello");
+    }
+
+    #[tokio::test]
+    async fn chat_home_and_end_move_cursor_to_line_boundaries() {
+        let mut app = test_app().await;
+        for c in "hello".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        assert_eq!(app.textarea.cursor(), (0, 5));
+
+        app.handle_chat_key(key(KeyCode::Home)).await.unwrap();
+        assert_eq!(app.textarea.cursor(), (0, 0));
+
+        app.handle_chat_key(key(KeyCode::End)).await.unwrap();
+        assert_eq!(app.textarea.cursor(), (0, 5));
+    }
+
+    #[tokio::test]
+    async fn chat_ctrl_left_right_jump_by_word() {
+        let mut app = test_app().await;
+        for c in "hello world".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        assert_eq!(app.textarea.cursor(), (0, 11));
+
+        app.handle_chat_key(key_mod(KeyCode::Left, KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+        // Cursor should now sit at the start of "world", not just move one
+        // character back.
+        assert_eq!(app.textarea.cursor(), (0, 6));
+    }
+
+    #[tokio::test]
+    async fn chat_ctrl_backspace_deletes_whole_word() {
+        let mut app = test_app().await;
+        for c in "hello world".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        app.handle_chat_key(key_mod(KeyCode::Backspace, KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_text(), "hello ");
+    }
+
+    #[tokio::test]
+    async fn paste_inserts_at_cursor_not_always_appended_at_the_end() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        for c in "helo".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        app.handle_chat_key(key(KeyCode::Left)).await.unwrap();
+
+        app.handle_event(TuiEvent::Paste("l".to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_text(), "hello");
+    }
+
+    #[tokio::test]
+    async fn paste_with_embedded_newline_produces_multiple_lines() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_event(TuiEvent::Paste("line one\nline two".to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_text(), "line one\nline two");
+    }
+
+    #[tokio::test]
+    async fn ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_chat_key(key_mod(KeyCode::Char('y'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.error_message.as_deref(),
+            Some("No response to copy yet.")
+        );
+    }
+
+    #[tokio::test]
+    async fn ctrl_y_copies_last_code_block_when_present() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "Here you go:\n\n```rust\nfn main() {}\n```".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+
+        app.handle_chat_key(key_mod(KeyCode::Char('y'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        // Clipboard availability is platform/environment-dependent: headless
+        // Linux CI has no backend and must fail gracefully with a
+        // clipboard-specific error (not the "no response" one); macOS/
+        // Windows CI runners typically have a real system clipboard, in
+        // which case the extracted code block must actually be there.
+        match &app.error_message {
+            Some(err) => assert!(err.contains("clipboard"), "unexpected error: {err}"),
+            None => {
+                let copied = arboard::Clipboard::new()
+                    .and_then(|mut cb| cb.get_text())
+                    .expect("clipboard copy just succeeded, so read-back must too");
+                assert_eq!(copied, "fn main() {}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_chat_key(key_mod(KeyCode::Char('v'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        // Clipboard availability is platform/environment-dependent (see
+        // ctrl_y_copies_last_code_block_when_present). On a headless Linux
+        // CI runner with no backend, this must fail gracefully into
+        // error_message rather than panic, and must not insert anything
+        // into the input. On macOS/Windows CI, a real clipboard read
+        // succeeds (with whatever text happens to be there) and the only
+        // requirement is that it doesn't panic.
+        if let Some(err) = &app.error_message {
+            assert!(err.contains("clipboard"), "unexpected error: {err}");
+            assert!(app.textarea.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn auto_mode_defaults_to_interactive() {
+        let app = test_app().await;
+        assert_eq!(app.auto_mode(), PlanExecMode::Interactive);
+    }
+
+    #[tokio::test]
+    async fn shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps() {
+        let mut app = test_app().await;
+
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+        assert_eq!(app.auto_mode(), PlanExecMode::AutoPlan);
+
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+        assert_eq!(app.auto_mode(), PlanExecMode::FullAuto);
+
+        // Wraps back to Interactive - Auto Mode is not a one-way ratchet.
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+        assert_eq!(app.auto_mode(), PlanExecMode::Interactive);
+    }
+
+    #[tokio::test]
+    async fn shift_tab_works_from_any_mode_not_just_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Plan;
+
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+
+        assert_eq!(app.auto_mode(), PlanExecMode::AutoPlan);
+        // Must not have also changed the current screen/dialog mode.
+        assert_eq!(app.mode, AppMode::Plan);
+    }
+
+    #[tokio::test]
+    async fn setting_auto_mode_state_shares_the_same_cell_as_a_clone() {
+        // This is the property the CLI's approval callback relies on:
+        // App::set_auto_mode_state must install the *same* Arc<Mutex<_>>
+        // the callback was built with, not a copy - otherwise toggling
+        // Shift+Tab in the TUI would never affect approval decisions.
+        let mut app = test_app().await;
+        let shared = Arc::new(Mutex::new(PlanExecMode::FullAuto));
+        app.set_auto_mode_state(shared.clone());
+
+        assert_eq!(app.auto_mode(), PlanExecMode::FullAuto);
+
+        app.handle_key_event(key(KeyCode::BackTab)).await.unwrap();
+
+        // The external handle must observe the change made through `app`.
+        assert_eq!(*shared.lock().unwrap(), PlanExecMode::Interactive);
+    }
+
+    #[tokio::test]
+    async fn slash_skills_command_opens_skills_view() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.working_directory = std::env::temp_dir();
+
+        assert!(app.try_handle_slash_command("/skills").await.unwrap());
+
+        assert_eq!(app.mode, AppMode::Skills);
+    }
+
+    #[tokio::test]
+    async fn slash_mcp_command_opens_mcp_view() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.mcp_status = vec![crate::mcp::McpServerStatus {
+            name: "test-server".to_string(),
+            command: "echo".to_string(),
+            connected: true,
+            tool_count: 3,
+            error: None,
+        }];
+
+        assert!(app.try_handle_slash_command("/mcp").await.unwrap());
+
+        assert_eq!(app.mode, AppMode::Mcp);
+    }
+
+    #[tokio::test]
+    async fn slash_help_command_opens_help_view() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        assert!(app.try_handle_slash_command("/help").await.unwrap());
+
+        assert_eq!(app.mode, AppMode::Help);
+    }
+
+    #[tokio::test]
+    async fn unrecognized_slash_word_falls_through_instead_of_being_swallowed() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        // A file path, not a command - must not be recognized/consumed.
+        let handled = app
+            .try_handle_slash_command("/usr/local/bin/cargo")
+            .await
+            .unwrap();
+
+        assert!(!handled);
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn non_slash_message_is_never_treated_as_a_command() {
+        let mut app = test_app().await;
+        let handled = app
+            .try_handle_slash_command("just a normal message")
+            .await
+            .unwrap();
+        assert!(!handled);
+    }
+
+    #[tokio::test]
+    async fn typing_and_submitting_slash_skills_opens_the_dialog_end_to_end() {
+        // Exercises the real path: typing characters into the textarea and
+        // pressing Enter, not calling try_handle_slash_command directly.
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.working_directory = std::env::temp_dir();
+
+        for c in "/skills".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        app.handle_chat_key(key(KeyCode::Enter)).await.unwrap();
+
+        assert_eq!(app.mode, AppMode::Skills);
+        // Must not have left the command text sitting in the input.
+        assert!(app.textarea.is_empty());
+    }
+
+    #[tokio::test]
+    async fn skills_view_up_down_navigation_clamps_at_bounds() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Skills;
+        app.skills_list = vec![
+            crate::llm::tools::skill::SkillListing {
+                name: "a".to_string(),
+                description: None,
+                root: std::path::PathBuf::new(),
+            },
+            crate::llm::tools::skill::SkillListing {
+                name: "b".to_string(),
+                description: None,
+                root: std::path::PathBuf::new(),
+            },
+        ];
+
+        app.handle_skills_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.skills_selected, 0);
+
+        app.handle_skills_key(key(KeyCode::Down)).await.unwrap();
+        app.handle_skills_key(key(KeyCode::Down)).await.unwrap();
+        assert_eq!(app.skills_selected, 1);
+    }
+
+    #[tokio::test]
+    async fn skills_view_esc_returns_to_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Skills;
+
+        app.handle_skills_key(key(KeyCode::Esc)).await.unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn mcp_view_up_down_navigation_clamps_at_bounds() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+        app.mcp_status = vec![
+            crate::mcp::McpServerStatus {
+                name: "a".to_string(),
+                command: "cmd-a".to_string(),
+                connected: true,
+                tool_count: 1,
+                error: None,
+            },
+            crate::mcp::McpServerStatus {
+                name: "b".to_string(),
+                command: "cmd-b".to_string(),
+                connected: false,
+                tool_count: 0,
+                error: Some("failed to spawn".to_string()),
+            },
+        ];
+
+        app.handle_mcp_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.mcp_selected, 0);
+
+        app.handle_mcp_key(key(KeyCode::Down)).await.unwrap();
+        app.handle_mcp_key(key(KeyCode::Down)).await.unwrap();
+        assert_eq!(app.mcp_selected, 1);
+    }
+
+    #[tokio::test]
+    async fn mcp_view_esc_returns_to_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+
+        app.handle_mcp_key(key(KeyCode::Esc)).await.unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn chat_plain_enter_submits_and_clears_buffer() {
+        let mut app = test_app().await;
+        app.handle_chat_key(key(KeyCode::Char('h'))).await.unwrap();
+        app.handle_chat_key(key(KeyCode::Char('i'))).await.unwrap();
+
+        // Plain Enter now sends (no session is set up in this harness, so
+        // send_message() is a no-op, but the input buffer must still clear
+        // as soon as submit is triggered).
+        app.handle_chat_key(key(KeyCode::Enter)).await.unwrap();
+
+        assert!(app.textarea.is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_plain_enter_on_empty_buffer_does_nothing() {
+        let mut app = test_app().await;
+
+        app.handle_chat_key(key(KeyCode::Enter)).await.unwrap();
+
+        assert!(app.textarea.is_empty());
+        assert!(app.messages.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ctrl_o_opens_model_info_panel_and_esc_closes_it() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_key_event(key_mod(KeyCode::Char('o'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+        assert_eq!(app.mode, AppMode::ModelInfo);
+
+        app.handle_key_event(key(KeyCode::Esc)).await.unwrap();
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn last_assistant_message_finds_most_recent_assistant_reply() {
+        let mut app = test_app().await;
+        assert!(app.last_assistant_message().is_none());
+
+        app.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "user".to_string(),
+            content: "hi".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+        app.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "first".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+        app.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "second".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+
+        assert_eq!(app.last_assistant_message().unwrap().content, "second");
+    }
+
+    #[tokio::test]
+    async fn chat_ctrl_enter_still_submits_as_legacy_alias() {
+        let mut app = test_app().await;
+        app.handle_chat_key(key(KeyCode::Char('h'))).await.unwrap();
+
+        app.handle_chat_key(key_mod(KeyCode::Enter, KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert!(app.textarea.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ctrl_w_opens_provider_switch_dialog_in_loading_state() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_key_event(key_mod(KeyCode::Char('w'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert_eq!(app.mode, AppMode::ProviderSwitch);
+        assert!(app.provider_switch_loading);
+        assert!(app.provider_switch_models.is_empty());
+    }
+
+    #[tokio::test]
+    async fn provider_switch_models_listed_clears_loading_state() {
+        let mut app = test_app().await;
+        app.provider_switch_loading = true;
+
+        app.handle_event(TuiEvent::ProviderSwitchModelsListed(vec![
+            "qwen2.5-coder:7b".to_string(),
+            "llama3.2:3b".to_string(),
+        ]))
+        .await
+        .unwrap();
+
+        assert!(!app.provider_switch_loading);
+        assert_eq!(app.provider_switch_models.len(), 2);
+        assert_eq!(app.provider_switch_selected, 0);
+    }
+
+    #[tokio::test]
+    async fn provider_switch_up_down_navigation_clamps_at_bounds() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ProviderSwitch;
+        app.provider_switch_loading = false;
+        app.provider_switch_models = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+
+        // Up from index 0 stays at 0.
+        app.handle_provider_switch_key(key(KeyCode::Up))
+            .await
+            .unwrap();
+        assert_eq!(app.provider_switch_selected, 0);
+
+        app.handle_provider_switch_key(key(KeyCode::Down))
+            .await
+            .unwrap();
+        app.handle_provider_switch_key(key(KeyCode::Down))
+            .await
+            .unwrap();
+        assert_eq!(app.provider_switch_selected, 2);
+
+        // Down at the last index stays at the last index.
+        app.handle_provider_switch_key(key(KeyCode::Down))
+            .await
+            .unwrap();
+        assert_eq!(app.provider_switch_selected, 2);
+    }
+
+    #[tokio::test]
+    async fn provider_switch_esc_returns_to_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ProviderSwitch;
+        app.provider_switch_loading = true;
+
+        app.handle_provider_switch_key(key(KeyCode::Esc))
+            .await
+            .unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[cfg(not(feature = "ollama"))]
+    #[tokio::test]
+    async fn switch_provider_without_ollama_feature_shows_clear_error() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ProviderSwitch;
+
+        app.switch_provider_to_ollama_model("qwen2.5-coder:7b".to_string())
+            .await
+            .unwrap();
+
+        assert!(app
+            .error_message
+            .as_ref()
+            .is_some_and(|e| e.contains("--features ollama")));
+        // Must not silently pretend to switch mode/post a success message.
+        assert_eq!(app.mode, AppMode::ProviderSwitch);
+    }
+
+    #[cfg(feature = "ollama")]
+    #[tokio::test]
+    async fn switch_provider_with_ollama_feature_swaps_provider_in_place() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ProviderSwitch;
+        let original_provider_name = app.provider_name().to_string();
+
+        app.switch_provider_to_ollama_model("qwen2.5-coder:7b".to_string())
+            .await
+            .unwrap();
+
+        assert!(app.error_message.is_none());
+        assert_eq!(app.mode, AppMode::Chat);
+        assert_eq!(app.provider_name(), "ollama");
+        assert_ne!(app.provider_name(), original_provider_name);
+        assert_eq!(app.provider_model(), "qwen2.5-coder:7b");
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Switched to Ollama model")));
     }
 }

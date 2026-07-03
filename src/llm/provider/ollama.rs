@@ -450,12 +450,9 @@ impl Provider for OllamaProvider {
                     stop_sequence: None,
                 },
                 usage: final_usage,
+                perf_metrics: final_perf,
             });
         }
-        // `perf_metrics` from `final_perf` isn't threaded onto `StreamEvent`
-        // today (no slot for it); non-streaming `complete()` is the primary
-        // path for surfacing PerfMetrics in the TUI (see agent/service.rs).
-        let _ = final_perf;
         events.push(StreamEvent::MessageStop);
 
         let event_stream = futures::stream::iter(events.into_iter().map(Ok::<_, ProviderError>));

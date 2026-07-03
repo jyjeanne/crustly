@@ -86,6 +86,32 @@ pub async fn fetch_installed_models(_host: String) -> Vec<String> {
     Vec::new()
 }
 
+/// Build a native Ollama provider for `model`, for the Provider Switch
+/// dialog (Ctrl+W). Returns a clear error instead of silently doing
+/// nothing when this build wasn't compiled with `--features ollama`.
+#[cfg(feature = "ollama")]
+pub fn build_ollama_provider(
+    host: &str,
+    model: &str,
+) -> Result<std::sync::Arc<dyn crate::llm::provider::Provider>, String> {
+    Ok(std::sync::Arc::new(
+        crate::llm::provider::OllamaProvider::new(host.to_string())
+            .with_default_model(model.to_string()),
+    ))
+}
+
+#[cfg(not(feature = "ollama"))]
+pub fn build_ollama_provider(
+    _host: &str,
+    _model: &str,
+) -> Result<std::sync::Arc<dyn crate::llm::provider::Provider>, String> {
+    Err(
+        "This build of crustly was compiled without the 'ollama' feature. \
+         Rebuild with `--features ollama` (or `all-llm`)."
+            .to_string(),
+    )
+}
+
 /// Start pulling `model` in the background, forwarding progress and the
 /// final result through `event_sender`. Returns the `JoinHandle` of the
 /// pull task itself so the caller can `.abort()` it (e.g. on Esc).

@@ -6,6 +6,7 @@ use super::app::App;
 use super::events::AppMode;
 use super::markdown::parse_markdown;
 use super::splash;
+use crate::config::PlanExecMode;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -65,6 +66,18 @@ pub fn render(f: &mut Frame, app: &App) {
         }
         AppMode::ModelDownload => {
             render_model_download(f, app, chunks[1]);
+        }
+        AppMode::ModelInfo => {
+            render_model_info(f, app, chunks[1]);
+        }
+        AppMode::ProviderSwitch => {
+            render_provider_switch(f, app, chunks[1]);
+        }
+        AppMode::Skills => {
+            render_skills(f, app, chunks[1]);
+        }
+        AppMode::Mcp => {
+            render_mcp(f, app, chunks[1]);
         }
     }
 
@@ -406,28 +419,25 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(chat, area);
 }
 
-/// Render the input box
+/// Render the input box. Clones `app.textarea` rather than mutating it in
+/// place, since every other `render_*` function takes `app: &App` and this
+/// keeps that read-only convention intact (`TextArea::set_block`/
+/// `set_cursor_style` need `&mut self`, but only to apply per-frame
+/// styling, not to change the actual buffer contents).
 fn render_input(f: &mut Frame, app: &App, area: Rect) {
-    let mut input_text = app.input_buffer.clone();
-
-    // Add cursor indicator
-    if !app.is_processing {
-        input_text.push('█');
-    }
-
-    let input_lines: Vec<Line> = input_text
-        .lines()
-        .map(|line| Line::from(line.to_string()))
-        .collect();
-
     let title = if app.is_processing {
         Span::styled(
             " ⏸️  Input (waiting for response...) ",
             Style::default().fg(Color::DarkGray),
         )
     } else {
+        let newline_hint = if app.kitty_keyboard_protocol_active {
+            "Shift+Enter for newline"
+        } else {
+            "Alt+Enter for newline"
+        };
         Span::styled(
-            " ✏️  Type your message (Ctrl+Enter to send, Esc to clear) ",
+            format!(" ✏️  Type your message (Enter to send, {newline_hint}, Esc to clear) "),
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
@@ -440,17 +450,21 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
         Style::default().fg(Color::Cyan)
     };
 
-    let input = Paragraph::new(input_lines)
-        .style(Style::default().fg(Color::White))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(title)
-                .border_style(border_style),
-        )
-        .wrap(Wrap { trim: false });
+    let mut textarea = app.textarea.clone();
+    textarea.set_style(Style::default().fg(Color::White));
+    if app.is_processing {
+        // No visible cursor while a response is in flight, matching the
+        // previous behavior of not appending a cursor glyph.
+        textarea.set_cursor_style(Style::default());
+    }
+    textarea.set_block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .border_style(border_style),
+    );
 
-    f.render_widget(input, area);
+    f.render_widget(textarea.widget(), area);
 }
 
 /// Render the sessions list
@@ -502,8 +516,131 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(sessions, area);
 }
 
+/// Render the `/skills` list view.
+fn render_skills(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(Span::styled(
+        "Discoverable skills (↑/↓ to navigate, Esc to close)",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    if app.skills_list.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "No skills found in .crustly/skills, .claude/skills, or their user-global equivalents.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, skill) in app.skills_list.iter().enumerate() {
+            let is_selected = idx == app.skills_selected;
+            let prefix = if is_selected { "> " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+
+            lines.push(Line::from(Span::styled(
+                format!("{prefix}{}", skill.name),
+                style,
+            )));
+            if let Some(desc) = &skill.description {
+                lines.push(Line::from(Span::styled(
+                    format!("      {desc}"),
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+        }
+    }
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " /skills ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the `/mcp` list view.
+fn render_mcp(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(Span::styled(
+        "Configured MCP servers (↑/↓ to navigate, Esc to close)",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    if app.mcp_status.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "No MCP servers configured. Add entries under [[mcp.servers]] in config.toml.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, server) in app.mcp_status.iter().enumerate() {
+            let is_selected = idx == app.mcp_selected;
+            let prefix = if is_selected { "> " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let status = if server.connected {
+                format!("connected, {} tools", server.tool_count)
+            } else {
+                "not connected".to_string()
+            };
+
+            lines.push(Line::from(Span::styled(
+                format!("{prefix}{} — {} ({status})", server.name, server.command),
+                style,
+            )));
+            if let Some(err) = &server.error {
+                lines.push(Line::from(Span::styled(
+                    format!("      {err}"),
+                    Style::default().fg(Color::Red),
+                )));
+            }
+        }
+    }
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " /mcp ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
 /// Render the help screen
-fn render_help(f: &mut Frame, _app: &App, area: Rect) {
+fn render_help(f: &mut Frame, app: &App, area: Rect) {
     let help_text = vec![
         Line::from(vec![
             Span::styled("🥐 ", Style::default().fg(Color::Rgb(218, 165, 32))),
@@ -576,6 +713,45 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
                 Style::default().fg(Color::White),
             ),
         ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+O       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Show Model Info panel (provider, model, context, perf)",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+W       ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Switch to a different local Ollama model",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Shift+Tab    ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Cycle Auto Mode: Interactive → AutoPlan → FullAuto",
+                Style::default().fg(Color::White),
+            ),
+        ]),
         Line::from(""),
         Line::from(Span::styled(
             "╭─ CHAT MODE ───────────────────────────────────────────────╮",
@@ -584,7 +760,7 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "  Ctrl+Enter   ",
+                "  Enter        ",
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
@@ -594,7 +770,11 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled(
-                "  Enter        ",
+                if app.kitty_keyboard_protocol_active {
+                    "  Shift+Enter  "
+                } else {
+                    "  Alt+Enter    "
+                },
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
@@ -607,13 +787,81 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled(
+                "  Ctrl+Enter   ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Send message (legacy alias)",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  ←/→/↑/↓      ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Move cursor (Ctrl+←/→ jumps by word)",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Home/End     ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Jump to start/end of line",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
                 "  Backspace    ",
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Delete last character", Style::default().fg(Color::White)),
+            Span::styled(
+                "Delete character at cursor (Ctrl+Backspace/Delete: whole word)",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+Y       ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Copy last response (or its code block) to clipboard",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  Ctrl+V       ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Paste from system clipboard at cursor",
+                Style::default().fg(Color::White),
+            ),
         ]),
         Line::from(vec![
             Span::styled(
@@ -1456,6 +1704,174 @@ fn render_file_picker(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(widget, area);
 }
 
+/// Render the Model Info panel (Ctrl+O): active provider/model, context
+/// window, and the last response's performance metrics, if any.
+fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(vec![
+        Span::styled("Provider: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!(
+                "{} {}",
+                provider_icon(app.provider_name()),
+                app.provider_name()
+            ),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled("Model:    ", Style::default().fg(Color::DarkGray)),
+        Span::styled(app.provider_model(), Style::default().fg(Color::White)),
+    ]));
+    let context_window = app
+        .provider_context_window()
+        .map(|n| format!("{n} tokens"))
+        .unwrap_or_else(|| "unknown".to_string());
+    lines.push(Line::from(vec![
+        Span::styled("Context:  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(context_window, Style::default().fg(Color::White)),
+    ]));
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Last response performance",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+
+    // Look up the last assistant message once and reuse it, rather than
+    // scanning app.messages twice (once for perf_metrics, once for
+    // tokens_per_second) on every render.
+    let last_msg = app.last_assistant_message();
+    match last_msg.and_then(|m| m.perf_metrics.as_ref()) {
+        Some(perf) => {
+            // Matches the `{ms}ms` (no space) convention used by the
+            // per-message performance footer in render_chat.
+            let ms = |v: Option<u64>| {
+                v.map(|ms| format!("{ms}ms"))
+                    .unwrap_or_else(|| "n/a".to_string())
+            };
+            let start = match perf.model_was_loaded {
+                Some(true) => " · 🔥 warm start",
+                Some(false) => " · 🧊 cold start",
+                None => "",
+            };
+            lines.push(Line::from(format!(
+                "  Load: {}{}",
+                ms(perf.load_duration_ms),
+                start
+            )));
+            lines.push(Line::from(format!(
+                "  Prefill: {}",
+                ms(perf.prompt_eval_duration_ms)
+            )));
+            lines.push(Line::from(format!(
+                "  Generation: {}",
+                ms(perf.eval_duration_ms)
+            )));
+            lines.push(Line::from(format!(
+                "  Total: {}",
+                ms(perf.total_duration_ms)
+            )));
+            if let Some(tps) = last_msg.and_then(|m| m.tokens_per_second) {
+                // Matches the integer-precision convention used by the
+                // header and per-message footer for tokens/sec.
+                lines.push(Line::from(format!("  Throughput: {tps:.0} tok/s")));
+            }
+        }
+        None => {
+            lines.push(Line::from(Span::styled(
+                "  No performance metrics yet — send a message to see stats.",
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "[Esc]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Close", Style::default().fg(Color::White)),
+    ]));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Model Info ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the Provider Switch dialog (Ctrl+W): pick a locally-installed
+/// Ollama model and switch the active provider to it without restarting.
+fn render_provider_switch(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(Span::styled(
+        "Switch to a locally-installed Ollama model (↑/↓ navigate, Enter to switch, Esc to cancel)",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    if app.provider_switch_loading {
+        lines.push(Line::from(Span::styled(
+            "Loading installed Ollama models…",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else if app.provider_switch_models.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "No Ollama models installed. Use Ctrl+D to download one first.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, model) in app.provider_switch_models.iter().enumerate() {
+            let is_selected = idx == app.provider_switch_selected;
+            let prefix = if is_selected { "> " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            lines.push(Line::from(Span::styled(format!("{prefix}{model}"), style)));
+        }
+    }
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Switch Provider ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
 /// Render the Model Download dialog (Ctrl+D): either the model
 /// name input + suggestions list, or a live progress bar while a pull is
 /// in flight.
@@ -1638,16 +2054,27 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::ToolApproval => "PERMISSION",
         AppMode::FilePicker => "FILE PICKER",
         AppMode::ModelDownload => "MODEL DOWNLOAD",
+        AppMode::ModelInfo => "MODEL INFO",
+        AppMode::ProviderSwitch => "SWITCH PROVIDER",
+        AppMode::Skills => "/SKILLS",
+        AppMode::Mcp => "/MCP",
+    };
+
+    let auto_mode = app.auto_mode();
+    let auto_mode_label = match auto_mode {
+        PlanExecMode::Interactive => "⚙ Interactive",
+        PlanExecMode::AutoPlan => "⚡ AutoPlan",
+        PlanExecMode::FullAuto => "⚡⚡ FullAuto",
     };
 
     let status = if let Some(ref error) = app.error_message {
-        format!(" [{}] ERROR: {}", mode_text, error)
+        format!(" [{}] {} │ ERROR: {}", mode_text, auto_mode_label, error)
     } else if app.is_processing {
-        format!(" [{}] Processing...", mode_text)
+        format!(" [{}] {} │ Processing...", mode_text, auto_mode_label)
     } else {
         format!(
-            " [{}] Ready │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
-            mode_text
+            " [{}] {} │ Shift+Tab: Auto Mode │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            mode_text, auto_mode_label
         )
     };
 
@@ -1656,7 +2083,11 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     } else if app.is_processing {
         Color::Yellow
     } else {
-        Color::Green
+        match auto_mode {
+            PlanExecMode::Interactive => Color::Green,
+            PlanExecMode::AutoPlan => Color::Yellow,
+            PlanExecMode::FullAuto => Color::Red,
+        }
     };
 
     let status_bar =
@@ -1783,6 +2214,102 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn status_bar_shows_interactive_by_default() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Interactive"));
+    }
+
+    #[tokio::test]
+    async fn status_bar_shows_full_auto_when_active() {
+        use crate::config::PlanExecMode;
+
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.set_auto_mode_state(std::sync::Arc::new(std::sync::Mutex::new(
+            PlanExecMode::FullAuto,
+        )));
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("FullAuto"));
+        // The persistent indicator must survive an error state too - Auto
+        // Mode being active should never become invisible.
+        app.error_message = Some("boom".to_string());
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("FullAuto"));
+    }
+
+    #[tokio::test]
+    async fn skills_view_shows_name_and_description() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Skills;
+        app.skills_list = vec![crate::llm::tools::skill::SkillListing {
+            name: "my-skill".to_string(),
+            description: Some("Does something cool".to_string()),
+            root: std::path::PathBuf::new(),
+        }];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("my-skill"));
+        assert!(screen.contains("Does something cool"));
+    }
+
+    #[tokio::test]
+    async fn skills_view_shows_empty_state_message() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Skills;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("No skills found"));
+    }
+
+    #[tokio::test]
+    async fn mcp_view_shows_connected_server_with_tool_count() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+        app.mcp_status = vec![crate::mcp::McpServerStatus {
+            name: "my-server".to_string(),
+            command: "my-mcp-binary".to_string(),
+            connected: true,
+            tool_count: 5,
+            error: None,
+        }];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("my-server"));
+        assert!(screen.contains("connected, 5 tools"));
+    }
+
+    #[tokio::test]
+    async fn mcp_view_shows_connection_error() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+        app.mcp_status = vec![crate::mcp::McpServerStatus {
+            name: "broken-server".to_string(),
+            command: "nonexistent-binary".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("No such file or directory".to_string()),
+        }];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("broken-server"));
+        assert!(screen.contains("not connected"));
+        assert!(screen.contains("No such file or directory"));
+    }
+
+    #[tokio::test]
+    async fn mcp_view_shows_empty_state_message() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Mcp;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("No MCP servers configured"));
+    }
+
+    #[tokio::test]
     async fn model_download_dialog_shows_prompt_and_suggestions() {
         let mut app = test_app().await;
         app.mode = AppMode::ModelDownload;
@@ -1806,5 +2333,66 @@ mod tests {
         assert!(screen.contains("Downloading 'qwen2.5-coder:7b'"));
         assert!(screen.contains("pulling abc123"));
         assert!(screen.contains("50%"));
+    }
+
+    #[tokio::test]
+    async fn chat_input_renders_textarea_contents_and_hint() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.textarea.insert_str("hi");
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("hi"));
+        assert!(screen.contains("Enter to send"));
+    }
+
+    #[tokio::test]
+    async fn model_info_panel_shows_provider_model_and_context_window() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelInfo;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("dummy"));
+        assert!(screen.contains("dummy-model"));
+        assert!(screen.contains("4096 tokens"));
+        assert!(screen.contains("No performance metrics yet"));
+    }
+
+    #[tokio::test]
+    async fn model_info_panel_shows_last_response_perf_metrics() {
+        use crate::llm::provider::PerfMetrics;
+
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelInfo;
+        app.messages.push(DisplayMessage {
+            id: uuid::Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "hi".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: Some(30),
+            cost: Some(0.0),
+            provider_name: Some("dummy".to_string()),
+            perf_metrics: Some(PerfMetrics {
+                load_duration_ms: Some(120),
+                prompt_eval_duration_ms: Some(45),
+                eval_duration_ms: Some(900),
+                total_duration_ms: Some(1065),
+                model_was_loaded: Some(true),
+            }),
+            tokens_per_second: Some(43.0),
+        });
+
+        // Taller terminal than the other tests: the panel has enough lines
+        // (provider/model/context + 5 perf metric rows) that a 20-row
+        // frame clips the bottom of the content area.
+        let screen = render_to_string(&app, 100, 30);
+        assert!(screen.contains("120ms"));
+        assert!(screen.contains("warm start"));
+        assert!(screen.contains("45ms"));
+        assert!(screen.contains("900ms"));
+        assert!(screen.contains("1065ms"));
+        assert!(screen.contains("43 tok/s"));
     }
 }
