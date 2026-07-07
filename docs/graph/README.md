@@ -56,22 +56,8 @@ cross-community "surprising connections," and suggested questions written up.
 
 ### Making it automatic
 
-To have Claude Code check the graph before answering codebase questions
-without being asked each time, add a section like this to a `CLAUDE.md` at the
-repo root (adjust the paths from graphify's own defaults, which assume
-`graphify-out/`):
-
-```markdown
-## graphify
-
-This project has a knowledge graph at docs/graph/ (graph.json, GRAPH_REPORT.md).
-
-Rules:
-- For codebase questions, first run `GRAPHIFY_OUT=docs/graph graphify query "<question>"`.
-  Use `graphify path "<A>" "<B>" --graph docs/graph/graph.json` for relationships
-  and `graphify explain "<concept>" --graph docs/graph/graph.json` for focused concepts.
-- Read docs/graph/GRAPH_REPORT.md for broad architecture questions or when
-  query/path/explain don't surface enough context.
-- After modifying code, the post-commit hook already refreshes docs/graph/ -
-  no manual rebuild needed for Rust changes.
-```
+The repo root already has `CLAUDE.md` and `AGENTS.md`, each with a `## graphify`
+section instructing the agent to check `docs/graph/` before answering codebase
+questions - Claude Code reads `CLAUDE.md`; Codex, Aider, OpenCode, Factory
+Droid, Trae, and OpenClaw read `AGENTS.md`. No per-session setup needed;
+update those files if the graph's location or workflow changes.
