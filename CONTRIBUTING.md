@@ -103,6 +103,18 @@ cargo install cargo-tarpaulin
 cargo install cargo-watch
 ```
 
+### Knowledge Graph (optional)
+
+The repo maintains a [graphify](https://github.com/safishamsi/graphify) knowledge
+graph of the codebase in `docs/graph/`. To have it auto-update after commits that
+touch Rust code, run once after cloning:
+
+```bash
+scripts/setup-graphify-hooks.sh
+```
+
+See `docs/graph/README.md` for details.
+
 ### Running the Development Version
 
 ```bash

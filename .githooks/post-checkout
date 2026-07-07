@@ -1,0 +1,29 @@
+#!/bin/sh
+# Refreshes docs/graph/ (Rust source only, no LLM) after switching branches.
+# Rebuild only - does not auto-commit, since committing to a branch you just
+# checked out (possibly someone else's) would be surprising.
+# Installed via scripts/setup-graphify-hooks.sh.
+
+PREV_HEAD=$1
+NEW_HEAD=$2
+BRANCH_SWITCH=$3
+
+[ "${GRAPHIFY_SKIP_HOOK:-0}" = "1" ] && exit 0
+[ "$BRANCH_SWITCH" != "1" ] && exit 0
+[ ! -d "docs/graph" ] && exit 0
+
+GIT_DIR=${GIT_DIR:-$(git rev-parse --git-dir 2>/dev/null)}
+[ -d "$GIT_DIR/rebase-merge" ] && exit 0
+[ -d "$GIT_DIR/rebase-apply" ] && exit 0
+[ -f "$GIT_DIR/MERGE_HEAD" ] && exit 0
+[ -f "$GIT_DIR/CHERRY_PICK_HEAD" ] && exit 0
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+
+echo "[graphify hook] branch switched - refreshing docs/graph"
+# Run directly (not via `sh`) so the script's own bash shebang applies -
+# invoking a bash script with `sh` breaks bashisms like `set -o pipefail`.
+"$REPO_ROOT/scripts/update-knowledge-graph.sh" --quiet || \
+  echo "[graphify hook] graph update failed - run scripts/update-knowledge-graph.sh manually"
+
+exit 0
