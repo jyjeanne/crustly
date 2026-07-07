@@ -931,7 +931,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
 /// enforced regardless of this function's result.
 fn auto_mode_bypasses_approval(mode: &crate::config::PlanExecMode, tool_name: &str) -> bool {
     use crate::config::PlanExecMode;
-    use crate::tui::plan::PlanModeState;
+    use crate::plan::PlanModeState;
 
     match mode {
         PlanExecMode::Interactive => false,
@@ -1303,7 +1303,7 @@ async fn cmd_autoplan(
     goal: String,
     max_iterations: u32,
 ) -> Result<()> {
-    use crate::tui::plan::PlanModeState;
+    use crate::plan::PlanModeState;
 
     println!("🤖 Crustly AutoPlan — FullAuto mode");
     println!("Goal: {}", goal);

@@ -178,6 +178,36 @@ impl PlanTask {
     }
 }
 
+/// Build crash-recovery info from a plan's task rows.
+///
+/// A free function here rather than an inherent method on `InterruptedPlan`
+/// because it consumes DB task rows: the db layer may depend on the plan
+/// domain model, never the other way around (ADR 0004) - and an inherent
+/// method, wherever its impl block lives, still makes the domain type's API
+/// depend on `db::models`.
+pub fn interrupted_plan_from_tasks(
+    plan_id: Uuid,
+    tasks: &[PlanTask],
+) -> Option<crate::plan::InterruptedPlan> {
+    let incomplete: Vec<_> = tasks
+        .iter()
+        .filter(|t| t.exec_status().is_incomplete())
+        .collect();
+    if incomplete.is_empty() {
+        return None;
+    }
+    let resume_at = incomplete
+        .iter()
+        .map(|t| t.task_order as usize)
+        .min()
+        .unwrap_or(0);
+    Some(crate::plan::InterruptedPlan {
+        plan_id,
+        resume_at_index: resume_at,
+        total_tasks: tasks.len(),
+    })
+}
+
 impl Session {
     /// Create a new session
     pub fn new(title: Option<String>, model: Option<String>) -> Self {

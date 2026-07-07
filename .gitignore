@@ -111,3 +111,12 @@ claude_desktop_config.json
 create_stubs.sh
 *.temp.sh
 .crustly_plan_*.json
+
+# graphify knowledge graph: keep graph.json/graph.html/GRAPH_REPORT.md and the
+# .graphify_* state files under version control, but not the regenerable
+# extraction cache or the dated pre-update safety backups.
+docs/graph/cache/
+docs/graph/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+
+# Universal Ctags symbol index (scripts/generate-ctags.sh) - regenerable, not diffable
+/tags

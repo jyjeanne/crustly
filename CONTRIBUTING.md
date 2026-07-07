@@ -103,6 +103,36 @@ cargo install cargo-tarpaulin
 cargo install cargo-watch
 ```
 
+### Knowledge Graph (optional)
+
+The repo maintains a [graphify](https://github.com/safishamsi/graphify) knowledge
+graph of the codebase in `docs/graph/`. To have it auto-update after commits that
+touch Rust code, run once after cloning:
+
+```bash
+scripts/setup-graphify-hooks.sh
+```
+
+See `docs/graph/README.md` for details.
+
+### Architecture Documentation (optional)
+
+`docs/architecture/` has generated crate/dependency facts, C4 diagrams, and
+advisory validation reports (unused deps, import cycles, module-layering
+checks against the graph), plus hand-written ADRs for decisions that need a
+"why," not just a "what." Regenerate the generated parts with:
+
+```bash
+scripts/generate-architecture-docs.sh    # repository.md (crate/deps)
+scripts/validate-architecture.sh          # VALIDATION.md (unused deps, cycles, orphans)
+scripts/analyze-module-coupling.sh        # module-coupling.md, dependency.dot
+scripts/check-architecture-drift.sh       # DRIFT.md (docs vs graph god nodes)
+scripts/generate-ctags.sh                  # tags (editor symbol index, gitignored)
+```
+
+See `docs/architecture/README.md` for what each covers and what was
+deliberately left out.
+
 ### Running the Development Version
 
 ```bash

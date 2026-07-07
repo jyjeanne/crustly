@@ -4,7 +4,7 @@
 
 use super::error::{Result, ToolError};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
-use crate::tui::plan::{PlanDocument, PlanStatus, PlanTask, TaskType, ToolCall as PlanToolCall};
+use crate::plan::{PlanDocument, PlanStatus, PlanTask, TaskType, ToolCall as PlanToolCall};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -644,7 +644,7 @@ impl Tool for PlanTool {
                     .status
                     .clone();
 
-                if !matches!(task_status, crate::tui::plan::TaskStatus::Pending) {
+                if !matches!(task_status, crate::plan::TaskStatus::Pending) {
                     return Ok(ToolResult::error(format!(
                         "Task #{} is not pending (current status: {:?})",
                         task_order, task_status
@@ -759,7 +759,7 @@ impl Tool for PlanTool {
 
                 if should_retry && task.can_retry() {
                     // Reset to pending for retry
-                    task.status = crate::tui::plan::TaskStatus::Pending;
+                    task.status = crate::plan::TaskStatus::Pending;
                     response.push_str("🔄 Task marked for retry. Use 'start_task' to retry.\n");
                 }
 

@@ -2,6 +2,11 @@
 //!
 //! Core data structures for plan mode, which enables structured task decomposition
 //! and controlled execution for complex development tasks.
+//!
+//! This is the shared Plan domain model: the TUI, database repository, plan tool,
+//! and plan service all depend on it. It must stay free of UI concerns - see
+//! ADR 0004 (docs/architecture/decisions/) for why it lives at the crate root
+//! rather than under `tui`.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -932,35 +937,16 @@ impl PlanModeState {
 }
 
 /// Crash recovery: describe what plan was interrupted.
+///
+/// Constructed from DB task rows by `crate::db::models::interrupted_plan_from_tasks`;
+/// the adapter lives in the db layer so this domain module stays free of `db`
+/// dependencies (ADR 0004).
 #[derive(Debug, Clone)]
 pub struct InterruptedPlan {
     pub plan_id: uuid::Uuid,
     /// Index of the task to resume at (the lowest incomplete task_order).
     pub resume_at_index: usize,
     pub total_tasks: usize,
-}
-
-impl InterruptedPlan {
-    /// Build from a list of all tasks for the plan.
-    pub fn from_tasks(plan_id: uuid::Uuid, tasks: &[crate::db::models::PlanTask]) -> Option<Self> {
-        let incomplete: Vec<_> = tasks
-            .iter()
-            .filter(|t| t.exec_status().is_incomplete())
-            .collect();
-        if incomplete.is_empty() {
-            return None;
-        }
-        let resume_at = incomplete
-            .iter()
-            .map(|t| t.task_order as usize)
-            .min()
-            .unwrap_or(0);
-        Some(InterruptedPlan {
-            plan_id,
-            resume_at_index: resume_at,
-            total_tasks: tasks.len(),
-        })
-    }
 }
 
 #[cfg(test)]

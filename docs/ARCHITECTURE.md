@@ -20,6 +20,11 @@ Crustly is a high-performance terminal AI assistant built in Rust, featuring:
 - **Local-First Storage**: SQLite database for privacy and persistence
 - **Intelligent Prompt Analysis**: Automatic tool hint detection
 
+> GitHub-renderable Mermaid versions of the diagrams below live in
+> [`docs/architecture/`](architecture/README.md) (C4 context/container), and
+> an AI-queryable knowledge graph of the actual codebase lives in
+> [`docs/graph/`](graph/README.md).
+
 ---
 
 ## Table of Contents

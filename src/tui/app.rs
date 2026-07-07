@@ -3,11 +3,11 @@
 //! Core state management for the terminal user interface.
 
 use super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResponse, TuiEvent};
-use super::plan::PlanDocument;
 use super::prompt_analyzer::PromptAnalyzer;
 use crate::config::PlanExecMode;
 use crate::db::models::{Message, Session};
 use crate::llm::agent::AgentService;
+use crate::plan::PlanDocument;
 use crate::services::{MessageService, PlanService, ServiceContext, SessionService};
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
@@ -1181,7 +1181,7 @@ impl App {
         let task_result = plan
             .tasks
             .iter_mut()
-            .find(|t| matches!(t.status, crate::tui::plan::TaskStatus::InProgress))
+            .find(|t| matches!(t.status, crate::plan::TaskStatus::InProgress))
             .map(|task| {
                 // Check for error indicators in the response
                 let response_lower = response_content.to_lowercase();
@@ -1196,14 +1196,14 @@ impl App {
 
                 if has_error {
                     // Mark task as failed
-                    task.status = crate::tui::plan::TaskStatus::Failed;
+                    task.status = crate::plan::TaskStatus::Failed;
                     task.notes = Some(
                         "Task failed during execution. Error detected in response.".to_string(),
                     );
                     true // Task failed
                 } else {
                     // Mark task as completed successfully
-                    task.status = crate::tui::plan::TaskStatus::Completed;
+                    task.status = crate::plan::TaskStatus::Completed;
                     task.completed_at = Some(chrono::Utc::now());
                     task.notes = Some("Task completed successfully".to_string());
                     false // Task succeeded
@@ -1259,7 +1259,7 @@ impl App {
         match tokio::fs::read_to_string(&plan_file).await {
             Ok(content) => {
                 tracing::debug!("Found plan JSON file, parsing...");
-                match serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
+                match serde_json::from_str::<crate::plan::PlanDocument>(&content) {
                     Ok(plan) => {
                         tracing::info!(
                             "✅ Loaded plan from JSON: '{}' ({:?}, {} tasks)",
@@ -1312,7 +1312,7 @@ impl App {
                     plan.status
                 );
                 // Only load if plan is pending approval
-                if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                if plan.status == crate::plan::PlanStatus::PendingApproval {
                     tracing::info!("✅ Plan ready for review!");
 
                     // Only load if not already loaded (avoid duplicate messages)
@@ -1371,7 +1371,7 @@ impl App {
         match tokio::fs::read_to_string(&plan_file).await {
             Ok(content) => {
                 tracing::debug!("Found plan JSON file, parsing...");
-                match serde_json::from_str::<crate::tui::plan::PlanDocument>(&content) {
+                match serde_json::from_str::<crate::plan::PlanDocument>(&content) {
                     Ok(plan) => {
                         tracing::debug!(
                             "Parsed plan: id={}, status={:?}, tasks={}",
@@ -1380,7 +1380,7 @@ impl App {
                             plan.tasks.len()
                         );
                         // Only load if plan is pending approval
-                        if plan.status == crate::tui::plan::PlanStatus::PendingApproval {
+                        if plan.status == crate::plan::PlanStatus::PendingApproval {
                             tracing::info!("✅ Plan ready for review!");
 
                             // Migrate to database
@@ -1591,7 +1591,7 @@ impl App {
             // Find the next pending task and extract its data
             let next_task_data = ordered_tasks
                 .iter()
-                .find(|task| matches!(task.status, crate::tui::plan::TaskStatus::Pending))
+                .find(|task| matches!(task.status, crate::plan::TaskStatus::Pending))
                 .map(|task| {
                     (
                         task.id,
@@ -1610,7 +1610,7 @@ impl App {
                 Some((task_id, order, title, description)) => {
                     // Mark task as in progress
                     if let Some(task_mut) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
-                        task_mut.status = crate::tui::plan::TaskStatus::InProgress;
+                        task_mut.status = crate::plan::TaskStatus::InProgress;
                     }
 
                     // Prepare task message

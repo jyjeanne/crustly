@@ -4,8 +4,8 @@
 
 use crate::db::models::PlanTaskStatus;
 use crate::db::repository::{PlanRepository, PlanTaskRepository};
+use crate::plan::{PlanDocument, PlanStatus, TaskStatus};
 use crate::services::ServiceContext;
-use crate::tui::plan::{PlanDocument, PlanStatus, TaskStatus};
 use anyhow::Result;
 use uuid::Uuid;
 
@@ -332,7 +332,7 @@ mod tests {
     use crate::db::models::Session;
     use crate::db::repository::session::SessionRepository;
     use crate::db::Database;
-    use crate::tui::plan::{PlanStatus, PlanTask, TaskStatus, TaskType};
+    use crate::plan::{PlanStatus, PlanTask, TaskStatus, TaskType};
     use tempfile::TempDir;
 
     /// Helper to create test database and service
