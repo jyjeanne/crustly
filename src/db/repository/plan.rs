@@ -3,7 +3,7 @@
 //! Database operations for plans and plan tasks.
 
 use crate::db::models::{Plan, PlanTask, PlanTaskStatus};
-use crate::tui::plan::{PlanDocument, PlanStatus, TaskStatus, TaskType};
+use crate::plan::{PlanDocument, PlanStatus, TaskStatus, TaskType};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -249,7 +249,7 @@ impl PlanRepository {
     }
 
     /// Convert database task to domain task
-    fn task_from_db(&self, db_task: PlanTask) -> Result<crate::tui::plan::PlanTask> {
+    fn task_from_db(&self, db_task: PlanTask) -> Result<crate::plan::PlanTask> {
         let dependencies: Vec<Uuid> = serde_json::from_str(&db_task.dependencies)
             .context("Failed to parse dependencies JSON")?;
         let acceptance_criteria: Vec<String> =
@@ -259,7 +259,7 @@ impl PlanRepository {
         let task_type = self.parse_task_type(&db_task.task_type)?;
         let status = self.parse_task_status(&db_task.status)?;
 
-        Ok(crate::tui::plan::PlanTask {
+        Ok(crate::plan::PlanTask {
             id: db_task.id,
             order: db_task.task_order as usize,
             title: db_task.title,
@@ -309,7 +309,7 @@ impl PlanRepository {
     }
 
     /// Convert domain task to database task
-    fn task_to_db(&self, task: &crate::tui::plan::PlanTask, plan_id: Uuid) -> Result<PlanTask> {
+    fn task_to_db(&self, task: &crate::plan::PlanTask, plan_id: Uuid) -> Result<PlanTask> {
         let dependencies = serde_json::to_string(&task.dependencies)
             .context("Failed to serialize dependencies")?;
         let acceptance_criteria = serde_json::to_string(&task.acceptance_criteria)
@@ -666,7 +666,7 @@ mod tests {
     use crate::db::models::Session;
     use crate::db::repository::session::SessionRepository;
     use crate::db::Database;
-    use crate::tui::plan::{PlanTask, TaskType};
+    use crate::plan::{PlanTask, TaskType};
     use chrono::Utc;
 
     /// Helper to create a test database and session

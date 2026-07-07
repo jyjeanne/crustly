@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tui::plan::*;
+    use crate::plan::*;
     use uuid::Uuid;
 
     // Helper function to create a test plan

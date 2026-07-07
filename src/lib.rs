@@ -34,6 +34,7 @@ pub mod db;
 pub mod error;
 pub mod llm;
 pub mod logging;
+pub mod plan;
 pub mod services;
 pub mod tui;
 pub mod utils;

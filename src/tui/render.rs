@@ -202,7 +202,7 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
 
     // Show banner if there's a pending plan
     if let Some(ref plan) = app.current_plan {
-        if matches!(plan.status, crate::tui::plan::PlanStatus::PendingApproval) {
+        if matches!(plan.status, crate::plan::PlanStatus::PendingApproval) {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::styled("  ⚠️  ", Style::default().fg(Color::Yellow)),

@@ -6,7 +6,6 @@ pub mod app;
 pub mod error;
 pub mod events;
 pub mod ollama_download;
-pub mod plan;
 pub mod prompt_analyzer;
 pub mod render;
 pub mod runner;
@@ -25,6 +24,5 @@ pub mod utils;
 // Re-exports
 pub use app::{App, DisplayMessage};
 pub use events::{AppMode, EventHandler, TuiEvent};
-pub use plan::{PlanDocument, PlanStatus, PlanTask, TaskStatus, TaskType};
 pub use prompt_analyzer::PromptAnalyzer;
 pub use runner::run;

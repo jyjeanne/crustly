@@ -2,7 +2,7 @@
 //!
 //! Provides permission approval dialogs, progress panels, and recovery prompts.
 
-use crate::tui::plan::{AutoRunMode, PlanModeState, PlanTask, TaskStatus};
+use crate::plan::{AutoRunMode, PlanModeState, PlanTask, TaskStatus};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},

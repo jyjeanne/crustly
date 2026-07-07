@@ -23,14 +23,19 @@ the full design and user-facing walkthrough.
 ## Consequences
 
 Safer execution, clearer task tracking, and the flexibility to route planning
-and execution to different models. The cost, found during Phase 3 module-
+and execution to different models. One cost, found during Phase 3 module-
 coupling analysis (`docs/architecture/module-coupling.md`): `PlanDocument`,
-`PlanTask`, and related types were defined in `src/tui/plan.rs` - the UI
-layer - because Plan Mode's UI was built first and the data model followed
-it. `src/db/repository/plan.rs`, `src/llm/tools/plan_tool.rs`, and
-`src/services/plan.rs` all now depend on the UI module for their own domain
-types, inverting the intended layering
-(`docs/architecture/containers.md`). `PlanDocument` is also the #3 god node in
-`docs/graph/GRAPH_REPORT.md`. Fix tracked as a follow-up: extract the Plan
-domain model into its own module that `tui`, `db`, `llm`, and `services` all
-depend on, rather than depending on each other.
+`PlanTask`, and related types were originally defined in `src/tui/plan.rs` -
+the UI layer - because Plan Mode's UI was built first and the data model
+followed it. `src/db/repository/plan.rs`, `src/llm/tools/plan_tool.rs`, and
+`src/services/plan.rs` all depended on the UI module for their own domain
+types, inverting the intended layering (`docs/architecture/containers.md`).
+`PlanDocument` is also a top god node in `docs/graph/GRAPH_REPORT.md`.
+
+**Resolved:** the Plan domain model now lives in `src/plan/` at the crate
+root, dependency-free (its one DB-consuming constructor moved to
+`crate::db::models::interrupted_plan_from_tasks`, keeping the db -> plan
+direction). `tui`, `db`, `llm`, and `services` all depend on `crate::plan`;
+no lower layer depends on `tui`. The invariant to preserve: `src/plan/` must
+stay free of `db`, `tui`, and every other crate-internal dependency - the
+coupling report's layering check will flag regressions.

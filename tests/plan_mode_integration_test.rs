@@ -9,8 +9,8 @@
 use crustly::db::models::Session;
 use crustly::db::repository::session::SessionRepository;
 use crustly::db::Database;
+use crustly::plan::{PlanDocument, PlanStatus, PlanTask, TaskStatus, TaskType};
 use crustly::services::{PlanService, ServiceContext};
-use crustly::tui::plan::{PlanDocument, PlanStatus, PlanTask, TaskStatus, TaskType};
 use tempfile::TempDir;
 use uuid::Uuid;
 

@@ -91,6 +91,7 @@ digraph {
     "crustly::llm::tools::web_search" [label="pub mod|llm::tools::web_search", fillcolor="#81c169"]; // "mod" node
     "crustly::llm::tools::write" [label="pub mod|llm::tools::write", fillcolor="#81c169"]; // "mod" node
     "crustly::mcp::client" [label="pub mod|mcp::client", fillcolor="#81c169"]; // "mod" node
+    "crustly::plan" [label="pub mod|plan", fillcolor="#81c169"]; // "mod" node
     "crustly::services" [label="pub mod|services", fillcolor="#81c169"]; // "mod" node
     "crustly::services::file" [label="pub mod|services::file", fillcolor="#81c169"]; // "mod" node
     "crustly::services::message" [label="pub mod|services::message", fillcolor="#81c169"]; // "mod" node
@@ -105,7 +106,6 @@ digraph {
     "crustly::tui::highlight" [label="pub mod|tui::highlight", fillcolor="#81c169"]; // "mod" node
     "crustly::tui::markdown" [label="pub mod|tui::markdown", fillcolor="#81c169"]; // "mod" node
     "crustly::tui::ollama_download" [label="pub mod|tui::ollama_download", fillcolor="#81c169"]; // "mod" node
-    "crustly::tui::plan" [label="pub mod|tui::plan", fillcolor="#81c169"]; // "mod" node
     "crustly::tui::prompt_analyzer" [label="pub mod|tui::prompt_analyzer", fillcolor="#81c169"]; // "mod" node
     "crustly::tui::render" [label="pub mod|tui::render", fillcolor="#81c169"]; // "mod" node
     "crustly::tui::runner" [label="pub mod|tui::runner", fillcolor="#81c169"]; // "mod" node
@@ -142,7 +142,7 @@ digraph {
     "crustly::db::repository::memory" -> "crustly::llm::provider::types" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::db::repository::message" -> "crustly::db::models" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::db::repository::plan" -> "crustly::db::models" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
-    "crustly::db::repository::plan" -> "crustly::tui::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
+    "crustly::db::repository::plan" -> "crustly::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::db::repository::session" -> "crustly::db::models" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::llm" -> "crustly::llm::agent::context" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::llm" -> "crustly::llm::agent::error" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
@@ -233,7 +233,7 @@ digraph {
     "crustly::llm::tools::notebook" -> "crustly::llm::tools::r#trait" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::llm::tools::plan_tool" -> "crustly::llm::tools::error" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::llm::tools::plan_tool" -> "crustly::llm::tools::r#trait" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
-    "crustly::llm::tools::plan_tool" -> "crustly::tui::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
+    "crustly::llm::tools::plan_tool" -> "crustly::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::llm::tools::powershell" -> "crustly::llm::tools::error" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::llm::tools::powershell" -> "crustly::llm::tools::r#trait" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::llm::tools::r#trait" -> "crustly::llm::tools::error" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
@@ -267,8 +267,8 @@ digraph {
     "crustly::services::message" -> "crustly::services" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::services::plan" -> "crustly::db::models" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::services::plan" -> "crustly::db::repository::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
+    "crustly::services::plan" -> "crustly::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::services::plan" -> "crustly::services" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
-    "crustly::services::plan" -> "crustly::tui::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::services::session" -> "crustly::db::models" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::services::session" -> "crustly::db::repository::memory" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::services::session" -> "crustly::db::repository::session" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
@@ -277,18 +277,17 @@ digraph {
     "crustly::services::session" -> "crustly::services" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui" -> "crustly::tui::app" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui" -> "crustly::tui::events" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
-    "crustly::tui" -> "crustly::tui::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui" -> "crustly::tui::prompt_analyzer" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui" -> "crustly::tui::runner" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::config" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::db::models" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::llm::agent::service" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
+    "crustly::tui::app" -> "crustly::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::services" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::services::message" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::services::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::services::session" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::tui::events" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
-    "crustly::tui::app" -> "crustly::tui::plan" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::app" -> "crustly::tui::prompt_analyzer" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::components" -> "crustly::tui::components::logo" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::events" -> "crustly::llm::agent::service" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
@@ -297,7 +296,6 @@ digraph {
     "crustly::tui::events::keys" -> "crustly::tui::events" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::markdown" -> "crustly::tui::highlight" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::ollama_download" -> "crustly::tui::events" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
-    "crustly::tui::plan" -> "crustly::db::models" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::prompt_analyzer" -> "crustly::llm::provider::router" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::render" -> "crustly::config" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge
     "crustly::tui::render" -> "crustly::tui::app" [label="uses", color="#7f7f7f", style="dashed"] [constraint=false]; // "uses" edge

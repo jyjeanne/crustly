@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo test plan_autorun
 
-use crustly::tui::plan::{AutoRunMode, PlanModeState, PlanTask, TaskStatus, TaskType};
+use crustly::plan::{AutoRunMode, PlanModeState, PlanTask, TaskStatus, TaskType};
 use uuid::Uuid;
 
 fn make_plan_task(order: usize, title: &str) -> PlanTask {

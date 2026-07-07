@@ -2,10 +2,9 @@
 //!
 //! Run with: cargo test plan_crash_recovery
 
-use crustly::db::models::PlanTaskStatus;
+use crustly::db::models::{interrupted_plan_from_tasks, PlanTaskStatus};
 use crustly::db::repository::PlanTaskRepository;
 use crustly::db::Database;
-use crustly::tui::plan::InterruptedPlan;
 use uuid::Uuid;
 
 async fn create_session(pool: &sqlx::SqlitePool, session_id: Uuid) {
@@ -208,7 +207,7 @@ async fn failed_task_stores_error_without_completion_timestamp() {
     );
 }
 
-/// InterruptedPlan::from_tasks returns None when all tasks are Done.
+/// interrupted_plan_from_tasks returns None when all tasks are Done.
 #[test]
 fn interrupted_plan_none_when_all_done() {
     let plan_id = Uuid::new_v4();
@@ -216,11 +215,11 @@ fn interrupted_plan_none_when_all_done() {
         minimal_task(plan_id, 0, "Done"),
         minimal_task(plan_id, 1, "Done"),
     ];
-    let result = InterruptedPlan::from_tasks(plan_id, &tasks);
+    let result = interrupted_plan_from_tasks(plan_id, &tasks);
     assert!(result.is_none(), "no interrupt if all tasks done");
 }
 
-/// InterruptedPlan::from_tasks returns correct resume_at_index.
+/// interrupted_plan_from_tasks returns correct resume_at_index.
 #[test]
 fn interrupted_plan_resumes_at_lowest_incomplete() {
     let plan_id = Uuid::new_v4();
@@ -230,7 +229,7 @@ fn interrupted_plan_resumes_at_lowest_incomplete() {
         minimal_task(plan_id, 2, "Running"),
         minimal_task(plan_id, 3, "Pending"),
     ];
-    let result = InterruptedPlan::from_tasks(plan_id, &tasks).unwrap();
+    let result = interrupted_plan_from_tasks(plan_id, &tasks).unwrap();
     assert_eq!(result.resume_at_index, 2);
     assert_eq!(result.total_tasks, 4);
     assert_eq!(result.plan_id, plan_id);
