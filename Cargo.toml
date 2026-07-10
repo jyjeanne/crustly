@@ -86,7 +86,7 @@ which = "6.0"
 shell-words = "1.1"
 notify = { version = "6.1", features = ["serde"] }
 git2 = "0.21"
-rand = "0.9"
+rand = "0.10"
 urlencoding = "2.1"
 
 # Syntax & Parsing
