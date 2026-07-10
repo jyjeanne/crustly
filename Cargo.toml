@@ -85,7 +85,7 @@ ignore = "0.4"
 which = "6.0"
 shell-words = "1.1"
 notify = { version = "6.1", features = ["serde"] }
-git2 = "0.18"
+git2 = "0.21"
 rand = "0.8"
 urlencoding = "2.1"
 
