@@ -99,8 +99,8 @@ impl RetryConfig {
 
         let final_delay = if self.jitter > 0.0 {
             use rand::Rng;
-            let mut rng = rand::thread_rng();
-            let jitter_factor = 1.0 + rng.gen_range(-self.jitter..self.jitter);
+            let mut rng = rand::rng();
+            let jitter_factor = 1.0 + rng.random_range(-self.jitter..self.jitter);
             (capped * jitter_factor).max(0.0)
         } else {
             capped

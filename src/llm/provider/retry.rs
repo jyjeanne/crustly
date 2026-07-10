@@ -81,8 +81,8 @@ impl RetryConfig {
         // Apply jitter: random value between (1 - jitter) and (1 + jitter)
         let jitter_factor = if self.jitter > 0.0 {
             use rand::Rng;
-            let mut rng = rand::thread_rng();
-            1.0 + rng.gen_range(-self.jitter..self.jitter)
+            let mut rng = rand::rng();
+            1.0 + rng.random_range(-self.jitter..self.jitter)
         } else {
             1.0
         };
