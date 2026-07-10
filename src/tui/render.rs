@@ -19,7 +19,7 @@ use ratatui::{
 pub fn render(f: &mut Frame, app: &App) {
     // Show splash screen if in splash mode
     if app.mode == AppMode::Splash {
-        splash::render_splash(f, f.size(), app.provider_name(), app.provider_model());
+        splash::render_splash(f, f.area(), app.provider_name(), app.provider_model());
         return;
     }
 
@@ -31,7 +31,7 @@ pub fn render(f: &mut Frame, app: &App) {
             Constraint::Length(5), // Input
             Constraint::Length(1), // Status bar
         ])
-        .split(f.size());
+        .split(f.area());
 
     // Render components based on mode
     render_header(f, app, chunks[0]);
@@ -464,7 +464,7 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
             .border_style(border_style),
     );
 
-    f.render_widget(textarea.widget(), area);
+    f.render_widget(&textarea, area);
 }
 
 /// Render the sessions list
@@ -2159,7 +2159,7 @@ mod tests {
         let mut out = String::new();
         for y in 0..buffer.area.height {
             for x in 0..buffer.area.width {
-                out.push_str(buffer.get(x, y).symbol());
+                out.push_str(buffer[(x, y)].symbol());
             }
             out.push('\n');
         }
