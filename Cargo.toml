@@ -27,7 +27,7 @@ clap_complete = "4.5"
 # TUI
 ratatui = { version = "0.26", features = ["all-widgets"] }
 crossterm = { version = "0.27", features = ["event-stream"] }
-tui-textarea = "0.4"
+tui-textarea = "0.6"
 tui-tree-widget = "0.19"
 ratatui-image = "1.0"
 viuer = "0.7"
