@@ -777,17 +777,17 @@ impl AgentService {
                             format!("grep:{}:{}", pattern, path)
                         }
 
-                        "read" => {
+                        "read_file" => {
                             if let Some(path) = input.get("file_path").and_then(|v| v.as_str()) {
                                 let normalized = path.replace('\\', "/");
-                                format!("read:{}", normalized)
+                                format!("read_file:{}", normalized)
                             } else {
-                                "read:".to_string()
+                                "read_file:".to_string()
                             }
                         }
 
                         // File modification tools - include file path
-                        "write" | "edit" => {
+                        "write_file" | "edit_file" => {
                             if let Some(path) = input.get("file_path").and_then(|v| v.as_str()) {
                                 let normalized = path.replace('\\', "/");
                                 format!("{}:{}", name, normalized)
@@ -829,10 +829,10 @@ impl AgentService {
             let is_exploration_tool = current_call_signature.starts_with("ls:")
                 || current_call_signature.starts_with("glob:")
                 || current_call_signature.starts_with("grep:")
-                || current_call_signature.starts_with("read:");
+                || current_call_signature.starts_with("read_file:");
 
-            let is_modification_tool = current_call_signature.starts_with("write:")
-                || current_call_signature.starts_with("edit:")
+            let is_modification_tool = current_call_signature.starts_with("write_file:")
+                || current_call_signature.starts_with("edit_file:")
                 || current_call_signature.starts_with("bash:");
 
             // Higher threshold for exploration tools (allow deep directory traversal)
@@ -973,6 +973,7 @@ impl AgentService {
             tool_results.extend(parallel_results);
 
             // --- Sequential execution (tools requiring approval or non-idempotent) ---
+            let ran_sequential_tools = !sequential_uses.is_empty();
             for (tool_id, tool_name, tool_input) in sequential_uses {
                 tracing::info!(
                     "Executing tool '{}' (iteration {}/{})",
@@ -1123,6 +1124,14 @@ impl AgentService {
                         });
                     }
                 }
+            }
+
+            // Sequential tools may have mutated the filesystem (write_file,
+            // edit_file, bash, …) — drop cached read results so the next
+            // read_file/glob/grep/ls sees the current state instead of a
+            // stale entry within its TTL.
+            if ran_sequential_tools {
+                self.tool_cache.invalidate_fs_entries();
             }
 
             // Add assistant message with tool use to context

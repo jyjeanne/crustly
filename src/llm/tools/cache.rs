@@ -121,6 +121,16 @@ impl ToolResultCache {
         let now = Instant::now();
         self.entries.retain(|_, v| now < v.expires_at);
     }
+
+    /// Drop all cached filesystem-tool results (read_file/glob/grep/ls).
+    ///
+    /// Must be called after any mutating tool (write_file, edit_file, bash, …)
+    /// runs, otherwise a later read_file within the TTL returns the pre-write
+    /// file content.
+    pub fn invalidate_fs_entries(&self) {
+        self.entries
+            .retain(|k, _| !matches!(k.tool_name.as_str(), "read_file" | "glob" | "grep" | "ls"));
+    }
 }
 
 #[cfg(test)]
@@ -158,6 +168,23 @@ mod tests {
         assert_eq!(cfg.ttl_for("write_file"), Duration::ZERO);
         assert_eq!(cfg.ttl_for("edit_file"), Duration::ZERO);
         assert_eq!(cfg.ttl_for("bash"), Duration::ZERO);
+    }
+
+    #[test]
+    fn invalidate_fs_entries_drops_read_results_but_keeps_web() {
+        let cache = ToolResultCache::new(ToolTtlConfig::default());
+        let read_key = CacheKey::from_tool("read_file", &serde_json::json!({ "path": "a.rs" }));
+        let web_key = CacheKey::from_tool("web_search", &serde_json::json!({ "query": "rust" }));
+        cache.insert(read_key.clone(), "old file".into(), Duration::from_secs(60));
+        cache.insert(web_key.clone(), "results".into(), Duration::from_secs(60));
+
+        cache.invalidate_fs_entries();
+
+        assert!(
+            cache.get(&read_key).is_none(),
+            "read_file entry must be dropped after a mutating tool runs"
+        );
+        assert_eq!(cache.get(&web_key), Some("results".to_string()));
     }
 
     #[test]

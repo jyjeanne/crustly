@@ -127,7 +127,6 @@ where
     E: RetryableError,
 {
     let mut attempt = 0;
-    let mut last_error: Option<E> = None;
 
     loop {
         match operation().await {
@@ -145,7 +144,7 @@ where
 
                 if attempt >= config.max_attempts {
                     tracing::warn!("Max retry attempts ({}) exceeded", config.max_attempts);
-                    return Err(last_error.unwrap_or(err));
+                    return Err(err);
                 }
 
                 // Check for Retry-After hint from the error
@@ -167,7 +166,6 @@ where
                     err
                 );
 
-                last_error = Some(err);
                 sleep(delay).await;
                 attempt += 1;
             }
@@ -190,7 +188,6 @@ where
     C: Fn(&E) -> bool,
 {
     let mut attempt = 0;
-    let mut last_error: Option<E> = None;
 
     loop {
         match operation().await {
@@ -208,7 +205,7 @@ where
 
                 if attempt >= config.max_attempts {
                     tracing::warn!("Max retry attempts ({}) exceeded", config.max_attempts);
-                    return Err(last_error.unwrap_or(err));
+                    return Err(err);
                 }
 
                 let delay = config.calculate_delay(attempt);
@@ -221,7 +218,6 @@ where
                     err
                 );
 
-                last_error = Some(err);
                 sleep(delay).await;
                 attempt += 1;
             }

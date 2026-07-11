@@ -441,7 +441,7 @@ impl Tool for TaskTool {
                 for task in filtered_tasks {
                     output.push_str(&format!(
                         "[{}] {:?} | {:?}\n",
-                        &task.id[..8],
+                        task.id.get(..8).unwrap_or(&task.id),
                         task.status,
                         task.priority
                     ));
@@ -454,7 +454,7 @@ impl Tool for TaskTool {
                             "    Dependencies: {}\n",
                             task.dependencies
                                 .iter()
-                                .map(|id| &id[..8])
+                                .map(|id| id.get(..8).unwrap_or(id))
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         ));
@@ -669,7 +669,7 @@ impl Tool for TaskTool {
                             dependents.len(),
                             dependents
                                 .iter()
-                                .map(|id| &id[..8])
+                                .map(|id| id.get(..8).unwrap_or(id))
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         )));

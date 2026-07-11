@@ -1511,7 +1511,10 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
                         let value_str = match value {
                             serde_json::Value::String(s) => {
                                 if s.len() > 50 {
-                                    format!("\"{}...\"", &s[..47])
+                                    format!(
+                                        "\"{}...\"",
+                                        crate::utils::truncate_at_char_boundary(s, 47)
+                                    )
                                 } else {
                                     format!("\"{}\"", s)
                                 }
