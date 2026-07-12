@@ -4,7 +4,7 @@
 
 use super::app::App;
 use super::events::AppMode;
-use super::markdown::parse_markdown;
+use super::markdown::{parse_markdown, parse_plain_text};
 use super::splash;
 use crate::config::PlanExecMode;
 use ratatui::{
@@ -308,8 +308,14 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
             }
         }
 
-        // Parse and render message content as markdown
-        let mut content_lines = parse_markdown(&msg.content);
+        // Assistant replies are markdown and are rendered as such. The user's own
+        // message is not - it is literal text, and parsing it as CommonMark eats
+        // the backslashes out of any Windows path they typed or pasted.
+        let mut content_lines = if msg.role == "user" {
+            parse_plain_text(&msg.content)
+        } else {
+            parse_markdown(&msg.content)
+        };
         lines.append(&mut content_lines);
 
         // Runtime performance metrics footer (currently Ollama only) - shown

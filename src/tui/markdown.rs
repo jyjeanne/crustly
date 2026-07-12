@@ -10,6 +10,18 @@ use ratatui::{
 
 use super::highlight::highlight_code;
 
+/// Render text verbatim, with no markdown interpretation.
+///
+/// For content the user typed. CommonMark treats `\` as an escape before ASCII
+/// punctuation, so running a user's message through the markdown parser silently
+/// eats backslashes in ordinary Windows paths: `C:\Users\me\.crustly` renders as
+/// `C:\Users\me.crustly`. A user typing a path means the path, not markup.
+pub fn parse_plain_text(text: &str) -> Vec<Line<'static>> {
+    text.split('\n')
+        .map(|line| Line::from(Span::raw(line.to_string())))
+        .collect()
+}
+
 /// Parse markdown and convert to styled lines for Ratatui
 pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
     let parser = Parser::new(markdown);
@@ -233,6 +245,69 @@ pub fn last_code_block(markdown: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Collect the rendered text of every span, so a test can assert on what the
+    /// user actually sees.
+    fn rendered_text(lines: &[Line<'static>]) -> String {
+        lines
+            .iter()
+            .map(|l| {
+                l.spans
+                    .iter()
+                    .map(|s| s.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Regression: chat messages are rendered as CommonMark, where `\` is an
+    /// escape character. A Windows path typed or pasted by the user came out with
+    /// its backslashes eaten - `D:\Projets\test-crustly` displayed as
+    /// `D:Projetstest-crustly` - which looked like the input had mangled the
+    /// paste, but was purely a rendering artifact.
+    /// The user's own messages must render verbatim. CommonMark escapes `\`
+    /// before ASCII punctuation, so parsing them as markdown ate the backslashes
+    /// out of ordinary Windows paths - `C:\Users\jerem\.crustly` came out as
+    /// `C:\Users\jerem.crustly`, which looked like the paste had been mangled.
+    #[test]
+    fn plain_text_keeps_windows_path_backslashes() {
+        for path in [
+            r"D:\Projets\test-crustly\src",
+            r"C:\Users\jerem\.crustly\crustly.db",
+            r"src\_internal\mod.rs",
+            r"C:\temp\-backup",
+            r"C:\a\*\b",
+        ] {
+            let text = rendered_text(&parse_plain_text(path));
+            assert_eq!(text, path, "user text must render verbatim");
+        }
+    }
+
+    #[test]
+    fn plain_text_keeps_markdown_syntax_literal() {
+        // A user typing `*not italic*` means the asterisks.
+        let text = rendered_text(&parse_plain_text("*not italic* and _not this_"));
+        assert_eq!(text, "*not italic* and _not this_");
+    }
+
+    #[test]
+    fn plain_text_preserves_line_structure() {
+        let text = rendered_text(&parse_plain_text("line one\nline two"));
+        assert_eq!(text, "line one\nline two");
+    }
+
+    /// Documents *why* user messages bypass the markdown parser: it really does
+    /// eat these backslashes. Assistant replies still go through it, on purpose.
+    #[test]
+    fn markdown_escapes_backslash_before_punctuation() {
+        let text = rendered_text(&parse_markdown(r"C:\Users\jerem\.crustly"));
+        assert!(
+            !text.contains(r"\.crustly"),
+            "expected CommonMark to eat the escape; if this now fails, the \
+             plain-text path for user messages may no longer be needed: {text:?}"
+        );
+    }
 
     #[test]
     fn test_parse_simple_text() {
