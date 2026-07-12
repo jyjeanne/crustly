@@ -76,6 +76,16 @@ pub struct App {
     /// `String` so the user gets real cursor movement, mid-buffer editing,
     /// and paste-at-cursor instead of append/pop-only editing.
     pub textarea: TextArea<'static>,
+    /// Previously submitted inputs, oldest first, for shell-style Up/Down recall.
+    /// Kept in memory only (a session's messages are in the DB, but this also
+    /// holds slash commands, which are not).
+    input_history: Vec<String>,
+    /// Cursor into `input_history` while browsing. `None` means "not browsing" -
+    /// the textarea holds the user's own draft rather than a recalled entry.
+    history_pos: Option<usize>,
+    /// The draft that was in the textarea when browsing started, restored when
+    /// the user presses Down past the newest entry.
+    history_draft: Option<String>,
     pub scroll_offset: usize,
     pub selected_session_index: usize,
     pub should_quit: bool,
@@ -170,6 +180,9 @@ impl App {
             sessions: Vec::new(),
             mode: AppMode::Splash,
             textarea: TextArea::default(),
+            input_history: Vec::new(),
+            history_pos: None,
+            history_draft: None,
             scroll_offset: 0,
             selected_session_index: 0,
             should_quit: false,
@@ -264,6 +277,86 @@ impl App {
     fn set_input_text(&mut self, text: &str) {
         self.textarea = TextArea::default();
         self.textarea.insert_str(text);
+    }
+
+    /// Record a submitted input for Up/Down recall.
+    ///
+    /// Skips consecutive duplicates, the way a shell does - resending the same
+    /// message twice should not make you press Up twice to get past it.
+    fn push_input_history(&mut self, content: &str) {
+        if self.input_history.last().map(String::as_str) != Some(content) {
+            self.input_history.push(content.to_string());
+        }
+        // Any submit ends browsing: the next Up starts again from the newest.
+        self.history_pos = None;
+        self.history_draft = None;
+    }
+
+    /// Whether the textarea cursor is on the first / last line. Up recalls
+    /// history only from the first line and Down only from the last, so that
+    /// vertical cursor movement still works inside a multi-line draft (which
+    /// Shift+Enter can create). This is the readline/shell convention.
+    fn cursor_on_first_line(&self) -> bool {
+        self.textarea.cursor().0 == 0
+    }
+
+    fn cursor_on_last_line(&self) -> bool {
+        self.textarea.cursor().0 + 1 >= self.textarea.lines().len()
+    }
+
+    /// Load `entry` into the input and put the cursor at the very end, so the
+    /// recalled message can be edited immediately.
+    fn load_history_entry(&mut self, entry: &str) {
+        self.set_input_text(entry);
+        self.textarea.move_cursor(CursorMove::Bottom);
+        self.textarea.move_cursor(CursorMove::End);
+    }
+
+    /// Step back through submitted messages (Up). Returns false when there is
+    /// no history at all, so the caller can fall back to cursor movement.
+    ///
+    /// The in-progress draft is stashed on the first Up and restored by Down.
+    fn history_prev(&mut self) -> bool {
+        if self.input_history.is_empty() {
+            return false;
+        }
+
+        let next = match self.history_pos {
+            // Already at the oldest entry - stay there rather than wrap.
+            Some(0) => return true,
+            Some(i) => i - 1,
+            None => {
+                self.history_draft = Some(self.input_text());
+                self.input_history.len() - 1
+            }
+        };
+
+        self.history_pos = Some(next);
+        let entry = self.input_history[next].clone();
+        self.load_history_entry(&entry);
+        true
+    }
+
+    /// Step forward through submitted messages (Down). Past the newest entry,
+    /// restore the draft that was being typed when browsing began.
+    ///
+    /// Returns false when not browsing, so Down still moves the cursor.
+    fn history_next(&mut self) -> bool {
+        let Some(pos) = self.history_pos else {
+            return false;
+        };
+
+        if pos + 1 < self.input_history.len() {
+            self.history_pos = Some(pos + 1);
+            let entry = self.input_history[pos + 1].clone();
+            self.load_history_entry(&entry);
+        } else {
+            // Walked past the newest: back to whatever was being typed.
+            self.history_pos = None;
+            let draft = self.history_draft.take().unwrap_or_default();
+            self.load_history_entry(&draft);
+        }
+        true
     }
 
     /// Copy the last assistant response to the system clipboard - just its
@@ -638,6 +731,7 @@ impl App {
         if keys::is_submit(&event) && !self.input_is_blank() {
             let content = self.input_text();
             self.clear_input();
+            self.push_input_history(&content);
             if !self.try_handle_slash_command(&content).await? {
                 self.send_message(content).await?;
             }
@@ -685,6 +779,12 @@ impl App {
                 KeyCode::Right if ctrl => self.textarea.move_cursor(CursorMove::WordForward),
                 KeyCode::Left => self.textarea.move_cursor(CursorMove::Back),
                 KeyCode::Right => self.textarea.move_cursor(CursorMove::Forward),
+                // Shell-style history recall. Only from the first/last line, so
+                // Up/Down still move the cursor inside a multi-line draft; and
+                // only if there is history to recall, so they behave as before
+                // on a fresh session.
+                KeyCode::Up if self.cursor_on_first_line() && self.history_prev() => {}
+                KeyCode::Down if self.cursor_on_last_line() && self.history_next() => {}
                 KeyCode::Up => self.textarea.move_cursor(CursorMove::Up),
                 KeyCode::Down => self.textarea.move_cursor(CursorMove::Down),
                 KeyCode::Home => self.textarea.move_cursor(CursorMove::Head),
@@ -2317,6 +2417,108 @@ mod tests {
             .iter()
             .any(|m| m.content.contains("Failed to pull 'bogus-model'")
                 && m.content.contains("model not found")));
+    }
+
+    /// Up recalls the last submitted message into the input without resending
+    /// it, and Down walks back toward the newest, then restores the draft.
+    #[tokio::test]
+    async fn up_recalls_previous_messages_without_sending_them() {
+        let mut app = test_app().await;
+        app.push_input_history("first message");
+        app.push_input_history("second message");
+
+        // Typing a draft, then Up: the draft is stashed, newest entry loaded.
+        app.set_input_text("half-typed draft");
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.input_text(), "second message");
+
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.input_text(), "first message");
+
+        // Oldest entry: further Up stays put rather than wrapping around.
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.input_text(), "first message");
+
+        // Down walks forward, then restores the draft that was interrupted.
+        app.handle_chat_key(key(KeyCode::Down)).await.unwrap();
+        assert_eq!(app.input_text(), "second message");
+        app.handle_chat_key(key(KeyCode::Down)).await.unwrap();
+        assert_eq!(app.input_text(), "half-typed draft");
+
+        // Nothing was sent: recall only fills the input.
+        assert!(
+            app.messages.is_empty(),
+            "recalling history must not send anything"
+        );
+    }
+
+    /// The recalled text must be editable and resendable - the whole point of
+    /// the feature - and the cursor must sit at the end, ready to type.
+    #[tokio::test]
+    async fn recalled_message_can_be_edited_before_resending() {
+        let mut app = test_app().await;
+        app.push_input_history("list files");
+
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.input_text(), "list files");
+
+        // Cursor lands at the end, so typing appends rather than prepends.
+        app.handle_chat_key(key(KeyCode::Char('!'))).await.unwrap();
+        assert_eq!(app.input_text(), "list files!");
+    }
+
+    /// Up/Down must still move the cursor inside a multi-line draft (Shift+Enter
+    /// makes those), so history is only recalled from the first/last line.
+    #[tokio::test]
+    async fn up_moves_the_cursor_inside_a_multiline_draft() {
+        let mut app = test_app().await;
+        app.push_input_history("old message");
+
+        app.set_input_text("line one\nline two");
+        // Cursor is on the last line, so Up moves it up rather than recalling.
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(
+            app.input_text(),
+            "line one\nline two",
+            "Up on a lower line must move the cursor, not overwrite the draft"
+        );
+        assert_eq!(app.textarea.cursor().0, 0, "cursor should have moved up");
+
+        // Now on the first line, Up does recall.
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.input_text(), "old message");
+    }
+
+    /// With no history, Up/Down must behave exactly as before.
+    #[tokio::test]
+    async fn up_is_plain_cursor_movement_when_there_is_no_history() {
+        let mut app = test_app().await;
+        app.set_input_text("just typing");
+
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.input_text(), "just typing");
+        app.handle_chat_key(key(KeyCode::Down)).await.unwrap();
+        assert_eq!(app.input_text(), "just typing");
+    }
+
+    /// A shell does not make you press Up twice to get past a repeated command.
+    #[tokio::test]
+    async fn consecutive_duplicate_submissions_are_stored_once() {
+        let mut app = test_app().await;
+        app.push_input_history("same");
+        app.push_input_history("same");
+        app.push_input_history("different");
+
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.input_text(), "different");
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(app.input_text(), "same");
+        app.handle_chat_key(key(KeyCode::Up)).await.unwrap();
+        assert_eq!(
+            app.input_text(),
+            "same",
+            "the duplicate was not stored twice"
+        );
     }
 
     fn key_mod(code: KeyCode, modifiers: KeyModifiers) -> crossterm::event::KeyEvent {

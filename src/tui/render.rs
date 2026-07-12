@@ -437,7 +437,9 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
             "Alt+Enter for newline"
         };
         Span::styled(
-            format!(" ✏️  Type your message (Enter to send, {newline_hint}, Esc to clear) "),
+            format!(
+                " ✏️  Type your message (Enter to send, {newline_hint}, ↑ history, Esc to clear) "
+            ),
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
@@ -782,6 +784,19 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("→ ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 "New line in message (multi-line input)",
+                Style::default().fg(Color::White),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "  ↑ / ↓        ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Recall previous messages (edit and resend; moves the cursor in a multi-line draft)",
                 Style::default().fg(Color::White),
             ),
         ]),
