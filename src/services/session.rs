@@ -200,7 +200,7 @@ impl SessionService {
                 if msg.role == Role::Assistant {
                     for block in &msg.content {
                         if let ContentBlock::Text { text } = block {
-                            let snippet = if text.len() > 300 { &text[..300] } else { text };
+                            let snippet = crate::utils::truncate_at_char_boundary(text, 300);
                             parts.push(snippet.to_string());
                         }
                     }

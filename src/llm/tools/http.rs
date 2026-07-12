@@ -288,7 +288,7 @@ impl Tool for HttpClientTool {
             if body_text.len() > 10000 {
                 output.push_str(&format!(
                     "{}... (truncated, {} bytes total)",
-                    &body_text[..10000],
+                    crate::utils::truncate_at_char_boundary(&body_text, 10000),
                     body_text.len()
                 ));
             } else {

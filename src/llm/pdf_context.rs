@@ -102,17 +102,8 @@ pub async fn augment_message_with_pdf(message: &str, cwd: &Path) -> String {
         }
     };
 
-    // Find a safe byte index that does not split a multi-byte UTF-8 character.
-    let safe_end = if text.len() > MAX_INJECTED_PDF_CHARS {
-        (0..=MAX_INJECTED_PDF_CHARS)
-            .rev()
-            .find(|&i| text.is_char_boundary(i))
-            .unwrap_or(0)
-    } else {
-        text.len()
-    };
-    let truncated = safe_end < text.len();
-    let body = &text[..safe_end];
+    let body = crate::utils::truncate_at_char_boundary(&text, MAX_INJECTED_PDF_CHARS);
+    let truncated = body.len() < text.len();
 
     let mut out = format!("[PDF Content: {}]\n{}\n", pdf_path.display(), body.trim());
     if truncated {
