@@ -186,6 +186,14 @@ impl EventHandler {
     }
 
     /// Receive the next event
+    /// Take an already-queued event without waiting, or `None` if the queue is
+    /// empty. Lets the render loop drain a burst - a paste arriving as one key
+    /// event per character, say - and repaint once for the whole batch instead
+    /// of once per keystroke.
+    pub fn try_next(&mut self) -> Option<TuiEvent> {
+        self.rx.try_recv().ok()
+    }
+
     pub async fn next(&mut self) -> Option<TuiEvent> {
         self.rx.recv().await
     }

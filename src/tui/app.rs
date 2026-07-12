@@ -476,6 +476,11 @@ impl App {
         self.event_handler.next().await
     }
 
+    /// Take an already-queued event without waiting. See `EventHandler::try_next`.
+    pub fn try_next_event(&mut self) -> Option<TuiEvent> {
+        self.event_handler.try_next()
+    }
+
     /// Handle an event
     pub async fn handle_event(&mut self, event: TuiEvent) -> Result<()> {
         match event {
@@ -492,6 +497,16 @@ impl App {
                 self.handle_key_event(key_event).await?;
             }
             TuiEvent::Paste(text) => {
+                // Bracketed paste: the whole clipboard arrives as one block, so
+                // it is inserted verbatim (backslashes and all) in a single edit.
+                // If this never logs while pasting, the terminal is not sending
+                // bracketed paste and the text is arriving as individual key
+                // events instead - which is what mangles characters.
+                tracing::debug!(
+                    "Bracketed paste: {} chars, {} backslashes",
+                    text.chars().count(),
+                    text.matches('\\').count()
+                );
                 // Handle paste events - only in Chat mode. Inserted at the
                 // cursor position rather than blindly appended.
                 if self.mode == AppMode::Chat {
@@ -2669,6 +2684,42 @@ mod tests {
             .unwrap();
 
         assert_eq!(app.input_text(), "hello ");
+    }
+
+    /// Pasting a Windows path must keep its backslashes, and a multi-line paste
+    /// must arrive whole. Bracketed paste delivers the text as one block; the
+    /// characters are inserted verbatim and nothing is treated as an escape.
+    #[tokio::test]
+    async fn paste_preserves_backslashes_and_newlines() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        let pasted = "D:\\Projets\\test-crustly\\src\\main.rs\nC:\\Users\\jerem\\.crustly";
+        app.handle_event(TuiEvent::Paste(pasted.to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.input_text(),
+            pasted,
+            "pasted text must survive verbatim - backslashes included"
+        );
+    }
+
+    /// If the terminal does not support bracketed paste, the text arrives as one
+    /// key event per character. Those must land in the input verbatim too - in
+    /// particular a backslash must not be swallowed by any shortcut.
+    #[tokio::test]
+    async fn typed_backslashes_reach_the_input() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        let path = r"D:\Projets\test-crustly\src";
+        for c in path.chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+
+        assert_eq!(app.input_text(), path);
     }
 
     #[tokio::test]

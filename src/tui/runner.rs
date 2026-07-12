@@ -114,6 +114,27 @@ async fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Resu
                 // Show error in UI
                 app.error_message = Some(e.to_string());
             }
+
+            // Drain whatever else is already queued before repainting. The loop
+            // renders once per iteration, so handling one event per iteration
+            // meant a full-screen redraw per keystroke: a paste that arrives as
+            // one key event per character (any terminal without bracketed paste)
+            // repainted once per character and crawled.
+            //
+            // Bounded so a saturated queue - streaming tokens, say - cannot
+            // starve rendering completely.
+            const MAX_EVENTS_PER_FRAME: usize = 256;
+            for _ in 0..MAX_EVENTS_PER_FRAME {
+                let Some(queued) = app.try_next_event() else {
+                    break;
+                };
+                if let Err(e) = app.handle_event(queued).await {
+                    app.error_message = Some(e.to_string());
+                }
+                if app.should_quit {
+                    break;
+                }
+            }
         }
     }
 
