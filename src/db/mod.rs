@@ -23,9 +23,22 @@ pub struct Database {
 }
 
 impl Database {
-    /// Connect to a SQLite database file
+    /// Connect to a SQLite database file.
+    ///
+    /// A leading `~` is expanded to the home directory. The default config ships
+    /// `path = "~/.crustly/crustly.db"`, and without expansion that was taken
+    /// literally: Crustly created a directory *named* `~` inside whatever folder
+    /// it was launched from and put the database there. The session then lived
+    /// somewhere nobody would think to look, `ls` reported a stray `~/` in the
+    /// workspace, and deleting `.crustly/crustly.db` did not reset anything.
     pub async fn connect<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let path = path.as_ref();
+        let raw = path.as_ref();
+        let expanded = shellexpand::tilde(&raw.to_string_lossy()).into_owned();
+        let expanded = std::path::PathBuf::from(expanded);
+        if expanded != raw {
+            tracing::debug!("Expanded database path {:?} -> {:?}", raw, expanded);
+        }
+        let path = expanded.as_path();
 
         // Create parent directory if it doesn't exist
         if let Some(parent) = path.parent() {
@@ -151,5 +164,38 @@ mod tests {
     async fn test_pool_connect_in_memory() {
         let pool = Pool::connect_in_memory().await.unwrap();
         assert!(pool.is_connected());
+    }
+
+    /// Regression: the default config ships `path = "~/.crustly/crustly.db"`.
+    /// Unexpanded, `create_dir_all` made a directory literally named `~` inside
+    /// the current working directory and opened the database there - so the
+    /// session was invisible, a stray `~/` polluted the user's workspace, and
+    /// clearing `.crustly/` did not reset anything.
+    #[tokio::test]
+    async fn tilde_in_the_database_path_is_expanded_to_home() {
+        let home = dirs::home_dir().expect("home dir");
+        let unique = format!("crustly-tilde-test-{}", uuid::Uuid::new_v4());
+        let rel = format!("~/{unique}/test.db");
+
+        let db = Database::connect(&rel).await.expect("connects");
+        assert!(db.is_connected());
+
+        // The database must land under $HOME, and crucially NOT in a directory
+        // literally named `~` inside the current working directory.
+        let expected_dir = home.join(&unique);
+        let literal_tilde_dir = std::path::Path::new("~").join(&unique);
+
+        assert!(
+            !literal_tilde_dir.exists(),
+            "the tilde was not expanded: a directory literally named `~` was created \
+             in the cwd at {literal_tilde_dir:?}"
+        );
+        assert!(
+            expected_dir.is_dir(),
+            "expected the database under home at {expected_dir:?}"
+        );
+
+        drop(db);
+        let _ = std::fs::remove_dir_all(&expected_dir);
     }
 }

@@ -652,6 +652,9 @@ impl AgentService {
         let mut total_output_tokens = 0u32;
         let mut final_response: Option<LLMResponse> = None;
         let mut recent_tool_calls: Vec<String> = Vec::new(); // Track tool calls to detect loops
+                                                             // Consecutive tool-calling turns in which the model said nothing to the
+                                                             // user. Reset by any turn that produces text. See MAX_SILENT_TOOL_CALLS.
+        let mut silent_tool_calls: usize = 0;
 
         while iteration < self.max_tool_iterations {
             iteration += 1;
@@ -842,6 +845,36 @@ impl AgentService {
                 recent_tool_calls.remove(0);
             }
 
+            // Drift guard. The identical-call check below only fires when the
+            // model repeats the *same* call, so a model that keeps picking
+            // *different* tools sails past it and burns all 20 iterations. That
+            // is the common failure: the very first `bash` returns the answer,
+            // the model ignores it and wanders off through ls, glob, write_file,
+            // task_manager..., ending in "Maximum tool iterations exceeded".
+            //
+            // Any turn where the model emits text is making progress, so the
+            // counter resets. Only an unbroken run of tool calls with nothing
+            // said to the user counts as drift.
+            const MAX_SILENT_TOOL_CALLS: usize = 6;
+            let produced_text = response
+                .content
+                .iter()
+                .any(|b| matches!(b, ContentBlock::Text { text } if !text.trim().is_empty()));
+            if produced_text {
+                silent_tool_calls = 0;
+            } else {
+                silent_tool_calls += 1;
+            }
+            let drifting = silent_tool_calls >= MAX_SILENT_TOOL_CALLS;
+            if drifting {
+                tracing::warn!(
+                    "⚠️ {} consecutive tool calls with no answer to the user \
+                     (last: '{}'). Forcing a text response.",
+                    silent_tool_calls,
+                    current_call_signature
+                );
+            }
+
             // Check for repeated patterns with tool-specific thresholds
             // This will only trigger for truly identical calls (same tool + same arguments)
 
@@ -869,10 +902,16 @@ impl AgentService {
                 3 // Default: 3 identical calls
             };
 
-            // Check if we have enough calls to detect a loop
-            if recent_tool_calls.len() >= loop_threshold {
-                let last_n = &recent_tool_calls[recent_tool_calls.len() - loop_threshold..];
-                if last_n.iter().all(|call| call == &current_call_signature) {
+            // The model is repeating one identical call.
+            let repeating = recent_tool_calls.len() >= loop_threshold
+                && recent_tool_calls[recent_tool_calls.len() - loop_threshold..]
+                    .iter()
+                    .all(|call| call == &current_call_signature);
+
+            // Either failure mode lands in the same recovery: re-ask with no
+            // tools, forcing the model to answer from what it already has.
+            if repeating || drifting {
+                {
                     tracing::warn!(
                         "⚠️ Detected tool loop: '{}' called {} times in a row. Breaking loop.",
                         current_call_signature,
@@ -901,12 +940,21 @@ impl AgentService {
                         loop_threshold
                     );
 
-                    let hint = format!(
-                        "⚠️ Loop detected: you called '{}' {} times in a row without making progress. \
-                         Please reassess your approach. Summarise what you have found so far and \
-                         explain what the next step should be without repeating the same tool call.",
-                        current_call_signature, loop_threshold
-                    );
+                    let hint = if repeating {
+                        format!(
+                            "⚠️ Loop detected: you called '{}' {} times in a row without making progress. \
+                             Please reassess your approach. Summarise what you have found so far and \
+                             explain what the next step should be without repeating the same tool call.",
+                            current_call_signature, loop_threshold
+                        )
+                    } else {
+                        format!(
+                            "⚠️ You have made {} tool calls without answering the user. The results you \
+                             already have are enough. Do NOT call any more tools. Answer the user's \
+                             original question now, using only what those tools returned.",
+                            silent_tool_calls
+                        )
+                    };
 
                     // Add the assistant's last response and a user recovery message to context.
                     let assistant_msg = Message {

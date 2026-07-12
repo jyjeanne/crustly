@@ -946,7 +946,7 @@ impl App {
 
     /// Load a session and its messages
     async fn load_session(&mut self, session_id: Uuid) -> Result<()> {
-        let session = self
+        let mut session = self
             .session_service
             .get_session(session_id)
             .await?
@@ -956,6 +956,17 @@ impl App {
             .message_service
             .list_messages_for_session(session_id)
             .await?;
+
+        // Sessions created before the model was recorded (and any created
+        // outside the TUI) carry a NULL model, which the header renders as
+        // "unknown". Fill it in from the active provider.
+        if session.model.is_none() {
+            session.model = Some(self.agent_service.provider_model().to_string());
+            session.provider = Some(self.agent_service.provider_name().to_string());
+            if let Err(e) = self.session_service.update_session(&session).await {
+                tracing::warn!("Failed to stamp loaded session model/provider: {}", e);
+            }
+        }
 
         self.current_session = Some(session);
         self.messages = messages.into_iter().map(DisplayMessage::from).collect();
@@ -2028,6 +2039,18 @@ impl App {
             Ok(provider) => match Arc::get_mut(&mut self.agent_service) {
                 Some(service) => {
                     service.set_provider(provider);
+
+                    // Re-stamp the session: the header and every message bubble
+                    // render the model from `session.model`, so without this the
+                    // UI keeps showing the *old* model after a successful switch.
+                    if let Some(session) = &mut self.current_session {
+                        session.model = Some(model.clone());
+                        session.provider = Some("ollama".to_string());
+                        if let Err(e) = self.session_service.update_session(session).await {
+                            tracing::warn!("Failed to update session after model switch: {}", e);
+                        }
+                    }
+
                     let notification = DisplayMessage {
                         id: Uuid::new_v4(),
                         role: "system".to_string(),
