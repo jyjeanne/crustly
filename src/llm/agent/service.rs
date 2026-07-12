@@ -855,9 +855,9 @@ impl AgentService {
                 .unwrap_or_default();
             let is_modification_tool = has_mutating_capability(&first_tool_caps);
             let is_exploration_tool = !is_modification_tool
-                && first_tool_caps.iter().any(|c| {
-                    matches!(c, ToolCapability::ReadFiles | ToolCapability::Network)
-                });
+                && first_tool_caps
+                    .iter()
+                    .any(|c| matches!(c, ToolCapability::ReadFiles | ToolCapability::Network));
 
             // Higher threshold for exploration tools (allow deep directory traversal)
             // Lower threshold for modification tools (dangerous if looping)
