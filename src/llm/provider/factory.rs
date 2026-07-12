@@ -172,6 +172,11 @@ fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     if let Some(num_ctx) = ollama_config.num_ctx {
         provider = provider.with_num_ctx(num_ctx);
     }
+    provider = provider.with_sampling(
+        ollama_config.temperature,
+        ollama_config.top_p,
+        ollama_config.top_k,
+    );
 
     Ok(Some(Arc::new(provider)))
 }

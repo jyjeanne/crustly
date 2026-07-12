@@ -1049,8 +1049,14 @@ impl AgentService {
                             continue;
                         };
 
-                        // Call approval callback
-                        tracing::info!("Requesting user approval for tool '{}'", tool_name);
+                        // Call approval callback. Log the inputs: for `bash` the
+                        // command decides whether the allowlist trusts it, and
+                        // without it a prompt here is impossible to explain.
+                        tracing::info!(
+                            "Requesting user approval for tool '{}' with input {}",
+                            tool_name,
+                            tool_input
+                        );
                         match approval_callback(tool_info).await {
                             Ok(approved) => {
                                 if !approved {
@@ -1830,6 +1836,63 @@ mod tests {
         assert!(!is_parallelizable("bash"));
         assert!(!is_parallelizable("write_file"));
         assert!(!is_parallelizable("edit_file"));
+    }
+
+    /// The TUI streams (`chunk_tx` is set), so its tool calls reach the agent only
+    /// through `drain_stream_to_response`. A provider-level test that inspects raw
+    /// StreamEvents does NOT cover this: it can pass while the assembled
+    /// `LLMResponse` carries no ToolUse block at all, which is exactly the
+    /// "model says it will run ls, then nothing happens" bug.
+    ///
+    ///   cargo test --features ollama -- --ignored streamed_ollama_tool_call_survives_drain
+    #[cfg(feature = "ollama")]
+    #[tokio::test]
+    #[ignore = "requires a running Ollama with a tool-capable model"]
+    async fn streamed_ollama_tool_call_survives_drain() {
+        use crate::llm::provider::{OllamaProvider, Provider, Tool};
+
+        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "ornith:9b".to_string());
+        let provider = OllamaProvider::default_local().with_default_model(model.clone());
+
+        let request = LLMRequest::new(
+            &model,
+            vec![Message::user("list all files into current folder")],
+        )
+        .with_tools(vec![Tool {
+            name: "bash".to_string(),
+            description: "Run a shell command".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {"command": {"type": "string"}},
+                "required": ["command"],
+            }),
+        }])
+        // Mirror the agent loop's request exactly: it sets max_tokens and a
+        // system prompt, and the TUI streams. Any of these can change whether
+        // the model emits a tool call at all.
+        .with_max_tokens(4096)
+        .with_system(crate::cli::SYSTEM_PROMPT.to_string())
+        .with_streaming();
+
+        let stream = provider.stream(request).await.expect("stream starts");
+        let response = drain_stream_to_response(stream, None, &model)
+            .await
+            .expect("stream drains");
+
+        let tool_uses: Vec<_> = response
+            .content
+            .iter()
+            .filter(|b| matches!(b, ContentBlock::ToolUse { .. }))
+            .collect();
+
+        assert!(
+            !tool_uses.is_empty(),
+            "assembled response carried no ToolUse block, so the agent would log \
+             'Found 0 tool uses' and end the turn. Blocks: {:?}, stop_reason: {:?}",
+            response.content,
+            response.stop_reason
+        );
+        assert_eq!(response.stop_reason, Some(StopReason::ToolUse));
     }
 
     #[tokio::test]

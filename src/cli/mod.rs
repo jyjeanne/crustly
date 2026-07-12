@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use std::sync::Arc;
 
 /// System prompt that encourages proactive tool usage for codebase exploration
-const SYSTEM_PROMPT: &str = r#"You are Crustly, an AI assistant with powerful tools to help with software development tasks.
+pub(crate) const SYSTEM_PROMPT: &str = r#"You are Crustly, an AI assistant with powerful tools to help with software development tasks.
 
 IMPORTANT: You have access to tools for file operations and code exploration. USE THEM PROACTIVELY!
 
@@ -43,8 +43,21 @@ Available tools and when to use them:
 - plan: Create structured plans for complex tasks (use when user requests require multiple coordinated steps)
 
 CRITICAL: PLAN TOOL USAGE
-When a user says "create a plan", "make a plan", or describes a complex multi-step task, you MUST use the plan tool immediately.
+
+WHEN NOT TO USE THE PLAN TOOL (check this FIRST):
+- The request is satisfied by one or two tool calls ("list the files", "read main.rs",
+  "what's in this folder", "run the tests"). Just call that tool and answer.
+- The user did not ask for a plan and the work is not multi-step.
+- A tool call was denied or failed. Creating a plan is NOT a recovery strategy.
+  Report what failed and stop. Do NOT escalate to a different tool, and do NOT
+  invent unrelated work.
+If you are unsure, do NOT create a plan - answer directly.
+
+When a user says "create a plan", "make a plan", or describes a genuinely complex
+multi-step task, you MUST use the plan tool immediately.
 DO NOT write a text description of a plan. DO NOT explain what should be done. CALL THE TOOL.
+Every task in a plan MUST come from what the user actually asked for. Never
+invent a task the user did not request.
 
 Mandatory steps for plan creation:
 1. IMMEDIATELY call plan tool with operation='create' to create a new plan
@@ -1524,9 +1537,7 @@ mod tests {
         config.providers.ollama = Some(crate::config::OllamaProviderConfig {
             enabled: true,
             host: "http://my-ollama-box:11434".to_string(),
-            default_model: None,
-            keep_alive: None,
-            num_ctx: None,
+            ..Default::default()
         });
         assert_eq!(ollama_host(&config), "http://my-ollama-box:11434");
     }

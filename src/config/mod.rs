@@ -371,6 +371,16 @@ pub struct OllamaProviderConfig {
     /// Context window size (num_ctx) to request from the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub num_ctx: Option<u32>,
+
+    /// Sampling defaults. Ollama otherwise applies its own generic ones
+    /// (temperature 0.8, top_p 0.9, top_k 40), which are rarely what a specific
+    /// model was tuned for - e.g. Ornith-1.0 documents 0.6 / 0.95 / 20.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_k: Option<u32>,
 }
 
 impl Default for OllamaProviderConfig {
@@ -381,6 +391,9 @@ impl Default for OllamaProviderConfig {
             default_model: None,
             keep_alive: None,
             num_ctx: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
         }
     }
 }

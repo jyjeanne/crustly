@@ -51,6 +51,14 @@ pub struct OllamaProvider {
     custom_default_model: Option<String>,
     keep_alive: Option<KeepAlive>,
     num_ctx: Option<u64>,
+    /// Sampling defaults applied when the request does not specify its own.
+    ///
+    /// Without these, Ollama falls back to its own generic defaults
+    /// (temperature 0.8, top_p 0.9, top_k 40), which are not what a given model
+    /// was tuned for - Ornith-1.0, for instance, documents 0.6 / 0.95 / 20.
+    temperature: Option<f32>,
+    top_p: Option<f32>,
+    top_k: Option<u32>,
 }
 
 impl OllamaProvider {
@@ -81,6 +89,9 @@ impl OllamaProvider {
             custom_default_model: None,
             keep_alive: None,
             num_ctx: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
         }
     }
 
@@ -105,6 +116,19 @@ impl OllamaProvider {
     /// Override the context window size (`num_ctx`) sent with every request.
     pub fn with_num_ctx(mut self, num_ctx: u32) -> Self {
         self.num_ctx = Some(num_ctx as u64);
+        self
+    }
+
+    /// Set the sampling defaults used when a request does not specify its own.
+    pub fn with_sampling(
+        mut self,
+        temperature: Option<f32>,
+        top_p: Option<f32>,
+        top_k: Option<u32>,
+    ) -> Self {
+        self.temperature = temperature;
+        self.top_p = top_p;
+        self.top_k = top_k;
         self
     }
 
@@ -173,12 +197,18 @@ impl OllamaProvider {
             }
         }
 
+        // Request values win; the provider's configured defaults fill the gaps.
+        // The agent sets neither today, so without these the model would run at
+        // Ollama's generic defaults rather than the ones it was tuned for.
         let mut options = ModelOptions::default();
-        if let Some(t) = request.temperature {
+        if let Some(t) = request.temperature.or(self.temperature) {
             options = options.temperature(t);
         }
-        if let Some(p) = request.top_p {
+        if let Some(p) = request.top_p.or(self.top_p) {
             options = options.top_p(p);
+        }
+        if let Some(k) = self.top_k {
+            options = options.top_k(k);
         }
         if let Some(seed) = request.seed.and_then(|s| i32::try_from(s).ok()) {
             options = options.seed(seed);
@@ -333,7 +363,11 @@ impl Provider for OllamaProvider {
         let model = request.model.clone();
         let ollama_request = self.to_ollama_request(request);
 
-        tracing::info!("Ollama streaming request: model={}", model);
+        tracing::info!(
+            "Ollama streaming request: model={}, tools={}",
+            model,
+            ollama_request.tools.len()
+        );
 
         let mut chunk_stream = self
             .client
@@ -405,6 +439,11 @@ impl Provider for OllamaProvider {
                 final_tool_calls.extend(collect_tool_calls(&chunk.message.tool_calls));
 
                 if chunk.done {
+                    tracing::debug!(
+                        "Ollama stream done: tool_calls={}, done_reason={:?}",
+                        final_tool_calls.len(),
+                        chunk.final_data.as_ref().map(|_| "present")
+                    );
                     stop_reason = Some(stop_reason_for(&final_tool_calls));
 
                     if let Some(final_data) = &chunk.final_data {
