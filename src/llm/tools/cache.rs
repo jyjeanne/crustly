@@ -122,14 +122,15 @@ impl ToolResultCache {
         self.entries.retain(|_, v| now < v.expires_at);
     }
 
-    /// Drop all cached filesystem-tool results (read_file/glob/grep/ls).
+    /// Drop every cached entry whose tool name matches `pred`.
     ///
-    /// Must be called after any mutating tool (write_file, edit_file, bash, …)
-    /// runs, otherwise a later read_file within the TTL returns the pre-write
-    /// file content.
-    pub fn invalidate_fs_entries(&self) {
-        self.entries
-            .retain(|k, _| !matches!(k.tool_name.as_str(), "read_file" | "glob" | "grep" | "ls"));
+    /// Callers invalidate after a mutating tool (write_file, edit_file,
+    /// bash, …) runs, otherwise a later read within the TTL returns the
+    /// pre-write result. The predicate lets the caller decide which tools
+    /// are affected (e.g. from `ToolCapability`) so this module doesn't
+    /// hardcode a tool-name list that can drift.
+    pub fn invalidate_matching(&self, pred: impl Fn(&str) -> bool) {
+        self.entries.retain(|k, _| !pred(&k.tool_name));
     }
 }
 
@@ -171,14 +172,14 @@ mod tests {
     }
 
     #[test]
-    fn invalidate_fs_entries_drops_read_results_but_keeps_web() {
+    fn invalidate_matching_drops_selected_tools_and_keeps_others() {
         let cache = ToolResultCache::new(ToolTtlConfig::default());
         let read_key = CacheKey::from_tool("read_file", &serde_json::json!({ "path": "a.rs" }));
         let web_key = CacheKey::from_tool("web_search", &serde_json::json!({ "query": "rust" }));
         cache.insert(read_key.clone(), "old file".into(), Duration::from_secs(60));
         cache.insert(web_key.clone(), "results".into(), Duration::from_secs(60));
 
-        cache.invalidate_fs_entries();
+        cache.invalidate_matching(|tool| tool == "read_file");
 
         assert!(
             cache.get(&read_key).is_none(),

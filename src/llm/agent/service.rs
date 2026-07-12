@@ -11,7 +11,7 @@ use crate::llm::provider::{
     ProviderStream, StopReason, StreamEvent, TokenUsage,
 };
 use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
-use crate::llm::tools::{ToolExecutionContext, ToolRegistry};
+use crate::llm::tools::{ToolCapability, ToolExecutionContext, ToolRegistry};
 use crate::services::{MessageService, ServiceContext, SessionService};
 use futures::future::join_all;
 use futures::StreamExt as _;
@@ -21,6 +21,19 @@ use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
+
+/// True when the capabilities can change files or system state, meaning
+/// cached read results may be stale after a tool with them runs.
+fn has_mutating_capability(caps: &[ToolCapability]) -> bool {
+    caps.iter().any(|c| {
+        matches!(
+            c,
+            ToolCapability::WriteFiles
+                | ToolCapability::ExecuteShell
+                | ToolCapability::SystemModification
+        )
+    })
+}
 
 /// Returns true for read-only, idempotent tools that can run concurrently.
 pub fn is_parallelizable(tool_name: &str) -> bool {
@@ -808,8 +821,15 @@ impl AgentService {
                             }
                         }
 
-                        // Other tools: just use name
-                        _ => name.to_string(),
+                        // Other tools: name plus an input hash, so different
+                        // calls to the same tool never share a signature.
+                        _ => {
+                            use std::collections::hash_map::DefaultHasher;
+                            use std::hash::{Hash, Hasher};
+                            let mut h = DefaultHasher::new();
+                            input.to_string().hash(&mut h);
+                            format!("{}:{:016x}", name, h.finish())
+                        }
                     }
                 })
                 .collect::<Vec<_>>()
@@ -825,15 +845,19 @@ impl AgentService {
             // Check for repeated patterns with tool-specific thresholds
             // This will only trigger for truly identical calls (same tool + same arguments)
 
-            // Determine loop threshold based on tool type
-            let is_exploration_tool = current_call_signature.starts_with("ls:")
-                || current_call_signature.starts_with("glob:")
-                || current_call_signature.starts_with("grep:")
-                || current_call_signature.starts_with("read_file:");
-
-            let is_modification_tool = current_call_signature.starts_with("write_file:")
-                || current_call_signature.starts_with("edit_file:")
-                || current_call_signature.starts_with("bash:");
+            // Determine loop threshold from the first tool's declared
+            // capabilities, so the classification cannot drift from the
+            // registry's actual tool names the way hardcoded strings did.
+            let first_tool_caps = tool_uses
+                .first()
+                .and_then(|(_, name, _)| self.tool_registry.get(name))
+                .map(|t| t.capabilities())
+                .unwrap_or_default();
+            let is_modification_tool = has_mutating_capability(&first_tool_caps);
+            let is_exploration_tool = !is_modification_tool
+                && first_tool_caps.iter().any(|c| {
+                    matches!(c, ToolCapability::ReadFiles | ToolCapability::Network)
+                });
 
             // Higher threshold for exploration tools (allow deep directory traversal)
             // Lower threshold for modification tools (dangerous if looping)
@@ -973,7 +997,9 @@ impl AgentService {
             tool_results.extend(parallel_results);
 
             // --- Sequential execution (tools requiring approval or non-idempotent) ---
-            let ran_sequential_tools = !sequential_uses.is_empty();
+            // Set when a tool with a mutating capability actually executes
+            // (approved or auto), so read caches can be invalidated below.
+            let mut mutating_tool_ran = false;
             for (tool_id, tool_name, tool_input) in sequential_uses {
                 tracing::info!(
                     "Executing tool '{}' (iteration {}/{})",
@@ -1043,6 +1069,10 @@ impl AgentService {
                                 };
 
                                 // Execute the tool with approved context
+                                mutating_tool_ran |= self
+                                    .tool_registry
+                                    .get(&tool_name)
+                                    .is_some_and(|t| has_mutating_capability(&t.capabilities()));
                                 match self
                                     .tool_registry
                                     .execute(&tool_name, tool_input, &approved_tool_context)
@@ -1098,6 +1128,10 @@ impl AgentService {
                 }
 
                 // Execute the tool
+                mutating_tool_ran |= self
+                    .tool_registry
+                    .get(&tool_name)
+                    .is_some_and(|t| has_mutating_capability(&t.capabilities()));
                 match self
                     .tool_registry
                     .execute(&tool_name, tool_input, &tool_context)
@@ -1126,12 +1160,18 @@ impl AgentService {
                 }
             }
 
-            // Sequential tools may have mutated the filesystem (write_file,
-            // edit_file, bash, …) — drop cached read results so the next
-            // read_file/glob/grep/ls sees the current state instead of a
-            // stale entry within its TTL.
-            if ran_sequential_tools {
-                self.tool_cache.invalidate_fs_entries();
+            // A mutating tool (write_file, edit_file, bash, …) may have
+            // changed the filesystem — drop cached results of every tool
+            // that reads it, so the next read sees the current state
+            // instead of a stale entry within its TTL. Which tools count
+            // as reads comes from their declared capabilities, not a
+            // hardcoded name list; unknown tools are invalidated too.
+            if mutating_tool_ran {
+                self.tool_cache.invalidate_matching(|tool_name| {
+                    self.tool_registry.get(tool_name).map_or(true, |t| {
+                        t.capabilities().contains(&ToolCapability::ReadFiles)
+                    })
+                });
             }
 
             // Add assistant message with tool use to context
