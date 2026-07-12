@@ -402,18 +402,10 @@ impl Provider for OllamaProvider {
                     });
                 }
 
+                final_tool_calls.extend(collect_tool_calls(&chunk.message.tool_calls));
+
                 if chunk.done {
-                    if !chunk.message.tool_calls.is_empty() {
-                        stop_reason = Some(StopReason::ToolUse);
-                        final_tool_calls = chunk
-                            .message
-                            .tool_calls
-                            .iter()
-                            .map(|tc| (tc.function.name.clone(), tc.function.arguments.clone()))
-                            .collect();
-                    } else {
-                        stop_reason = Some(StopReason::EndTurn);
-                    }
+                    stop_reason = Some(stop_reason_for(&final_tool_calls));
 
                     if let Some(final_data) = &chunk.final_data {
                         final_usage = TokenUsage {
@@ -509,6 +501,27 @@ impl Provider for OllamaProvider {
     fn calculate_cost(&self, _model: &str, _input_tokens: u32, _output_tokens: u32) -> f64 {
         // Local inference: no per-token API cost.
         0.0
+    }
+}
+
+/// Pull the (name, arguments) pairs out of one streamed chunk's tool calls.
+///
+/// Ollama emits `tool_calls` on the chunk where the model makes the call, then
+/// sends a separate terminal `done` chunk carrying none. Callers must therefore
+/// accumulate across every chunk rather than reading only the `done` one.
+fn collect_tool_calls(tool_calls: &[ToolCall]) -> Vec<(String, serde_json::Value)> {
+    tool_calls
+        .iter()
+        .map(|tc| (tc.function.name.clone(), tc.function.arguments.clone()))
+        .collect()
+}
+
+/// A turn ends in `ToolUse` if the model called anything across the whole stream.
+fn stop_reason_for(tool_calls: &[(String, serde_json::Value)]) -> StopReason {
+    if tool_calls.is_empty() {
+        StopReason::EndTurn
+    } else {
+        StopReason::ToolUse
     }
 }
 
@@ -799,6 +812,84 @@ mod tests {
             }
             other => panic!("expected ToolUse block, got {other:?}"),
         }
+    }
+
+    /// Regression: Ollama streams tool_calls on a `done=false` chunk and then a
+    /// terminal `done=true` chunk with none. Reading only the `done` chunk lost
+    /// the call entirely and ended the turn as EndTurn, so no tool ever ran.
+    #[test]
+    fn streamed_tool_calls_arrive_before_the_done_chunk() {
+        let call_chunk = vec![ToolCall {
+            function: ToolCallFunction {
+                name: "bash".to_string(),
+                arguments: serde_json::json!({"command": "ls -la"}),
+            },
+        }];
+        let done_chunk: Vec<ToolCall> = vec![];
+
+        let mut accumulated = Vec::new();
+        accumulated.extend(collect_tool_calls(&call_chunk));
+        accumulated.extend(collect_tool_calls(&done_chunk));
+
+        assert_eq!(accumulated.len(), 1, "tool call from mid-stream chunk kept");
+        assert_eq!(accumulated[0].0, "bash");
+        assert_eq!(accumulated[0].1["command"], "ls -la");
+        assert_eq!(stop_reason_for(&accumulated), StopReason::ToolUse);
+    }
+
+    #[test]
+    fn stream_without_tool_calls_ends_the_turn() {
+        assert_eq!(stop_reason_for(&[]), StopReason::EndTurn);
+    }
+
+    /// End-to-end against a real Ollama daemon; ignored by default because it
+    /// needs `ollama serve` and a tool-capable model pulled locally.
+    ///
+    ///   cargo test --features ollama -- --ignored streamed_tool_call_reaches_caller
+    #[tokio::test]
+    #[ignore = "requires a running Ollama with a tool-capable model"]
+    async fn streamed_tool_call_reaches_caller() {
+        use futures::StreamExt as _;
+
+        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "ornith:9b".to_string());
+        let provider = OllamaProvider::default_local().with_default_model(model.clone());
+
+        let request = LLMRequest::new(
+            &model,
+            vec![Message::user("List the files here. Use the bash tool.")],
+        )
+        .with_tools(vec![Tool {
+            name: "bash".to_string(),
+            description: "Run a shell command".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {"command": {"type": "string"}},
+                "required": ["command"],
+            }),
+        }]);
+
+        let mut stream = provider.stream(request).await.expect("stream starts");
+
+        let mut tool_uses = Vec::new();
+        let mut stop_reason = None;
+        while let Some(event) = stream.next().await {
+            match event.expect("no stream error") {
+                StreamEvent::ContentBlockStart {
+                    content_block: ContentBlock::ToolUse { name, input, .. },
+                    ..
+                } => tool_uses.push((name, input)),
+                StreamEvent::MessageDelta { delta, .. } => stop_reason = delta.stop_reason,
+                _ => {}
+            }
+        }
+
+        assert!(
+            !tool_uses.is_empty(),
+            "model asked to call a tool but no ToolUse block surfaced (tool calls \
+             arrive on a pre-`done` chunk; regression if dropped)"
+        );
+        assert_eq!(tool_uses[0].0, "bash");
+        assert_eq!(stop_reason, Some(StopReason::ToolUse));
     }
 
     #[test]
