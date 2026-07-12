@@ -778,6 +778,23 @@ impl App {
         } else {
             let ctrl = event.modifiers.contains(KeyModifiers::CONTROL);
             match event.code {
+                // AltGr. On non-US layouts it is how you type `\`, `@`, `[`, `]`,
+                // `{`, `}`, `~`, `|`, `€`... - and Windows reports it as
+                // CONTROL|ALT. tui-textarea's `input_without_shortcuts` drops any
+                // Char carrying CONTROL, treating it as a control key, so every
+                // one of those characters was silently swallowed: typing or
+                // pasting `D:\Projets` landed as `D:Projets`.
+                //
+                // AltGr is a text-entry modifier, not a shortcut, so insert the
+                // character it produced verbatim. This must precede the '@' arm
+                // below: on AZERTY, '@' is itself an AltGr character, and would
+                // otherwise open the file picker instead of being typed.
+                KeyCode::Char(c)
+                    if event.modifiers.contains(KeyModifiers::CONTROL)
+                        && event.modifiers.contains(KeyModifiers::ALT) =>
+                {
+                    self.textarea.insert_char(c);
+                }
                 KeyCode::Char('@') => {
                     // Trigger file picker mode
                     self.open_file_picker().await?;
@@ -2709,6 +2726,60 @@ mod tests {
     /// If the terminal does not support bracketed paste, the text arrives as one
     /// key event per character. Those must land in the input verbatim too - in
     /// particular a backslash must not be swallowed by any shortcut.
+    /// AltGr on many non-US layouts produces `\`, and crossterm reports it as
+    /// CONTROL|ALT. If the input path drops modified Char events, the backslash
+    /// never lands - which is exactly "the backslashes are removed".
+    #[tokio::test]
+    async fn altgr_backslash_reaches_the_input() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        // A whole Windows path, as AltGr delivers it on a non-US layout.
+        for c in r"D:\Projets\test-crustly".chars() {
+            let ev = if c == '\\' {
+                key_mod(KeyCode::Char(c), KeyModifiers::CONTROL | KeyModifiers::ALT)
+            } else {
+                key(KeyCode::Char(c))
+            };
+            app.handle_chat_key(ev).await.unwrap();
+        }
+
+        assert_eq!(
+            app.input_text(),
+            r"D:\Projets\test-crustly",
+            "AltGr backslashes must be inserted, not swallowed as control keys"
+        );
+    }
+
+    /// `@` opens the file picker - but on AZERTY `@` is itself typed with AltGr,
+    /// so an AltGr '@' must insert the character rather than open the picker.
+    #[tokio::test]
+    async fn altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_chat_key(key_mod(
+            KeyCode::Char('@'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT,
+        ))
+        .await
+        .unwrap();
+
+        assert_eq!(app.input_text(), "@");
+        assert_eq!(app.mode, AppMode::Chat, "must not open the file picker");
+    }
+
+    /// A plain (unmodified) '@' still opens the file picker.
+    #[tokio::test]
+    async fn plain_at_sign_still_opens_the_file_picker() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_chat_key(key(KeyCode::Char('@'))).await.unwrap();
+
+        assert_ne!(app.mode, AppMode::Chat, "plain @ should open the picker");
+    }
+
     #[tokio::test]
     async fn typed_backslashes_reach_the_input() {
         let mut app = test_app().await;
