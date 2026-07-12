@@ -166,6 +166,41 @@ fn route_text_delta(
     }
 }
 
+/// Apply accumulated `input_json_delta` fragments to a streamed tool-use block.
+///
+/// Anthropic streams tool-call arguments as `InputJsonDelta` fragments *after*
+/// the `ContentBlockStart`, which itself carries an empty `input: {}`. Without
+/// merging the assembled JSON back in, the tool would be executed with `{}`
+/// instead of its real arguments. A no-op for providers (OpenAI, Ollama) that
+/// deliver a fully-formed `input` in the `ContentBlockStart` and never emit
+/// `InputJsonDelta`.
+fn apply_streamed_tool_input(block: ContentBlock, json_buf: &str) -> ContentBlock {
+    if let ContentBlock::ToolUse { id, name, input } = block {
+        if json_buf.trim().is_empty() {
+            return ContentBlock::ToolUse { id, name, input };
+        }
+        let merged = match serde_json::from_str(json_buf) {
+            Ok(value) => value,
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse streamed tool arguments for '{}': {} (raw: {})",
+                    name,
+                    e,
+                    json_buf.chars().take(200).collect::<String>()
+                );
+                input
+            }
+        };
+        ContentBlock::ToolUse {
+            id,
+            name,
+            input: merged,
+        }
+    } else {
+        block
+    }
+}
+
 /// Consume a [`ProviderStream`] and assemble a complete [`LLMResponse`].
 ///
 /// While consuming the stream, text deltas are optionally forwarded to
@@ -192,6 +227,9 @@ async fn drain_stream_to_response(
 
     // A ToolUse block assembled from ContentBlockStart + ContentBlockStop.
     let mut pending_tool: Option<ContentBlock> = None;
+    // Accumulates `input_json_delta` fragments for the currently-open tool-use
+    // block (Anthropic streams tool arguments this way). Applied on stop.
+    let mut pending_tool_json = String::new();
 
     // Tracks whether we are currently inside a `<think>…</think>` block while
     // routing TextDelta events from tag-based reasoning models (e.g. Ollama
@@ -207,11 +245,13 @@ async fn drain_stream_to_response(
             StreamEvent::ContentBlockStart { content_block, .. } => {
                 if matches!(content_block, ContentBlock::ToolUse { .. }) {
                     pending_tool = Some(content_block);
+                    pending_tool_json.clear();
                 }
             }
             StreamEvent::ContentBlockStop { .. } => {
                 if let Some(tool) = pending_tool.take() {
-                    tool_uses.push(tool);
+                    tool_uses.push(apply_streamed_tool_input(tool, &pending_tool_json));
+                    pending_tool_json.clear();
                 }
             }
             StreamEvent::ContentBlockDelta { delta, .. } => match delta {
@@ -228,6 +268,13 @@ async fn drain_stream_to_response(
                 }
                 ContentDelta::ThinkingDelta { ref thinking } if !thinking.is_empty() => {
                     thinking_buf.push_str(thinking);
+                }
+                // Tool-argument fragments for the open tool-use block
+                // (Anthropic). Accumulated and parsed at ContentBlockStop.
+                ContentDelta::InputJsonDelta { ref partial_json } => {
+                    if pending_tool.is_some() {
+                        pending_tool_json.push_str(partial_json);
+                    }
                 }
                 _ => {}
             },
@@ -252,7 +299,7 @@ async fn drain_stream_to_response(
     // Flush any tool use block that arrived without a matching ContentBlockStop
     // (e.g. stream truncated or provider omitted the stop event).
     if let Some(tool) = pending_tool.take() {
-        tool_uses.push(tool);
+        tool_uses.push(apply_streamed_tool_input(tool, &pending_tool_json));
     }
 
     // Fallback: if `route_text_delta` did not extract any thinking (no <think>
@@ -1996,5 +2043,71 @@ mod tests {
             .expect("perf metrics should survive draining the stream");
         assert_eq!(perf.eval_duration_ms, Some(200));
         assert_eq!(perf.model_was_loaded, Some(true));
+    }
+
+    #[tokio::test]
+    async fn drain_stream_assembles_anthropic_tool_input_from_json_deltas() {
+        use crate::llm::provider::types::MessageDelta;
+        use crate::llm::provider::ContentDelta;
+
+        // Anthropic streams a tool_use block with an empty `input`, then sends
+        // the real arguments as `input_json_delta` fragments before the stop.
+        let events: Vec<crate::llm::provider::Result<StreamEvent>> = vec![
+            Ok(StreamEvent::ContentBlockStart {
+                index: 0,
+                content_block: ContentBlock::ToolUse {
+                    id: "toolu_1".to_string(),
+                    name: "read_file".to_string(),
+                    input: serde_json::json!({}),
+                },
+            }),
+            Ok(StreamEvent::ContentBlockDelta {
+                index: 0,
+                delta: ContentDelta::InputJsonDelta {
+                    partial_json: "{\"file_path\":".to_string(),
+                },
+            }),
+            Ok(StreamEvent::ContentBlockDelta {
+                index: 0,
+                delta: ContentDelta::InputJsonDelta {
+                    partial_json: "\"src/main.rs\"}".to_string(),
+                },
+            }),
+            Ok(StreamEvent::ContentBlockStop { index: 0 }),
+            Ok(StreamEvent::MessageDelta {
+                delta: MessageDelta {
+                    stop_reason: Some(StopReason::ToolUse),
+                    stop_sequence: None,
+                },
+                usage: TokenUsage {
+                    input_tokens: 5,
+                    output_tokens: 10,
+                },
+                perf_metrics: None,
+            }),
+            Ok(StreamEvent::MessageStop),
+        ];
+        let stream: ProviderStream = Box::pin(futures::stream::iter(events));
+
+        let response = drain_stream_to_response(stream, None, "claude-3-5-sonnet")
+            .await
+            .unwrap();
+
+        // Regression: the streamed tool call must carry its assembled arguments
+        // instead of the empty `{}` from ContentBlockStart.
+        let tool = response
+            .content
+            .iter()
+            .find_map(|b| match b {
+                ContentBlock::ToolUse { name, input, .. } => Some((name.clone(), input.clone())),
+                _ => None,
+            })
+            .expect("response must contain a tool use block");
+        assert_eq!(tool.0, "read_file");
+        assert_eq!(
+            tool.1,
+            serde_json::json!({"file_path": "src/main.rs"}),
+            "input_json_delta fragments must be assembled into the tool input"
+        );
     }
 }
