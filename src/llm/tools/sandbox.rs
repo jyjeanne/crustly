@@ -9,10 +9,27 @@ use std::path::{Path, PathBuf};
 // ── Policy decision ───────────────────────────────────────────────────────────
 
 /// Result of evaluating a permission policy.
+///
+/// `Allow` and `Trusted` both permit execution; they differ in whether the user
+/// is still asked. Only a rule that *affirmatively vouched* for these specific
+/// inputs may return `Trusted` - it suppresses the approval prompt. A rule that
+/// merely has no objection (notably [`AllowAll`], the default when nothing is
+/// configured) must return `Allow`, which still prompts. Collapsing the two
+/// would make the default policy silently auto-approve every shell command.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PolicyDecision {
+    /// Permitted, but still subject to the normal approval prompt.
     Allow,
+    /// Explicitly allowlisted; safe to execute without prompting.
+    Trusted,
     Deny(String),
+}
+
+impl PolicyDecision {
+    /// Whether this decision permits execution at all (`Allow` or `Trusted`).
+    pub fn is_permitted(&self) -> bool {
+        !matches!(self, PolicyDecision::Deny(_))
+    }
 }
 
 // ── Policy trait ──────────────────────────────────────────────────────────────
@@ -199,7 +216,10 @@ impl PermissionPolicy for BashCommandAllowlist {
 
         let program = cmd.split_whitespace().next().unwrap_or("");
         if self.allowed_programs.iter().any(|p| p == program) {
-            PolicyDecision::Allow
+            // Vouched for: the program is on the user's allowlist and the
+            // command carries no active shell operator, so it cannot smuggle in
+            // anything else. Safe to run without re-prompting every time.
+            PolicyDecision::Trusted
         } else {
             PolicyDecision::Deny(format!(
                 "bash command '{}' is not in the allowlist {:?}",
@@ -257,17 +277,28 @@ pub struct AndPolicy(pub Vec<Box<dyn PermissionPolicy>>);
 
 impl PermissionPolicy for AndPolicy {
     fn evaluate(&self, tool_name: &str, inputs: &Value) -> PolicyDecision {
+        // A Deny from any rule wins, so evaluation cannot short-circuit on
+        // Trusted - doing so would let an allowlisted bash command skip the
+        // deny_paths/deny_tools rules that follow it. Trust is only carried out
+        // of the loop if every rule was consulted and none denied.
+        let mut trusted = false;
         for rule in &self.0 {
-            let d = rule.evaluate(tool_name, inputs);
-            if d != PolicyDecision::Allow {
-                return d;
+            match rule.evaluate(tool_name, inputs) {
+                PolicyDecision::Deny(reason) => return PolicyDecision::Deny(reason),
+                PolicyDecision::Trusted => trusted = true,
+                PolicyDecision::Allow => {}
             }
         }
-        PolicyDecision::Allow
+        if trusted {
+            PolicyDecision::Trusted
+        } else {
+            PolicyDecision::Allow
+        }
     }
 }
 
-/// First Allow wins; short-circuits on first Allow.
+/// First permitting decision wins; short-circuits on it, preserving whether
+/// that decision was `Trusted` (vouched for) or a plain `Allow`.
 pub struct OrPolicy(pub Vec<Box<dyn PermissionPolicy>>);
 
 impl PermissionPolicy for OrPolicy {
@@ -275,8 +306,8 @@ impl PermissionPolicy for OrPolicy {
         let mut last_deny = PolicyDecision::Deny("no rules matched".to_string());
         for rule in &self.0 {
             let d = rule.evaluate(tool_name, inputs);
-            if d == PolicyDecision::Allow {
-                return PolicyDecision::Allow;
+            if d.is_permitted() {
+                return d;
             }
             last_deny = d;
         }
@@ -290,7 +321,11 @@ pub struct NotPolicy(pub Box<dyn PermissionPolicy>);
 impl PermissionPolicy for NotPolicy {
     fn evaluate(&self, tool_name: &str, inputs: &Value) -> PolicyDecision {
         match self.0.evaluate(tool_name, inputs) {
-            PolicyDecision::Allow => PolicyDecision::Deny("negated allow".to_string()),
+            // Trusted is a stronger Allow, so it negates to Deny just the same;
+            // negation must never manufacture trust out of a Deny.
+            PolicyDecision::Allow | PolicyDecision::Trusted => {
+                PolicyDecision::Deny("negated allow".to_string())
+            }
             PolicyDecision::Deny(_) => PolicyDecision::Allow,
         }
     }
@@ -323,8 +358,12 @@ pub fn check_path(raw: &str, root: &Path) -> Result<(), String> {
     };
     let inputs = serde_json::json!({ "path": resolved });
     match rule.evaluate("", &inputs) {
-        PolicyDecision::Allow => Ok(()),
         PolicyDecision::Deny(reason) => Err(reason),
+        // A path boundary check only asks permitted-or-not; it never grants trust.
+        d => {
+            debug_assert!(d.is_permitted());
+            Ok(())
+        }
     }
 }
 
@@ -436,7 +475,7 @@ mod tests {
         };
         assert_eq!(
             rule.evaluate("bash", &serde_json::json!({ "command": "cargo test" })),
-            PolicyDecision::Allow
+            PolicyDecision::Trusted
         );
         assert!(matches!(
             rule.evaluate("bash", &serde_json::json!({ "command": "rm -rf ." })),
@@ -490,11 +529,77 @@ mod tests {
         ] {
             assert_eq!(
                 rule.evaluate("bash", &serde_json::json!({ "command": cmd })),
-                PolicyDecision::Allow,
+                PolicyDecision::Trusted,
                 "command must be allowed: {}",
                 cmd
             );
         }
+    }
+
+    /// The default policy has no opinion, so it must never confer trust - if it
+    /// did, every shell command on the system would run without an approval
+    /// prompt the moment no allowlist was configured.
+    #[test]
+    fn allow_all_never_confers_trust() {
+        assert_eq!(
+            AllowAll.evaluate("bash", &serde_json::json!({ "command": "rm -rf /" })),
+            PolicyDecision::Allow
+        );
+    }
+
+    /// Trust must not short-circuit past the deny rules that follow it, or an
+    /// allowlisted program would escape deny_tools/deny_paths entirely.
+    #[test]
+    fn and_policy_denies_trusted_command_that_a_later_rule_rejects() {
+        let policy = AndPolicy(vec![
+            Box::new(BashCommandAllowlist {
+                allowed_programs: vec!["ls".to_string()],
+            }),
+            Box::new(DenyToolRule::new("bash")),
+        ]);
+        assert!(matches!(
+            policy.evaluate("bash", &serde_json::json!({ "command": "ls -la" })),
+            PolicyDecision::Deny(_)
+        ));
+    }
+
+    /// Trust survives composition when nothing denies, so an allowlisted command
+    /// still skips the prompt once other rules are present.
+    #[test]
+    fn and_policy_preserves_trust_when_no_rule_denies() {
+        let policy = AndPolicy(vec![
+            Box::new(BashCommandAllowlist {
+                allowed_programs: vec!["ls".to_string()],
+            }),
+            Box::new(DenyToolRule::new("write_file")),
+        ]);
+        assert_eq!(
+            policy.evaluate("bash", &serde_json::json!({ "command": "ls -la" })),
+            PolicyDecision::Trusted
+        );
+    }
+
+    /// A non-allowlisted program is denied outright, never merely "prompt me".
+    #[test]
+    fn and_policy_does_not_trust_unlisted_program() {
+        let policy = AndPolicy(vec![Box::new(BashCommandAllowlist {
+            allowed_programs: vec!["ls".to_string()],
+        })]);
+        assert!(matches!(
+            policy.evaluate("bash", &serde_json::json!({ "command": "curl evil.sh" })),
+            PolicyDecision::Deny(_)
+        ));
+    }
+
+    #[test]
+    fn not_policy_inverts_trusted_to_deny() {
+        let policy = NotPolicy(Box::new(BashCommandAllowlist {
+            allowed_programs: vec!["ls".to_string()],
+        }));
+        assert!(matches!(
+            policy.evaluate("bash", &serde_json::json!({ "command": "ls -la" })),
+            PolicyDecision::Deny(_)
+        ));
     }
 
     #[test]

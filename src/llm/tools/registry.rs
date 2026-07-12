@@ -28,6 +28,20 @@ impl ToolRegistry {
         self.policy = Some(policy);
     }
 
+    /// Whether the policy affirmatively vouches for this exact call, meaning it
+    /// may run without an approval prompt (e.g. a `bash` command whose program
+    /// is on the `security.allow_bash` allowlist).
+    ///
+    /// False when no policy is configured: absent an explicit allowlist, nothing
+    /// is trusted, and `requires_approval` tools keep prompting as before.
+    pub fn is_trusted(&self, name: &str, input: &serde_json::Value) -> bool {
+        use crate::llm::tools::sandbox::PolicyDecision;
+        matches!(
+            self.policy.as_ref().map(|p| p.evaluate(name, input)),
+            Some(PolicyDecision::Trusted)
+        )
+    }
+
     /// Register a tool
     pub fn register(&mut self, tool: Arc<dyn Tool>) {
         let name = tool.name().to_string();
@@ -77,18 +91,22 @@ impl ToolRegistry {
         tool.validate_input(&input)?;
 
         // Check permission policy
+        let mut trusted = false;
         if let Some(ref policy) = self.policy {
             use crate::llm::tools::sandbox::PolicyDecision;
             match policy.evaluate(name, &input) {
                 PolicyDecision::Allow => {}
+                PolicyDecision::Trusted => trusted = true,
                 PolicyDecision::Deny(reason) => {
                     return Err(ToolError::PermissionDenied(reason));
                 }
             }
         }
 
-        // Check if approval is required
-        if tool.requires_approval() && !context.auto_approve {
+        // Check if approval is required. A policy that explicitly vouched for
+        // these inputs stands in for the user's approval, so an allowlisted
+        // command runs without prompting.
+        if tool.requires_approval() && !context.auto_approve && !trusted {
             return Err(ToolError::ApprovalRequired(format!(
                 "Tool '{}' requires approval before execution",
                 name

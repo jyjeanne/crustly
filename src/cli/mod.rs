@@ -890,6 +890,11 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         })
     });
 
+    // Install the [security] policy chain (deny_tools/deny_paths/allow_bash).
+    // Without this the whole section is inert: nothing is denied, and nothing
+    // is trusted, so every bash call re-prompts.
+    tool_registry.set_policy(config.security.to_policy().into());
+
     // Create agent service with approval callback
     tracing::debug!("Creating agent service with approval callback");
     let agent_service = Arc::new(
@@ -927,8 +932,9 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
 ///
 /// Callers must not treat this as the only safety layer: the
 /// `SecurityConfig` policy chain (`deny_tools`/`deny_paths`/`allow_bash`)
-/// is evaluated independently in `ToolRegistry::execute()` and stays
-/// enforced regardless of this function's result.
+/// is installed via `ToolRegistry::set_policy` and evaluated independently in
+/// `ToolRegistry::execute()`, so it stays enforced regardless of this
+/// function's result. A `Deny` there overrides any bypass decided here.
 fn auto_mode_bypasses_approval(mode: &crate::config::PlanExecMode, tool_name: &str) -> bool {
     use crate::config::PlanExecMode;
     use crate::plan::PlanModeState;
@@ -1023,6 +1029,9 @@ async fn cmd_run(
             }
         }
     }
+
+    // Install the [security] policy chain, as in the interactive path above.
+    tool_registry.set_policy(config.security.to_policy().into());
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());
