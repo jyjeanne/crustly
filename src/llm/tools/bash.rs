@@ -10,24 +10,69 @@ use serde_json::Value;
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
+/// Standard Git-for-Windows shell locations, probed when `bash` is not on PATH.
+///
+/// `Git\bin\bash.exe` is the supported launcher and comes first;
+/// `Git\usr\bin\bash.exe` is the internal MSYS binary and is only a fallback.
+#[cfg(target_os = "windows")]
+const WINDOWS_BASH_FALLBACKS: &[&str] = &[
+    r"C:\Program Files\Git\bin\bash.exe",
+    r"C:\Program Files (x86)\Git\bin\bash.exe",
+    r"C:\Program Files\Git\usr\bin\bash.exe",
+];
+
 /// Resolve the shell used to run a `bash` tool command, as `(program, arg)`.
 ///
-/// On Unix this is `sh -c`. On Windows we look for a real POSIX shell on PATH
-/// (Git for Windows ships one) and use it, because the model writes POSIX.
-/// Only if none exists do we fall back to `cmd /C`, which cannot run `ls -la`
-/// or a pipeline and will mislead the model rather than fail loudly.
+/// On Unix this is `sh -c`. On Windows the model still writes POSIX (`ls -la`,
+/// pipelines), so we need a real POSIX shell:
+///
+/// 1. `CRUSTLY_BASH`, if set - explicit override for a non-standard install.
+/// 2. `bash` on PATH.
+/// 3. The standard Git-for-Windows install paths. PATH alone is not enough:
+///    Git ships bash but only puts it on PATH inside a Git Bash session, so a
+///    Crustly launched from PowerShell or Explorer would not find it.
+/// 4. Only then `cmd /C`, which cannot run POSIX and will mislead the model.
+///
+/// The result is computed once - this runs on every bash tool call.
 fn resolve_shell() -> (String, &'static str) {
-    if cfg!(target_os = "windows") {
-        if let Ok(bash) = which::which("bash") {
-            return (bash.to_string_lossy().into_owned(), "-c");
-        }
-        tracing::warn!(
-            "No POSIX shell (bash) found on PATH; falling back to `cmd /C`. \
-             POSIX commands such as `ls -la` will not work correctly - install \
-             Git for Windows, or prefer the `powershell` tool on this host."
-        );
-        return ("cmd".to_string(), "/C");
+    #[cfg(target_os = "windows")]
+    {
+        use std::sync::OnceLock;
+        static SHELL: OnceLock<(String, &'static str)> = OnceLock::new();
+
+        SHELL
+            .get_or_init(|| {
+                if let Some(bash) = std::env::var_os("CRUSTLY_BASH") {
+                    let path = std::path::PathBuf::from(&bash);
+                    if path.is_file() {
+                        return (path.to_string_lossy().into_owned(), "-c");
+                    }
+                    tracing::warn!("CRUSTLY_BASH is set but not a file: {:?}; ignoring", bash);
+                }
+
+                if let Ok(bash) = which::which("bash") {
+                    return (bash.to_string_lossy().into_owned(), "-c");
+                }
+
+                for candidate in WINDOWS_BASH_FALLBACKS {
+                    if std::path::Path::new(candidate).is_file() {
+                        tracing::debug!("Using POSIX shell found off PATH: {}", candidate);
+                        return ((*candidate).to_string(), "-c");
+                    }
+                }
+
+                tracing::warn!(
+                    "No POSIX shell found (not on PATH, not at the standard Git for \
+                     Windows locations); falling back to `cmd /C`. POSIX commands such \
+                     as `ls -la` will NOT work - install Git for Windows, set \
+                     CRUSTLY_BASH to a bash.exe, or use the `powershell` tool instead."
+                );
+                ("cmd".to_string(), "/C")
+            })
+            .clone()
     }
+
+    #[cfg(not(target_os = "windows"))]
     ("sh".to_string(), "-c")
 }
 
@@ -322,6 +367,27 @@ mod tests {
     ///
     /// The tool is advertised to the model as `bash`, so it must run POSIX and
     /// must honour the working directory it was given.
+    /// Regression: the first version of the Windows fix looked only at PATH.
+    /// Git for Windows ships bash but only puts it on PATH inside a Git Bash
+    /// session, so it resolved fine when tests were run from Git Bash and fell
+    /// back to `cmd /C` for a user launching Crustly from PowerShell - the exact
+    /// case the fix existed to handle.
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_resolves_a_posix_shell_not_cmd() {
+        let (shell, arg) = resolve_shell();
+        assert_ne!(
+            shell, "cmd",
+            "fell back to cmd /C: no POSIX shell was found on PATH or at the \
+             standard Git for Windows locations, so `ls -la` cannot work"
+        );
+        assert_eq!(arg, "-c");
+        assert!(
+            shell.to_lowercase().contains("bash"),
+            "expected a bash, got {shell:?}"
+        );
+    }
+
     #[tokio::test]
     async fn bash_runs_posix_in_the_requested_working_directory() {
         let temp = tempfile::tempdir().expect("temp dir");
