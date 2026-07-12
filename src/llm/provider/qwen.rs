@@ -948,44 +948,135 @@ impl Provider for QwenProvider {
         )
         .await?;
 
-        // Parse Server-Sent Events stream
-        let byte_stream = response.bytes_stream();
-        let event_stream = byte_stream.map(|chunk_result| {
-            chunk_result
-                .map_err(|e| ProviderError::StreamError(e.to_string()))
-                .map(|chunk| {
-                    let text = String::from_utf8_lossy(&chunk);
+        // Collect the full SSE stream before emitting events.
+        //
+        // Qwen embeds tool calls inside the assistant text (Hermes
+        // `<tool_call>` blocks or native Qwen markers), so a call can't be
+        // recognised until its closing marker has been seen. Buffering the
+        // whole response — then reusing `from_qwen_response`, the same parser
+        // the non-streaming path uses — guarantees streaming and blocking
+        // requests detect tool calls identically. (Mirrors the OpenAI
+        // provider, which buffers for the analogous reason.)
+        let mut raw_bytes = Vec::<u8>::new();
+        {
+            let mut bs = response.bytes_stream();
+            while let Some(chunk_result) = bs.next().await {
+                match chunk_result {
+                    Ok(chunk) => raw_bytes.extend_from_slice(&chunk),
+                    Err(e) => return Err(ProviderError::StreamError(e.to_string())),
+                }
+            }
+        }
+        let text = String::from_utf8_lossy(&raw_bytes);
 
-                    for line in text.lines() {
-                        if let Some(json_str) = line.strip_prefix("data: ") {
-                            if json_str == "[DONE]" {
-                                return StreamEvent::MessageStop;
+        let mut full_content = String::new();
+        let mut response_id: Option<String> = None;
+        let mut stream_model: Option<String> = None;
+        let mut finish_reason: Option<String> = None;
+        let mut stream_usage: Option<QwenUsage> = None;
+        // OpenAI-style tool-call fragments, accumulated by index.
+        let mut tool_call_builders: Vec<QwenToolCall> = Vec::new();
+
+        for line in text.lines() {
+            let Some(json_str) = line.strip_prefix("data: ") else {
+                continue;
+            };
+            if json_str == "[DONE]" {
+                break;
+            }
+            let chunk = match serde_json::from_str::<QwenStreamChunk>(json_str) {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to parse Qwen stream chunk: {}. Data: {}",
+                        e,
+                        json_str.chars().take(200).collect::<String>()
+                    );
+                    continue;
+                }
+            };
+
+            if response_id.is_none() {
+                response_id = Some(chunk.id.clone());
+                stream_model = chunk.model.clone();
+            }
+            if chunk.usage.is_some() {
+                stream_usage = chunk.usage;
+            }
+
+            if let Some(choice) = chunk.choices.first() {
+                if let Some(ref reason) = choice.finish_reason {
+                    if !reason.is_empty() {
+                        finish_reason = Some(reason.clone());
+                    }
+                }
+                if let Some(ref delta) = choice.delta {
+                    if let Some(ref content) = delta.content {
+                        full_content.push_str(content);
+                    }
+                    for tc in &delta.tool_calls {
+                        if tc.index >= tool_call_builders.len() {
+                            tool_call_builders.resize_with(tc.index + 1, || QwenToolCall {
+                                id: String::new(),
+                                r#type: "function".to_string(),
+                                function: QwenFunctionCall {
+                                    name: String::new(),
+                                    arguments: String::new(),
+                                },
+                            });
+                        }
+                        let builder = &mut tool_call_builders[tc.index];
+                        if let Some(ref id) = tc.id {
+                            builder.id.clone_from(id);
+                        }
+                        if let Some(ref func) = tc.function {
+                            if let Some(ref name) = func.name {
+                                builder.function.name.clone_from(name);
                             }
-
-                            if let Ok(chunk) = serde_json::from_str::<QwenStreamChunk>(json_str) {
-                                if let Some(choice) = chunk.choices.first() {
-                                    if let Some(ref delta) = choice.delta {
-                                        if let Some(ref content) = delta.content {
-                                            if !content.is_empty() {
-                                                return StreamEvent::ContentBlockDelta {
-                                                    index: 0,
-                                                    delta: ContentDelta::TextDelta {
-                                                        text: content.clone(),
-                                                    },
-                                                };
-                                            }
-                                        }
-                                    }
-                                }
+                            if let Some(ref args) = func.arguments {
+                                builder.function.arguments.push_str(args);
                             }
                         }
                     }
+                }
+            }
+        }
 
-                    StreamEvent::Ping
-                })
-        });
+        // Drop tool-call fragments that never received an id/name (truncated).
+        let assembled_tool_calls: Vec<QwenToolCall> = tool_call_builders
+            .into_iter()
+            .filter(|tc| !tc.id.is_empty() && !tc.function.name.is_empty())
+            .collect();
 
-        Ok(Box::pin(event_stream))
+        // Reuse the shared parser so embedded (Hermes/native) and OpenAI-style
+        // tool calls are handled exactly as in the non-streaming path.
+        let synthetic = QwenResponse {
+            id: response_id.unwrap_or_else(|| format!("qwen-stream-{}", uuid::Uuid::new_v4())),
+            model: stream_model.unwrap_or_else(|| qwen_request.model.clone()),
+            choices: vec![QwenChoice {
+                index: 0,
+                message: QwenMessage {
+                    role: "assistant".to_string(),
+                    content: Some(full_content),
+                    tool_calls: if assembled_tool_calls.is_empty() {
+                        None
+                    } else {
+                        Some(assembled_tool_calls)
+                    },
+                    tool_call_id: None,
+                },
+                finish_reason,
+            }],
+            usage: stream_usage.unwrap_or(QwenUsage {
+                prompt_tokens: 0,
+                completion_tokens: 0,
+            }),
+        };
+        let llm_response = self.from_qwen_response(synthetic);
+
+        Ok(Box::pin(futures::stream::iter(
+            llm_response_to_stream_events(llm_response).into_iter().map(Ok),
+        )))
     }
 
     fn supports_streaming(&self) -> bool {
@@ -1085,6 +1176,88 @@ impl Provider for QwenProvider {
     }
 }
 
+/// Convert an assembled [`LLMResponse`] into the ordered [`StreamEvent`]
+/// sequence a consumer expects: `MessageStart`, one content block per
+/// response block (text/thinking streamed as deltas, tool use as start/stop),
+/// then `MessageDelta` (stop reason + usage) and the terminal `MessageStop`.
+///
+/// Used by the buffered Qwen streaming path so that tool calls parsed from the
+/// full response are surfaced as real `ToolUse` blocks instead of being lost.
+fn llm_response_to_stream_events(response: LLMResponse) -> Vec<StreamEvent> {
+    let mut events = vec![StreamEvent::MessageStart {
+        message: StreamMessage {
+            id: response.id.clone(),
+            model: response.model.clone(),
+            role: Role::Assistant,
+            usage: TokenUsage {
+                input_tokens: 0,
+                output_tokens: 0,
+            },
+        },
+    }];
+
+    let mut index = 0usize;
+    for block in &response.content {
+        match block {
+            ContentBlock::Text { text } => {
+                events.push(StreamEvent::ContentBlockStart {
+                    index,
+                    content_block: ContentBlock::Text {
+                        text: String::new(),
+                    },
+                });
+                if !text.is_empty() {
+                    events.push(StreamEvent::ContentBlockDelta {
+                        index,
+                        delta: ContentDelta::TextDelta { text: text.clone() },
+                    });
+                }
+                events.push(StreamEvent::ContentBlockStop { index });
+                index += 1;
+            }
+            ContentBlock::Thinking { thinking } => {
+                events.push(StreamEvent::ContentBlockStart {
+                    index,
+                    content_block: ContentBlock::Thinking {
+                        thinking: String::new(),
+                    },
+                });
+                if !thinking.is_empty() {
+                    events.push(StreamEvent::ContentBlockDelta {
+                        index,
+                        delta: ContentDelta::ThinkingDelta {
+                            thinking: thinking.clone(),
+                        },
+                    });
+                }
+                events.push(StreamEvent::ContentBlockStop { index });
+                index += 1;
+            }
+            other => {
+                // ToolUse / other blocks carry their full payload up front.
+                events.push(StreamEvent::ContentBlockStart {
+                    index,
+                    content_block: other.clone(),
+                });
+                events.push(StreamEvent::ContentBlockStop { index });
+                index += 1;
+            }
+        }
+    }
+
+    events.push(StreamEvent::MessageDelta {
+        delta: MessageDelta {
+            stop_reason: response.stop_reason,
+            stop_sequence: None,
+        },
+        usage: response.usage,
+        perf_metrics: None,
+    });
+    events.push(StreamEvent::MessageStop);
+
+    events
+}
+
 // ============================================================================
 // Qwen API Types (OpenAI-compatible)
 // ============================================================================
@@ -1166,7 +1339,12 @@ struct QwenUsage {
 #[allow(dead_code)]
 struct QwenStreamChunk {
     id: String,
+    #[serde(default)]
+    model: Option<String>,
     choices: Vec<QwenStreamChoice>,
+    /// Present only on the final chunk when the server includes usage.
+    #[serde(default)]
+    usage: Option<QwenUsage>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1182,6 +1360,30 @@ struct QwenStreamChoice {
 struct QwenMessageDelta {
     role: Option<String>,
     content: Option<String>,
+    /// OpenAI-style streamed tool-call fragments (DashScope with the OpenAI
+    /// tool parser). Accumulated by index across chunks.
+    #[serde(default)]
+    tool_calls: Vec<QwenToolCallDelta>,
+}
+
+/// A single fragment of an OpenAI-style streamed tool call. Fields arrive
+/// incrementally across SSE chunks and are assembled by `index`.
+#[derive(Debug, Clone, Deserialize)]
+struct QwenToolCallDelta {
+    #[serde(default)]
+    index: usize,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    function: Option<QwenFunctionCallDelta>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct QwenFunctionCallDelta {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    arguments: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1199,6 +1401,90 @@ struct QwenError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Build the synthetic `QwenResponse` the buffered streaming path assembles
+    /// from accumulated `delta.content`, then reuse the shared parser + event
+    /// conversion — exactly the chain `stream()` runs after draining the SSE
+    /// body. Returns the emitted stream events.
+    fn stream_events_from_buffered_content(
+        provider: &QwenProvider,
+        content: &str,
+    ) -> Vec<StreamEvent> {
+        let synthetic = QwenResponse {
+            id: "qwen-stream-test".to_string(),
+            model: "qwen3-8b".to_string(),
+            choices: vec![QwenChoice {
+                index: 0,
+                message: QwenMessage {
+                    role: "assistant".to_string(),
+                    content: Some(content.to_string()),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                finish_reason: Some("stop".to_string()),
+            }],
+            usage: QwenUsage {
+                prompt_tokens: 5,
+                completion_tokens: 10,
+            },
+        };
+        let llm_response = provider.from_qwen_response(synthetic);
+        llm_response_to_stream_events(llm_response)
+    }
+
+    /// Regression: a Hermes `<tool_call>` block that arrives over the streaming
+    /// path must be surfaced as a real `ToolUse` block, not dropped as text.
+    #[test]
+    fn streaming_assembles_hermes_tool_call_from_buffered_text() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+        let content = "Let me read that.\n\
+             <tool_call>\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/main.rs\"}}\n</tool_call>";
+
+        let events = stream_events_from_buffered_content(&provider, content);
+
+        let tool = events.iter().find_map(|e| match e {
+            StreamEvent::ContentBlockStart {
+                content_block: ContentBlock::ToolUse { name, input, .. },
+                ..
+            } => Some((name.clone(), input.clone())),
+            _ => None,
+        });
+        let (name, input) = tool.expect("streamed Hermes tool call must become a ToolUse block");
+        assert_eq!(name, "read_file");
+        assert_eq!(input, serde_json::json!({"path": "src/main.rs"}));
+
+        // The terminal stop reason must reflect the tool call.
+        let stop = events.iter().find_map(|e| match e {
+            StreamEvent::MessageDelta { delta, .. } => delta.stop_reason.clone(),
+            _ => None,
+        });
+        assert_eq!(stop, Some(StopReason::ToolUse));
+    }
+
+    /// Plain streamed text (no tool call) must still round-trip as a text block.
+    #[test]
+    fn streaming_plain_text_roundtrips_without_tool_calls() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+        let events = stream_events_from_buffered_content(&provider, "Hello there!");
+
+        let text: String = events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::ContentBlockDelta {
+                    delta: ContentDelta::TextDelta { text },
+                    ..
+                } => Some(text.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(text, "Hello there!");
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, StreamEvent::ContentBlockStart {
+                content_block: ContentBlock::ToolUse { .. },
+                ..
+            })));
+    }
 
     #[test]
     fn test_qwen_provider_creation() {
