@@ -118,7 +118,22 @@ impl ToolRegistry {
         let result = tool.execute(input, context).await?;
 
         if result.success {
-            tracing::info!("Tool '{}' executed successfully", name);
+            // Log a prefix of the output: when a tool "succeeds" but returns the
+            // wrong thing (e.g. a listing of the wrong directory), the failure is
+            // invisible from the log without it, and the model's confused reply
+            // is the only symptom.
+            const PREVIEW: usize = 400;
+            let preview: String = result.output.chars().take(PREVIEW).collect();
+            tracing::info!(
+                "Tool '{}' executed successfully -> {}{}",
+                name,
+                preview,
+                if result.output.chars().count() > PREVIEW {
+                    " …[truncated]"
+                } else {
+                    ""
+                }
+            );
         } else {
             tracing::warn!(
                 "Tool '{}' failed: {:?}",

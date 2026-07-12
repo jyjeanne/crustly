@@ -918,10 +918,20 @@ impl App {
 
     /// Create a new session
     async fn create_new_session(&mut self) -> Result<()> {
-        let session = self
+        let mut session = self
             .session_service
             .create_session(Some("New Chat".to_string()))
             .await?;
+
+        // Stamp the model/provider now. They were previously only filled in
+        // after the first assistant reply landed, so a fresh session rendered
+        // its header as "unknown" until then - even though the provider was
+        // known all along.
+        session.model = Some(self.agent_service.provider_model().to_string());
+        session.provider = Some(self.agent_service.provider_name().to_string());
+        if let Err(e) = self.session_service.update_session(&session).await {
+            tracing::warn!("Failed to stamp session model/provider: {}", e);
+        }
 
         self.current_session = Some(session.clone());
         self.messages.clear();
