@@ -480,6 +480,15 @@ impl App {
     pub async fn handle_event(&mut self, event: TuiEvent) -> Result<()> {
         match event {
             TuiEvent::Key(key_event) => {
+                // The Kitty keyboard protocol is enabled (for Shift+Enter), and
+                // under it crossterm reports Release - and Repeat - as well as
+                // Press. Acting on every kind runs each handler twice per
+                // keypress: Up would recall an entry on Press and then step past
+                // it again on Release, so history recall appeared to do nothing.
+                // Only Press is a keypress.
+                if key_event.kind != crossterm::event::KeyEventKind::Press {
+                    return Ok(());
+                }
                 self.handle_key_event(key_event).await?;
             }
             TuiEvent::Paste(text) => {
@@ -2449,6 +2458,42 @@ mod tests {
         assert!(
             app.messages.is_empty(),
             "recalling history must not send anything"
+        );
+    }
+
+    /// Regression: the Kitty keyboard protocol (enabled for Shift+Enter) makes
+    /// crossterm emit Release as well as Press. Handling both ran every handler
+    /// twice per physical keypress - Up recalled an entry on Press and stepped
+    /// straight past it on Release, so history recall did nothing at all in the
+    /// real TUI while passing tests that synthesise a bare Press.
+    #[tokio::test]
+    async fn key_release_events_are_ignored() {
+        use crossterm::event::{KeyEvent, KeyEventKind};
+
+        let mut app = test_app().await;
+        // handle_event dispatches by mode (the app starts in Splash), unlike the
+        // other tests, which call handle_chat_key directly.
+        app.mode = AppMode::Chat;
+        app.push_input_history("first message");
+        app.push_input_history("second message");
+
+        // One physical press of Up: crossterm delivers Press then Release.
+        app.handle_event(TuiEvent::Key(KeyEvent::new(
+            KeyCode::Up,
+            KeyModifiers::NONE,
+        )))
+        .await
+        .unwrap();
+
+        let mut release = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
+        release.kind = KeyEventKind::Release;
+        app.handle_event(TuiEvent::Key(release)).await.unwrap();
+
+        assert_eq!(
+            app.input_text(),
+            "second message",
+            "one keypress must recall exactly one entry; the Release event \
+             double-stepped it back to 'first message'"
         );
     }
 
