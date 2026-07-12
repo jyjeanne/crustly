@@ -1039,9 +1039,14 @@ async fn cmd_run(
         .create_session(Some("CLI Run".to_string()))
         .await?;
 
-    // Send message
+    // Send message. Must go through the tool-aware path: the service above is
+    // built with a tool registry, an iteration cap, and an auto-approve flag,
+    // none of which `send_message` consults - it would send `tools=0` and the
+    // model could never call anything.
     println!("🤔 Processing...\n");
-    let response = agent_service.send_message(session.id, prompt, None).await?;
+    let response = agent_service
+        .send_message_with_tools(session.id, prompt, None)
+        .await?;
 
     // Format and display output
     match format {
