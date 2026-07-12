@@ -10,6 +10,27 @@ use serde_json::Value;
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
+/// Resolve the shell used to run a `bash` tool command, as `(program, arg)`.
+///
+/// On Unix this is `sh -c`. On Windows we look for a real POSIX shell on PATH
+/// (Git for Windows ships one) and use it, because the model writes POSIX.
+/// Only if none exists do we fall back to `cmd /C`, which cannot run `ls -la`
+/// or a pipeline and will mislead the model rather than fail loudly.
+fn resolve_shell() -> (String, &'static str) {
+    if cfg!(target_os = "windows") {
+        if let Ok(bash) = which::which("bash") {
+            return (bash.to_string_lossy().into_owned(), "-c");
+        }
+        tracing::warn!(
+            "No POSIX shell (bash) found on PATH; falling back to `cmd /C`. \
+             POSIX commands such as `ls -la` will not work correctly - install \
+             Git for Windows, or prefer the `powershell` tool on this host."
+        );
+        return ("cmd".to_string(), "/C");
+    }
+    ("sh".to_string(), "-c")
+}
+
 /// Bash execution tool
 pub struct BashTool;
 
@@ -215,12 +236,13 @@ impl Tool for BashTool {
             )));
         }
 
-        // Prepare command for the current platform
-        let (shell, shell_arg) = if cfg!(target_os = "windows") {
-            ("cmd", "/C")
-        } else {
-            ("sh", "-c")
-        };
+        // Pick the shell. This tool is advertised to the model as `bash`, and
+        // models accordingly emit POSIX (`ls -la`, `grep -r`, pipelines). On
+        // Windows those must not be handed to `cmd.exe`, which understands none
+        // of them: `cmd /C ls -la` silently resolves `ls` off PATH (e.g. Git's
+        // ls.exe) and runs it detached from `current_dir`, so the model gets a
+        // listing of some *other* directory and reasons from garbage.
+        let (shell, shell_arg) = resolve_shell();
 
         // Execute command with timeout
         let command_future = Command::new(shell)
@@ -291,6 +313,50 @@ impl Tool for BashTool {
 mod tests {
     use super::*;
     use uuid::Uuid;
+
+    /// Regression: on Windows this tool ran commands through `cmd /C`, which has
+    /// no `ls`/`pwd`. `cmd /C ls -la` silently resolved `ls` off PATH (Git's
+    /// ls.exe) and ran it detached from `current_dir`, so the model asked for
+    /// "the current folder" and was handed the user's HOME directory instead.
+    /// It then reasoned from that garbage - inventing unrelated work.
+    ///
+    /// The tool is advertised to the model as `bash`, so it must run POSIX and
+    /// must honour the working directory it was given.
+    #[tokio::test]
+    async fn bash_runs_posix_in_the_requested_working_directory() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let canonical = temp.path().canonicalize().expect("canonicalize");
+
+        let mut context = ToolExecutionContext::new(Uuid::new_v4());
+        context.working_directory = canonical.clone();
+        context.auto_approve = true;
+
+        let result = BashTool
+            .execute(serde_json::json!({ "command": "pwd" }), &context)
+            .await
+            .expect("pwd runs");
+
+        assert!(
+            result.success,
+            "`pwd` must run: a shell that cannot run POSIX is not `bash`. Got: {:?}",
+            result.output
+        );
+
+        // Compare on the leaf: a POSIX shell on Windows reports /d/... or
+        // /tmp/..., not a `D:\` path, so only the final component is portable.
+        let leaf = canonical
+            .file_name()
+            .expect("temp dir has a name")
+            .to_string_lossy()
+            .into_owned();
+        assert!(
+            result.output.contains(&leaf),
+            "`pwd` reported the wrong directory - the shell ignored current_dir. \
+             expected it to contain {:?}, got {:?}",
+            leaf,
+            result.output
+        );
+    }
 
     #[tokio::test]
     async fn test_bash_simple_command() {
