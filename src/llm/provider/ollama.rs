@@ -260,7 +260,11 @@ impl OllamaProvider {
     /// Convert an `ollama-rs` response into our generic `LLMResponse`,
     /// including `PerfMetrics` derived from the final-chunk timing data.
     #[allow(clippy::wrong_self_convention)]
-    fn from_ollama_response(&self, response: ChatMessageResponse) -> LLMResponse {
+    fn from_ollama_response(
+        &self,
+        response: ChatMessageResponse,
+        offered_tools: &[Tool],
+    ) -> LLMResponse {
         let mut content_blocks = Vec::new();
 
         // --- Reasoning / thinking block ---
@@ -281,7 +285,16 @@ impl OllamaProvider {
             });
         }
 
-        if !visible_text.is_empty() {
+        // Templates that never populate `tool_calls` print the call as content
+        // instead. Recover it, and don't also render it as text - it is a call,
+        // not something to show the user.
+        let recovered = if response.message.tool_calls.is_empty() {
+            tool_call_from_content(&visible_text, offered_tools)
+        } else {
+            None
+        };
+
+        if recovered.is_none() && !visible_text.is_empty() {
             content_blocks.push(ContentBlock::Text { text: visible_text });
         }
 
@@ -293,7 +306,15 @@ impl OllamaProvider {
             });
         }
 
-        let stop_reason = if !response.message.tool_calls.is_empty() {
+        if let Some((name, input)) = &recovered {
+            content_blocks.push(ContentBlock::ToolUse {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: name.clone(),
+                input: input.clone(),
+            });
+        }
+
+        let stop_reason = if !response.message.tool_calls.is_empty() || recovered.is_some() {
             Some(StopReason::ToolUse)
         } else if response.done {
             Some(StopReason::EndTurn)
@@ -334,6 +355,9 @@ impl OllamaProvider {
 impl Provider for OllamaProvider {
     async fn complete(&self, request: LLMRequest) -> Result<LLMResponse> {
         let model = request.model.clone();
+        // Kept for the content-as-text tool-call fallback: a recovered call is
+        // only honoured if it names a tool we actually offered.
+        let offered_tools = request.tools.clone().unwrap_or_default();
         let ollama_request = self.to_ollama_request(request);
 
         tracing::info!(
@@ -348,7 +372,7 @@ impl Provider for OllamaProvider {
             .await
             .map_err(map_ollama_error)?;
 
-        let llm_response = self.from_ollama_response(response);
+        let llm_response = self.from_ollama_response(response, &offered_tools);
         tracing::info!(
             "Ollama API response: input_tokens={}, output_tokens={}, stop_reason={:?}",
             llm_response.usage.input_tokens,
@@ -361,6 +385,7 @@ impl Provider for OllamaProvider {
 
     async fn stream(&self, request: LLMRequest) -> Result<ProviderStream> {
         let model = request.model.clone();
+        let offered_tools = request.tools.clone().unwrap_or_default();
         let ollama_request = self.to_ollama_request(request);
 
         tracing::info!(
@@ -389,6 +414,7 @@ impl Provider for OllamaProvider {
         }];
 
         let mut text_block_started = false;
+        let mut streamed_text = String::new();
         let mut final_tool_calls: Vec<(String, serde_json::Value)> = Vec::new();
         let mut final_usage = TokenUsage {
             input_tokens: 0,
@@ -419,33 +445,36 @@ impl Provider for OllamaProvider {
                 }
 
                 if !chunk.message.content.is_empty() {
-                    if !text_block_started {
-                        text_block_started = true;
-                        events.push(StreamEvent::ContentBlockStart {
+                    streamed_text.push_str(&chunk.message.content);
+
+                    // Stream deltas out as they arrive, as usual - but not while
+                    // the content still looks like it might be a tool call the
+                    // model is printing as text (qwen2.5-coder does this). Those
+                    // are withheld so raw JSON never reaches the chat; if the
+                    // content turns out to be prose after all, the buffered text
+                    // is flushed below and nothing is lost but a little latency.
+                    if !maybe_tool_call_json(&streamed_text) {
+                        if !text_block_started {
+                            text_block_started = true;
+                            events.push(StreamEvent::ContentBlockStart {
+                                index: 0,
+                                content_block: ContentBlock::Text {
+                                    text: String::new(),
+                                },
+                            });
+                        }
+                        events.push(StreamEvent::ContentBlockDelta {
                             index: 0,
-                            content_block: ContentBlock::Text {
-                                text: String::new(),
+                            delta: ContentDelta::TextDelta {
+                                text: std::mem::take(&mut streamed_text),
                             },
                         });
                     }
-                    events.push(StreamEvent::ContentBlockDelta {
-                        index: 0,
-                        delta: ContentDelta::TextDelta {
-                            text: chunk.message.content.clone(),
-                        },
-                    });
                 }
 
                 final_tool_calls.extend(collect_tool_calls(&chunk.message.tool_calls));
 
                 if chunk.done {
-                    tracing::debug!(
-                        "Ollama stream done: tool_calls={}, done_reason={:?}",
-                        final_tool_calls.len(),
-                        chunk.final_data.as_ref().map(|_| "present")
-                    );
-                    stop_reason = Some(stop_reason_for(&final_tool_calls));
-
                     if let Some(final_data) = &chunk.final_data {
                         final_usage = TokenUsage {
                             input_tokens: final_data.prompt_eval_count as u32,
@@ -453,12 +482,48 @@ impl Provider for OllamaProvider {
                         };
                         final_perf = Some(perf_metrics_from_final_data(final_data));
                     }
+                    stop_reason = Some(StopReason::EndTurn); // refined below
                 }
             }
         }
 
+        // Templates that never populate `tool_calls` print the call as content.
+        // Recover it from the buffered text; on success the text is the call, so
+        // it is not also streamed to the user as a message.
+        if final_tool_calls.is_empty() {
+            if let Some(call) = tool_call_from_content(&streamed_text, &offered_tools) {
+                final_tool_calls.push(call);
+                streamed_text.clear();
+            }
+        }
+
+        // Whatever was withheld but turned out not to be a tool call.
+        if !streamed_text.is_empty() {
+            if !text_block_started {
+                text_block_started = true;
+                events.push(StreamEvent::ContentBlockStart {
+                    index: 0,
+                    content_block: ContentBlock::Text {
+                        text: String::new(),
+                    },
+                });
+            }
+            events.push(StreamEvent::ContentBlockDelta {
+                index: 0,
+                delta: ContentDelta::TextDelta {
+                    text: std::mem::take(&mut streamed_text),
+                },
+            });
+        }
+
+        tracing::debug!("Ollama stream done: tool_calls={}", final_tool_calls.len());
+
         if text_block_started {
             events.push(StreamEvent::ContentBlockStop { index: 0 });
+        }
+
+        if stop_reason.is_some() {
+            stop_reason = Some(stop_reason_for(&final_tool_calls));
         }
 
         for (i, (name, input)) in final_tool_calls.into_iter().enumerate() {
@@ -562,6 +627,78 @@ fn stop_reason_for(tool_calls: &[(String, serde_json::Value)]) -> StopReason {
     } else {
         StopReason::ToolUse
     }
+}
+
+/// Whether the text so far could still turn out to be a tool call printed as
+/// content, and so should be withheld from the chat rather than streamed.
+///
+/// Only a leading `{` (or a ```json fence) qualifies. Ordinary prose therefore
+/// streams token-by-token exactly as before; the buffering cost falls only on
+/// content that really does look like a call.
+fn maybe_tool_call_json(text: &str) -> bool {
+    let t = text.trim_start();
+    t.is_empty() || t.starts_with('{') || t.starts_with("```")
+}
+
+/// Recover a tool call that the model printed as text instead of returning in
+/// Ollama's native `tool_calls` field.
+///
+/// Some Ollama chat templates - qwen2.5-coder's among them - never populate
+/// `tool_calls`; the model emits `{"name": "bash", "arguments": {...}}` as its
+/// message content. Without this the call is just text: nothing executes, and the
+/// user sees raw JSON in the chat.
+///
+/// Deliberately strict, because a false positive would execute a tool the model
+/// never asked for. The *entire* content must be one JSON object carrying exactly
+/// a string `name` and an object `arguments` (or `parameters`), and the name must
+/// match a tool that was actually offered. Prose that merely contains JSON, a
+/// fenced example, or a call to an unknown tool are all left as text.
+fn tool_call_from_content(content: &str, offered: &[Tool]) -> Option<(String, serde_json::Value)> {
+    let trimmed = content.trim();
+
+    // Tolerate a ```json fence, which some templates add around the object.
+    let unfenced = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .and_then(|s| s.strip_suffix("```"))
+        .map(str::trim)
+        .unwrap_or(trimmed);
+
+    if !unfenced.starts_with('{') {
+        return None;
+    }
+
+    let value: serde_json::Value = serde_json::from_str(unfenced).ok()?;
+    let obj = value.as_object()?;
+
+    let name = obj.get("name")?.as_str()?;
+    if !offered.iter().any(|t| t.name == name) {
+        tracing::debug!("Content looks like a tool call but names no offered tool: {name}");
+        return None;
+    }
+
+    // The arguments object must be present and be an object. A bare
+    // `{"name": "bash"}` is not a call, and defaulting it to `{}` would invoke
+    // the tool with empty input on the strength of a guess.
+    let arguments = obj.get("arguments").or_else(|| obj.get("parameters"))?;
+    if !arguments.is_object() {
+        return None;
+    }
+    let arguments = arguments.clone();
+
+    // Any other key means this is not a bare tool call - don't guess.
+    if obj
+        .keys()
+        .any(|k| !matches!(k.as_str(), "name" | "arguments" | "parameters"))
+    {
+        return None;
+    }
+
+    tracing::info!(
+        "Recovered a tool call the model emitted as text (its template does not \
+         populate Ollama's tool_calls field): {name}"
+    );
+    Some((name.to_string(), arguments))
 }
 
 /// Convert our generic `Tool` (name/description/JSON-Schema) into the
@@ -790,6 +927,105 @@ mod tests {
         }
     }
 
+    fn bash_tool() -> Tool {
+        Tool {
+            name: "bash".to_string(),
+            description: "Run a shell command".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {"command": {"type": "string"}},
+                "required": ["command"],
+            }),
+        }
+    }
+
+    /// qwen2.5-coder's Ollama template never populates `tool_calls` - it prints
+    /// the call as message content. Without recovering it, nothing executes and
+    /// the user just sees raw JSON in the chat.
+    #[test]
+    fn tool_call_printed_as_content_is_recovered() {
+        let tools = [bash_tool()];
+        let content =
+            "{\n  \"name\": \"bash\",\n  \"arguments\": {\n    \"command\": \"ls -la\"\n  }\n}";
+
+        let (name, args) =
+            tool_call_from_content(content, &tools).expect("call should be recovered");
+        assert_eq!(name, "bash");
+        assert_eq!(args["command"], "ls -la");
+    }
+
+    #[test]
+    fn tool_call_in_a_json_fence_is_recovered() {
+        let tools = [bash_tool()];
+        let content = "```json\n{\"name\": \"bash\", \"arguments\": {\"command\": \"ls\"}}\n```";
+        let (name, _) = tool_call_from_content(content, &tools).expect("recovered");
+        assert_eq!(name, "bash");
+    }
+
+    /// The recovery must never fire on content that merely *contains* JSON, or
+    /// Crustly would execute a tool the model never asked for.
+    #[test]
+    fn prose_is_never_mistaken_for_a_tool_call() {
+        let tools = [bash_tool()];
+        for content in [
+            "Here is an example: {\"name\": \"bash\", \"arguments\": {}}",
+            "I will run ls for you.",
+            "{\"name\": \"rm_rf\", \"arguments\": {}}", // not an offered tool
+            "{\"name\": \"bash\"}",                     // no arguments object
+            "{\"name\": \"bash\", \"arguments\": {}, \"note\": \"extra\"}", // unexpected key
+            "{\"arguments\": {\"command\": \"ls\"}}",   // no name
+            "{}",
+            "",
+        ] {
+            assert!(
+                tool_call_from_content(content, &tools).is_none(),
+                "must not be treated as a tool call: {content:?}"
+            );
+        }
+    }
+
+    /// Prose must still stream token-by-token; only content that might be a
+    /// printed tool call is withheld.
+    #[test]
+    fn only_json_like_content_is_withheld_from_streaming() {
+        assert!(maybe_tool_call_json(""));
+        assert!(maybe_tool_call_json("{"));
+        assert!(maybe_tool_call_json("  {\"name\""));
+        assert!(maybe_tool_call_json("```json"));
+        assert!(!maybe_tool_call_json("Here are the files"));
+        assert!(!maybe_tool_call_json("I'll run ls."));
+    }
+
+    /// End to end through the non-streaming path: the recovered call must surface
+    /// as a ToolUse block with StopReason::ToolUse, and the JSON must NOT also be
+    /// shown to the user as text.
+    #[test]
+    fn recovered_tool_call_becomes_a_tool_use_block() {
+        let provider = OllamaProvider::default_local();
+        let response = mock_response(
+            ChatMessage::assistant(
+                "{\"name\": \"bash\", \"arguments\": {\"command\": \"ls -la\"}}".to_string(),
+            ),
+            true,
+        );
+
+        let llm = provider.from_ollama_response(response, &[bash_tool()]);
+
+        assert_eq!(llm.stop_reason, Some(StopReason::ToolUse));
+        let tool_uses: Vec<_> = llm
+            .content
+            .iter()
+            .filter(|b| matches!(b, ContentBlock::ToolUse { .. }))
+            .collect();
+        assert_eq!(tool_uses.len(), 1, "expected one ToolUse block");
+        assert!(
+            !llm.content
+                .iter()
+                .any(|b| matches!(b, ContentBlock::Text { .. })),
+            "the JSON is the call - it must not also be rendered as a message"
+        );
+    }
+
     #[test]
     fn from_ollama_response_plain_text_with_final_data() {
         let provider = OllamaProvider::default_local();
@@ -803,7 +1039,7 @@ mod tests {
             eval_duration: 1_000_000_000,
         });
 
-        let llm_response = provider.from_ollama_response(response);
+        let llm_response = provider.from_ollama_response(response, &[]);
         assert_eq!(llm_response.model, "llama3.2");
         assert_eq!(llm_response.stop_reason, Some(StopReason::EndTurn));
         assert_eq!(llm_response.usage.input_tokens, 10);
@@ -822,7 +1058,7 @@ mod tests {
         // Mid-stream chunk: done=false, no final_data yet.
         let response = mock_response(ChatMessage::assistant("partial".to_string()), false);
 
-        let llm_response = provider.from_ollama_response(response);
+        let llm_response = provider.from_ollama_response(response, &[]);
         assert_eq!(llm_response.stop_reason, None);
         assert_eq!(llm_response.usage.input_tokens, 0);
         assert_eq!(llm_response.usage.output_tokens, 0);
@@ -841,7 +1077,7 @@ mod tests {
         }];
         let response = mock_response(message, true);
 
-        let llm_response = provider.from_ollama_response(response);
+        let llm_response = provider.from_ollama_response(response, &[]);
         assert_eq!(llm_response.stop_reason, Some(StopReason::ToolUse));
         assert_eq!(llm_response.content.len(), 1);
         match &llm_response.content[0] {
@@ -938,7 +1174,7 @@ mod tests {
         message.thinking = Some("reasoning about the question".to_string());
         let response = mock_response(message, true);
 
-        let llm_response = provider.from_ollama_response(response);
+        let llm_response = provider.from_ollama_response(response, &[]);
         assert_eq!(llm_response.content.len(), 2);
         assert!(matches!(
             &llm_response.content[0],
@@ -959,7 +1195,7 @@ mod tests {
             ChatMessage::assistant("<think>let me work this out</think>final answer".to_string());
         let response = mock_response(message, true);
 
-        let llm_response = provider.from_ollama_response(response);
+        let llm_response = provider.from_ollama_response(response, &[]);
         assert!(matches!(
             &llm_response.content[0],
             ContentBlock::Thinking { thinking } if thinking == "let me work this out"
