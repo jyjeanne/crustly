@@ -148,7 +148,7 @@ Generated Tokens
 | Élément | Valeur |
 |-|-|
 | Architecture | Transformer Decoder |
-| Paramètres totaux | ~26 milliards |
+| Paramètres totaux | 25.2 milliards |
 | Paramètres actifs | ~3.8 milliards/token |
 | Experts | 128 |
 | Experts actifs | 8 |

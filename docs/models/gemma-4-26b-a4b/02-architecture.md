@@ -413,7 +413,7 @@ Gemma 4 26B :
 Paramètres totaux :
 
 ```
-≈ 26 milliards
+≈ 25.2 milliards
 ```
 
 Mais actifs :
@@ -602,7 +602,7 @@ Pourquoi :
 
 # Conclusion
 
-Gemma 4 26B A4B n'est pas simplement un modèle de 26 milliards de paramètres.
+Gemma 4 26B A4B n'est pas simplement un modèle de 25.2 milliards de paramètres.
 
 C'est un système hybride :
 

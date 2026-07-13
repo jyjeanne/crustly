@@ -394,6 +394,8 @@ Pour JSON :
 }
 ```
 
+> Note : Google/Ollama documentent une configuration standardisée différente (`temperature=1.0, top_p=0.95, top_k=64`) comme recommandation générale "pour tous les cas d'usage" (voir [`README.md`](README.md#recommended-parameters)). Les valeurs basses ci-dessus sont une recommandation Crustly, pas une valeur officielle du fournisseur, à utiliser si l'on privilégie la conformité stricte du JSON au détriment du comportement par défaut du modèle.
+
 Pourquoi :
 
 - moins de variations ;

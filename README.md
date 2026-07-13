@@ -907,7 +907,7 @@ Google's latest generation. Excellent instruction following and reasoning; stron
 | Gemma-3-27B-IT | 20 GB VRAM / 40 GB RAM | 128K | Highest quality in the family |
 | **Gemma 4 26B A4B (MoE)** ⭐ | 12 GB VRAM / 32 GB RAM | 256K | 128 experts, 8 active (~3.8B active params/token); native tool calling, vision, and thinking mode |
 
-> Gemma 4 26B A4B is a Mixture-of-Experts model: 25.8B total parameters but only ~3.8B active per token, giving dense-26B-class quality at a fraction of the compute/VRAM cost. See [`docs/models/gemma-4-26b-a4b/`](docs/models/gemma-4-26b-a4b/) for the full architecture, tool-calling, and Crustly integration reference.
+> Gemma 4 26B A4B is a Mixture-of-Experts model: 25.2B total parameters but only ~3.8B active per token (8 active / 128 total experts + 1 shared), giving dense-26B-class quality at a fraction of the compute/VRAM cost. Apache 2.0 licensed. Also available in `12b`, `31b` (dense), `e2b`/`e4b` (edge-optimized), and `31b-cloud` (Ollama-hosted) variants — see [`ollama.com/library/gemma4:26b`](https://ollama.com/library/gemma4:26b). Full architecture, tool-calling, MoE routing, JSON output, and Crustly integration reference: [`docs/models/gemma-4-26b-a4b/`](docs/models/gemma-4-26b-a4b/).
 
 **LM Studio search term:** `gemma-3-12b-it` (Gemma-3) / check HuggingFace for Gemma 4 26B A4B GGUF quants
 **Ollama:** `ollama pull gemma3:12b` (Gemma-3) / `ollama pull gemma4:26b` (Gemma 4 26B A4B MoE)
@@ -915,7 +915,7 @@ Google's latest generation. Excellent instruction following and reasoning; stron
 **Minimum system requirements:**
 - RAM: **8 GB** (4B model); 20 GB (12B); 40 GB (27B); 32 GB (26B A4B MoE)
 - GPU (optional): Any NVIDIA/AMD with 4 GB+ VRAM for 4B model; RTX 3060 12 GB+ recommended for 26B A4B MoE
-- Storage: ~3 GB (4B Q4), ~7 GB (12B Q4), ~17 GB (27B Q4), ~15 GB (26B A4B MoE Q4)
+- Storage: ~3 GB (4B Q4), ~7 GB (12B Q4), ~17 GB (27B Q4), ~18 GB (26B A4B MoE Q4_K_M, Ollama's default quant)
 
 **Config for LM Studio:**
 ```toml
@@ -930,7 +930,10 @@ default_model = "gemma-3-12b-it"
 [providers.ollama]
 enabled = true
 default_model = "gemma4:26b"
-num_ctx = 65536  # good latency/quality balance; model supports up to 262144
+num_ctx = 65536      # good latency/quality balance; model supports up to 262144
+temperature = 1.0    # Google/Ollama's standardized recommendation
+top_p = 0.95
+top_k = 64
 ```
 
 ---

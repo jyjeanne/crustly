@@ -59,9 +59,11 @@ This documentation targets:
 | 21-troubleshooting.md | Troubleshooting |
 | appendix.md | Reference |
 
-> Only `01-introduction.md`, `02-architecture.md`, `03-mixture-of-experts.md`, `08-tool-calling.md`, and `09-json-output.md` are written so far. The remaining chapters are planned and will be added incrementally; this table tracks the target structure.
+> Only `01-introduction.md`, `02-architecture.md`, `03-mixture-of-experts.md`, `07-thinking-mode.md`, `08-tool-calling.md`, `09-json-output.md`, and `20-benchmarks.md` are written so far. The remaining chapters are planned and will be added incrementally; this table tracks the target structure.
 >
-> `09-json-output.md`'s JSON mode and JSON Schema output are already supported end-to-end by Crustly's native Ollama provider (`response_format` maps to Ollama's `format: "json"` / structured schema — see `src/llm/provider/ollama.rs`'s `to_ollama_format`), so no code changes were needed for that chapter.
+> `09-json-output.md`'s JSON mode and JSON Schema output, and `07-thinking-mode.md`'s thinking-mode control tokens, are already supported end-to-end by Crustly's native Ollama provider (`response_format` → `to_ollama_format`; `thinking.budget_tokens` → `ThinkType` — see `src/llm/provider/ollama.rs`), so no code changes were needed for either chapter.
+>
+> Specs and benchmarks in this documentation set have been cross-checked against the official listing at [ollama.com/library/gemma4:26b](https://ollama.com/library/gemma4:26b) as of 2026-07-13.
 
 ---
 
@@ -69,23 +71,30 @@ This documentation targets:
 
 | Property | Value |
 |------------|----------------|
-| Name | Gemma 4 26B |
+| Name | Gemma 4 26B A4B |
 | Family | Gemma 4 |
 | Architecture | Decoder Transformer |
 | Type | Mixture of Experts |
-| Parameters | 25.8B |
-| Active Parameters | ~3.8B/token |
-| Experts | 128 |
+| Total Parameters | 25.2B |
+| Active Parameters | 3.8B/token |
+| Layers | 30 |
+| Experts | 128 total, 1 shared |
 | Active Experts | 8 |
 | Shared Expert | Yes |
-| Context Window | 256k |
-| Vocabulary | 262k |
+| Context Window | 256K |
+| Sliding Window | 1024 tokens |
+| Vocabulary | 262K |
+| Vision Encoder Params | ~550M |
 | Attention | Sliding Window + Global |
-| Quantization | GGUF |
-| Ollama | Supported |
+| Quantization | GGUF (Ollama default: Q4_K_M, ~18 GB) |
+| License | Apache License 2.0 |
+| Ollama | Supported (`gemma4:26b`) |
 | Tool Calling | Supported |
 | Vision | Supported |
+| Audio | Not supported (26B MoE variant; E2B/E4B support audio) |
 | Thinking | Supported |
+
+> Source: [ollama.com/library/gemma4:26b](https://ollama.com/library/gemma4:26b). Sibling variants in the same family: `gemma4:e2b`, `gemma4:e4b` (edge/effective-parameter models), `gemma4:12b` (dense), `gemma4:31b` (dense), `gemma4:31b-cloud` (Ollama-hosted).
 
 ---
 
@@ -253,15 +262,16 @@ Minimal request
 
 # Recommended Parameters
 
+Google/Ollama's standardized sampling configuration, documented as recommended "across all use cases" (including agentic/tool-calling workflows):
+
 | Parameter | Value |
 |------------|----------|
-| temperature | 0.2 |
-| top_p | 0.9 |
-| top_k | 20 |
-| repeat_penalty | 1.05 |
+| temperature | 1.0 |
+| top_p | 0.95 |
+| top_k | 64 |
 | num_ctx | 65536 |
 
-These values provide deterministic answers suitable for software development.
+> For stricter determinism in tool calling or JSON output specifically, Crustly's [`08-tool-calling.md`](08-tool-calling.md) and [`09-json-output.md`](09-json-output.md) chapters suggest a lower temperature (~0.1) as an optional override — this is a Crustly-side recommendation, not a documented Google/Ollama value, and trades some of the model's tuned behavior for more predictable structured output.
 
 ---
 

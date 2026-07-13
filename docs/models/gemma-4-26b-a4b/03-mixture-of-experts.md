@@ -83,7 +83,7 @@ Gemma 4 26B utilise :
 
 | Élément | Valeur |
 |-|-|
-| Paramètres totaux | ~26B |
+| Paramètres totaux | 25.2B |
 | Paramètres actifs | ~3.8B/token |
 | Nombre experts | 128 |
 | Experts actifs | 8 |
@@ -610,7 +610,7 @@ Filesystem / Git / Terminal
 
 # Conclusion
 
-Gemma 4 26B A4B n'est pas un simple modèle de 26 milliards de paramètres.
+Gemma 4 26B A4B n'est pas un simple modèle de 25.2 milliards de paramètres.
 
 Son architecture MoE lui permet d'obtenir :
 
