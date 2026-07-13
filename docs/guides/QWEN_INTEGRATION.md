@@ -270,6 +270,18 @@ default_model = "qwen2.5-coder-7b-instruct"
 2. **Verify vLLM settings**: Ensure `--tool-call-parser hermes` is set
 3. **Enable debug mode**: `crustly -d` to see detailed logs
 
+**Qwen2.5-Coder specifically:** unlike Qwen3, Qwen2.5-Coder models were not
+trained on Hermes `<tool_call>` tokens (see vLLM issues
+[#10952](https://github.com/vllm-project/vllm/issues/10952),
+[#29192](https://github.com/vllm-project/vllm/issues/29192)), so they often
+reply with a bare JSON object or a ```` ```json ```` fenced block instead of
+the wrapped tag format — even with `tool_parser = "hermes"` and
+`--tool-call-parser hermes` set correctly on the vLLM side. Crustly's Hermes
+parser automatically falls back to detecting that shape (`{"name": ...,
+"arguments": {...}}`, tagged or bare) when no `<tool_call>` tags are found,
+so no configuration change is needed — just make sure you're on a build that
+includes this fallback if tool calls with a Coder model still aren't firing.
+
 ### Thinking Mode Not Working
 
 1. Ensure `enable_thinking = true` in config

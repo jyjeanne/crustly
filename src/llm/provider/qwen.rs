@@ -228,6 +228,116 @@ impl QwenProvider {
         tool_calls
     }
 
+    /// Extract balanced top-level JSON objects from `text`, returning their
+    /// byte span (start, end-exclusive) and parsed value.
+    ///
+    /// Used as a fallback for Qwen2.5-Coder, which — unlike Qwen3 — was not
+    /// trained on Hermes `<tool_call>` tokens (see vLLM issues #10952,
+    /// #29192, #32926) and frequently emits bare JSON or a ```json fenced
+    /// block instead of the wrapped tag format.
+    fn find_json_objects(text: &str) -> Vec<(usize, usize, serde_json::Value)> {
+        let bytes = text.as_bytes();
+        let mut result = Vec::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'{' {
+                let mut depth = 0i32;
+                let mut in_string = false;
+                let mut escape = false;
+                let mut j = i;
+                let mut end = None;
+                while j < bytes.len() {
+                    let c = bytes[j];
+                    if in_string {
+                        if escape {
+                            escape = false;
+                        } else if c == b'\\' {
+                            escape = true;
+                        } else if c == b'"' {
+                            in_string = false;
+                        }
+                    } else {
+                        match c {
+                            b'"' => in_string = true,
+                            b'{' => depth += 1,
+                            b'}' => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    end = Some(j + 1);
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    j += 1;
+                }
+
+                if let Some(end) = end {
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text[i..end]) {
+                        result.push((i, end, value));
+                    }
+                    i = end;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        result
+    }
+
+    /// Fallback tool-call extraction for Qwen2.5-Coder models, which
+    /// frequently skip the Hermes `<tool_call>` wrapper and emit bare JSON
+    /// or a ```json fenced block shaped like
+    /// `{"name": ..., "arguments": {...}}` instead. Only objects matching
+    /// that exact shape are treated as tool calls, so ordinary JSON the
+    /// model prints while explaining code is left alone.
+    ///
+    /// Returns the parsed calls and the input text with matched JSON spans
+    /// (and any surrounding ```json fence markers) removed for display.
+    fn parse_fallback_tool_calls(
+        &self,
+        text: &str,
+    ) -> (Vec<(String, String, serde_json::Value)>, String) {
+        let mut calls = Vec::new();
+        let mut spans = Vec::new();
+
+        for (start, end, value) in Self::find_json_objects(text) {
+            let name = value.get("name").and_then(|v| v.as_str());
+            let arguments = value.get("arguments");
+            if let (Some(name), Some(arguments)) = (name, arguments) {
+                let args_value = match arguments {
+                    serde_json::Value::String(s) => {
+                        serde_json::from_str(s).unwrap_or_else(|_| serde_json::json!({}))
+                    }
+                    other => other.clone(),
+                };
+                let id = format!(
+                    "call_{}",
+                    &uuid::Uuid::new_v4().to_string().replace('-', "")[..24]
+                );
+                calls.push((id, name.to_string(), args_value));
+                spans.push((start, end));
+            }
+        }
+
+        if calls.is_empty() {
+            return (calls, text.to_string());
+        }
+
+        // Remove matched JSON spans, highest offset first so earlier spans
+        // (computed against the original text) stay valid.
+        let mut clean_text = text.to_string();
+        for (start, end) in spans.into_iter().rev() {
+            clean_text.replace_range(start..end, "");
+        }
+
+        // Strip any leftover fence markers left behind by the removal.
+        let clean_text = clean_text.replace("```json", "").replace("```", "");
+
+        (calls, clean_text)
+    }
+
     /// Extract thinking content from Qwen3 response
     fn extract_thinking(&self, text: &str) -> (Option<String>, String) {
         if !self.thinking_config.enabled {
@@ -692,8 +802,33 @@ impl QwenProvider {
                                 tracing::debug!("Parsed Hermes tool call: {} with id {}", name, id);
                                 content_blocks.push(ContentBlock::ToolUse { id, name, input });
                             }
-                        } else if !remaining.is_empty() {
-                            content_blocks.push(ContentBlock::Text { text: remaining });
+                        } else {
+                            // Qwen2.5-Coder was not trained on Hermes
+                            // `<tool_call>` tokens and often emits bare or
+                            // fenced JSON instead; fall back to detecting
+                            // that shape before treating the reply as plain
+                            // text.
+                            let (fallback_calls, clean_text) =
+                                self.parse_fallback_tool_calls(&remaining);
+                            if !fallback_calls.is_empty() {
+                                has_tool_calls = true;
+                                let clean_text = clean_text.trim();
+                                if !clean_text.is_empty() {
+                                    content_blocks.push(ContentBlock::Text {
+                                        text: clean_text.to_string(),
+                                    });
+                                }
+                                for (id, name, input) in fallback_calls {
+                                    tracing::debug!(
+                                        "Parsed fallback JSON tool call (non-Hermes format): {} with id {}",
+                                        name,
+                                        id
+                                    );
+                                    content_blocks.push(ContentBlock::ToolUse { id, name, input });
+                                }
+                            } else if !remaining.is_empty() {
+                                content_blocks.push(ContentBlock::Text { text: remaining });
+                            }
                         }
                     }
                     ToolCallParser::NativeQwen => {
@@ -1847,6 +1982,89 @@ Here's my analysis of the code."#;
         let text = "Complete text";
         let cleaned = provider.clean_incomplete_markers(text);
         assert_eq!(cleaned, "Complete text");
+    }
+
+    /// Qwen2.5-Coder frequently skips the Hermes `<tool_call>` wrapper and
+    /// emits a bare JSON object shaped like a function call instead.
+    #[test]
+    fn test_fallback_parses_bare_json_tool_call() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let text = r#"I'll read that file for you.
+{"name": "read_file", "arguments": {"path": "/home/user/test.txt"}}"#;
+
+        let (calls, clean_text) = provider.parse_fallback_tool_calls(text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].1, "read_file");
+        assert_eq!(calls[0].2["path"], "/home/user/test.txt");
+        assert!(!clean_text.contains("read_file"));
+    }
+
+    /// Qwen2.5-Coder sometimes wraps the JSON tool call in a ```json fence
+    /// instead of `<tool_call>` tags.
+    #[test]
+    fn test_fallback_parses_fenced_json_tool_call() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let text = "Let me check that.\n```json\n{\"name\": \"list_files\", \"arguments\": {\"dir\": \"src\"}}\n```";
+
+        let (calls, clean_text) = provider.parse_fallback_tool_calls(text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].1, "list_files");
+        assert_eq!(calls[0].2["dir"], "src");
+        assert!(!clean_text.contains("```"));
+    }
+
+    /// Ordinary JSON the model prints while explaining code (no "name" +
+    /// "arguments" shape) must not be misdetected as a tool call.
+    #[test]
+    fn test_fallback_ignores_unrelated_json() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let text = "Here's an example config:\n```json\n{\"host\": \"localhost\", \"port\": 8000}\n```";
+
+        let (calls, _) = provider.parse_fallback_tool_calls(text);
+        assert!(calls.is_empty());
+    }
+
+    /// End-to-end: a response with no `<tool_call>` tags but a bare JSON
+    /// function call must still surface as a `ToolUse` block via
+    /// `from_qwen_response`.
+    #[test]
+    fn test_from_qwen_response_uses_fallback_when_no_hermes_tags() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let response = QwenResponse {
+            id: "qwen-fallback-test".to_string(),
+            model: "qwen2.5-coder-7b-instruct".to_string(),
+            choices: vec![QwenChoice {
+                index: 0,
+                message: QwenMessage {
+                    role: "assistant".to_string(),
+                    content: Some(
+                        r#"{"name": "read_file", "arguments": {"path": "src/main.rs"}}"#
+                            .to_string(),
+                    ),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                finish_reason: Some("stop".to_string()),
+            }],
+            usage: QwenUsage {
+                prompt_tokens: 5,
+                completion_tokens: 10,
+            },
+        };
+
+        let llm_response = provider.from_qwen_response(response);
+        let tool = llm_response.content.iter().find_map(|b| match b {
+            ContentBlock::ToolUse { name, input, .. } => Some((name.clone(), input.clone())),
+            _ => None,
+        });
+        let (name, input) = tool.expect("fallback JSON tool call must become a ToolUse block");
+        assert_eq!(name, "read_file");
+        assert_eq!(input, serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(llm_response.stop_reason, Some(StopReason::ToolUse));
     }
 
     #[test]
