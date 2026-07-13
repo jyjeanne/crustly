@@ -271,10 +271,8 @@ async fn drain_stream_to_response(
                 }
                 // Tool-argument fragments for the open tool-use block
                 // (Anthropic). Accumulated and parsed at ContentBlockStop.
-                ContentDelta::InputJsonDelta { ref partial_json } => {
-                    if pending_tool.is_some() {
-                        pending_tool_json.push_str(partial_json);
-                    }
+                ContentDelta::InputJsonDelta { ref partial_json } if pending_tool.is_some() => {
+                    pending_tool_json.push_str(partial_json);
                 }
                 _ => {}
             },

@@ -1075,7 +1075,9 @@ impl Provider for QwenProvider {
         let llm_response = self.from_qwen_response(synthetic);
 
         Ok(Box::pin(futures::stream::iter(
-            llm_response_to_stream_events(llm_response).into_iter().map(Ok),
+            llm_response_to_stream_events(llm_response)
+                .into_iter()
+                .map(Ok),
         )))
     }
 
@@ -1478,12 +1480,141 @@ mod tests {
             })
             .collect();
         assert_eq!(text, "Hello there!");
-        assert!(!events
-            .iter()
-            .any(|e| matches!(e, StreamEvent::ContentBlockStart {
+        assert!(!events.iter().any(|e| matches!(
+            e,
+            StreamEvent::ContentBlockStart {
                 content_block: ContentBlock::ToolUse { .. },
                 ..
-            })));
+            }
+        )));
+    }
+
+    /// Spin up a one-shot local HTTP server that replies to the first request
+    /// it receives with a fixed SSE body, then closes. Mirrors the raw-TCP
+    /// mocking technique used in `ollama_models::tests::mock_server`, so no
+    /// extra HTTP-mocking dependency is needed here.
+    async fn mock_sse_server(body: String) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind mock server");
+        let addr = listener.local_addr().expect("mock server addr");
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept request");
+
+            let mut request = Vec::new();
+            let mut buf = [0u8; 1024];
+            loop {
+                let n = socket.read(&mut buf).await.expect("read request");
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buf[..n]);
+                if request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    break;
+                }
+            }
+
+            let response = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket
+                .write_all(response.as_bytes())
+                .await
+                .expect("write response");
+        });
+
+        format!("http://{addr}")
+    }
+
+    /// Regression: `stream()` itself (not just the buffered-content helper)
+    /// must assemble OpenAI-style `tool_calls` deltas — split across multiple
+    /// SSE chunks and indexed out of order with the id/name in one fragment
+    /// and the arguments in another — into a single `ToolUse` block, and
+    /// carry through the model, finish reason, and usage from later chunks.
+    #[tokio::test]
+    async fn stream_assembles_openai_style_tool_call_across_sse_chunks() {
+        let body = concat!(
+            "data: {\"id\":\"chatcmpl-1\",\"model\":\"qwen3-8b\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"}}]}\n\n",
+            "data: {\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"function\":{\"name\":\"read_file\",\"arguments\":\"{\\\"path\\\":\"}}]}}]}\n\n",
+            "data: {\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"src/main.rs\\\"}\"}}]}}]}\n\n",
+            "data: {\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":12}}\n\n",
+            "data: [DONE]\n\n",
+        )
+        .to_string();
+        let host = mock_sse_server(body).await;
+
+        let provider = QwenProvider::local(host);
+        let request = LLMRequest::new("qwen3-8b", vec![Message::user("read src/main.rs")]);
+        let events: Vec<StreamEvent> = provider
+            .stream(request)
+            .await
+            .expect("stream() succeeds")
+            .map(|e| e.expect("stream event is Ok"))
+            .collect()
+            .await;
+
+        let tool = events
+            .iter()
+            .find_map(|e| match e {
+                StreamEvent::ContentBlockStart {
+                    content_block: ContentBlock::ToolUse { name, input, .. },
+                    ..
+                } => Some((name.clone(), input.clone())),
+                _ => None,
+            })
+            .expect("assembled tool call must surface as a ToolUse block");
+        assert_eq!(tool.0, "read_file");
+        assert_eq!(tool.1, serde_json::json!({"path": "src/main.rs"}));
+
+        let usage = events
+            .iter()
+            .find_map(|e| match e {
+                StreamEvent::MessageDelta { usage, .. } => Some(*usage),
+                _ => None,
+            })
+            .expect("usage must be present in the terminal MessageDelta");
+        assert_eq!(usage.input_tokens, 7);
+        assert_eq!(usage.output_tokens, 12);
+    }
+
+    /// A malformed SSE data line must be logged and skipped rather than
+    /// aborting the stream — subsequent valid chunks still get processed.
+    #[tokio::test]
+    async fn stream_skips_malformed_sse_chunk_and_continues() {
+        let body = concat!(
+            "data: {this is not valid json}\n\n",
+            "data: {\"id\":\"chatcmpl-2\",\"model\":\"qwen3-8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello there!\"},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: [DONE]\n\n",
+        )
+        .to_string();
+        let host = mock_sse_server(body).await;
+
+        let provider = QwenProvider::local(host);
+        let request = LLMRequest::new("qwen3-8b", vec![Message::user("hi")]);
+        let events: Vec<StreamEvent> = provider
+            .stream(request)
+            .await
+            .expect("stream() succeeds despite a malformed chunk")
+            .map(|e| e.expect("stream event is Ok"))
+            .collect()
+            .await;
+
+        let text: String = events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::ContentBlockDelta {
+                    delta: ContentDelta::TextDelta { text },
+                    ..
+                } => Some(text.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(text, "Hello there!");
     }
 
     #[test]
