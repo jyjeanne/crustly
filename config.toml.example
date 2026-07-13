@@ -60,6 +60,16 @@ default_model = "qwen2.5-coder-7b-instruct"
 # - "native" or "qwen": Uses ✿FUNCTION✿ Unicode markers (official Qwen-Agent format)
 # - "openai": Uses standard OpenAI tool_calls format
 
+# Sampling overrides (optional). vLLM's OpenAI-compatible server does not
+# apply model-appropriate sampling itself and is prone to repetition/looping
+# output without them, so crustly sends Qwen's recommended defaults
+# automatically: top_p=0.8 + repetition_penalty=1.05 for Qwen2.5/Coder
+# models, top_p=0.8 + top_k=20 for Qwen3 (top_p=0.95 in thinking mode, no
+# repetition_penalty). Only set these to override that behavior:
+# top_p = 0.8
+# top_k = 20               # vLLM/LM Studio extension; local deployments only unless set here
+# repetition_penalty = 1.05  # vLLM/LM Studio extension; local deployments only unless set here
+
 # For DashScope cloud API:
 # [providers.qwen]
 # enabled = true

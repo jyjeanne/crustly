@@ -64,6 +64,15 @@ pub struct ThinkingConfig {
     pub budget_tokens: Option<u32>,
 }
 
+/// User-supplied sampling overrides. `None` fields fall back to
+/// [`QwenProvider::default_sampling`]'s model-family-aware defaults.
+#[derive(Debug, Clone, Default)]
+struct SamplingOverrides {
+    top_p: Option<f32>,
+    top_k: Option<u32>,
+    repetition_penalty: Option<f32>,
+}
+
 /// Qwen provider for Alibaba's Qwen models
 #[derive(Clone)]
 pub struct QwenProvider {
@@ -73,6 +82,7 @@ pub struct QwenProvider {
     custom_default_model: Option<String>,
     tool_parser: ToolCallParser,
     thinking_config: ThinkingConfig,
+    sampling: SamplingOverrides,
 }
 
 impl QwenProvider {
@@ -97,6 +107,7 @@ impl QwenProvider {
             custom_default_model: None,
             tool_parser: ToolCallParser::Hermes, // Default to Hermes for local
             thinking_config: ThinkingConfig::default(),
+            sampling: SamplingOverrides::default(),
         }
     }
 
@@ -111,6 +122,7 @@ impl QwenProvider {
             custom_default_model: None,
             tool_parser: ToolCallParser::OpenAI, // Default to OpenAI for cloud
             thinking_config: ThinkingConfig::default(),
+            sampling: SamplingOverrides::default(),
         }
     }
 
@@ -123,6 +135,26 @@ impl QwenProvider {
     /// Set tool call parsing mode
     pub fn with_tool_parser(mut self, parser: ToolCallParser) -> Self {
         self.tool_parser = parser;
+        self
+    }
+
+    /// Override sampling parameters sent with every request. Any field left
+    /// `None` falls back to [`QwenProvider::default_sampling`]'s
+    /// model-family-aware defaults (Qwen2.5/Coder vs Qwen3), which are
+    /// applied automatically because vLLM's OpenAI-compatible server does
+    /// not apply sensible defaults itself and is prone to repetition
+    /// without them.
+    pub fn with_sampling(
+        mut self,
+        top_p: Option<f32>,
+        top_k: Option<u32>,
+        repetition_penalty: Option<f32>,
+    ) -> Self {
+        self.sampling = SamplingOverrides {
+            top_p,
+            top_k,
+            repetition_penalty,
+        };
         self
     }
 
@@ -723,13 +755,58 @@ impl QwenProvider {
             None // Hermes-style uses system prompt instead
         };
 
+        // vLLM's OpenAI-compatible server does not apply model-appropriate
+        // sampling defaults and is prone to repetition without them (see
+        // https://qwen.readthedocs.io/en/latest/deployment/vllm.html), so
+        // fall back to Qwen's recommended values when neither the caller
+        // nor provider config specified an override. top_p is safe to send
+        // to any backend (including DashScope); top_k/repetition_penalty
+        // are vLLM/LM Studio extensions, so auto-injected defaults are only
+        // sent to local deployments unless explicitly configured.
+        let is_local = self.api_key == "not-needed";
+        let (default_top_p, default_top_k, default_repetition_penalty) =
+            Self::default_sampling(&request.model, self.thinking_config.enabled);
+        let top_p = request.top_p.or(self.sampling.top_p).or(default_top_p);
+        let top_k = self
+            .sampling
+            .top_k
+            .or(if is_local { default_top_k } else { None });
+        let repetition_penalty = self.sampling.repetition_penalty.or(if is_local {
+            default_repetition_penalty
+        } else {
+            None
+        });
+
         QwenRequest {
             model: request.model,
             messages,
             temperature: request.temperature,
+            top_p,
+            top_k,
+            repetition_penalty,
             max_tokens: request.max_tokens,
             stream: Some(request.stream),
             tools,
+        }
+    }
+
+    /// Model-family-aware default sampling parameters recommended by Qwen
+    /// for vLLM deployments. Returns `(top_p, top_k, repetition_penalty)`.
+    ///
+    /// Qwen3 recommends `top_k=20` and a higher `top_p` for thinking mode,
+    /// and explicitly does *not* recommend a repetition penalty (it can
+    /// degrade naturally repetitive text like tables). Qwen2.5 / Qwen2.5-Coder
+    /// recommend `top_p=0.8` and `repetition_penalty=1.05` to counter vLLM's
+    /// default sampling, which is prone to repetition/looping output.
+    fn default_sampling(
+        model: &str,
+        thinking_enabled: bool,
+    ) -> (Option<f32>, Option<u32>, Option<f32>) {
+        if model.to_lowercase().contains("qwen3") {
+            let top_p = if thinking_enabled { 0.95 } else { 0.8 };
+            (Some(top_p), Some(20), None)
+        } else {
+            (Some(0.8), None, Some(1.05))
         }
     }
 
@@ -1406,6 +1483,16 @@ struct QwenRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    top_p: Option<f32>,
+    /// vLLM/LM Studio extension (not part of the OpenAI schema); only sent
+    /// to local deployments unless explicitly configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    top_k: Option<u32>,
+    /// vLLM/LM Studio extension (not part of the OpenAI schema); only sent
+    /// to local deployments unless explicitly configured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repetition_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stream: Option<bool>,
@@ -1868,6 +1955,89 @@ Here's my analysis of the code."#;
         let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
             .with_default_model("qwen2.5-coder-14b-instruct".to_string());
         assert_eq!(provider.default_model(), "qwen2.5-coder-14b-instruct");
+    }
+
+    /// Qwen2.5-Coder deployed locally must get the documented Qwen2.5
+    /// defaults (top_p=0.8, repetition_penalty=1.05, no top_k) when the
+    /// caller and config leave sampling unset.
+    #[test]
+    fn test_sampling_defaults_qwen25_coder_local() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+        let request = LLMRequest::new(
+            "qwen2.5-coder-7b-instruct",
+            vec![Message::user("hello")],
+        );
+
+        let qwen_request = provider.to_qwen_request(request);
+        assert_eq!(qwen_request.top_p, Some(0.8));
+        assert_eq!(qwen_request.top_k, None);
+        assert_eq!(qwen_request.repetition_penalty, Some(1.05));
+    }
+
+    /// Qwen3 non-thinking gets top_p=0.8/top_k=20 and no repetition penalty
+    /// (Qwen explicitly does not recommend one for Qwen3).
+    #[test]
+    fn test_sampling_defaults_qwen3_non_thinking() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+        let request = LLMRequest::new("qwen3-8b", vec![Message::user("hello")]);
+
+        let qwen_request = provider.to_qwen_request(request);
+        assert_eq!(qwen_request.top_p, Some(0.8));
+        assert_eq!(qwen_request.top_k, Some(20));
+        assert_eq!(qwen_request.repetition_penalty, None);
+    }
+
+    /// Qwen3 thinking mode uses the higher top_p=0.95 Qwen recommends.
+    #[test]
+    fn test_sampling_defaults_qwen3_thinking() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_thinking(true);
+        let request = LLMRequest::new("qwen3-32b", vec![Message::user("hello")]);
+
+        let qwen_request = provider.to_qwen_request(request);
+        assert_eq!(qwen_request.top_p, Some(0.95));
+        assert_eq!(qwen_request.top_k, Some(20));
+    }
+
+    /// DashScope (cloud) must still get the safe, standard top_p default,
+    /// but never the vLLM-only top_k/repetition_penalty extensions unless
+    /// the user explicitly configured them.
+    #[test]
+    fn test_sampling_defaults_dashscope_omits_vendor_extensions() {
+        let provider = QwenProvider::dashscope_intl("test-key".to_string());
+        let request = LLMRequest::new("qwen-plus", vec![Message::user("hello")]);
+
+        let qwen_request = provider.to_qwen_request(request);
+        assert_eq!(qwen_request.top_p, Some(0.8));
+        assert_eq!(qwen_request.top_k, None);
+        assert_eq!(qwen_request.repetition_penalty, None);
+    }
+
+    /// Explicit per-request top_p (LLMRequest::with_top_p) always wins over
+    /// both provider config and model-family defaults.
+    #[test]
+    fn test_sampling_explicit_request_top_p_wins() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+        let request = LLMRequest::new("qwen2.5-coder-7b-instruct", vec![Message::user("hello")])
+            .with_top_p(0.42);
+
+        let qwen_request = provider.to_qwen_request(request);
+        assert_eq!(qwen_request.top_p, Some(0.42));
+    }
+
+    /// Explicit provider-level config overrides (e.g. from crustly.toml)
+    /// win over the model-family defaults, and top_k/repetition_penalty
+    /// overrides are honored even for DashScope if the user set them.
+    #[test]
+    fn test_sampling_config_override_wins_over_defaults() {
+        let provider = QwenProvider::dashscope_intl("test-key".to_string())
+            .with_sampling(Some(0.5), Some(40), Some(1.2));
+        let request = LLMRequest::new("qwen-plus", vec![Message::user("hello")]);
+
+        let qwen_request = provider.to_qwen_request(request);
+        assert_eq!(qwen_request.top_p, Some(0.5));
+        assert_eq!(qwen_request.top_k, Some(40));
+        assert_eq!(qwen_request.repetition_penalty, Some(1.2));
     }
 
     #[test]
