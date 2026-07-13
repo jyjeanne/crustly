@@ -86,12 +86,31 @@ default_model = "qwen2.5-coder-7b-instruct"
 # keep_alive/num_ctx control plus runtime performance metrics (tokens/sec,
 # model load time) shown in the TUI. Requires building crustly with
 # `--features ollama` (or `all-llm`).
+# Only ONE [providers.ollama] table is valid per config file - the two
+# examples below show alternative values for the *same* table (which model
+# to run), not two sections to enable together. Uncomment one, not both.
+#
+# Option A - Qwen2.5-Coder 7B (default example):
 # [providers.ollama]
 # enabled = true
 # host = "http://localhost:11434"
 # default_model = "qwen2.5-coder:7b"
 # keep_alive = "5m"    # "-1" (never unload), "0" (unload immediately), or "5m"/"30s"/"2h"
 # num_ctx = 8192       # Context window size to request from the model
+#
+# Option B - Ornith 9B (agentic coding model, MIT license, 256K context):
+# ollama pull ornith:9b
+# Sampling values below are Ornith's documented recommendation for software
+# development tasks (lower for refactoring, e.g. temperature = 0.05).
+# [providers.ollama]
+# enabled = true
+# host = "http://localhost:11434"
+# default_model = "ornith:9b"
+# keep_alive = "5m"
+# num_ctx = 65536       # Model supports up to 262144; 65536 balances context vs. memory/latency
+# temperature = 0.10
+# top_p = 0.90
+# top_k = 20
 #
 # Env var equivalents: OLLAMA_HOST (or OLLAMA_BASE_URL), OLLAMA_MODEL
 #

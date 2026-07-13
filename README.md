@@ -955,6 +955,38 @@ default_model = "meta-llama-3.1-8b-instruct"
 
 ---
 
+#### Ornith 9B (agentic coding)
+
+Ornith AI's Qwen-3.5-based model, post-trained specifically for agentic software development: repo navigation, planning, refactoring, bug fixing, and tool calling. MIT licensed, with a 256K-token context window — the largest of any model in this section.
+
+| Version | VRAM / RAM | Context | Notes |
+|---------|-----------|---------|-------|
+| **Ornith 9B (Q4_K_M)** ⭐ | 8 GB VRAM / 16 GB RAM | 256K | Recommended quant — best speed/quality balance |
+| Ornith 9B (Q5_K_M) | 10 GB VRAM / 20 GB RAM | 256K | Slightly higher quality |
+| Ornith 9B (FP16) | 24 GB VRAM / 32 GB RAM | 256K | Full precision, rarely needed locally |
+
+> Q8 is also available (very high quality, heavier than Q5_K_M) but Ornith's documentation doesn't publish an exact memory figure for it — measure with `ollama ps` after pulling if you need one.
+
+**Ollama:** `ollama pull ornith:9b`
+
+**Minimum system requirements:**
+- GPU: 8 GB VRAM (RTX 3060 12 GB or better recommended)
+- RAM: **16 GB** minimum; 32 GB recommended; 64 GB for the largest contexts
+- Storage: ~5.6 GB (Q4_K_M), ~6.5 GB (Q5_K_M), ~18 GB (FP16)
+
+**Recommended sampling** (per Ornith's documentation — use `providers.ollama` for native `/api/chat`, not the OpenAI-compatible shim, so `temperature`/`top_p`/`top_k`/`num_ctx` apply):
+```toml
+[providers.ollama]
+enabled = true
+default_model = "ornith:9b"
+num_ctx = 65536      # up to 262144 supported; 65536 balances context vs. memory/latency
+temperature = 0.10   # 0.05 for refactoring, 0.30 for brainstorming
+top_p = 0.90
+top_k = 20
+```
+
+---
+
 #### Quick Comparison
 
 | Model | RAM | Code | Reasoning | Speed | Best For |
@@ -962,6 +994,7 @@ default_model = "meta-llama-3.1-8b-instruct"
 | Qwen2.5-Coder-7B ⭐ | 16 GB | ★★★★★ | ★★★★☆ | Fast | Code generation, tool use |
 | Gemma-3-12B | 20 GB | ★★★★☆ | ★★★★★ | Medium | Code review, explanation |
 | Llama-3.1-8B ⭐ | 16 GB | ★★★★☆ | ★★★★☆ | Fast | General-purpose coding |
+| Ornith 9B | 16 GB | ★★★★★ | ★★★★☆ | Fast | Agentic coding, 256K context |
 | Qwen2.5-Coder-32B | 48 GB | ★★★★★ | ★★★★★ | Slow | Production-quality code |
 | Llama-3.3-70B | 64 GB | ★★★★★ | ★★★★★ | Very slow | Complex multi-file tasks |
 
@@ -1665,6 +1698,7 @@ Crustly: [executes bash tool] ✅ 145 tests passed
 |-------|-------------|-----|------|-------------|---------|
 | **Qwen2.5-Coder 7B** ⭐ | `ollama pull qwen2.5-coder:7b` | 16 GB | ★★★★★ | ✅ Excellent | Code gen, tool use, default pick |
 | **Llama 3.1 8B** ⭐ | `ollama pull llama3.1:8b` | 16 GB | ★★★★☆ | ✅ Full | General-purpose coding |
+| **Ornith 9B** ⭐ | `ollama pull ornith:9b` | 16 GB | ★★★★★ | ✅ Excellent | Agentic coding, 256K context |
 | Llama 3.2 3B | `ollama pull llama3.2:3b` | 8 GB | ★★★☆☆ | ✅ Yes | Low-RAM / CPU-only machines |
 | Gemma 3 12B | `ollama pull gemma3:12b` | 20 GB | ★★★★☆ | ✅ Yes | Code review & explanation |
 | Qwen2.5-Coder 14B | `ollama pull qwen2.5-coder:14b` | 24 GB | ★★★★★ | ✅ Excellent | Higher quality code generation |
