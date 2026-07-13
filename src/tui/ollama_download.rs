@@ -20,6 +20,7 @@ use tokio::task::JoinHandle;
 pub const CURATED_MODELS: &[&str] = &[
     "qwen2.5-coder:7b",
     "gemma3:12b",
+    "gemma4:26b",
     "llama3.1:8b",
     "llama3.2:3b",
     "mistral:latest",
