@@ -180,12 +180,28 @@ impl QwenProvider {
             .expect("Failed to create HTTP client")
     }
 
+    /// Whether this provider talks to a local deployment (vLLM, LM Studio)
+    /// rather than DashScope cloud. Centralizes the sentinel used by
+    /// [`QwenProvider::local`] so callers don't repeat the string comparison.
+    fn is_local(&self) -> bool {
+        self.api_key == "not-needed"
+    }
+
+    /// Generate a synthetic tool-call id in the `call_<24 hex chars>` shape
+    /// used across all tool-call parsers in this file.
+    fn generate_call_id() -> String {
+        format!(
+            "call_{}",
+            &uuid::Uuid::new_v4().to_string().replace('-', "")[..24]
+        )
+    }
+
     /// Build request headers
     fn headers(&self) -> reqwest::header::HeaderMap {
         let mut headers = reqwest::header::HeaderMap::new();
 
         // Only add authorization if not using local
-        if self.api_key != "not-needed" {
+        if !self.is_local() {
             headers.insert(
                 reqwest::header::AUTHORIZATION,
                 format!("Bearer {}", self.api_key)
@@ -243,10 +259,7 @@ impl QwenProvider {
                         parsed.get("name").and_then(|v| v.as_str()),
                         parsed.get("arguments"),
                     ) {
-                        let id = format!(
-                            "call_{}",
-                            &uuid::Uuid::new_v4().to_string().replace("-", "")[..24]
-                        );
+                        let id = Self::generate_call_id();
                         tool_calls.push((id, name.to_string(), arguments.clone()));
                     }
                 }
@@ -308,9 +321,15 @@ impl QwenProvider {
                 if let Some(end) = end {
                     if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text[i..end]) {
                         result.push((i, end, value));
+                        i = end;
+                        continue;
                     }
-                    i = end;
-                    continue;
+                    // The whole balanced span failed to parse (e.g. an
+                    // unquoted key in an enclosing object) — don't skip
+                    // past it. A validly-formed JSON object can still be
+                    // nested inside, so just advance one byte; the next
+                    // `{` encountered (including one inside this span)
+                    // will be scanned on its own.
                 }
             }
             i += 1;
@@ -318,18 +337,42 @@ impl QwenProvider {
         result
     }
 
+    /// Expand a matched JSON span to also swallow an immediately adjacent
+    /// fence marker (```json or ```) directly before/after it — separated
+    /// only by whitespace — so a ```json fenced tool call's fence markers
+    /// are removed along with the JSON, without touching an unrelated fence
+    /// elsewhere in the message.
+    fn expand_span_over_adjacent_fences(text: &str, start: usize, end: usize) -> (usize, usize) {
+        let before = text[..start].trim_end();
+        let new_start = before
+            .strip_suffix("```json")
+            .or_else(|| before.strip_suffix("```"))
+            .map_or(start, str::len);
+
+        let after = text[end..].trim_start();
+        let new_end = after
+            .strip_prefix("```")
+            .map_or(end, |rest| text.len() - rest.len());
+
+        (new_start, new_end)
+    }
+
     /// Fallback tool-call extraction for Qwen2.5-Coder models, which
     /// frequently skip the Hermes `<tool_call>` wrapper and emit bare JSON
     /// or a ```json fenced block shaped like
-    /// `{"name": ..., "arguments": {...}}` instead. Only objects matching
-    /// that exact shape are treated as tool calls, so ordinary JSON the
-    /// model prints while explaining code is left alone.
+    /// `{"name": ..., "arguments": {...}}` instead. A match is only
+    /// accepted when `name` is one of `known_tools` (the tools offered in
+    /// the request) — without that check, ordinary JSON the model prints
+    /// while explaining something (e.g. an example payload) can look
+    /// identical to a real tool call.
     ///
     /// Returns the parsed calls and the input text with matched JSON spans
-    /// (and any surrounding ```json fence markers) removed for display.
+    /// (and their immediately adjacent ```json fence markers, if any)
+    /// removed for display.
     fn parse_fallback_tool_calls(
         &self,
         text: &str,
+        known_tools: &[String],
     ) -> (Vec<(String, String, serde_json::Value)>, String) {
         let mut calls = Vec::new();
         let mut spans = Vec::new();
@@ -338,18 +381,18 @@ impl QwenProvider {
             let name = value.get("name").and_then(|v| v.as_str());
             let arguments = value.get("arguments");
             if let (Some(name), Some(arguments)) = (name, arguments) {
+                if !known_tools.iter().any(|t| t == name) {
+                    continue;
+                }
                 let args_value = match arguments {
                     serde_json::Value::String(s) => {
                         serde_json::from_str(s).unwrap_or_else(|_| serde_json::json!({}))
                     }
                     other => other.clone(),
                 };
-                let id = format!(
-                    "call_{}",
-                    &uuid::Uuid::new_v4().to_string().replace('-', "")[..24]
-                );
+                let id = Self::generate_call_id();
                 calls.push((id, name.to_string(), args_value));
-                spans.push((start, end));
+                spans.push(Self::expand_span_over_adjacent_fences(text, start, end));
             }
         }
 
@@ -357,15 +400,12 @@ impl QwenProvider {
             return (calls, text.to_string());
         }
 
-        // Remove matched JSON spans, highest offset first so earlier spans
-        // (computed against the original text) stay valid.
+        // Remove matched (fence-expanded) spans, highest offset first so
+        // earlier spans (computed against the original text) stay valid.
         let mut clean_text = text.to_string();
         for (start, end) in spans.into_iter().rev() {
             clean_text.replace_range(start..end, "");
         }
-
-        // Strip any leftover fence markers left behind by the removal.
-        let clean_text = clean_text.replace("```json", "").replace("```", "");
 
         (calls, clean_text)
     }
@@ -468,10 +508,7 @@ impl QwenProvider {
                     if !fn_name.is_empty() && !args_text.is_empty() {
                         match serde_json::from_str::<serde_json::Value>(args_text) {
                             Ok(args) => {
-                                let id = format!(
-                                    "call_{}",
-                                    &uuid::Uuid::new_v4().to_string().replace('-', "")[..24]
-                                );
+                                let id = Self::generate_call_id();
                                 tool_calls.push((id, fn_name, args));
                             }
                             Err(e) => {
@@ -763,7 +800,7 @@ impl QwenProvider {
         // to any backend (including DashScope); top_k/repetition_penalty
         // are vLLM/LM Studio extensions, so auto-injected defaults are only
         // sent to local deployments unless explicitly configured.
-        let is_local = self.api_key == "not-needed";
+        let is_local = self.is_local();
         let (default_top_p, default_top_k, default_repetition_penalty) =
             Self::default_sampling(&request.model, self.thinking_config.enabled);
         let top_p = request.top_p.or(self.sampling.top_p).or(default_top_p);
@@ -802,17 +839,63 @@ impl QwenProvider {
         model: &str,
         thinking_enabled: bool,
     ) -> (Option<f32>, Option<u32>, Option<f32>) {
-        if model.to_lowercase().contains("qwen3") {
+        let lower = model.to_lowercase();
+        if lower.contains("qwen3") {
             let top_p = if thinking_enabled { 0.95 } else { 0.8 };
             (Some(top_p), Some(20), None)
-        } else {
+        } else if lower.contains("qwen2") || lower.contains("coder") {
             (Some(0.8), None, Some(1.05))
+        } else {
+            // Model name doesn't identify a known family (e.g. a custom
+            // --served-model-name on a local deployment). We can't tell
+            // whether Qwen3's or Qwen2.5's tuning applies, so only send the
+            // top_p baseline both agree on — never guess repetition_penalty,
+            // which Qwen explicitly advises against for Qwen3.
+            (Some(0.8), None, None)
         }
     }
 
-    /// Convert Qwen response to our generic format
+    /// Try the fallback JSON tool-call detector on `remaining`; on a match,
+    /// push text/tool-use blocks and set `has_tool_calls`. Falls back to
+    /// pushing `remaining` verbatim as text when nothing matches. Shared by
+    /// the Hermes and OpenAI branches of [`QwenProvider::from_qwen_response`],
+    /// since Qwen2.5-Coder's untrained tool-call format can surface as bare
+    /// or fenced JSON regardless of which parser mode is configured.
+    fn push_fallback_or_text(
+        &self,
+        remaining: String,
+        known_tools: &[String],
+        has_tool_calls: &mut bool,
+        content_blocks: &mut Vec<ContentBlock>,
+    ) {
+        let (fallback_calls, clean_text) = self.parse_fallback_tool_calls(&remaining, known_tools);
+        if !fallback_calls.is_empty() {
+            *has_tool_calls = true;
+            let clean_text = clean_text.trim();
+            if !clean_text.is_empty() {
+                content_blocks.push(ContentBlock::Text {
+                    text: clean_text.to_string(),
+                });
+            }
+            for (id, name, input) in fallback_calls {
+                tracing::debug!(
+                    "Parsed fallback JSON tool call (non-Hermes format): {} with id {}",
+                    name,
+                    id
+                );
+                content_blocks.push(ContentBlock::ToolUse { id, name, input });
+            }
+        } else if !remaining.is_empty() {
+            content_blocks.push(ContentBlock::Text { text: remaining });
+        }
+    }
+
+    /// Convert Qwen response to our generic format. `known_tools` are the
+    /// tool names offered in the originating request — used to gate the
+    /// fallback JSON tool-call detector against false positives (see
+    /// [`QwenProvider::parse_fallback_tool_calls`]).
     #[allow(clippy::wrong_self_convention)]
-    fn from_qwen_response(&self, response: QwenResponse) -> LLMResponse {
+    fn from_qwen_response(&self, response: QwenResponse, known_tools: &[String]) -> LLMResponse {
         let choice = response
             .choices
             .into_iter()
@@ -885,27 +968,12 @@ impl QwenProvider {
                             // fenced JSON instead; fall back to detecting
                             // that shape before treating the reply as plain
                             // text.
-                            let (fallback_calls, clean_text) =
-                                self.parse_fallback_tool_calls(&remaining);
-                            if !fallback_calls.is_empty() {
-                                has_tool_calls = true;
-                                let clean_text = clean_text.trim();
-                                if !clean_text.is_empty() {
-                                    content_blocks.push(ContentBlock::Text {
-                                        text: clean_text.to_string(),
-                                    });
-                                }
-                                for (id, name, input) in fallback_calls {
-                                    tracing::debug!(
-                                        "Parsed fallback JSON tool call (non-Hermes format): {} with id {}",
-                                        name,
-                                        id
-                                    );
-                                    content_blocks.push(ContentBlock::ToolUse { id, name, input });
-                                }
-                            } else if !remaining.is_empty() {
-                                content_blocks.push(ContentBlock::Text { text: remaining });
-                            }
+                            self.push_fallback_or_text(
+                                remaining,
+                                known_tools,
+                                &mut has_tool_calls,
+                                &mut content_blocks,
+                            );
                         }
                     }
                     ToolCallParser::NativeQwen => {
@@ -955,10 +1023,20 @@ impl QwenProvider {
                         }
                     }
                     ToolCallParser::OpenAI => {
-                        // OpenAI format doesn't embed tool calls in text
-                        if !remaining.is_empty() {
-                            content_blocks.push(ContentBlock::Text { text: remaining });
-                        }
+                        // The API's structured `tool_calls` field (handled
+                        // below, independent of `self.tool_parser`) is the
+                        // primary path here. But Qwen2.5-Coder's untrained
+                        // tool-call format means it can still emit bare or
+                        // fenced JSON in `content` even when the client
+                        // requested OpenAI-style tool_calls, so fall back to
+                        // detecting that shape too instead of only ever
+                        // treating this content as plain text.
+                        self.push_fallback_or_text(
+                            remaining,
+                            known_tools,
+                            &mut has_tool_calls,
+                            &mut content_blocks,
+                        );
                     }
                 }
             }
@@ -1085,6 +1163,12 @@ impl Provider for QwenProvider {
     async fn complete(&self, request: LLMRequest) -> Result<LLMResponse> {
         use super::retry::{retry_with_backoff, RetryConfig};
 
+        let known_tools: Vec<String> = request
+            .tools
+            .as_ref()
+            .map(|tools| tools.iter().map(|t| t.name.clone()).collect())
+            .unwrap_or_default();
+
         let qwen_request = self.to_qwen_request(request);
         let retry_config = RetryConfig::default();
 
@@ -1120,7 +1204,7 @@ impl Provider for QwenProvider {
                 }
 
                 let qwen_response: QwenResponse = response.json().await?;
-                Ok(self.from_qwen_response(qwen_response))
+                Ok(self.from_qwen_response(qwen_response, &known_tools))
             },
             &retry_config,
         )
@@ -1129,6 +1213,12 @@ impl Provider for QwenProvider {
 
     async fn stream(&self, request: LLMRequest) -> Result<ProviderStream> {
         use super::retry::{retry_with_backoff, RetryConfig};
+
+        let known_tools: Vec<String> = request
+            .tools
+            .as_ref()
+            .map(|tools| tools.iter().map(|t| t.name.clone()).collect())
+            .unwrap_or_default();
 
         let mut qwen_request = self.to_qwen_request(request);
         qwen_request.stream = Some(true);
@@ -1284,7 +1374,7 @@ impl Provider for QwenProvider {
                 completion_tokens: 0,
             }),
         };
-        let llm_response = self.from_qwen_response(synthetic);
+        let llm_response = self.from_qwen_response(synthetic, &known_tools);
 
         Ok(Box::pin(futures::stream::iter(
             llm_response_to_stream_events(llm_response)
@@ -1339,7 +1429,7 @@ impl Provider for QwenProvider {
 
     fn validate_model(&self, model: &str) -> bool {
         // Accept any model for local deployments
-        if self.api_key == "not-needed" {
+        if self.is_local() {
             return true;
         }
         self.supported_models().contains(&model.to_string()) || model.starts_with("qwen")
@@ -1372,7 +1462,7 @@ impl Provider for QwenProvider {
     fn calculate_cost(&self, model: &str, input_tokens: u32, output_tokens: u32) -> f64 {
         // DashScope pricing (as of 2025) in USD per million tokens
         // Local models have no cost
-        if self.api_key == "not-needed" {
+        if self.is_local() {
             return 0.0;
         }
 
@@ -1633,6 +1723,7 @@ mod tests {
     fn stream_events_from_buffered_content(
         provider: &QwenProvider,
         content: &str,
+        known_tools: &[String],
     ) -> Vec<StreamEvent> {
         let synthetic = QwenResponse {
             id: "qwen-stream-test".to_string(),
@@ -1652,7 +1743,7 @@ mod tests {
                 completion_tokens: 10,
             },
         };
-        let llm_response = provider.from_qwen_response(synthetic);
+        let llm_response = provider.from_qwen_response(synthetic, known_tools);
         llm_response_to_stream_events(llm_response)
     }
 
@@ -1664,7 +1755,7 @@ mod tests {
         let content = "Let me read that.\n\
              <tool_call>\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/main.rs\"}}\n</tool_call>";
 
-        let events = stream_events_from_buffered_content(&provider, content);
+        let events = stream_events_from_buffered_content(&provider, content, &[]);
 
         let tool = events.iter().find_map(|e| match e {
             StreamEvent::ContentBlockStart {
@@ -1689,7 +1780,7 @@ mod tests {
     #[test]
     fn streaming_plain_text_roundtrips_without_tool_calls() {
         let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
-        let events = stream_events_from_buffered_content(&provider, "Hello there!");
+        let events = stream_events_from_buffered_content(&provider, "Hello there!", &[]);
 
         let text: String = events
             .iter()
@@ -2162,12 +2253,29 @@ Here's my analysis of the code."#;
 
         let text = r#"I'll read that file for you.
 {"name": "read_file", "arguments": {"path": "/home/user/test.txt"}}"#;
+        let known_tools = vec!["read_file".to_string()];
 
-        let (calls, clean_text) = provider.parse_fallback_tool_calls(text);
+        let (calls, clean_text) = provider.parse_fallback_tool_calls(text, &known_tools);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].1, "read_file");
         assert_eq!(calls[0].2["path"], "/home/user/test.txt");
         assert!(!clean_text.contains("read_file"));
+    }
+
+    /// Regression: JSON shaped exactly like a tool call but whose "name"
+    /// isn't among the tools offered in the request must NOT be treated as
+    /// a tool call — e.g. an illustrative example the model prints while
+    /// explaining something.
+    #[test]
+    fn test_fallback_rejects_unregistered_tool_name() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let text = r#"A payload for this event looks like {"name": "page_view", "arguments": {"url": "/home"}}."#;
+        let known_tools = vec!["read_file".to_string(), "list_files".to_string()];
+
+        let (calls, clean_text) = provider.parse_fallback_tool_calls(text, &known_tools);
+        assert!(calls.is_empty());
+        assert_eq!(clean_text, text);
     }
 
     /// Qwen2.5-Coder sometimes wraps the JSON tool call in a ```json fence
@@ -2177,12 +2285,31 @@ Here's my analysis of the code."#;
         let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
 
         let text = "Let me check that.\n```json\n{\"name\": \"list_files\", \"arguments\": {\"dir\": \"src\"}}\n```";
+        let known_tools = vec!["list_files".to_string()];
 
-        let (calls, clean_text) = provider.parse_fallback_tool_calls(text);
+        let (calls, clean_text) = provider.parse_fallback_tool_calls(text, &known_tools);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].1, "list_files");
         assert_eq!(calls[0].2["dir"], "src");
         assert!(!clean_text.contains("```"));
+    }
+
+    /// A fenced tool call must only have ITS OWN fence markers removed —
+    /// an unrelated fenced code block elsewhere in the same reply must be
+    /// left intact.
+    #[test]
+    fn test_fallback_does_not_corrupt_unrelated_fenced_code_block() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+        let known_tools = vec!["list_files".to_string()];
+
+        let text = "Here's an example:\n```python\nprint(1)\n```\nAlso: {\"name\": \"list_files\", \"arguments\": {\"dir\": \"src\"}}";
+
+        let (calls, clean_text) = provider.parse_fallback_tool_calls(text, &known_tools);
+        assert_eq!(calls.len(), 1);
+        assert!(
+            clean_text.contains("```python\nprint(1)\n```"),
+            "unrelated fenced block must survive intact, got: {clean_text:?}"
+        );
     }
 
     /// Ordinary JSON the model prints while explaining code (no "name" +
@@ -2193,8 +2320,25 @@ Here's my analysis of the code."#;
 
         let text = "Here's an example config:\n```json\n{\"host\": \"localhost\", \"port\": 8000}\n```";
 
-        let (calls, _) = provider.parse_fallback_tool_calls(text);
+        let (calls, _) = provider.parse_fallback_tool_calls(text, &[]);
         assert!(calls.is_empty());
+    }
+
+    /// Regression: `find_json_objects` must not skip past a validly-formed
+    /// JSON object nested inside an outer brace pair that itself fails to
+    /// parse (e.g. an unquoted key), rather than silently dropping it.
+    #[test]
+    fn test_find_json_objects_recovers_nested_object_after_failed_outer_parse() {
+        let text = r#"Note {oops: {"name": "read_file", "arguments": {"path": "x"}}} end"#;
+
+        let objects = QwenProvider::find_json_objects(text);
+        let found = objects
+            .iter()
+            .any(|(_, _, value)| value.get("name").and_then(|v| v.as_str()) == Some("read_file"));
+        assert!(
+            found,
+            "the validly-formed nested tool-call object must still be found, got: {objects:?}"
+        );
     }
 
     /// End-to-end: a response with no `<tool_call>` tags but a bare JSON
@@ -2226,7 +2370,8 @@ Here's my analysis of the code."#;
             },
         };
 
-        let llm_response = provider.from_qwen_response(response);
+        let known_tools = vec!["read_file".to_string()];
+        let llm_response = provider.from_qwen_response(response, &known_tools);
         let tool = llm_response.content.iter().find_map(|b| match b {
             ContentBlock::ToolUse { name, input, .. } => Some((name.clone(), input.clone())),
             _ => None,
@@ -2235,6 +2380,62 @@ Here's my analysis of the code."#;
         assert_eq!(name, "read_file");
         assert_eq!(input, serde_json::json!({"path": "src/main.rs"}));
         assert_eq!(llm_response.stop_reason, Some(StopReason::ToolUse));
+    }
+
+    /// Regression: Qwen2.5-Coder's untrained tool-call format can surface as
+    /// bare JSON even when `tool_parser = "openai"` is configured (a
+    /// documented local-deployment option) — the OpenAI branch must also
+    /// fall back to detecting it, not just the Hermes branch.
+    #[test]
+    fn test_from_qwen_response_openai_parser_still_detects_fallback_json() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_tool_parser(ToolCallParser::OpenAI);
+
+        let response = QwenResponse {
+            id: "qwen-openai-fallback-test".to_string(),
+            model: "qwen2.5-coder-7b-instruct".to_string(),
+            choices: vec![QwenChoice {
+                index: 0,
+                message: QwenMessage {
+                    role: "assistant".to_string(),
+                    content: Some(
+                        r#"{"name": "read_file", "arguments": {"path": "src/main.rs"}}"#
+                            .to_string(),
+                    ),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                finish_reason: Some("stop".to_string()),
+            }],
+            usage: QwenUsage {
+                prompt_tokens: 5,
+                completion_tokens: 10,
+            },
+        };
+
+        let known_tools = vec!["read_file".to_string()];
+        let llm_response = provider.from_qwen_response(response, &known_tools);
+        let tool = llm_response.content.iter().find_map(|b| match b {
+            ContentBlock::ToolUse { name, input, .. } => Some((name.clone(), input.clone())),
+            _ => None,
+        });
+        let (name, _) = tool.expect("fallback JSON tool call must be detected under the OpenAI parser too");
+        assert_eq!(name, "read_file");
+    }
+
+    /// A model name that doesn't identify a known Qwen family (e.g. a
+    /// custom --served-model-name on a local deployment) must not guess
+    /// repetition_penalty, since that's specifically discouraged for Qwen3
+    /// and we can't tell which family actually applies.
+    #[test]
+    fn test_sampling_defaults_unrecognized_model_name_is_conservative() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+        let request = LLMRequest::new("acme-ft-v2", vec![Message::user("hello")]);
+
+        let qwen_request = provider.to_qwen_request(request);
+        assert_eq!(qwen_request.top_p, Some(0.8));
+        assert_eq!(qwen_request.top_k, None);
+        assert_eq!(qwen_request.repetition_penalty, None);
     }
 
     #[test]

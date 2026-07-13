@@ -306,11 +306,14 @@ trained on Hermes `<tool_call>` tokens (see vLLM issues
 [#29192](https://github.com/vllm-project/vllm/issues/29192)), so they often
 reply with a bare JSON object or a ```` ```json ```` fenced block instead of
 the wrapped tag format — even with `tool_parser = "hermes"` and
-`--tool-call-parser hermes` set correctly on the vLLM side. Crustly's Hermes
-parser automatically falls back to detecting that shape (`{"name": ...,
-"arguments": {...}}`, tagged or bare) when no `<tool_call>` tags are found,
-so no configuration change is needed — just make sure you're on a build that
-includes this fallback if tool calls with a Coder model still aren't firing.
+`--tool-call-parser hermes` set correctly on the vLLM side. Crustly
+automatically falls back to detecting that shape (`{"name": ...,
+"arguments": {...}}`, tagged or bare) whenever no `<tool_call>` tags are
+found — under both `tool_parser = "hermes"` and `tool_parser = "openai"` —
+so no configuration change is needed. A match is only accepted when `name`
+is one of the tools offered in the request, so an unrelated JSON example
+the model prints while explaining something isn't misdetected as a real
+tool call.
 
 ### Repetitive or Looping Output
 
