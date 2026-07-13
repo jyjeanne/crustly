@@ -195,6 +195,12 @@ mod tests {
     }
 
     #[test]
+    fn filter_suggestions_includes_ornith() {
+        let suggestions = filter_suggestions("ornith", &[]);
+        assert_eq!(suggestions, vec!["ornith:9b".to_string()]);
+    }
+
+    #[test]
     fn pull_progress_fraction() {
         let p = ModelPullProgress {
             status: "pulling abc".to_string(),

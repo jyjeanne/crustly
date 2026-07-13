@@ -834,6 +834,13 @@ mod tests {
     }
 
     #[test]
+    fn test_supported_models_includes_ornith() {
+        let provider = OllamaProvider::default_local();
+        let models = provider.supported_models();
+        assert!(models.contains(&"ornith:9b".to_string()));
+    }
+
+    #[test]
     fn test_context_window_default_and_custom() {
         let provider = OllamaProvider::default_local();
         assert_eq!(provider.context_window("llama3.2"), Some(8_192));
