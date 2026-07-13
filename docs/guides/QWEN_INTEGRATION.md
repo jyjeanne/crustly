@@ -114,6 +114,36 @@ Standard OpenAI-compatible format with `tool_calls` array in response.
 - Compatibility with existing tools
 - LM Studio with auto-parsing enabled
 
+## Sampling Parameters
+
+vLLM's OpenAI-compatible server does **not** apply model-appropriate
+sampling defaults on its own, and Qwen's own docs warn that its defaults are
+prone to repetitive/looping output for Qwen2.5 models — you're expected to
+always pass `top_p` and `repetition_penalty` explicitly. Crustly now does
+this automatically, based on the model family:
+
+| Model family | `top_p` | `top_k` | `repetition_penalty` |
+|---|---|---|---|
+| Qwen2.5 / Qwen2.5-Coder | 0.8 | — | 1.05 |
+| Qwen3 (non-thinking) | 0.8 | 20 | — (not recommended for Qwen3) |
+| Qwen3 (thinking) | 0.95 | 20 | — (not recommended for Qwen3) |
+
+`top_k` and `repetition_penalty` are vLLM/LM Studio extensions to the
+OpenAI schema, so they're only auto-injected for local deployments —
+DashScope only ever gets the standard `top_p`, unless you override it below.
+
+To override any of these (e.g. for DashScope, or to tune repetition
+yourself), set them explicitly in `crustly.toml`:
+
+```toml
+[providers.qwen]
+top_p = 0.8
+top_k = 20               # local deployments only, unless set here
+repetition_penalty = 1.05  # local deployments only, unless set here
+```
+
+An explicit override always wins over the automatic model-family default.
+
 ## Qwen3 Thinking Mode
 
 When enabled, Qwen3 models use `<think>` tags to show their reasoning process:
@@ -269,6 +299,31 @@ default_model = "qwen2.5-coder-7b-instruct"
 1. **Check tool parser setting**: Use `tool_parser = "hermes"` for Qwen3
 2. **Verify vLLM settings**: Ensure `--tool-call-parser hermes` is set
 3. **Enable debug mode**: `crustly -d` to see detailed logs
+
+**Qwen2.5-Coder specifically:** unlike Qwen3, Qwen2.5-Coder models were not
+trained on Hermes `<tool_call>` tokens (see vLLM issues
+[#10952](https://github.com/vllm-project/vllm/issues/10952),
+[#29192](https://github.com/vllm-project/vllm/issues/29192)), so they often
+reply with a bare JSON object or a ```` ```json ```` fenced block instead of
+the wrapped tag format — even with `tool_parser = "hermes"` and
+`--tool-call-parser hermes` set correctly on the vLLM side. Crustly
+automatically falls back to detecting that shape (`{"name": ...,
+"arguments": {...}}`, tagged or bare) whenever no `<tool_call>` tags are
+found — under both `tool_parser = "hermes"` and `tool_parser = "openai"` —
+so no configuration change is needed. A match is only accepted when `name`
+is one of the tools offered in the request, so an unrelated JSON example
+the model prints while explaining something isn't misdetected as a real
+tool call.
+
+### Repetitive or Looping Output
+
+Crustly now sends Qwen-recommended `top_p`/`top_k`/`repetition_penalty`
+automatically (see [Sampling Parameters](#sampling-parameters)), which is
+the documented fix for vLLM's default sampling being prone to repetition on
+Qwen2.5/Coder models. If you still see looping output, try setting
+`repetition_penalty` a bit higher (e.g. `1.1`) in `[providers.qwen]` — but
+avoid pushing it much further, as too high a value degrades naturally
+repetitive text (tables, code with repeated tokens).
 
 ### Thinking Mode Not Working
 

@@ -346,6 +346,25 @@ pub struct QwenProviderConfig {
     /// DashScope region: "intl" (Singapore) or "cn" (Beijing)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
+
+    /// Nucleus sampling override (0.0-1.0). Qwen recommends 0.8 for
+    /// Qwen2.5/Coder and Qwen3 (non-thinking), 0.95 for Qwen3 thinking mode;
+    /// crustly applies those automatically when this is unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f32>,
+
+    /// Top-k sampling override. Qwen recommends 20 for Qwen3; not applicable
+    /// to Qwen2.5. Only sent to local deployments (vLLM/LM Studio), never to
+    /// DashScope, unless explicitly set here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_k: Option<u32>,
+
+    /// Repetition penalty override. Qwen recommends 1.05 for Qwen2.5/Coder
+    /// to counter vLLM's default sampling being prone to repetition; not
+    /// recommended for Qwen3. Only sent to local deployments unless
+    /// explicitly set here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repetition_penalty: Option<f32>,
 }
 
 /// Native Ollama provider configuration (`/api/chat`, via `ollama-rs`).
@@ -718,6 +737,9 @@ impl Config {
                 enable_thinking: false,
                 thinking_budget: None,
                 region: None,
+                top_p: None,
+                top_k: None,
+                repetition_penalty: None,
             });
             provider.api_key = Some(api_key);
         }
@@ -733,6 +755,9 @@ impl Config {
                 enable_thinking: false,
                 thinking_budget: None,
                 region: None,
+                top_p: None,
+                top_k: None,
+                repetition_penalty: None,
             });
             provider.base_url = Some(base_url);
         }
@@ -748,6 +773,9 @@ impl Config {
                 enable_thinking: false,
                 thinking_budget: None,
                 region: None,
+                top_p: None,
+                top_k: None,
+                repetition_penalty: None,
             });
             provider.enable_thinking = thinking.parse().unwrap_or(false);
         }

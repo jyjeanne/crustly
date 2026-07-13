@@ -271,6 +271,12 @@ fn configure_qwen(mut provider: QwenProvider, config: &QwenProviderConfig) -> Qw
         provider = provider.with_default_model(model.clone());
     }
 
+    // Sampling overrides (top_p/top_k/repetition_penalty). Unset fields fall
+    // back to Qwen's model-family-aware recommended defaults.
+    if config.top_p.is_some() || config.top_k.is_some() || config.repetition_penalty.is_some() {
+        provider = provider.with_sampling(config.top_p, config.top_k, config.repetition_penalty);
+    }
+
     provider
 }
 
@@ -515,6 +521,9 @@ mod tests {
                     enable_thinking: false,
                     thinking_budget: None,
                     region: None,
+                    top_p: None,
+                    top_k: None,
+                    repetition_penalty: None,
                 }),
                 ..Default::default()
             },
