@@ -807,12 +807,11 @@ impl QwenProvider {
         let top_k = self
             .sampling
             .top_k
-            .or(if is_local { default_top_k } else { None });
-        let repetition_penalty = self.sampling.repetition_penalty.or(if is_local {
-            default_repetition_penalty
-        } else {
-            None
-        });
+            .or(Self::local_only(is_local, default_top_k));
+        let repetition_penalty = self
+            .sampling
+            .repetition_penalty
+            .or(Self::local_only(is_local, default_repetition_penalty));
 
         QwenRequest {
             model: request.model,
@@ -824,6 +823,18 @@ impl QwenProvider {
             max_tokens: request.max_tokens,
             stream: Some(request.stream),
             tools,
+        }
+    }
+
+    /// Only forward `value` when this is a local deployment. `top_k` and
+    /// `repetition_penalty` are vLLM/LM Studio extensions to the OpenAI
+    /// schema, not part of it, so auto-injected defaults should never reach
+    /// DashScope.
+    fn local_only<T>(is_local: bool, value: Option<T>) -> Option<T> {
+        if is_local {
+            value
+        } else {
+            None
         }
     }
 
@@ -949,6 +960,14 @@ impl QwenProvider {
                                     break;
                                 }
                             }
+
+                            // Qwen2.5-Coder can mix one correctly Hermes-tagged
+                            // call with a second call emitted as bare/fenced
+                            // JSON in the same reply; scan what's left after
+                            // stripping Hermes tags for that too, instead of
+                            // only ever detecting the first.
+                            let (extra_calls, clean_text) =
+                                self.parse_fallback_tool_calls(&clean_text, known_tools);
                             let clean_text = clean_text.trim();
 
                             if !clean_text.is_empty() {
@@ -960,6 +979,14 @@ impl QwenProvider {
                             // Add tool use blocks
                             for (id, name, input) in hermes_calls {
                                 tracing::debug!("Parsed Hermes tool call: {} with id {}", name, id);
+                                content_blocks.push(ContentBlock::ToolUse { id, name, input });
+                            }
+                            for (id, name, input) in extra_calls {
+                                tracing::debug!(
+                                    "Parsed additional fallback JSON tool call alongside Hermes calls: {} with id {}",
+                                    name,
+                                    id
+                                );
                                 content_blocks.push(ContentBlock::ToolUse { id, name, input });
                             }
                         } else {
@@ -2054,10 +2081,7 @@ Here's my analysis of the code."#;
     #[test]
     fn test_sampling_defaults_qwen25_coder_local() {
         let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
-        let request = LLMRequest::new(
-            "qwen2.5-coder-7b-instruct",
-            vec![Message::user("hello")],
-        );
+        let request = LLMRequest::new("qwen2.5-coder-7b-instruct", vec![Message::user("hello")]);
 
         let qwen_request = provider.to_qwen_request(request);
         assert_eq!(qwen_request.top_p, Some(0.8));
@@ -2121,8 +2145,11 @@ Here's my analysis of the code."#;
     /// overrides are honored even for DashScope if the user set them.
     #[test]
     fn test_sampling_config_override_wins_over_defaults() {
-        let provider = QwenProvider::dashscope_intl("test-key".to_string())
-            .with_sampling(Some(0.5), Some(40), Some(1.2));
+        let provider = QwenProvider::dashscope_intl("test-key".to_string()).with_sampling(
+            Some(0.5),
+            Some(40),
+            Some(1.2),
+        );
         let request = LLMRequest::new("qwen-plus", vec![Message::user("hello")]);
 
         let qwen_request = provider.to_qwen_request(request);
@@ -2318,7 +2345,8 @@ Here's my analysis of the code."#;
     fn test_fallback_ignores_unrelated_json() {
         let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
 
-        let text = "Here's an example config:\n```json\n{\"host\": \"localhost\", \"port\": 8000}\n```";
+        let text =
+            "Here's an example config:\n```json\n{\"host\": \"localhost\", \"port\": 8000}\n```";
 
         let (calls, _) = provider.parse_fallback_tool_calls(text, &[]);
         assert!(calls.is_empty());
@@ -2419,8 +2447,53 @@ Here's my analysis of the code."#;
             ContentBlock::ToolUse { name, input, .. } => Some((name.clone(), input.clone())),
             _ => None,
         });
-        let (name, _) = tool.expect("fallback JSON tool call must be detected under the OpenAI parser too");
+        let (name, _) =
+            tool.expect("fallback JSON tool call must be detected under the OpenAI parser too");
         assert_eq!(name, "read_file");
+    }
+
+    /// Regression: a reply mixing one correctly Hermes-tagged tool call with
+    /// a second call emitted as bare JSON (no tags) must surface BOTH calls,
+    /// not just the tagged one — Qwen2.5-Coder is inconsistent about using
+    /// the tag format even within a single response.
+    #[test]
+    fn test_from_qwen_response_detects_bare_json_call_mixed_with_hermes_call() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let content = "First I'll read the file.\n\
+             <tool_call>\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/main.rs\"}}\n</tool_call>\n\
+             Then I'll list the directory: {\"name\": \"list_files\", \"arguments\": {\"dir\": \"src\"}}";
+
+        let response = QwenResponse {
+            id: "qwen-mixed-format-test".to_string(),
+            model: "qwen2.5-coder-7b-instruct".to_string(),
+            choices: vec![QwenChoice {
+                index: 0,
+                message: QwenMessage {
+                    role: "assistant".to_string(),
+                    content: Some(content.to_string()),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                finish_reason: Some("stop".to_string()),
+            }],
+            usage: QwenUsage {
+                prompt_tokens: 5,
+                completion_tokens: 10,
+            },
+        };
+
+        let known_tools = vec!["read_file".to_string(), "list_files".to_string()];
+        let llm_response = provider.from_qwen_response(response, &known_tools);
+        let names: Vec<String> = llm_response
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::ToolUse { name, .. } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(names, vec!["read_file", "list_files"]);
     }
 
     /// A model name that doesn't identify a known Qwen family (e.g. a
