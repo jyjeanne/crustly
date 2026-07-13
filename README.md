@@ -963,7 +963,9 @@ Ornith AI's Qwen-3.5-based model, post-trained specifically for agentic software
 |---------|-----------|---------|-------|
 | **Ornith 9B (Q4_K_M)** ⭐ | 8 GB VRAM / 16 GB RAM | 256K | Recommended quant — best speed/quality balance |
 | Ornith 9B (Q5_K_M) | 10 GB VRAM / 20 GB RAM | 256K | Slightly higher quality |
-| Ornith 9B (Q8) | 14 GB VRAM / 32 GB RAM | 256K | Highest quality, heavier memory use |
+| Ornith 9B (FP16) | 24 GB VRAM / 32 GB RAM | 256K | Full precision, rarely needed locally |
+
+> Q8 is also available (very high quality, heavier than Q5_K_M) but Ornith's documentation doesn't publish an exact memory figure for it — measure with `ollama ps` after pulling if you need one.
 
 **Ollama:** `ollama pull ornith:9b`
 
