@@ -75,7 +75,7 @@ This documentation targets:
 | Family | Gemma 4 |
 | Architecture | Decoder Transformer |
 | Type | Mixture of Experts |
-| Total Parameters | 25.2B |
+| Total Parameters | 25.2B (spec table) / 25.8B (model blob metadata)* |
 | Active Parameters | 3.8B/token |
 | Layers | 30 |
 | Experts | 128 total, 1 shared |
@@ -95,6 +95,8 @@ This documentation targets:
 | Thinking | Supported |
 
 > Source: [ollama.com/library/gemma4:26b](https://ollama.com/library/gemma4:26b). Sibling variants in the same family: `gemma4:e2b`, `gemma4:e4b` (edge/effective-parameter models), `gemma4:12b` (dense), `gemma4:31b` (dense), `gemma4:31b-cloud` (Ollama-hosted).
+>
+> \* The page lists two different total-parameter figures for the same `gemma4:26b` tag: the architecture "Model information" table says **25.2B**, while the pulled model blob's own metadata panel (next to the `Q4_K_M` quant and digest `5571076f3d70`) says **25.8B**. Both come from the official listing — the ~0.6B delta likely reflects whether embedding/lm_head weights are counted in the blob inspector's tally. Active parameters (3.8B/token) match in both places, which is what actually drives inference cost.
 
 ---
 

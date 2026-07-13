@@ -132,6 +132,13 @@ default_model = "qwen2.5-coder-7b-instruct"
 # top_p = 0.95
 # top_k = 64
 #
+# Other Gemma 4 tags (swap default_model above, same sampling values apply):
+#   gemma4:e2b / gemma4:e4b - edge/effective-parameter models, 128K context,
+#                             lower RAM (~8-16 GB), also support audio input
+#   gemma4:12b              - 128K context, dense, mid-size
+#   gemma4:31b               - 256K context, dense, highest quality, heaviest
+#   gemma4:31b-cloud         - Ollama-hosted, no local GPU/RAM required
+#
 # Env var equivalents: OLLAMA_HOST (or OLLAMA_BASE_URL), OLLAMA_MODEL
 #
 # Model management from the command line (list/pull/delete/show/embed):
