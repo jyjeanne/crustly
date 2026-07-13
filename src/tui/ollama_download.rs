@@ -24,6 +24,7 @@ pub const CURATED_MODELS: &[&str] = &[
     "llama3.2:3b",
     "mistral:latest",
     "deepseek-r1:14b",
+    "ornith:9b",
 ];
 
 /// One progress update from an in-flight pull, decoupled from the `ollama`

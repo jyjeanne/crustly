@@ -102,6 +102,22 @@ default_model = "qwen2.5-coder-7b-instruct"
 #   crustly ollama show qwen2.5-coder:7b
 #   crustly ollama embed nomic-embed-text "some text to embed"
 
+# ----------------------------------------
+# Example: Ornith 9B (agentic coding model, MIT license, 256K context)
+# ----------------------------------------
+# ollama pull ornith:9b
+# Sampling values below are Ornith's documented recommendation for software
+# development tasks (lower for refactoring, e.g. temperature = 0.05).
+# [providers.ollama]
+# enabled = true
+# host = "http://localhost:11434"
+# default_model = "ornith:9b"
+# keep_alive = "5m"
+# num_ctx = 65536       # Model supports up to 262144; 65536 balances context vs. memory/latency
+# temperature = 0.10
+# top_p = 0.90
+# top_k = 20
+
 # Environment variables for Qwen:
 # - QWEN_BASE_URL: Local endpoint URL
 # - DASHSCOPE_API_KEY: Cloud API key

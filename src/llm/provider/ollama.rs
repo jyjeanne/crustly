@@ -586,6 +586,7 @@ impl Provider for OllamaProvider {
             "gemma3:12b".to_string(),
             "mistral:latest".to_string(),
             "deepseek-r1:14b".to_string(),
+            "ornith:9b".to_string(),
         ]
     }
 
