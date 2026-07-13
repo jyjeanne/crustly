@@ -59,7 +59,7 @@ This documentation targets:
 | 21-troubleshooting.md | Troubleshooting |
 | appendix.md | Reference |
 
-> Only `01-introduction.md` and `02-architecture.md` are written so far. The remaining chapters are planned and will be added incrementally; this table tracks the target structure.
+> Only `01-introduction.md`, `02-architecture.md`, and `08-tool-calling.md` are written so far. The remaining chapters are planned and will be added incrementally; this table tracks the target structure.
 
 ---
 
