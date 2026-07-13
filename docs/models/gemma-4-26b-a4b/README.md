@@ -59,7 +59,9 @@ This documentation targets:
 | 21-troubleshooting.md | Troubleshooting |
 | appendix.md | Reference |
 
-> Only `01-introduction.md`, `02-architecture.md`, and `08-tool-calling.md` are written so far. The remaining chapters are planned and will be added incrementally; this table tracks the target structure.
+> Only `01-introduction.md`, `02-architecture.md`, `03-mixture-of-experts.md`, `08-tool-calling.md`, and `09-json-output.md` are written so far. The remaining chapters are planned and will be added incrementally; this table tracks the target structure.
+>
+> `09-json-output.md`'s JSON mode and JSON Schema output are already supported end-to-end by Crustly's native Ollama provider (`response_format` maps to Ollama's `format: "json"` / structured schema — see `src/llm/provider/ollama.rs`'s `to_ollama_format`), so no code changes were needed for that chapter.
 
 ---
 

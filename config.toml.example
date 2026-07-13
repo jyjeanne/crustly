@@ -112,6 +112,21 @@ default_model = "qwen2.5-coder-7b-instruct"
 # top_p = 0.90
 # top_k = 20
 #
+# Option C - Gemma 4 26B A4B (MoE, 128 experts/8 active, 256K context, native
+# tool calling + vision + thinking):
+# ollama pull gemma4:26b
+# Sampling values below are Gemma 4's documented recommendation for software
+# development tasks; see docs/models/gemma-4-26b-a4b/ for the full reference.
+# [providers.ollama]
+# enabled = true
+# host = "http://localhost:11434"
+# default_model = "gemma4:26b"
+# keep_alive = "5m"
+# num_ctx = 65536       # Model supports up to 262144; 65536 balances context vs. memory/latency
+# temperature = 0.10    # 0.1-0.2 recommended; lower for tool calling/JSON output
+# top_p = 0.90
+# top_k = 20
+#
 # Env var equivalents: OLLAMA_HOST (or OLLAMA_BASE_URL), OLLAMA_MODEL
 #
 # Model management from the command line (list/pull/delete/show/embed):
