@@ -25,6 +25,7 @@ pub const CURATED_MODELS: &[&str] = &[
     "llama3.2:3b",
     "mistral:latest",
     "deepseek-r1:14b",
+    "ornith:9b",
 ];
 
 /// One progress update from an in-flight pull, decoupled from the `ollama`
@@ -192,6 +193,12 @@ mod tests {
         assert!(suggestions.contains(&"llama3.1:8b".to_string()));
         assert!(suggestions.contains(&"llama3.2:3b".to_string()));
         assert!(!suggestions.contains(&"mistral:latest".to_string()));
+    }
+
+    #[test]
+    fn filter_suggestions_includes_ornith() {
+        let suggestions = filter_suggestions("ornith", &[]);
+        assert_eq!(suggestions, vec!["ornith:9b".to_string()]);
     }
 
     #[test]

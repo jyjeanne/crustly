@@ -587,6 +587,7 @@ impl Provider for OllamaProvider {
             "gemma4:26b".to_string(),
             "mistral:latest".to_string(),
             "deepseek-r1:14b".to_string(),
+            "ornith:9b".to_string(),
         ]
     }
 
@@ -839,6 +840,13 @@ mod tests {
         assert!(provider
             .supported_models()
             .contains(&"gemma4:26b".to_string()));
+    }
+
+    #[test]
+    fn test_supported_models_includes_ornith() {
+        let provider = OllamaProvider::default_local();
+        let models = provider.supported_models();
+        assert!(models.contains(&"ornith:9b".to_string()));
     }
 
     #[test]
