@@ -3,6 +3,7 @@
 //! Intelligently modify portions of files (find/replace, line-based edits).
 
 use super::error::{validate_file_path, Result, ToolError};
+use super::file_read_cache::{FileFingerprint, ReadGate};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -112,7 +113,8 @@ impl Tool for EditTool {
     fn description(&self) -> &str {
         "Edit a file intelligently using various operations: replace text, replace lines, insert lines, delete lines, or regex replace. \
          For a simple text replacement, `file_path`/`old_string`/`new_string` (with optional `replace_all`) may be sent with no \
-         `operation` field - it defaults to 'replace'. `old_string` must match exactly once in the file unless `replace_all` is true."
+         `operation` field - it defaults to 'replace'. `old_string` must match exactly once in the file unless `replace_all` is true. \
+         You must read the file with read_file at least once in this session before editing it."
     }
 
     fn input_schema(&self) -> Value {
@@ -231,6 +233,30 @@ impl Tool for EditTool {
             Ok(p) => p,
             Err(msg) => return Ok(ToolResult::error(msg)),
         };
+
+        // Prior-read enforcement (matches Claude Code's/qwen-code's edit
+        // tools): reject blindly editing a file this session never read,
+        // or one that changed on disk since it was last read.
+        let metadata_before = fs::metadata(&path).await.map_err(ToolError::Io)?;
+        match context
+            .file_read_cache
+            .check(&path, FileFingerprint::of(&metadata_before))
+        {
+            ReadGate::NeverRead => {
+                return Ok(ToolResult::error(format!(
+                    "You must read '{}' with read_file before editing it.",
+                    path.display()
+                )));
+            }
+            ReadGate::Stale => {
+                return Ok(ToolResult::error(format!(
+                    "'{}' has changed on disk since it was last read. Re-read it with \
+                     read_file before editing.",
+                    path.display()
+                )));
+            }
+            ReadGate::Ok => {}
+        }
 
         // Read file content
         let content = fs::read_to_string(&path).await.map_err(ToolError::Io)?;
@@ -369,6 +395,13 @@ impl Tool for EditTool {
             .await
             .map_err(ToolError::Io)?;
 
+        // Seed the cache with the post-edit fingerprint so a follow-up edit
+        // in the same session doesn't need an intervening re-read.
+        let metadata_after = fs::metadata(&path).await.map_err(ToolError::Io)?;
+        context
+            .file_read_cache
+            .record(&path, FileFingerprint::of(&metadata_after));
+
         let lines_before = content.lines().count();
         let lines_after = new_content.lines().count();
 
@@ -392,6 +425,20 @@ mod tests {
             .with_working_directory(temp_dir.path().to_path_buf())
     }
 
+    /// A context whose file-read cache already has `relative_path` recorded
+    /// against its current on-disk fingerprint, simulating "the model read
+    /// this file earlier in the session." Most of edit_file's own tests
+    /// exist to exercise the edit logic itself, not prior-read enforcement,
+    /// so they use this rather than tripping over the gate incidentally.
+    async fn seeded_context(temp_dir: &TempDir, relative_path: &str) -> ToolExecutionContext {
+        let ctx = context(temp_dir);
+        let full_path = temp_dir.path().join(relative_path);
+        let metadata = fs::metadata(&full_path).await.unwrap();
+        ctx.file_read_cache
+            .record(&full_path, FileFingerprint::of(&metadata));
+        ctx
+    }
+
     #[tokio::test]
     async fn test_replace_with_explicit_operation_still_works() {
         let temp_dir = TempDir::new().unwrap();
@@ -407,7 +454,10 @@ mod tests {
             "create_backup": false
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "test.txt").await)
+            .await
+            .unwrap();
         assert!(result.success, "{:?}", result.error);
         assert_eq!(
             fs::read_to_string(&file_path).await.unwrap(),
@@ -433,7 +483,10 @@ mod tests {
             "new_string": "there"
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "test.txt").await)
+            .await
+            .unwrap();
         assert!(result.success, "{:?}", result.error);
         assert_eq!(
             fs::read_to_string(&file_path).await.unwrap(),
@@ -458,7 +511,10 @@ mod tests {
             "new_string": "bar"
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "test.txt").await)
+            .await
+            .unwrap();
         assert!(!result.success);
         assert!(result.error.unwrap().contains("3 times"));
         // File must be untouched.
@@ -482,7 +538,10 @@ mod tests {
             "replace_all": true
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "test.txt").await)
+            .await
+            .unwrap();
         assert!(result.success, "{:?}", result.error);
         assert_eq!(
             fs::read_to_string(&file_path).await.unwrap(),
@@ -503,7 +562,10 @@ mod tests {
             "new_string": "x"
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "test.txt").await)
+            .await
+            .unwrap();
         assert!(!result.success);
         assert!(result.error.unwrap().contains("not found"));
     }
@@ -544,7 +606,10 @@ mod tests {
             "create_backup": false
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "test.txt").await)
+            .await
+            .unwrap();
         assert!(result.success, "{:?}", result.error);
         assert_eq!(
             fs::read_to_string(&file_path).await.unwrap(),
@@ -561,5 +626,134 @@ mod tests {
             "new_string": "b"
         });
         assert!(tool.validate_input(&input).is_ok());
+    }
+
+    /// Regression: matches Claude Code's/qwen-code's edit tools - a file
+    /// this session has never read must not be blindly editable.
+    #[tokio::test]
+    async fn test_edit_rejects_a_file_never_read_this_session() {
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(temp_dir.path().join("test.txt"), "hello world")
+            .await
+            .unwrap();
+
+        let tool = EditTool;
+        let input = serde_json::json!({
+            "file_path": "test.txt",
+            "old_string": "world",
+            "new_string": "there"
+        });
+
+        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("must read"));
+    }
+
+    /// Regression: a file read earlier, then changed on disk by something
+    /// else (another process, a human, a build step) before the edit
+    /// arrives, must not be silently overwritten with stale assumptions.
+    #[tokio::test]
+    async fn test_edit_rejects_a_file_changed_since_it_was_read() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "hello world").await.unwrap();
+
+        let ctx = seeded_context(&temp_dir, "test.txt").await;
+
+        // The file changes on disk after the recorded read.
+        fs::write(&file_path, "hello world, extended").await.unwrap();
+
+        let tool = EditTool;
+        let input = serde_json::json!({
+            "file_path": "test.txt",
+            "old_string": "world",
+            "new_string": "there"
+        });
+
+        let result = tool.execute(input, &ctx).await.unwrap();
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("changed on disk"));
+        // Must not have touched the file.
+        assert_eq!(
+            fs::read_to_string(&file_path).await.unwrap(),
+            "hello world, extended"
+        );
+    }
+
+    /// End-to-end: an actual read_file call (not a hand-seeded cache)
+    /// clears enforcement for a subsequent edit_file call sharing the same
+    /// context - proving the two tools' cache usage actually interoperate.
+    #[tokio::test]
+    async fn test_read_file_then_edit_file_succeeds() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "hello world").await.unwrap();
+        let ctx = context(&temp_dir);
+
+        let read_result = crate::llm::tools::read::ReadTool
+            .execute(serde_json::json!({ "path": "test.txt" }), &ctx)
+            .await
+            .unwrap();
+        assert!(read_result.success);
+
+        let edit_result = EditTool
+            .execute(
+                serde_json::json!({
+                    "file_path": "test.txt",
+                    "old_string": "world",
+                    "new_string": "there"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert!(edit_result.success, "{:?}", edit_result.error);
+        assert_eq!(
+            fs::read_to_string(&file_path).await.unwrap(),
+            "hello there"
+        );
+    }
+
+    /// A second edit in the same session, on the same file, must not need
+    /// an intervening re-read - the first edit's own post-write record
+    /// clears the gate for the next one (matches qwen-code's recordWrite
+    /// note: the model authored those bytes, so it has "seen" them).
+    #[tokio::test]
+    async fn test_consecutive_edits_do_not_require_a_re_read_between_them() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "one two three").await.unwrap();
+        let ctx = seeded_context(&temp_dir, "test.txt").await;
+
+        let first = EditTool
+            .execute(
+                serde_json::json!({
+                    "file_path": "test.txt",
+                    "old_string": "one",
+                    "new_string": "ONE"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert!(first.success, "{:?}", first.error);
+
+        // No re-read in between.
+        let second = EditTool
+            .execute(
+                serde_json::json!({
+                    "file_path": "test.txt",
+                    "old_string": "two",
+                    "new_string": "TWO"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert!(second.success, "{:?}", second.error);
+        assert_eq!(
+            fs::read_to_string(&file_path).await.unwrap(),
+            "ONE TWO three"
+        );
     }
 }

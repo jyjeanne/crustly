@@ -131,6 +131,17 @@ impl Tool for ReadTool {
                 (contents, line_count, None)
             };
 
+        // Record this read against the session's file-read cache. Any
+        // successful read - even a partial/paginated one - clears prior-read
+        // enforcement for edit_file/write_file/apply_patch, matching Claude
+        // Code's/qwen-code's stance that "has the model seen current bytes"
+        // is the bar, not "has it seen every byte" (see file_read_cache
+        // module docs).
+        context.file_read_cache.record(
+            &path,
+            crate::llm::tools::FileFingerprint::of(&metadata),
+        );
+
         let output_len = output.len();
         let mut result = ToolResult::success(output)
             .with_metadata("path".to_string(), path.display().to_string())

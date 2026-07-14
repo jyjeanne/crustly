@@ -6,6 +6,7 @@
 pub mod aliases;
 pub mod cache;
 pub mod error;
+pub mod file_read_cache;
 pub mod registry;
 pub mod sandbox;
 mod r#trait;
@@ -43,5 +44,6 @@ pub mod web_fetch;
 
 // Re-exports
 pub use error::{Result, ToolError};
+pub use file_read_cache::{FileFingerprint, FileReadCache, ReadGate};
 pub use r#trait::{SubAgentLauncher, Tool, ToolCapability, ToolExecutionContext, ToolResult};
 pub use registry::ToolRegistry;

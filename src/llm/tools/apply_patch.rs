@@ -36,6 +36,7 @@
 //! whitespace-fuzzy hunk matching, and the `*** End of File` hunk marker.
 
 use super::error::{validate_file_path, validate_path_safety, Result, ToolError};
+use super::file_read_cache::{FileFingerprint, ReadGate};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -301,7 +302,8 @@ impl Tool for ApplyPatchTool {
          `@@` hunks with ' ' context, '-' removed, and '+' added lines; may be followed by \
          `*** Move to: <new path>` to rename), then `*** End Patch`. The whole patch is validated \
          against the current file contents before anything is written - if any hunk fails to \
-         match, no files are changed."
+         match, no files are changed. Every `Update File` target must have been read with \
+         read_file at least once in this session first; `Add File`/`Delete File` need no prior read."
     }
 
     fn input_schema(&self) -> Value {
@@ -409,6 +411,31 @@ impl Tool for ApplyPatchTool {
                             return Ok(ToolResult::error(format!("Update File '{path}': {msg}")))
                         }
                     };
+
+                    // Prior-read enforcement (matches Claude Code's/
+                    // qwen-code's edit tools): only applies to Update File,
+                    // not Add File (nothing existing to have read) or
+                    // Delete File (no content is being trusted/modified).
+                    let metadata_before = fs::metadata(&full).await.map_err(ToolError::Io)?;
+                    match context
+                        .file_read_cache
+                        .check(&full, FileFingerprint::of(&metadata_before))
+                    {
+                        ReadGate::NeverRead => {
+                            return Ok(ToolResult::error(format!(
+                                "Update File '{path}': you must read this file with read_file \
+                                 before editing it."
+                            )));
+                        }
+                        ReadGate::Stale => {
+                            return Ok(ToolResult::error(format!(
+                                "Update File '{path}': it has changed on disk since it was \
+                                 last read. Re-read it with read_file before editing."
+                            )));
+                        }
+                        ReadGate::Ok => {}
+                    }
+
                     let original = fs::read_to_string(&full).await.map_err(ToolError::Io)?;
                     let new_content = match apply_hunks(&original, hunks) {
                         Ok(c) => c,
@@ -465,6 +492,16 @@ impl Tool for ApplyPatchTool {
                         fs::create_dir_all(parent).await.map_err(ToolError::Io)?;
                     }
                     fs::write(&path, &content).await.map_err(ToolError::Io)?;
+
+                    // Seed the cache with the post-write fingerprint (new
+                    // file, updated file, or a rename's destination) so a
+                    // follow-up edit in the same session doesn't need an
+                    // intervening re-read.
+                    let metadata_after = fs::metadata(&path).await.map_err(ToolError::Io)?;
+                    context
+                        .file_read_cache
+                        .record(&path, FileFingerprint::of(&metadata_after));
+
                     summary.push(format!("wrote {}", path.display()));
                 }
                 PlannedAction::Delete { path } => {
@@ -490,6 +527,20 @@ mod tests {
     fn context(temp_dir: &TempDir) -> ToolExecutionContext {
         ToolExecutionContext::new(Uuid::new_v4())
             .with_working_directory(temp_dir.path().to_path_buf())
+    }
+
+    /// A context with `relative_path` already recorded in the file-read
+    /// cache, simulating "the model read this file earlier in the
+    /// session" - needed before any `Update File` op, which (like
+    /// edit_file) requires a prior read. `Add`/`Delete File` need no such
+    /// seeding.
+    async fn seeded_context(temp_dir: &TempDir, relative_path: &str) -> ToolExecutionContext {
+        let ctx = context(temp_dir);
+        let full_path = temp_dir.path().join(relative_path);
+        let metadata = fs::metadata(&full_path).await.unwrap();
+        ctx.file_read_cache
+            .record(&full_path, FileFingerprint::of(&metadata));
+        ctx
     }
 
     #[test]
@@ -605,7 +656,10 @@ mod tests {
             "input": "*** Begin Patch\n*** Update File: a.txt\n@@\n-hello\n+goodbye\n world\n*** End Patch"
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "a.txt").await)
+            .await
+            .unwrap();
         assert!(result.success, "{:?}", result.error);
         let contents = tokio::fs::read_to_string(temp_dir.path().join("a.txt"))
             .await
@@ -681,7 +735,10 @@ mod tests {
             "input": "*** Begin Patch\n*** Update File: old.txt\n*** Move to: new.txt\n@@\n-content\n+updated\n*** End Patch"
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "old.txt").await)
+            .await
+            .unwrap();
         assert!(result.success, "{:?}", result.error);
         assert!(!temp_dir.path().join("old.txt").exists());
         assert_eq!(
@@ -711,7 +768,10 @@ mod tests {
                  *** End Patch"
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let result = tool
+            .execute(input, &seeded_context(&temp_dir, "update.txt").await)
+            .await
+            .unwrap();
         assert!(result.success, "{:?}", result.error);
         assert!(temp_dir.path().join("add.txt").exists());
         assert!(!temp_dir.path().join("delete.txt").exists());
@@ -746,7 +806,14 @@ mod tests {
                  *** End Patch"
         });
 
-        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        let ctx = seeded_context(&temp_dir, "first.txt").await;
+        let metadata = fs::metadata(temp_dir.path().join("second.txt"))
+            .await
+            .unwrap();
+        ctx.file_read_cache
+            .record(&temp_dir.path().join("second.txt"), FileFingerprint::of(&metadata));
+
+        let result = tool.execute(input, &ctx).await.unwrap();
         assert!(!result.success);
         // Neither file may have been modified.
         assert_eq!(
@@ -789,5 +856,50 @@ mod tests {
         let tool = ApplyPatchTool;
         let input = serde_json::json!({ "input": "not a patch at all" });
         assert!(tool.validate_input(&input).is_err());
+    }
+
+    /// Regression: Update File must not blindly rewrite a file this
+    /// session never read - matches edit_file's own prior-read enforcement.
+    #[tokio::test]
+    async fn execute_update_rejects_a_file_never_read_this_session() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join("a.txt"), "hello\n")
+            .await
+            .unwrap();
+
+        let tool = ApplyPatchTool;
+        let input = serde_json::json!({
+            "input": "*** Begin Patch\n*** Update File: a.txt\n@@\n-hello\n+goodbye\n*** End Patch"
+        });
+
+        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("must read"));
+        assert_eq!(
+            tokio::fs::read_to_string(temp_dir.path().join("a.txt"))
+                .await
+                .unwrap(),
+            "hello\n"
+        );
+    }
+
+    /// Add File and Delete File need no prior read - only Update File does.
+    #[tokio::test]
+    async fn execute_add_and_delete_need_no_prior_read() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join("gone.txt"), "bye")
+            .await
+            .unwrap();
+
+        let tool = ApplyPatchTool;
+        let input = serde_json::json!({
+            "input": "*** Begin Patch\n\
+                 *** Add File: new.txt\n+hi\n\
+                 *** Delete File: gone.txt\n\
+                 *** End Patch"
+        });
+
+        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
     }
 }
