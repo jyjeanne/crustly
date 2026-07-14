@@ -12,20 +12,27 @@
 //! (`Read`, `TodoWrite`) forms work without listing every case variant.
 //!
 //! Only maps to tools Crustly actually has a real equivalent for, and only
-//! where the argument *shape* also lines up (verified against the source of
-//! qwen-code and Crustly's own tool schemas) - a name for a capability
-//! Crustly doesn't implement, or whose input format genuinely differs, is
-//! intentionally left out rather than pointed at something that would
-//! deserialize into nonsense. One notable omission: qwen-code's
-//! `save_memory` - Crustly has no equivalent write-to-memory tool
-//! (`session_context` is read-only).
+//! where the argument *shape* AND *behavior* also line up (verified against
+//! the source of qwen-code and Crustly's own tool schemas) - a name for a
+//! capability Crustly doesn't implement, or whose input format or semantics
+//! genuinely differ, is intentionally left out rather than pointed at
+//! something that would deserialize fine but quietly do the wrong thing.
 //!
-//! Codex's `apply_patch` isn't in this table at all, by design: it's not a
-//! renamed `edit_file`, it's a distinct multi-file patch-script format
-//! (`*** Begin Patch` / `*** Update File:` / `@@` hunks / `*** End Patch`)
-//! that `edit_file` can't parse. It's registered as its own real tool -
-//! `apply_patch.rs` - under the exact name Codex uses, so no alias is
-//! needed.
+//! Two tools are absent from this table entirely, by design, because they
+//! turned out to need real implementations rather than a rename:
+//! - Codex's `apply_patch` - not a renamed `edit_file`. It's a distinct
+//!   multi-file patch-script format (`*** Begin Patch` / `*** Update File:`
+//!   / `@@` hunks / `*** End Patch`) that `edit_file` can't parse.
+//!   Registered as its own real tool (`apply_patch.rs`) under the exact
+//!   name Codex uses, so no alias is needed.
+//! - qwen-code's `save_memory` - not the same thing as `session_context`'s
+//!   `add_fact` operation, which is scoped to `context_{session_id}.json`
+//!   and disappears once the session ends. `save_memory`'s whole point is
+//!   that the fact outlives the session, so aliasing it to `add_fact` would
+//!   make the call succeed while silently breaking that guarantee.
+//!   Registered as its own real tool (`save_memory.rs`) that persists to a
+//!   working-directory-keyed file instead, so no alias is needed here
+//!   either.
 pub const TOOL_ALIASES: &[(&str, &str)] = &[
     // qwen-code (packages/core/src/tools/tool-names.ts and per-tool
     // schemas) - verified against source, not guessed. Field-shape

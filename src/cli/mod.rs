@@ -600,9 +600,9 @@ fn build_tool_registry() -> crate::llm::tools::registry::ToolRegistry {
         code_exec::CodeExecTool, context::ContextTool, doc_parser::DocParserTool, edit::EditTool,
         glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
         notebook::NotebookEditTool, plan_tool::PlanTool, powershell::PowerShellTool,
-        read::ReadTool, registry::ToolRegistry, skill::SkillTool, task::TaskTool,
-        todo_write::TodoWriteTool, web_fetch::WebFetchTool, web_search::WebSearchTool,
-        write::WriteTool,
+        read::ReadTool, registry::ToolRegistry, save_memory::SaveMemoryTool, skill::SkillTool,
+        task::TaskTool, todo_write::TodoWriteTool, web_fetch::WebFetchTool,
+        web_search::WebSearchTool, write::WriteTool,
     };
 
     let mut tool_registry = ToolRegistry::new();
@@ -623,6 +623,7 @@ fn build_tool_registry() -> crate::llm::tools::registry::ToolRegistry {
     // Phase 3: Workflow & integration
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));
+    tool_registry.register(Arc::new(SaveMemoryTool));
     tool_registry.register(Arc::new(HttpClientTool));
     tool_registry.register(Arc::new(PlanTool));
     // Phase 4: Claw Code parity
@@ -873,18 +874,7 @@ async fn cmd_run(
 ) -> Result<()> {
     use crate::{
         db::Database,
-        llm::{
-            agent::AgentService,
-            tools::{
-                agent::AgentTool, apply_patch::ApplyPatchTool, ask_user::AskUserTool,
-                bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
-                doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
-                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
-                powershell::PowerShellTool, read::ReadTool, registry::ToolRegistry,
-                skill::SkillTool, task::TaskTool, todo_write::TodoWriteTool,
-                web_fetch::WebFetchTool, web_search::WebSearchTool, write::WriteTool,
-            },
-        },
+        llm::agent::AgentService,
         services::{ServiceContext, SessionService},
     };
 
@@ -897,34 +887,9 @@ async fn cmd_run(
     // Select provider based on configuration using factory
     let provider = crate::llm::provider::create_provider(config)?;
 
-    // Create tool registry
-    let mut tool_registry = ToolRegistry::new();
-    // Phase 1: Essential file operations
-    tool_registry.register(Arc::new(ReadTool));
-    tool_registry.register(Arc::new(WriteTool));
-    tool_registry.register(Arc::new(EditTool));
-    tool_registry.register(Arc::new(ApplyPatchTool));
-    tool_registry.register(Arc::new(BashTool));
-    tool_registry.register(Arc::new(LsTool));
-    tool_registry.register(Arc::new(GlobTool));
-    tool_registry.register(Arc::new(GrepTool));
-    // Phase 2: Advanced features
-    tool_registry.register(Arc::new(WebSearchTool));
-    tool_registry.register(Arc::new(CodeExecTool));
-    tool_registry.register(Arc::new(NotebookEditTool));
-    tool_registry.register(Arc::new(DocParserTool));
-    // Phase 3: Workflow & integration
-    tool_registry.register(Arc::new(TaskTool));
-    tool_registry.register(Arc::new(ContextTool));
-    tool_registry.register(Arc::new(HttpClientTool));
-    tool_registry.register(Arc::new(PlanTool));
-    // Phase 4: Claw Code parity
-    tool_registry.register(Arc::new(WebFetchTool));
-    tool_registry.register(Arc::new(TodoWriteTool));
-    tool_registry.register(Arc::new(AskUserTool));
-    tool_registry.register(Arc::new(SkillTool));
-    tool_registry.register(Arc::new(AgentTool));
-    tool_registry.register(Arc::new(PowerShellTool));
+    // Create tool registry (same built-in set as the interactive chat agent
+    // - see build_tool_registry's doc comment).
+    let mut tool_registry = build_tool_registry();
 
     // Connect to configured MCP servers, same as cmd_chat - see its
     // comment for why this needs to happen at all (config.mcp.servers was
@@ -1552,7 +1517,7 @@ mod tests {
         let registry = build_tool_registry();
 
         // One entry per Phase 1-4 tool registered in build_tool_registry.
-        assert_eq!(registry.count(), 22);
+        assert_eq!(registry.count(), 23);
         for name in [
             "read_file",
             "write_file",
@@ -1568,6 +1533,7 @@ mod tests {
             "parse_document",
             "task_manager",
             "session_context",
+            "save_memory",
             "http_request",
             "plan",
             "web_fetch",
