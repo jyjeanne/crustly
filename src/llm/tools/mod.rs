@@ -3,13 +3,16 @@
 //! Provides an abstraction for tools that can be called by LLM agents,
 //! including file operations, shell commands, and more.
 
+pub mod aliases;
 pub mod cache;
 pub mod error;
+pub mod file_read_cache;
 pub mod registry;
 pub mod sandbox;
 mod r#trait;
 
 // Tool implementations - Phase 1: Essential File Operations
+pub mod apply_patch;
 pub mod bash;
 pub mod edit;
 pub mod glob;
@@ -28,6 +31,7 @@ pub mod web_search;
 pub mod context;
 pub mod http;
 pub mod plan_tool;
+pub mod save_memory;
 pub mod task;
 
 // Tool implementations - Phase 4: Claw Code parity
@@ -40,5 +44,6 @@ pub mod web_fetch;
 
 // Re-exports
 pub use error::{Result, ToolError};
+pub use file_read_cache::{FileFingerprint, FileReadCache, ReadGate};
 pub use r#trait::{SubAgentLauncher, Tool, ToolCapability, ToolExecutionContext, ToolResult};
 pub use registry::ToolRegistry;

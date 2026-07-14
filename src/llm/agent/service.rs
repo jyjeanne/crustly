@@ -11,7 +11,7 @@ use crate::llm::provider::{
     ProviderStream, StopReason, StreamEvent, TokenUsage,
 };
 use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
-use crate::llm::tools::{ToolCapability, ToolExecutionContext, ToolRegistry};
+use crate::llm::tools::{FileReadCache, ToolCapability, ToolExecutionContext, ToolRegistry};
 use crate::services::{MessageService, ServiceContext, SessionService};
 use futures::future::join_all;
 use futures::StreamExt as _;
@@ -101,6 +101,14 @@ pub struct AgentService {
 
     /// Session-scoped tool result cache (T037)
     tool_cache: Arc<ToolResultCache>,
+
+    /// Session-scoped file-read cache backing "prior read" enforcement in
+    /// edit_file/write_file/apply_patch (see `file_read_cache` module
+    /// docs). One `AgentService` instance is one session (matches
+    /// `tool_cache`'s treatment above), so a plain shared field - rather
+    /// than a map keyed by session_id - is enough for reads to persist
+    /// across every `send_message*` call on this instance.
+    file_read_cache: Arc<FileReadCache>,
 
     /// SQLite pool for compaction writes (T032)
     pool: Option<Arc<sqlx::SqlitePool>>,
@@ -349,6 +357,7 @@ impl AgentService {
             working_directory: std::env::current_dir().unwrap_or_default(),
             model_router: None,
             tool_cache: Arc::new(ToolResultCache::new(ToolTtlConfig::default())),
+            file_read_cache: Arc::new(FileReadCache::new()),
             pool: None,
             allow_sub_agents: true,
         }
@@ -703,7 +712,8 @@ impl AgentService {
         let mut tool_context = ToolExecutionContext::new(session_id)
             .with_auto_approve(self.auto_approve_tools)
             .with_working_directory(self.working_directory.clone())
-            .with_read_only_mode(read_only_mode);
+            .with_read_only_mode(read_only_mode)
+            .with_file_read_cache(self.file_read_cache.clone());
         if self.allow_sub_agents {
             let launcher = Arc::new(AgentServiceLauncher::new(
                 self.provider.clone(),
@@ -1196,6 +1206,7 @@ impl AgentService {
                                     timeout_secs: tool_context.timeout_secs,
                                     read_only_mode: tool_context.read_only_mode,
                                     sub_agent_launcher: tool_context.sub_agent_launcher.clone(),
+                                    file_read_cache: tool_context.file_read_cache.clone(),
                                 };
 
                                 // Execute the tool with approved context

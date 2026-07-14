@@ -22,8 +22,13 @@ struct GrepInput {
     #[serde(default)]
     path: Option<String>,
 
-    /// Use regex instead of literal string
-    #[serde(default)]
+    /// Whether to treat `pattern` as a regex. Defaults to true - Claude
+    /// Code's and qwen-code's grep tools always treat pattern as a full
+    /// regex with no literal/regex toggle at all, so a model trained on
+    /// either never sends this field and expects regex semantics by
+    /// default. Set to false to search for `pattern` as a literal string
+    /// instead (regex metacharacters are escaped).
+    #[serde(default = "default_true")]
     regex: bool,
 
     /// Case insensitive search
@@ -38,8 +43,9 @@ struct GrepInput {
     #[serde(default)]
     context: Option<usize>,
 
-    /// File pattern to filter (e.g., "*.rs")
-    #[serde(default)]
+    /// File pattern to filter (e.g., "*.rs"). Accepts `glob` as an alias -
+    /// the field name sent by Claude Code's and qwen-code's grep tools.
+    #[serde(alias = "glob", default)]
     file_pattern: Option<String>,
 
     /// Maximum number of matches to return
@@ -58,7 +64,7 @@ impl Tool for GrepTool {
     }
 
     fn description(&self) -> &str {
-        "Search for patterns in file contents. Supports literal string or regex search with context lines."
+        "Search for patterns in file contents. Supports full regex syntax (e.g. \"log.*Error\", \"function\\s+\\w+\") with context lines. Set regex: false to search for pattern as a literal string instead."
     }
 
     fn input_schema(&self) -> Value {
@@ -67,7 +73,7 @@ impl Tool for GrepTool {
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "Pattern to search for (literal string or regex)"
+                    "description": "The regular expression pattern to search for in file contents"
                 },
                 "path": {
                     "type": "string",
@@ -75,8 +81,8 @@ impl Tool for GrepTool {
                 },
                 "regex": {
                     "type": "boolean",
-                    "description": "Treat pattern as regex instead of literal string",
-                    "default": false
+                    "description": "Whether to treat pattern as a regex. Defaults to true; set to false to search for pattern as a literal string instead.",
+                    "default": true
                 },
                 "case_insensitive": {
                     "type": "boolean",
@@ -95,7 +101,11 @@ impl Tool for GrepTool {
                 },
                 "file_pattern": {
                     "type": "string",
-                    "description": "File pattern to filter (e.g., '*.rs', '*.{js,ts}')"
+                    "description": "File pattern to filter (e.g., '*.rs', '*.{js,ts}'). Alias: glob."
+                },
+                "glob": {
+                    "type": "string",
+                    "description": "Alias of 'file_pattern'."
                 },
                 "limit": {
                     "type": "integer",
@@ -187,14 +197,15 @@ impl Tool for GrepTool {
             )
             .await?;
         } else {
-            self.search_directory(
-                &search_path,
-                &regex,
-                &input,
-                &mut matches,
-                &mut total_matches,
-            )
-            .await?;
+            for path in collect_searchable_files(&search_path).await? {
+                if let Some(limit) = input.limit {
+                    if matches.len() >= limit {
+                        break;
+                    }
+                }
+                self.search_file(&path, &regex, &input, &mut matches, &mut total_matches)
+                    .await?;
+            }
         }
 
         if matches.is_empty() {
@@ -299,44 +310,177 @@ impl GrepTool {
 
         Ok(())
     }
+}
 
-    fn search_directory<'a>(
-        &'a self,
-        dir: &'a PathBuf,
-        regex: &'a regex::Regex,
-        input: &'a GrepInput,
-        matches: &'a mut Vec<String>,
-        total_matches: &'a mut usize,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
-        Box::pin(async move {
-            let mut entries = fs::read_dir(dir).await.map_err(ToolError::Io)?;
+/// Enumerate every regular file under `dir`, respecting `.gitignore`,
+/// `.git/info/exclude`, and the global gitignore (matches ripgrep's - and
+/// therefore qwen-code's `grep_search` and Claude Code's `Grep` - default
+/// behavior). Hidden files/directories are skipped, matching the previous
+/// manual-walk behavior this replaces. Sorted for deterministic output.
+///
+/// The `ignore` crate's walker is synchronous (blocking I/O per step), so
+/// the walk itself runs on a blocking thread; only the per-file content
+/// search remains on the async path.
+async fn collect_searchable_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    let dir = dir.to_path_buf();
+    let mut files = tokio::task::spawn_blocking(move || {
+        ignore::WalkBuilder::new(&dir)
+            .hidden(true)
+            .build()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().is_some_and(|ft| ft.is_file()))
+            .map(|entry| entry.into_path())
+            .collect::<Vec<_>>()
+    })
+    .await
+    .map_err(|e| ToolError::Internal(format!("directory walk failed: {e}")))?;
 
-            while let Some(entry) = entries.next_entry().await.map_err(ToolError::Io)? {
-                let path = entry.path();
+    files.sort();
+    Ok(files)
+}
 
-                // Check limit
-                if let Some(limit) = input.limit {
-                    if matches.len() >= limit {
-                        return Ok(());
-                    }
-                }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use uuid::Uuid;
 
-                if path.is_file() {
-                    self.search_file(&path, regex, input, matches, total_matches)
-                        .await?;
-                } else if path.is_dir() {
-                    // Skip hidden directories
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        if name.starts_with('.') {
-                            continue;
-                        }
-                    }
-                    self.search_directory(&path, regex, input, matches, total_matches)
-                        .await?;
-                }
-            }
+    /// Regression: Claude Code's and qwen-code's grep tools send `glob`,
+    /// not `file_pattern`. A model trained on either must still be able to
+    /// filter by file pattern.
+    #[tokio::test]
+    async fn test_grep_accepts_glob_alias_for_file_pattern() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join("match.rs"), "needle here")
+            .await
+            .unwrap();
+        tokio::fs::write(temp_dir.path().join("match.txt"), "needle here")
+            .await
+            .unwrap();
 
-            Ok(())
-        })
+        let tool = GrepTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({
+            "pattern": "needle",
+            "glob": "*.rs"
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("match.rs"));
+        assert!(!result.output.contains("match.txt"));
+    }
+
+    /// Regression: Claude Code's and qwen-code's grep tools always treat
+    /// `pattern` as a regex - there's no literal/regex toggle in either -
+    /// so a model trained on either never sends `regex` and expects regex
+    /// semantics by default. Before this fix, an omitted `regex` field
+    /// defaulted to literal-string matching, so `.` in a pattern like
+    /// `fn.run` would only match a literal dot instead of "any character",
+    /// silently missing matches a Claude Code/qwen-code-trained model
+    /// expects to find.
+    #[tokio::test]
+    async fn test_pattern_is_regex_by_default() {
+        let temp_dir = TempDir::new().unwrap();
+        // "fn.run" as a regex matches this via `.` = "any character"; as a
+        // literal string it would not (no literal dot between fn and run).
+        tokio::fs::write(temp_dir.path().join("code.rs"), "fnXrun")
+            .await
+            .unwrap();
+
+        let tool = GrepTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        // No `regex` field at all - matches what a Claude Code/qwen-code-
+        // trained model actually sends.
+        let input = serde_json::json!({ "pattern": "fn.run" });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(
+            result.output.contains("code.rs"),
+            "expected regex '.' to match any character by default, got: {:?}",
+            result.output
+        );
+    }
+
+    /// `regex: false` must still work as an explicit opt-out into literal
+    /// string matching (regex metacharacters escaped).
+    #[tokio::test]
+    async fn test_regex_false_still_searches_literally() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join("code.rs"), "fnXrun\nfn.run")
+            .await
+            .unwrap();
+
+        let tool = GrepTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({ "pattern": "fn.run", "regex": false });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(
+            result.output.contains("fn.run"),
+            "literal '.' must match the literal dot"
+        );
+        assert!(
+            !result.output.contains("fnXrun"),
+            "with regex: false, '.' must not match an arbitrary character, got: {:?}",
+            result.output
+        );
+    }
+
+    /// Regression: an unbounded recursive search must not wade into
+    /// directories the project's own `.gitignore` excludes (build output,
+    /// vendored deps, etc.) - both ripgrep-backed grep_search (qwen-code)
+    /// and Claude Code's Grep respect `.gitignore` by default.
+    #[tokio::test]
+    async fn test_search_respects_gitignore() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join(".gitignore"), "ignored_dir/\n")
+            .await
+            .unwrap();
+        tokio::fs::create_dir(temp_dir.path().join("ignored_dir"))
+            .await
+            .unwrap();
+        tokio::fs::write(
+            temp_dir.path().join("ignored_dir/noise.txt"),
+            "needle in a haystack that should be ignored",
+        )
+        .await
+        .unwrap();
+        tokio::fs::write(
+            temp_dir.path().join("real.txt"),
+            "needle in a haystack that should be found",
+        )
+        .await
+        .unwrap();
+
+        // A gitignore-aware walker only activates inside an actual repo
+        // (or with a `.git` directory present) for some ignore-crate
+        // configurations; make this deterministic by giving it one.
+        tokio::fs::create_dir(temp_dir.path().join(".git"))
+            .await
+            .unwrap();
+
+        let tool = GrepTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({ "pattern": "needle", "regex": false });
+        let result = tool.execute(input, &context).await.unwrap();
+
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("real.txt"));
+        assert!(
+            !result.output.contains("ignored_dir"),
+            "gitignored directory must be skipped, got: {:?}",
+            result.output
+        );
     }
 }

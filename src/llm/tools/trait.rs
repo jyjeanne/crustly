@@ -1,6 +1,7 @@
 //! Tool trait definition
 
 use super::error::Result;
+use super::file_read_cache::FileReadCache;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -48,6 +49,18 @@ pub struct ToolExecutionContext {
     /// Optional spawner used by the Agent tool to launch sub-agent sessions.
     /// `None` in unit tests or when the caller has not wired up a launcher.
     pub sub_agent_launcher: Option<Arc<dyn SubAgentLauncher>>,
+
+    /// Session-scoped record of which files this session has read (or
+    /// written), backing "prior read" enforcement in `edit_file`,
+    /// `write_file`'s overwrite path, and `apply_patch`'s Update File
+    /// operation - see `file_read_cache` module docs.
+    ///
+    /// Defaults to a fresh, empty cache scoped to just this context - fine
+    /// for tests and other single-call usages. Real sessions should use
+    /// [`Self::with_file_read_cache`] to inject the same `Arc` across every
+    /// context built for that session, so a read recorded by one tool call
+    /// is visible to the next (see `AgentService`).
+    pub file_read_cache: Arc<FileReadCache>,
 }
 
 impl ToolExecutionContext {
@@ -61,6 +74,7 @@ impl ToolExecutionContext {
             timeout_secs: 30,
             read_only_mode: false,
             sub_agent_launcher: None,
+            file_read_cache: Arc::new(FileReadCache::new()),
         }
     }
 
@@ -91,6 +105,14 @@ impl ToolExecutionContext {
     /// Set the sub-agent launcher (for Agent tool)
     pub fn with_sub_agent_launcher(mut self, launcher: Arc<dyn SubAgentLauncher>) -> Self {
         self.sub_agent_launcher = Some(launcher);
+        self
+    }
+
+    /// Inject a session-scoped file-read cache, shared across every context
+    /// built for the same session, so reads persist across tool calls (and
+    /// across separate `send_message` turns) instead of resetting per call.
+    pub fn with_file_read_cache(mut self, cache: Arc<FileReadCache>) -> Self {
+        self.file_read_cache = cache;
         self
     }
 }

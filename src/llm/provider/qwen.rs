@@ -253,14 +253,33 @@ impl QwenProvider {
                 let tool_call_content = &remaining[start + 11..start + end];
                 let trimmed = tool_call_content.trim();
 
-                // Parse the JSON inside
-                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                    if let (Some(name), Some(arguments)) = (
+                // Parse the JSON inside. Failures are logged rather than
+                // silently dropped: without this, a malformed tool call
+                // vanishes with no trace, and the agent loop sees a model
+                // turn with no tool use and no explanation why.
+                match serde_json::from_str::<serde_json::Value>(trimmed) {
+                    Ok(parsed) => match (
                         parsed.get("name").and_then(|v| v.as_str()),
                         parsed.get("arguments"),
                     ) {
-                        let id = Self::generate_call_id();
-                        tool_calls.push((id, name.to_string(), arguments.clone()));
+                        (Some(name), Some(arguments)) => {
+                            let id = Self::generate_call_id();
+                            tool_calls.push((id, name.to_string(), arguments.clone()));
+                        }
+                        _ => {
+                            tracing::warn!(
+                                "Hermes <tool_call> block parsed as JSON but is missing \
+                                 'name' or 'arguments': {}",
+                                trimmed
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to parse Hermes <tool_call> block as JSON: {} (content: {})",
+                            e,
+                            trimmed
+                        );
                     }
                 }
 
@@ -947,7 +966,13 @@ impl QwenProvider {
                         if !hermes_calls.is_empty() {
                             has_tool_calls = true;
 
-                            // Remove tool_call tags from text for display
+                            // Remove tool_call tags from text for display. An
+                            // opening tag with no closing tag (e.g. the
+                            // response was cut off mid-argument by
+                            // max_tokens) has no valid span to remove up to,
+                            // so drop everything from the opening tag to the
+                            // end of the text instead of leaving the raw,
+                            // truncated JSON fragment visible to the user.
                             let mut clean_text = remaining.clone();
                             while let Some(start) = clean_text.find("<tool_call>") {
                                 if let Some(end) = clean_text.find("</tool_call>") {
@@ -957,6 +982,12 @@ impl QwenProvider {
                                         &clean_text[end + 12..]
                                     );
                                 } else {
+                                    tracing::warn!(
+                                        "Dropping truncated <tool_call> block with no closing \
+                                         tag (likely cut off by max_tokens): {}",
+                                        &clean_text[start..]
+                                    );
+                                    clean_text.truncate(start);
                                     break;
                                 }
                             }
@@ -2018,6 +2049,99 @@ mod tests {
         assert_eq!(calls.len(), 2);
         assert_eq!(calls[0].1, "read_file");
         assert_eq!(calls[1].1, "write_file");
+    }
+
+    /// Malformed JSON inside an otherwise well-formed `<tool_call>` pair must
+    /// not panic, and must not be mistaken for a valid call.
+    #[test]
+    fn test_hermes_malformed_json_is_skipped_without_panicking() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let text = r#"I'll read that file.
+<tool_call>
+{"name": "read_file", "arguments": {path: unquoted}}
+</tool_call>"#;
+
+        let calls = provider.parse_hermes_tool_calls(text);
+        assert!(calls.is_empty());
+    }
+
+    /// JSON that parses but is missing `name`/`arguments` must also be
+    /// skipped rather than crashing or fabricating a call.
+    #[test]
+    fn test_hermes_json_missing_required_fields_is_skipped() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let text = r#"<tool_call>
+{"foo": "bar"}
+</tool_call>"#;
+
+        let calls = provider.parse_hermes_tool_calls(text);
+        assert!(calls.is_empty());
+    }
+
+    /// Regression: a response cut off mid-argument by `max_tokens` (finish_reason
+    /// "length") leaves a `<tool_call>` opening tag with no closing tag. Before
+    /// this fix, `from_qwen_response` would leave that dangling, truncated JSON
+    /// fragment in the displayed text verbatim. An earlier, complete tool call in
+    /// the same response must still be parsed correctly, and the truncated
+    /// fragment must never reach the displayed text.
+    #[test]
+    fn test_from_qwen_response_drops_truncated_trailing_hermes_tag_from_display() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let content = "First I'll read the file.\n\
+             <tool_call>\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/main.rs\"}}\n</tool_call>\n\
+             Now let me write the result.\n\
+             <tool_call>\n{\"name\": \"write_file\", \"arguments\": {\"path\": \"out.txt\", \"content\": \"a very long argument that got cut off mid-stream because max_tokens was reached before the closing tag could be emitted";
+
+        let response = QwenResponse {
+            id: "qwen-truncated-test".to_string(),
+            model: "qwen3-8b".to_string(),
+            choices: vec![QwenChoice {
+                index: 0,
+                message: QwenMessage {
+                    role: "assistant".to_string(),
+                    content: Some(content.to_string()),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                finish_reason: Some("length".to_string()),
+            }],
+            usage: QwenUsage {
+                prompt_tokens: 5,
+                completion_tokens: 10,
+            },
+        };
+
+        let known_tools = vec!["read_file".to_string(), "write_file".to_string()];
+        let llm_response = provider.from_qwen_response(response, &known_tools);
+
+        // The earlier, complete tool call must still be recognized.
+        let names: Vec<String> = llm_response
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::ToolUse { name, .. } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(names, vec!["read_file"]);
+
+        // No raw tag markup or truncated JSON fragment may leak into the
+        // displayed text.
+        for block in &llm_response.content {
+            if let ContentBlock::Text { text } = block {
+                assert!(
+                    !text.contains("<tool_call>"),
+                    "truncated tool_call tag leaked into displayed text: {text:?}"
+                );
+                assert!(
+                    !text.contains("write_file"),
+                    "truncated tool call's raw JSON leaked into displayed text: {text:?}"
+                );
+            }
+        }
     }
 
     #[test]

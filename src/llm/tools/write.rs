@@ -3,6 +3,7 @@
 //! Allows writing content to files on the filesystem.
 
 use super::error::{validate_path_safety, Result, ToolError};
+use super::file_read_cache::{FileFingerprint, ReadGate};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,9 @@ pub struct WriteTool;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct WriteInput {
-    /// Path to the file to write
+    /// Path to the file to write. Accepts `file_path` as an alias - the
+    /// field name sent by Claude Code's and qwen-code's write tools.
+    #[serde(alias = "file_path")]
     path: String,
 
     /// Content to write to the file
@@ -33,7 +36,9 @@ impl Tool for WriteTool {
     }
 
     fn description(&self) -> &str {
-        "Write content to a file on the filesystem. Creates the file if it doesn't exist, overwrites if it does."
+        "Write content to a file on the filesystem. Creates the file if it doesn't exist. If it \
+         does exist, this overwrites it, and you must have read it with read_file at least once \
+         in this session first."
     }
 
     fn input_schema(&self) -> Value {
@@ -42,7 +47,11 @@ impl Tool for WriteTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to the file to write (absolute or relative to working directory)"
+                    "description": "Path to the file to write (absolute or relative to working directory). Alias: file_path."
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Alias of 'path'."
                 },
                 "content": {
                     "type": "string",
@@ -161,10 +170,45 @@ impl Tool for WriteTool {
             }
         }
 
+        // Prior-read enforcement (matches Claude Code's/qwen-code's write
+        // tools) only applies to overwriting an EXISTING file - there is
+        // nothing to have read before creating a brand-new one.
+        if let Ok(metadata_before) = fs::metadata(&path).await {
+            match context
+                .file_read_cache
+                .check(&path, FileFingerprint::of(&metadata_before))
+            {
+                ReadGate::NeverRead => {
+                    return Ok(ToolResult::error(format!(
+                        "'{}' already exists. You must read it with read_file before \
+                         overwriting it.",
+                        path.display()
+                    )));
+                }
+                ReadGate::Stale => {
+                    return Ok(ToolResult::error(format!(
+                        "'{}' has changed on disk since it was last read. Re-read it with \
+                         read_file before overwriting.",
+                        path.display()
+                    )));
+                }
+                ReadGate::Ok => {}
+            }
+        }
+
         // Write the file
         fs::write(&path, &input.content)
             .await
             .map_err(ToolError::Io)?;
+
+        // Seed the cache with the post-write fingerprint - for a new file
+        // this is the read cache's first record; for an overwrite it
+        // clears the way for a follow-up edit without an intervening
+        // re-read (the model authored these bytes).
+        let metadata_after = fs::metadata(&path).await.map_err(ToolError::Io)?;
+        context
+            .file_read_cache
+            .record(&path, FileFingerprint::of(&metadata_after));
 
         let message = format!(
             "Successfully wrote {} bytes to {}",
@@ -251,6 +295,31 @@ mod tests {
         assert!(result.error.is_some());
     }
 
+    /// Regression: Claude Code's and qwen-code's write tools send
+    /// `file_path`, not `path`. A model trained on either must still be
+    /// able to call this tool.
+    #[tokio::test]
+    async fn test_write_file_accepts_file_path_alias() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+
+        let tool = WriteTool;
+        let session_id = Uuid::new_v4();
+        let context = ToolExecutionContext::new(session_id)
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({
+            "file_path": "test.txt",
+            "content": "Hello via file_path"
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+
+        let contents = tokio::fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(contents, "Hello via file_path");
+    }
+
     #[test]
     fn test_write_tool_schema() {
         let tool = WriteTool;
@@ -277,16 +346,133 @@ mod tests {
         let context = ToolExecutionContext::new(session_id)
             .with_working_directory(temp_dir.path().to_path_buf());
 
+        // Overwriting an existing file requires having read it first.
+        let metadata = fs::metadata(&file_path).await.unwrap();
+        context
+            .file_read_cache
+            .record(&file_path, FileFingerprint::of(&metadata));
+
         let input = serde_json::json!({
             "path": "test.txt",
             "content": "New content"
         });
 
         let result = tool.execute(input, &context).await.unwrap();
-        assert!(result.success);
+        assert!(result.success, "{:?}", result.error);
 
         // Verify file was overwritten
         let contents = tokio::fs::read_to_string(&file_path).await.unwrap();
         assert_eq!(contents, "New content");
+    }
+
+    /// Regression: matches Claude Code's/qwen-code's write tools - a model
+    /// must not blindly overwrite a file it never read. Creating a brand
+    /// new file (the common case, and every other test in this module) is
+    /// unaffected - there's nothing to have read.
+    #[tokio::test]
+    async fn test_overwrite_rejects_a_file_never_read_this_session() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        tokio::fs::write(&file_path, "Initial content")
+            .await
+            .unwrap();
+
+        let tool = WriteTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({ "path": "test.txt", "content": "New content" });
+        let result = tool.execute(input, &context).await.unwrap();
+
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("must read"));
+        // Must not have touched the file.
+        assert_eq!(
+            tokio::fs::read_to_string(&file_path).await.unwrap(),
+            "Initial content"
+        );
+    }
+
+    /// A file that changed on disk after it was read must not be silently
+    /// clobbered with stale assumptions.
+    #[tokio::test]
+    async fn test_overwrite_rejects_a_file_changed_since_it_was_read() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        tokio::fs::write(&file_path, "Initial content")
+            .await
+            .unwrap();
+
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+        let metadata = fs::metadata(&file_path).await.unwrap();
+        context
+            .file_read_cache
+            .record(&file_path, FileFingerprint::of(&metadata));
+
+        // Changes on disk after the recorded read.
+        tokio::fs::write(&file_path, "Initial content, extended")
+            .await
+            .unwrap();
+
+        let tool = WriteTool;
+        let input = serde_json::json!({ "path": "test.txt", "content": "New content" });
+        let result = tool.execute(input, &context).await.unwrap();
+
+        assert!(!result.success);
+        assert!(result.error.unwrap().contains("changed on disk"));
+        assert_eq!(
+            tokio::fs::read_to_string(&file_path).await.unwrap(),
+            "Initial content, extended"
+        );
+    }
+
+    /// Writing a brand-new file needs no prior read - the model is
+    /// authoring the content, not reading existing bytes.
+    #[tokio::test]
+    async fn test_creating_a_new_file_needs_no_prior_read() {
+        let temp_dir = TempDir::new().unwrap();
+        let tool = WriteTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({ "path": "brand_new.txt", "content": "hello" });
+        let result = tool.execute(input, &context).await.unwrap();
+
+        assert!(result.success, "{:?}", result.error);
+    }
+
+    /// A write's own post-write record clears the gate for a follow-up
+    /// edit_file call in the same session, without an intervening re-read.
+    #[tokio::test]
+    async fn test_write_then_overwrite_does_not_require_a_re_read() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let tool = WriteTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let first = tool
+            .execute(
+                serde_json::json!({ "path": "test.txt", "content": "first" }),
+                &context,
+            )
+            .await
+            .unwrap();
+        assert!(first.success, "{:?}", first.error);
+
+        // No re-read in between.
+        let second = tool
+            .execute(
+                serde_json::json!({ "path": "test.txt", "content": "second" }),
+                &context,
+            )
+            .await
+            .unwrap();
+        assert!(second.success, "{:?}", second.error);
+        assert_eq!(
+            tokio::fs::read_to_string(&file_path).await.unwrap(),
+            "second"
+        );
     }
 }

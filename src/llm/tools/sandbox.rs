@@ -159,13 +159,19 @@ impl PathBoundaryRule {
                 ))
             }
         } else {
-            // Non-existent path (e.g. a file about to be written). Only the
-            // candidate can be normalized - there is nothing on disk to
-            // canonicalize - so the root may still carry a `\\?\` verbatim prefix
-            // while the candidate does not. Strip it from both sides before
-            // comparing, or an absolute path *inside* the root is rejected as an
-            // escape: `D:\proj\new.md` does not `starts_with` `\\?\D:\proj`.
-            let resolved = strip_verbatim_prefix(&normalize_path(candidate));
+            // Non-existent path (e.g. a file about to be written). Resolve
+            // symlinks in whatever prefix of it *does* exist - e.g. on
+            // macOS, TempDir's base is under `/var`, itself a symlink to
+            // `/private/var`. `self.root` was canonicalized by `check_path`
+            // (resolving that symlink) before reaching here, but a brand
+            // new file under it, left untouched, would not be - making an
+            // otherwise-valid path look like it escapes the (canonicalized)
+            // root. The root may still carry a `\\?\` verbatim prefix while
+            // the candidate does not (or vice versa after this resolution),
+            // so strip it from both sides before comparing, or an absolute
+            // path *inside* the root is rejected as an escape: `D:\proj\new.md`
+            // does not `starts_with` `\\?\D:\proj`.
+            let resolved = strip_verbatim_prefix(&resolve_existing_prefix(candidate));
             let root_normalized = strip_verbatim_prefix(&normalize_path(&self.root));
             if resolved.starts_with(&root_normalized) {
                 PolicyDecision::Allow
@@ -426,6 +432,44 @@ fn normalize_path(path: &Path) -> PathBuf {
     result
 }
 
+/// Resolve symlinks in the longest existing prefix of `path`, then append
+/// whatever trailing components don't exist yet, lexically normalized.
+///
+/// A path that doesn't fully exist can't be `canonicalize`d outright, but
+/// leaving it completely untouched breaks comparison against an
+/// already-canonicalized root the moment any *existing* ancestor of the
+/// path is itself a symlink - e.g. on macOS, where a temp directory lives
+/// under `/var`, a symlink to `/private/var`: `root.canonicalize()`
+/// resolves it, but a brand new file path under that same root, left as
+/// plain `/var/...`, no longer shares a prefix with the resolved
+/// `/private/var/...` root even though it's the same location.
+fn resolve_existing_prefix(path: &Path) -> PathBuf {
+    if path.exists() {
+        return std::fs::canonicalize(path).unwrap_or_else(|_| normalize_path(path));
+    }
+
+    let mut tail = Vec::new();
+    let mut current = path;
+    loop {
+        let (parent, name) = match (current.parent(), current.file_name()) {
+            (Some(parent), Some(name)) => (parent, name),
+            // Ran out of ancestors (reached a root component) without
+            // finding anything that exists - nothing to resolve.
+            _ => return normalize_path(path),
+        };
+        tail.push(name.to_os_string());
+        if parent.exists() {
+            let mut resolved =
+                std::fs::canonicalize(parent).unwrap_or_else(|_| normalize_path(parent));
+            for component in tail.into_iter().rev() {
+                resolved.push(component);
+            }
+            return resolved;
+        }
+        current = parent;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505,6 +549,39 @@ mod tests {
         assert!(
             check_path(outside.to_str().unwrap(), root).is_err(),
             "a non-existent path outside the root must still be denied",
+        );
+    }
+
+    /// Regression (macOS CI failure): reproduces the exact failure mode
+    /// with a real symlink, so it's caught on any platform rather than
+    /// only on macOS, where a temp directory's own base lives under
+    /// `/var`, itself a symlink to `/private/var`. `check_path`
+    /// canonicalizes the root (resolving the symlink), but a non-existent
+    /// candidate built from the unresolved symlinked root (exactly what
+    /// `TempDir::path()` returns on macOS) was previously left completely
+    /// untouched, so it no longer shared a prefix with the canonicalized
+    /// root and was wrongly denied as an escape.
+    #[cfg(unix)]
+    #[test]
+    fn absolute_path_to_nonexistent_file_through_a_symlinked_root_allowed() {
+        let real_dir = TempDir::new().unwrap();
+        let link_path = real_dir
+            .path()
+            .parent()
+            .unwrap()
+            .join(format!("symlink-root-{}", std::process::id()));
+        std::os::unix::fs::symlink(real_dir.path(), &link_path).unwrap();
+
+        // The caller passes the *symlinked* root, unresolved.
+        let new_file = link_path.join("new-file.md");
+        assert!(!new_file.exists());
+
+        let result = check_path(new_file.to_str().unwrap(), &link_path);
+        let _ = std::fs::remove_file(&link_path);
+        assert_eq!(
+            result,
+            Ok(()),
+            "a non-existent path under a symlinked root must be allowed"
         );
     }
 

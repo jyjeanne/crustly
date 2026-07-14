@@ -862,9 +862,12 @@ pub enum PlanModeState {
 impl PlanModeState {
     /// Returns true if the tool requires user approval in this state.
     pub fn tool_needs_approval(&self, tool_name: &str, _threshold: u8) -> bool {
-        let is_high_risk = matches!(tool_name, "bash" | "write_file" | "edit_file" | "code_exec");
         match self {
-            PlanModeState::AutoExecuting { .. } => is_high_risk,
+            // `is_high_risk_tool` is the single source of truth for this
+            // classification - duplicating its list here previously let the
+            // two drift (a tool added to one list silently stayed missing
+            // from the other).
+            PlanModeState::AutoExecuting { .. } => Self::is_high_risk_tool(tool_name),
             PlanModeState::Executing { .. } => true,
             _ => false,
         }
@@ -932,7 +935,10 @@ impl PlanModeState {
 
     /// Classify a tool call as high-risk for auto-run threshold checks.
     pub fn is_high_risk_tool(tool_name: &str) -> bool {
-        matches!(tool_name, "bash" | "write_file" | "edit_file" | "code_exec")
+        matches!(
+            tool_name,
+            "bash" | "write_file" | "edit_file" | "apply_patch" | "code_exec"
+        )
     }
 }
 

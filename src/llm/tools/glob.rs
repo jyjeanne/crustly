@@ -118,47 +118,40 @@ impl Tool for GlobTool {
             )));
         }
 
-        // Build full pattern with base directory
-        let full_pattern = base_dir.join(&input.pattern);
-        let pattern_str = full_pattern
-            .to_str()
-            .ok_or_else(|| ToolError::InvalidInput("Invalid path encoding".to_string()))?;
-
-        // Use glob crate to find matches
-        let glob_result = glob::glob(pattern_str)
+        let glob_pattern = glob::Pattern::new(&input.pattern)
             .map_err(|e| ToolError::InvalidInput(format!("Invalid glob pattern: {}", e)))?;
 
-        let mut matches: Vec<PathBuf> = Vec::new();
+        // Enumerate candidate files via a gitignore-aware walk (matches
+        // ripgrep's - and therefore qwen-code's `glob` and Claude Code's
+        // `Glob` - default behavior: `**/*.rs` should not wade into
+        // target/, node_modules/, etc.), then filter by the glob pattern
+        // relative to base_dir. The walk itself is blocking I/O, so it
+        // runs on a blocking thread; only directory traversal moves there,
+        // not the (cheap, in-memory) pattern matching below.
+        let dir_for_walk = base_dir.clone();
+        let include_hidden = input.include_hidden;
+        let candidates: Vec<PathBuf> = tokio::task::spawn_blocking(move || {
+            ignore::WalkBuilder::new(&dir_for_walk)
+                .hidden(!include_hidden)
+                .build()
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| entry.file_type().is_some_and(|ft| ft.is_file()))
+                .map(|entry| entry.into_path())
+                .collect::<Vec<_>>()
+        })
+        .await
+        .map_err(|e| ToolError::Internal(format!("directory walk failed: {e}")))?;
 
-        for entry in glob_result {
-            match entry {
-                Ok(path) => {
-                    // Filter hidden files if not requested
-                    if !input.include_hidden {
-                        if let Some(file_name) = path.file_name() {
-                            if file_name
-                                .to_str()
-                                .map(|s| s.starts_with('.'))
-                                .unwrap_or(false)
-                            {
-                                continue;
-                            }
-                        }
-                    }
+        let mut matches: Vec<PathBuf> = candidates
+            .into_iter()
+            .filter(|path| {
+                let rel = path.strip_prefix(&base_dir).unwrap_or(path);
+                glob_pattern.matches_path(rel)
+            })
+            .collect();
 
-                    matches.push(path);
-
-                    // Apply limit
-                    if let Some(limit) = input.limit {
-                        if matches.len() >= limit {
-                            break;
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!("Error reading glob entry: {}", e);
-                }
-            }
+        if let Some(limit) = input.limit {
+            matches.truncate(limit);
         }
 
         if matches.is_empty() {
@@ -195,5 +188,107 @@ impl Tool for GlobTool {
         }
 
         Ok(ToolResult::success(output))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    fn context(temp_dir: &TempDir) -> ToolExecutionContext {
+        ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf())
+    }
+
+    #[tokio::test]
+    async fn test_glob_matches_recursive_pattern() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::create_dir_all(temp_dir.path().join("src/nested"))
+            .await
+            .unwrap();
+        tokio::fs::write(temp_dir.path().join("src/a.rs"), "")
+            .await
+            .unwrap();
+        tokio::fs::write(temp_dir.path().join("src/nested/b.rs"), "")
+            .await
+            .unwrap();
+        tokio::fs::write(temp_dir.path().join("readme.md"), "")
+            .await
+            .unwrap();
+
+        let tool = GlobTool;
+        let input = serde_json::json!({ "pattern": "**/*.rs" });
+
+        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("a.rs"));
+        assert!(result.output.contains("b.rs"));
+        assert!(!result.output.contains("readme.md"));
+    }
+
+    /// Regression: an unbounded `**` glob must not wade into directories
+    /// the project's `.gitignore` excludes - both qwen-code's `glob` and
+    /// Claude Code's `Glob` are ripgrep-backed and respect `.gitignore` by
+    /// default.
+    #[tokio::test]
+    async fn test_glob_respects_gitignore() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join(".gitignore"), "target/\n")
+            .await
+            .unwrap();
+        tokio::fs::create_dir(temp_dir.path().join(".git"))
+            .await
+            .unwrap();
+        tokio::fs::create_dir_all(temp_dir.path().join("target/debug"))
+            .await
+            .unwrap();
+        tokio::fs::write(temp_dir.path().join("target/debug/build.rs"), "")
+            .await
+            .unwrap();
+        tokio::fs::write(temp_dir.path().join("src.rs"), "")
+            .await
+            .unwrap();
+
+        let tool = GlobTool;
+        let input = serde_json::json!({ "pattern": "**/*.rs" });
+
+        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("src.rs"));
+        assert!(
+            !result.output.contains("build.rs"),
+            "gitignored target/ must be skipped, got: {:?}",
+            result.output
+        );
+    }
+
+    #[tokio::test]
+    async fn test_glob_no_matches() {
+        let temp_dir = TempDir::new().unwrap();
+        let tool = GlobTool;
+        let input = serde_json::json!({ "pattern": "**/*.nonexistent" });
+
+        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        assert!(result.success);
+        assert!(result.output.contains("No files found"));
+    }
+
+    #[tokio::test]
+    async fn test_glob_respects_limit() {
+        let temp_dir = TempDir::new().unwrap();
+        for i in 0..5 {
+            tokio::fs::write(temp_dir.path().join(format!("f{i}.txt")), "")
+                .await
+                .unwrap();
+        }
+
+        let tool = GlobTool;
+        let input = serde_json::json!({ "pattern": "*.txt", "limit": 2 });
+
+        let result = tool.execute(input, &context(&temp_dir)).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("Found 2 files"));
     }
 }

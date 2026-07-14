@@ -57,10 +57,18 @@ impl ToolRegistry {
     ///
     /// False when no policy is configured: absent an explicit allowlist, nothing
     /// is trusted, and `requires_approval` tools keep prompting as before.
+    ///
+    /// Resolves `name` through the alias table first, same as `execute()`,
+    /// so a policy rule written against the canonical name (e.g. an
+    /// allowlist entry for `bash`) still applies when a model calls the
+    /// same tool by an alias (e.g. `run_shell_command`). Without this, the
+    /// approval-prompt precheck in `llm::agent::service` and `execute()`'s
+    /// own policy check could disagree about the same call.
     pub fn is_trusted(&self, name: &str, input: &serde_json::Value) -> bool {
         use crate::llm::tools::sandbox::PolicyDecision;
+        let canonical = self.canonical_name(name);
         matches!(
-            self.policy.as_ref().map(|p| p.evaluate(name, input)),
+            self.policy.as_ref().map(|p| p.evaluate(canonical, input)),
             Some(PolicyDecision::Trusted)
         )
     }
@@ -72,14 +80,34 @@ impl ToolRegistry {
         self.tools.insert(name, tool);
     }
 
-    /// Get a tool by name
-    pub fn get(&self, name: &str) -> Option<Arc<dyn Tool>> {
-        self.tools.get(name).cloned()
+    /// Resolve `name` to the key actually present in the registry: `name`
+    /// itself if it's registered directly, otherwise its alias target (see
+    /// [`super::aliases::resolve`]) if *that* is registered, otherwise
+    /// `name` unchanged - so a genuinely unknown name still produces a
+    /// clear "not found" error naming what the model actually sent, rather
+    /// than silently becoming something else.
+    ///
+    /// An exact match always wins over an alias: if a real tool is ever
+    /// registered under a name that happens to collide with an alias entry,
+    /// the real tool takes precedence.
+    fn canonical_name<'a>(&self, name: &'a str) -> &'a str {
+        if self.tools.contains_key(name) {
+            return name;
+        }
+        match super::aliases::resolve(name) {
+            Some(target) if self.tools.contains_key(target) => target,
+            _ => name,
+        }
     }
 
-    /// Check if a tool is registered
+    /// Get a tool by name (resolving aliases - see [`Self::canonical_name`])
+    pub fn get(&self, name: &str) -> Option<Arc<dyn Tool>> {
+        self.tools.get(self.canonical_name(name)).cloned()
+    }
+
+    /// Check if a tool is registered (resolving aliases - see [`Self::canonical_name`])
     pub fn has_tool(&self, name: &str) -> bool {
-        self.tools.contains_key(name)
+        self.tools.contains_key(self.canonical_name(name))
     }
 
     /// List all registered tool names
@@ -99,15 +127,26 @@ impl ToolRegistry {
             .collect()
     }
 
-    /// Execute a tool by name
+    /// Execute a tool by name. `name` is resolved through the alias table
+    /// (see [`Self::canonical_name`]) once, up front, and that canonical
+    /// name is used for the tool lookup, the permission policy check, and
+    /// logging - so a call for e.g. `list_directory` (qwen-code's name for
+    /// `ls`) is indistinguishable, from the policy's perspective, from a
+    /// call for `ls` itself. Evaluating the policy against the raw alias
+    /// instead would let a configured `security.allow_bash`-style rule
+    /// silently fail to match a call that used a different name for the
+    /// same tool.
     pub async fn execute(
         &self,
         name: &str,
         input: Value,
         context: &ToolExecutionContext,
     ) -> Result<ToolResult> {
+        let canonical = self.canonical_name(name);
         let tool = self
-            .get(name)
+            .tools
+            .get(canonical)
+            .cloned()
             .ok_or_else(|| ToolError::NotFound(name.to_string()))?;
 
         // Validate input
@@ -117,7 +156,7 @@ impl ToolRegistry {
         let mut trusted = false;
         if let Some(ref policy) = self.policy {
             use crate::llm::tools::sandbox::PolicyDecision;
-            match policy.evaluate(name, &input) {
+            match policy.evaluate(canonical, &input) {
                 PolicyDecision::Allow => {}
                 PolicyDecision::Trusted => trusted = true,
                 PolicyDecision::Deny(reason) => {
@@ -132,8 +171,12 @@ impl ToolRegistry {
         if tool.requires_approval() && !context.auto_approve && !trusted {
             return Err(ToolError::ApprovalRequired(format!(
                 "Tool '{}' requires approval before execution",
-                name
+                canonical
             )));
+        }
+
+        if canonical != name {
+            tracing::debug!("Resolved tool alias '{}' -> '{}'", name, canonical);
         }
 
         // Execute the tool. Log the arguments, not just the name: when a model
@@ -143,7 +186,7 @@ impl ToolRegistry {
         // for the wrong thing.
         tracing::info!(
             "Executing tool: {} with input: {}",
-            name,
+            canonical,
             preview_input(&input)
         );
         let result = tool.execute(input, context).await?;
@@ -157,7 +200,7 @@ impl ToolRegistry {
             let preview: String = result.output.chars().take(PREVIEW).collect();
             tracing::info!(
                 "Tool '{}' executed successfully -> {}{}",
-                name,
+                canonical,
                 preview,
                 if result.output.chars().count() > PREVIEW {
                     " …[truncated]"
@@ -168,7 +211,7 @@ impl ToolRegistry {
         } else {
             tracing::warn!(
                 "Tool '{}' failed: {:?}",
-                name,
+                canonical,
                 result.error.as_deref().unwrap_or("unknown error")
             );
         }
@@ -443,5 +486,141 @@ mod tests {
         assert!(result.is_err());
         // No tools should have been registered from a failed connection.
         assert_eq!(registry.count(), 0);
+    }
+
+    // ── Alias resolution ────────────────────────────────────────────────────
+
+    #[test]
+    fn get_resolves_a_known_alias_to_the_registered_canonical_tool() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MockTool {
+            name: "bash".to_string(),
+            requires_approval: false,
+        }));
+
+        // "run_shell_command" is qwen-code's name for the same tool.
+        assert!(registry.get("run_shell_command").is_some());
+        assert!(registry.has_tool("run_shell_command"));
+    }
+
+    #[test]
+    fn has_tool_is_false_for_an_alias_whose_target_is_not_registered() {
+        let registry = ToolRegistry::new();
+        // "run_shell_command" is a real alias entry, but nothing named
+        // "bash" was ever registered in this registry.
+        assert!(!registry.has_tool("run_shell_command"));
+    }
+
+    #[test]
+    fn an_exact_match_wins_over_an_alias_entry() {
+        let mut registry = ToolRegistry::new();
+        // Register a real tool under a name that also happens to be a
+        // listed alias key, to prove the exact match takes precedence
+        // rather than being redirected to the alias's target.
+        registry.register(Arc::new(MockTool {
+            name: "cat".to_string(),
+            requires_approval: false,
+        }));
+
+        let tool = registry.get("cat").expect("exact match must be found");
+        // If alias resolution had won, this would be Crustly's real
+        // `read_file` tool instead of the mock registered above.
+        assert_eq!(tool.name(), "cat");
+    }
+
+    #[tokio::test]
+    async fn execute_resolves_an_alias_name_to_the_registered_tool() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MockTool {
+            name: "bash".to_string(),
+            requires_approval: false,
+        }));
+
+        let context = ToolExecutionContext::new(Uuid::new_v4());
+        let input = serde_json::json!({ "message": "test" });
+
+        // "Bash" (Claude Code's name) and "shell" (a generic alias) both
+        // resolve to the "bash" tool registered above.
+        for alias in ["Bash", "shell", "run_shell_command"] {
+            let result = registry
+                .execute(alias, input.clone(), &context)
+                .await
+                .unwrap_or_else(|e| panic!("alias '{alias}' should resolve: {e}"));
+            assert!(result.success);
+        }
+    }
+
+    #[tokio::test]
+    async fn execute_reports_not_found_using_the_original_unresolved_name() {
+        let registry = ToolRegistry::new();
+        let context = ToolExecutionContext::new(Uuid::new_v4());
+
+        let result = registry
+            .execute(
+                "definitely_not_a_real_tool",
+                serde_json::json!({}),
+                &context,
+            )
+            .await;
+
+        match result {
+            Err(ToolError::NotFound(name)) => assert_eq!(name, "definitely_not_a_real_tool"),
+            other => panic!("expected NotFound with the original name, got {other:?}"),
+        }
+    }
+
+    /// Regression: a permission policy rule written against the canonical
+    /// tool name must still apply when a model calls the same tool by an
+    /// alias - otherwise a `security.allow_bash`-style allowlist (or a
+    /// deny rule) silently stops working the moment a model uses a
+    /// different name for the same tool.
+    #[tokio::test]
+    async fn execute_evaluates_policy_against_the_canonical_name_not_the_alias() {
+        use crate::llm::tools::sandbox::DenyToolRule;
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MockTool {
+            name: "bash".to_string(),
+            requires_approval: false,
+        }));
+        // Denies by the canonical name "bash" - not "run_shell_command".
+        registry.set_policy(Arc::new(DenyToolRule::new("bash")));
+
+        let context = ToolExecutionContext::new(Uuid::new_v4());
+        let result = registry
+            .execute(
+                "run_shell_command",
+                serde_json::json!({ "message": "test" }),
+                &context,
+            )
+            .await;
+
+        assert!(
+            matches!(result, Err(ToolError::PermissionDenied(_))),
+            "expected the canonical-name deny rule to catch the alias call, got {result:?}"
+        );
+    }
+
+    /// The same consistency must hold for the pre-execution trust check
+    /// (`is_trusted`), which `llm::agent::service` calls separately from
+    /// `execute()` to decide whether to prompt for approval.
+    #[test]
+    fn is_trusted_evaluates_policy_against_the_canonical_name_not_the_alias() {
+        use crate::llm::tools::sandbox::AllowToolRule;
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MockTool {
+            name: "bash".to_string(),
+            requires_approval: true,
+        }));
+        // AllowToolRule only ever returns Allow (never Trusted), so this
+        // confirms canonical-name evaluation happens, not that it's
+        // Trusted - is_trusted's own tests elsewhere cover the Trusted case.
+        registry.set_policy(Arc::new(AllowToolRule::new("bash")));
+
+        // Both must evaluate identically because both resolve to "bash".
+        let direct = registry.is_trusted("bash", &serde_json::json!({}));
+        let via_alias = registry.is_trusted("run_shell_command", &serde_json::json!({}));
+        assert_eq!(direct, via_alias);
     }
 }

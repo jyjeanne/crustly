@@ -24,7 +24,9 @@ pub struct ReadTool;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ReadInput {
-    /// Path to the file to read
+    /// Path to the file to read. Accepts `file_path` as an alias - the
+    /// field name sent by Claude Code's and qwen-code's read tools.
+    #[serde(alias = "file_path")]
     path: String,
 
     /// Optional: Start line (0-indexed)
@@ -52,7 +54,11 @@ impl Tool for ReadTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to the file to read (absolute or relative to working directory)"
+                    "description": "Path to the file to read (absolute or relative to working directory). Alias: file_path."
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Alias of 'path'."
                 },
                 "start_line": {
                     "type": "integer",
@@ -124,6 +130,16 @@ impl Tool for ReadTool {
                 let line_count = contents.lines().count();
                 (contents, line_count, None)
             };
+
+        // Record this read against the session's file-read cache. Any
+        // successful read - even a partial/paginated one - clears prior-read
+        // enforcement for edit_file/write_file/apply_patch, matching Claude
+        // Code's/qwen-code's stance that "has the model seen current bytes"
+        // is the bar, not "has it seen every byte" (see file_read_cache
+        // module docs).
+        context
+            .file_read_cache
+            .record(&path, crate::llm::tools::FileFingerprint::of(&metadata));
 
         let output_len = output.len();
         let mut result = ToolResult::success(output)
@@ -298,6 +314,31 @@ mod tests {
         assert!(!result.success);
         assert!(result.error.is_some());
         assert!(result.error.unwrap().contains("not found"));
+    }
+
+    /// Regression: Claude Code's and qwen-code's read tools send `file_path`,
+    /// not `path`. A model trained on either must still be able to call this
+    /// tool.
+    #[tokio::test]
+    async fn test_read_file_accepts_file_path_alias() {
+        let temp_dir = TempDir::new().unwrap();
+        let temp_file_path = temp_dir.path().join("test.txt");
+        let mut temp_file = std::fs::File::create(&temp_file_path).unwrap();
+        writeln!(temp_file, "aliased read").unwrap();
+        temp_file.flush().unwrap();
+
+        let tool = ReadTool;
+        let session_id = Uuid::new_v4();
+        let context = ToolExecutionContext::new(session_id)
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({
+            "file_path": temp_file_path.to_str().unwrap()
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("aliased read"));
     }
 
     #[test]
