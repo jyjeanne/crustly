@@ -13,7 +13,7 @@ Generated from `Cargo.toml` + `cargo metadata` by `scripts/generate-architecture
 ## Targets
 
 - **lib** (1): crustly
-- **bin** (2): crustly, migrate_plans
+- **bin** (1): crustly
 - **test** (11): cli_test, codebase_index_test, compaction_test, error_scenarios_test, integration_test, mcp_contract_test, model_routing_test, plan_autorun_test, plan_crash_recovery_test, plan_mode_integration_test, streaming_test
 - **bench** (2): database, parallel_tool_dispatch
 
