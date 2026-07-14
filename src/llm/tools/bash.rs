@@ -79,14 +79,44 @@ fn resolve_shell() -> (String, &'static str) {
 /// Bash execution tool
 pub struct BashTool;
 
+/// Maximum per-call timeout override, in milliseconds. Matches qwen-code's
+/// `run_shell_command` documented maximum (600000ms / 10 minutes), so a
+/// value copied from a qwen-code-trained model's tool call behaves the same
+/// way here rather than being silently capped to something else.
+const MAX_TIMEOUT_OVERRIDE_MS: u64 = 600_000;
+
 #[derive(Debug, Deserialize, Serialize)]
 struct BashInput {
     /// Command to execute
     command: String,
 
-    /// Optional working directory (overrides context)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional working directory (overrides context). Accepts `directory`
+    /// as an alias - the field name sent by qwen-code's `run_shell_command`
+    /// tool.
+    #[serde(alias = "directory", skip_serializing_if = "Option::is_none")]
     working_dir: Option<String>,
+
+    /// Optional per-call timeout override in milliseconds, matching
+    /// qwen-code's `run_shell_command` field of the same name. Overrides
+    /// `context.timeout_secs` when present; capped at
+    /// [`MAX_TIMEOUT_OVERRIDE_MS`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timeout: Option<u64>,
+
+    /// Optional human-readable description of the command, matching
+    /// qwen-code's `run_shell_command` field of the same name. Logged for
+    /// debuggability; has no effect on execution.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+
+    /// Matches qwen-code's `run_shell_command` field of the same name.
+    /// Crustly does not yet implement real background execution (that
+    /// needs a process registry this tool doesn't have) - when set, the
+    /// command still runs synchronously and the result says so, rather
+    /// than silently ignoring the model's intent and leaving a long-running
+    /// process (e.g. a dev server) to simply time out with no explanation.
+    #[serde(default)]
+    is_background: bool,
 }
 
 /// Check if a bash command is safe for read-only mode (Plan mode)
@@ -221,7 +251,23 @@ impl Tool for BashTool {
                 },
                 "working_dir": {
                     "type": "string",
-                    "description": "Optional: Working directory for command execution"
+                    "description": "Optional: Working directory for command execution. Alias: directory."
+                },
+                "directory": {
+                    "type": "string",
+                    "description": "Alias of 'working_dir'."
+                },
+                "timeout": {
+                    "type": "number",
+                    "description": "Optional timeout override in milliseconds (max 600000)."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional: Brief description of the command, for logging. Has no effect on execution."
+                },
+                "is_background": {
+                    "type": "boolean",
+                    "description": "Optional: intended for long-running background processes. Not yet supported - the command still runs synchronously and the result notes this."
                 }
             },
             "required": ["command"]
@@ -281,6 +327,18 @@ impl Tool for BashTool {
             )));
         }
 
+        if let Some(ref desc) = input.description {
+            tracing::debug!("bash: {}", desc);
+        }
+
+        // A per-call override (qwen-code's `run_shell_command` field) takes
+        // precedence over the context default, capped at
+        // MAX_TIMEOUT_OVERRIDE_MS the same way qwen-code documents.
+        let timeout_secs = input
+            .timeout
+            .map(|ms| ms.clamp(1000, MAX_TIMEOUT_OVERRIDE_MS) / 1000)
+            .unwrap_or(context.timeout_secs);
+
         // Pick the shell. This tool is advertised to the model as `bash`, and
         // models accordingly emit POSIX (`ls -la`, `grep -r`, pipelines). On
         // Windows those must not be handed to `cmd.exe`, which understands none
@@ -296,8 +354,7 @@ impl Tool for BashTool {
             .current_dir(&working_dir)
             .output();
 
-        let output = match timeout(Duration::from_secs(context.timeout_secs), command_future).await
-        {
+        let output = match timeout(Duration::from_secs(timeout_secs), command_future).await {
             Ok(Ok(output)) => output,
             Ok(Err(e)) => {
                 return Ok(ToolResult::error(format!(
@@ -306,7 +363,7 @@ impl Tool for BashTool {
                 )));
             }
             Err(_) => {
-                return Err(ToolError::Timeout(context.timeout_secs));
+                return Err(ToolError::Timeout(timeout_secs));
             }
         };
 
@@ -317,6 +374,14 @@ impl Tool for BashTool {
 
         // Build output message
         let mut result_text = String::new();
+
+        if input.is_background {
+            result_text.push_str(
+                "NOTE: is_background was requested, but Crustly does not yet support \
+                 background command execution - this command ran synchronously and \
+                 already completed (or timed out) before this result was returned.\n\n",
+            );
+        }
 
         if !stdout.is_empty() {
             result_text.push_str("STDOUT:\n");
@@ -503,6 +568,88 @@ mod tests {
         let capabilities = tool.capabilities();
         assert!(capabilities.contains(&ToolCapability::ExecuteShell));
         assert!(capabilities.contains(&ToolCapability::SystemModification));
+    }
+
+    /// Regression: qwen-code's `run_shell_command` sends `directory`, not
+    /// `working_dir`. A model trained on it must still be able to override
+    /// the working directory.
+    #[tokio::test]
+    async fn test_bash_accepts_directory_alias() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let canonical = temp.path().canonicalize().expect("canonicalize");
+
+        let context = ToolExecutionContext::new(Uuid::new_v4()).with_auto_approve(true);
+
+        let result = BashTool
+            .execute(
+                serde_json::json!({
+                    "command": "pwd",
+                    "directory": canonical.to_str().unwrap()
+                }),
+                &context,
+            )
+            .await
+            .expect("pwd runs");
+
+        assert!(result.success, "{:?}", result.error);
+        let leaf = canonical
+            .file_name()
+            .expect("temp dir has a name")
+            .to_string_lossy()
+            .into_owned();
+        assert!(
+            result.output.contains(&leaf),
+            "expected output to contain {:?}, got {:?}",
+            leaf,
+            result.output
+        );
+    }
+
+    /// A per-call `timeout` (milliseconds, qwen-code's field) overrides the
+    /// context default and is what actually triggers the timeout error.
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn test_bash_timeout_field_overrides_context_default() {
+        let tool = BashTool;
+        // Context default is generous; the per-call override should be what
+        // actually fires here.
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_auto_approve(true)
+            .with_timeout(60);
+
+        let input = serde_json::json!({
+            "command": "sleep 5",
+            "timeout": 1000
+        });
+
+        let result = tool.execute(input, &context).await;
+        assert!(result.is_err(), "expected timeout error, got: {:?}", result);
+        assert!(matches!(result.unwrap_err(), ToolError::Timeout(1)));
+    }
+
+    /// `is_background: true` must not be silently ignored - the result must
+    /// tell the model the command actually ran synchronously, since Crustly
+    /// has no background-execution support yet.
+    #[tokio::test]
+    async fn test_bash_is_background_notes_synchronous_fallback() {
+        let tool = BashTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4()).with_auto_approve(true);
+
+        let command = if cfg!(target_os = "windows") {
+            "echo Hello"
+        } else {
+            "echo 'Hello'"
+        };
+
+        let input = serde_json::json!({
+            "command": command,
+            "is_background": true
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success);
+        assert!(result.output.contains("does not yet support"));
+        assert!(result.output.contains("Hello"));
     }
 
     #[test]

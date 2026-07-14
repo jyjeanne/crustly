@@ -15,7 +15,9 @@ pub struct WriteTool;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct WriteInput {
-    /// Path to the file to write
+    /// Path to the file to write. Accepts `file_path` as an alias - the
+    /// field name sent by Claude Code's and qwen-code's write tools.
+    #[serde(alias = "file_path")]
     path: String,
 
     /// Content to write to the file
@@ -42,7 +44,11 @@ impl Tool for WriteTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to the file to write (absolute or relative to working directory)"
+                    "description": "Path to the file to write (absolute or relative to working directory). Alias: file_path."
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Alias of 'path'."
                 },
                 "content": {
                     "type": "string",
@@ -249,6 +255,31 @@ mod tests {
         let result = tool.execute(input, &context).await.unwrap();
         assert!(!result.success);
         assert!(result.error.is_some());
+    }
+
+    /// Regression: Claude Code's and qwen-code's write tools send
+    /// `file_path`, not `path`. A model trained on either must still be
+    /// able to call this tool.
+    #[tokio::test]
+    async fn test_write_file_accepts_file_path_alias() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+
+        let tool = WriteTool;
+        let session_id = Uuid::new_v4();
+        let context = ToolExecutionContext::new(session_id)
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({
+            "file_path": "test.txt",
+            "content": "Hello via file_path"
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+
+        let contents = tokio::fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(contents, "Hello via file_path");
     }
 
     #[test]
