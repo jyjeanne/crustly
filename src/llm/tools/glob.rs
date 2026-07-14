@@ -208,11 +208,15 @@ mod tests {
         tokio::fs::create_dir_all(temp_dir.path().join("src/nested"))
             .await
             .unwrap();
-        tokio::fs::write(temp_dir.path().join("src/a.rs"), "").await.unwrap();
+        tokio::fs::write(temp_dir.path().join("src/a.rs"), "")
+            .await
+            .unwrap();
         tokio::fs::write(temp_dir.path().join("src/nested/b.rs"), "")
             .await
             .unwrap();
-        tokio::fs::write(temp_dir.path().join("readme.md"), "").await.unwrap();
+        tokio::fs::write(temp_dir.path().join("readme.md"), "")
+            .await
+            .unwrap();
 
         let tool = GlobTool;
         let input = serde_json::json!({ "pattern": "**/*.rs" });
@@ -234,14 +238,18 @@ mod tests {
         tokio::fs::write(temp_dir.path().join(".gitignore"), "target/\n")
             .await
             .unwrap();
-        tokio::fs::create_dir(temp_dir.path().join(".git")).await.unwrap();
+        tokio::fs::create_dir(temp_dir.path().join(".git"))
+            .await
+            .unwrap();
         tokio::fs::create_dir_all(temp_dir.path().join("target/debug"))
             .await
             .unwrap();
         tokio::fs::write(temp_dir.path().join("target/debug/build.rs"), "")
             .await
             .unwrap();
-        tokio::fs::write(temp_dir.path().join("src.rs"), "").await.unwrap();
+        tokio::fs::write(temp_dir.path().join("src.rs"), "")
+            .await
+            .unwrap();
 
         let tool = GlobTool;
         let input = serde_json::json!({ "pattern": "**/*.rs" });

@@ -459,10 +459,7 @@ mod tests {
             .await
             .unwrap();
         assert!(result.success, "{:?}", result.error);
-        assert_eq!(
-            fs::read_to_string(&file_path).await.unwrap(),
-            "hello there"
-        );
+        assert_eq!(fs::read_to_string(&file_path).await.unwrap(), "hello there");
     }
 
     /// Regression: Claude Code's and qwen-code's edit tools send
@@ -488,10 +485,7 @@ mod tests {
             .await
             .unwrap();
         assert!(result.success, "{:?}", result.error);
-        assert_eq!(
-            fs::read_to_string(&file_path).await.unwrap(),
-            "hello there"
-        );
+        assert_eq!(fs::read_to_string(&file_path).await.unwrap(), "hello there");
     }
 
     /// Regression: a non-unique `old_string` with `replace_all` unset (or
@@ -661,7 +655,9 @@ mod tests {
         let ctx = seeded_context(&temp_dir, "test.txt").await;
 
         // The file changes on disk after the recorded read.
-        fs::write(&file_path, "hello world, extended").await.unwrap();
+        fs::write(&file_path, "hello world, extended")
+            .await
+            .unwrap();
 
         let tool = EditTool;
         let input = serde_json::json!({
@@ -708,10 +704,7 @@ mod tests {
             .await
             .unwrap();
         assert!(edit_result.success, "{:?}", edit_result.error);
-        assert_eq!(
-            fs::read_to_string(&file_path).await.unwrap(),
-            "hello there"
-        );
+        assert_eq!(fs::read_to_string(&file_path).await.unwrap(), "hello there");
     }
 
     /// A second edit in the same session, on the same file, must not need

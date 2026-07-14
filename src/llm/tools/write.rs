@@ -399,7 +399,9 @@ mod tests {
     async fn test_overwrite_rejects_a_file_changed_since_it_was_read() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.txt");
-        tokio::fs::write(&file_path, "Initial content").await.unwrap();
+        tokio::fs::write(&file_path, "Initial content")
+            .await
+            .unwrap();
 
         let context = ToolExecutionContext::new(Uuid::new_v4())
             .with_working_directory(temp_dir.path().to_path_buf());

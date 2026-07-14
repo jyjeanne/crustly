@@ -44,7 +44,6 @@ pub const TOOL_ALIASES: &[(&str, &str)] = &[
     ("search_file_content", "grep"), // qwen-code's legacy pre-rename name
     ("edit", "edit_file"), // also Claude Code's name for the same tool (case-insensitive match covers `Edit` too)
     ("run_shell_command", "bash"),
-
     // Claude Code's documented/observed tool names. Crustly's own file/
     // search/shell tools were deliberately modeled on these (see
     // CLAUDE.md's "Claw Code parity" phase), so shape already matches.
@@ -59,7 +58,6 @@ pub const TOOL_ALIASES: &[(&str, &str)] = &[
     ("TodoWrite", "todo_write"),
     ("NotebookEdit", "notebook_edit"),
     ("Task", "agent"), // Claude Code's subagent-launch tool; same description/prompt/subagent_type shape as Crustly's `agent`.
-
     // Generic names models commonly reach for regardless of training
     // source, for single-argument tools where a shape mismatch isn't a
     // real risk.

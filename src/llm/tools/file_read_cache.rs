@@ -106,10 +106,7 @@ mod tests {
     #[test]
     fn never_read_path_is_rejected() {
         let cache = FileReadCache::new();
-        assert_eq!(
-            cache.check(Path::new("a.txt"), fp(1)),
-            ReadGate::NeverRead
-        );
+        assert_eq!(cache.check(Path::new("a.txt"), fp(1)), ReadGate::NeverRead);
     }
 
     #[test]
@@ -130,10 +127,7 @@ mod tests {
     fn distinct_paths_are_tracked_independently() {
         let cache = FileReadCache::new();
         cache.record(Path::new("a.txt"), fp(10));
-        assert_eq!(
-            cache.check(Path::new("b.txt"), fp(10)),
-            ReadGate::NeverRead
-        );
+        assert_eq!(cache.check(Path::new("b.txt"), fp(10)), ReadGate::NeverRead);
     }
 
     #[test]

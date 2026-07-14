@@ -556,7 +556,11 @@ mod tests {
         let context = ToolExecutionContext::new(Uuid::new_v4());
 
         let result = registry
-            .execute("definitely_not_a_real_tool", serde_json::json!({}), &context)
+            .execute(
+                "definitely_not_a_real_tool",
+                serde_json::json!({}),
+                &context,
+            )
             .await;
 
         match result {

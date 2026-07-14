@@ -164,7 +164,9 @@ fn parse_patch(text: &str) -> std::result::Result<Vec<FileOp>, String> {
                 }
                 i += 1;
                 let mut hunk = Hunk::default();
-                while i < lines.len() && !lines[i].starts_with("@@") && !lines[i].starts_with("*** ")
+                while i < lines.len()
+                    && !lines[i].starts_with("@@")
+                    && !lines[i].starts_with("*** ")
                 {
                     let l = lines[i];
                     if let Some(rest) = l.strip_prefix('+') {
@@ -367,9 +369,7 @@ impl Tool for ApplyPatchTool {
                     }
                     let full = match validate_path_safety(path, &context.working_directory) {
                         Ok(p) => p,
-                        Err(e) => {
-                            return Ok(ToolResult::error(format!("Add File '{path}': {e}")))
-                        }
+                        Err(e) => return Ok(ToolResult::error(format!("Add File '{path}': {e}"))),
                     };
                     if full.exists() {
                         return Ok(ToolResult::error(format!(
@@ -810,8 +810,10 @@ mod tests {
         let metadata = fs::metadata(temp_dir.path().join("second.txt"))
             .await
             .unwrap();
-        ctx.file_read_cache
-            .record(&temp_dir.path().join("second.txt"), FileFingerprint::of(&metadata));
+        ctx.file_read_cache.record(
+            &temp_dir.path().join("second.txt"),
+            FileFingerprint::of(&metadata),
+        );
 
         let result = tool.execute(input, &ctx).await.unwrap();
         assert!(!result.success);

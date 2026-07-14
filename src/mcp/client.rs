@@ -267,7 +267,10 @@ mod mcp_tool_naming_tests {
     #[test]
     fn namespaced_tool_name_contains_no_colons() {
         let name = namespaced_tool_name("github", "get_me");
-        assert!(!name.contains(':'), "tool name must not contain ':': {name}");
+        assert!(
+            !name.contains(':'),
+            "tool name must not contain ':': {name}"
+        );
     }
 
     /// Must match the `mcp__{server}__{tool}` convention used by Claude

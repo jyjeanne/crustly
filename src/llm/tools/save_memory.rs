@@ -137,7 +137,9 @@ impl Tool for SaveMemoryTool {
 
         let (new_content, added) = append_fact(&existing, fact);
         if added {
-            fs::write(&path, &new_content).await.map_err(ToolError::Io)?;
+            fs::write(&path, &new_content)
+                .await
+                .map_err(ToolError::Io)?;
         }
 
         let message = if added {
@@ -274,9 +276,7 @@ mod tests {
         let mut ctx = context(&temp_dir);
         ctx.read_only_mode = true;
 
-        let result = tool
-            .execute(serde_json::json!({ "fact": "x" }), &ctx)
-            .await;
+        let result = tool.execute(serde_json::json!({ "fact": "x" }), &ctx).await;
         assert!(matches!(result, Err(ToolError::PermissionDenied(_))));
     }
 
