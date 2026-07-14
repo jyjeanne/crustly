@@ -159,9 +159,14 @@ impl PathBoundaryRule {
                 ))
             }
         } else {
-            // Non-existent path: normalize both sides (no canonicalize → no UNC prefix issues).
-            let resolved = normalize_path(candidate);
-            let root_normalized = normalize_path(&self.root);
+            // Non-existent path (e.g. a file about to be written). Only the
+            // candidate can be normalized - there is nothing on disk to
+            // canonicalize - so the root may still carry a `\\?\` verbatim prefix
+            // while the candidate does not. Strip it from both sides before
+            // comparing, or an absolute path *inside* the root is rejected as an
+            // escape: `D:\proj\new.md` does not `starts_with` `\\?\D:\proj`.
+            let resolved = strip_verbatim_prefix(&normalize_path(candidate));
+            let root_normalized = strip_verbatim_prefix(&normalize_path(&self.root));
             if resolved.starts_with(&root_normalized) {
                 PolicyDecision::Allow
             } else {
@@ -173,6 +178,43 @@ impl PathBoundaryRule {
             }
         }
     }
+}
+
+/// Strip Windows' `\\?\` verbatim prefix, so a canonicalized path and a plain one
+/// can be compared component-wise.
+///
+/// `Path::canonicalize` returns verbatim paths on Windows (`\\?\D:\proj`) while a
+/// path the model supplies is plain (`D:\proj\file`). Comparing the two directly
+/// with `starts_with` always fails, since the verbatim prefix is a distinct leading
+/// component. On non-Windows this is the identity.
+fn strip_verbatim_prefix(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+
+        if let Some(Component::Prefix(p)) = path.components().next() {
+            match p.kind() {
+                // \\?\D:\... → D:\...
+                Prefix::VerbatimDisk(letter) => {
+                    let rest: PathBuf = path.components().skip(1).collect();
+                    let mut out = PathBuf::from(format!("{}:", letter as char));
+                    out.push(&rest);
+                    return out;
+                }
+                // \\?\UNC\server\share\... → \\server\share\...
+                Prefix::VerbatimUNC(server, share) => {
+                    let rest: PathBuf = path.components().skip(1).collect();
+                    let mut out = PathBuf::from(r"\\");
+                    out.push(server);
+                    out.push(share);
+                    out.push(&rest);
+                    return out;
+                }
+                _ => {}
+            }
+        }
+    }
+    path.to_path_buf()
 }
 
 impl PermissionPolicy for PathBoundaryRule {
@@ -401,6 +443,69 @@ mod tests {
         let rule = PathBoundaryRule { root };
         let d = rule.evaluate("read_file", &serde_json::json!({ "path": "/etc/passwd" }));
         assert!(matches!(d, PolicyDecision::Deny(_)));
+    }
+
+    /// Regression: an absolute path to a file that does not exist *yet*, inside the
+    /// root, was denied as an escape.
+    ///
+    /// `canonicalize` yields a verbatim path on Windows (`\\?\D:\proj`), but a
+    /// non-existent candidate cannot be canonicalized, so it stays plain
+    /// (`D:\proj\new.md`). `starts_with` then compares a plain path against a
+    /// verbatim one and fails. Every existing test used paths that exist, which take
+    /// the canonicalize-both-sides branch and so never hit this.
+    ///
+    /// The visible symptom was write_file/read_file refusing perfectly ordinary
+    /// paths inside the workspace with "escapes project boundary".
+    /// These go through `check_path`, the entry point the tools actually call. That
+    /// matters: `check_path` canonicalizes the root itself (yielding `\\?\D:\...` on
+    /// Windows) while the candidate arrives from the model as a plain string. Tests
+    /// that construct `PathBoundaryRule` directly from an already-canonical root
+    /// derive the candidate from it too, so both sides carry the prefix and the bug
+    /// is invisible - which is exactly why this went unnoticed.
+    #[test]
+    fn absolute_path_to_nonexistent_file_inside_root_allowed() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path(); // plain, un-canonicalized - as the caller supplies it
+        let new_file = root.join("does-not-exist-yet.md");
+        assert!(!new_file.exists(), "test requires a non-existent path");
+
+        assert_eq!(
+            check_path(new_file.to_str().unwrap(), root),
+            Ok(()),
+            "an absolute path inside the root must be allowed even when the file \
+             does not exist yet",
+        );
+    }
+
+    /// The exact shape that failed in the wild: `<root>\.crustly\crustly.md`, absent.
+    #[test]
+    fn absolute_path_to_nonexistent_file_in_subdir_allowed() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let subdir = root.join(".crustly");
+        std::fs::create_dir_all(&subdir).unwrap();
+        let new_file = subdir.join("crustly.md");
+        assert!(!new_file.exists());
+
+        assert_eq!(check_path(new_file.to_str().unwrap(), root), Ok(()));
+    }
+
+    /// The prefix fix must not weaken the boundary: a non-existent path *outside*
+    /// the root is still an escape.
+    #[test]
+    fn absolute_path_to_nonexistent_file_outside_root_still_denied() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let outside = root
+            .parent()
+            .unwrap()
+            .join("elsewhere-does-not-exist")
+            .join("secret.md");
+
+        assert!(
+            check_path(outside.to_str().unwrap(), root).is_err(),
+            "a non-existent path outside the root must still be denied",
+        );
     }
 
     #[test]
