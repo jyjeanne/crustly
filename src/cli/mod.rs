@@ -1543,4 +1543,65 @@ mod tests {
             other => panic!("expected Ollama Pull command, got {other:?}"),
         }
     }
+
+    #[test]
+    fn build_tool_registry_registers_every_built_in_tool() {
+        let registry = build_tool_registry();
+
+        // One entry per Phase 1-4 tool registered in build_tool_registry.
+        assert_eq!(registry.count(), 21);
+        for name in [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "bash",
+            "ls",
+            "glob",
+            "grep",
+            "web_search",
+            "execute_code",
+            "notebook_edit",
+            "parse_document",
+            "task_manager",
+            "session_context",
+            "http_request",
+            "plan",
+            "web_fetch",
+            "todo_write",
+            "ask_user",
+            "skill",
+            "agent",
+            "powershell",
+        ] {
+            assert!(registry.has_tool(name), "missing tool: {name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn connect_configured_mcp_servers_returns_empty_status_with_no_servers() {
+        let config = crate::config::Config::default();
+        let mut registry = build_tool_registry();
+
+        let status = connect_configured_mcp_servers(&mut registry, &config).await;
+
+        assert!(status.is_empty());
+    }
+
+    #[tokio::test]
+    async fn connect_configured_mcp_servers_records_failure_for_unreachable_server() {
+        let mut config = crate::config::Config::default();
+        config.mcp.servers.push(crate::config::McpServerConfig {
+            name: "broken".to_string(),
+            command: "definitely-not-a-real-binary".to_string(),
+            args: vec![],
+        });
+        let mut registry = build_tool_registry();
+
+        let status = connect_configured_mcp_servers(&mut registry, &config).await;
+
+        assert_eq!(status.len(), 1);
+        assert_eq!(status[0].name, "broken");
+        assert!(!status[0].connected);
+        assert!(status[0].error.is_some());
+    }
 }

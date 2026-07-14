@@ -2234,4 +2234,227 @@ mod tests {
         assert!(screen.contains("1065ms"));
         assert!(screen.contains("43 tok/s"));
     }
+
+    #[tokio::test]
+    async fn help_screen_lists_commands_from_every_section() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Help;
+
+        let screen = render_to_string(&app, 100, 100);
+        // GLOBAL COMMANDS
+        assert!(screen.contains("Ctrl+C"));
+        assert!(screen.contains("Quit application"));
+        // CHAT MODE (non-kitty terminal falls back to Alt+Enter)
+        assert!(screen.contains("Alt+Enter"));
+        assert!(screen.contains("New line in message"));
+        // SESSION LIST
+        assert!(screen.contains("Navigate through sessions"));
+        // PLAN MODE
+        assert!(screen.contains("Approve plan and start execution"));
+        // FEATURES
+        assert!(screen.contains("Syntax Highlighting"));
+        // Footer
+        assert!(screen.contains("to return to chat"));
+    }
+
+    #[tokio::test]
+    async fn help_screen_shows_shift_enter_when_kitty_protocol_active() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Help;
+        app.kitty_keyboard_protocol_active = true;
+
+        let screen = render_to_string(&app, 100, 100);
+        assert!(screen.contains("Shift+Enter"));
+    }
+
+    #[tokio::test]
+    async fn chat_shows_pending_plan_banner_only_while_awaiting_approval() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        let mut plan = crate::plan::PlanDocument::new(
+            uuid::Uuid::new_v4(),
+            "Add login page".to_string(),
+            "".to_string(),
+        );
+        plan.status = crate::plan::PlanStatus::PendingApproval;
+        app.current_plan = Some(plan);
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Plan Pending Approval"));
+
+        app.current_plan.as_mut().unwrap().status = crate::plan::PlanStatus::Approved;
+        let screen = render_to_string(&app, 100, 20);
+        assert!(!screen.contains("Plan Pending Approval"));
+    }
+
+    #[tokio::test]
+    async fn chat_message_thinking_block_toggles_between_collapsed_and_expanded() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.messages.push(DisplayMessage {
+            id: uuid::Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "answer".to_string(),
+            thinking_text: Some("step one\nstep two".to_string()),
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("press t to expand"));
+        assert!(!screen.contains("step one"));
+
+        app.messages[0].thinking_expanded = true;
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("press t to collapse"));
+        assert!(screen.contains("step one"));
+        assert!(screen.contains("step two"));
+    }
+
+    #[tokio::test]
+    async fn chat_message_perf_footer_reports_cold_and_warm_starts() {
+        use crate::llm::provider::PerfMetrics;
+
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.messages.push(DisplayMessage {
+            id: uuid::Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "hi".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: Some(PerfMetrics {
+                load_duration_ms: Some(250),
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: Some(500),
+                total_duration_ms: None,
+                model_was_loaded: Some(false),
+            }),
+            tokens_per_second: Some(12.0),
+        });
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("500ms generation"));
+        assert!(screen.contains("12 tok/s"));
+        assert!(screen.contains("cold start (model loaded in 250ms)"));
+    }
+
+    #[tokio::test]
+    async fn chat_shows_streaming_response_and_processing_indicator() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.is_processing = true;
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("is thinking..."));
+
+        app.streaming_response = Some("partial reply".to_string());
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("[streaming]"));
+        assert!(screen.contains("partial reply"));
+        // The spinner only shows up before the first token arrives.
+        assert!(!screen.contains("is thinking..."));
+    }
+
+    #[tokio::test]
+    async fn plan_mode_shows_full_document_with_tasks_and_criteria() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Plan;
+
+        let mut plan = crate::plan::PlanDocument::new(
+            uuid::Uuid::new_v4(),
+            "Add login page".to_string(),
+            "Build a login form".to_string(),
+        );
+        plan.technical_stack = vec!["React".to_string()];
+        plan.test_strategy = "Unit test the form validation".to_string();
+
+        let mut task = crate::plan::PlanTask::new(
+            0,
+            "Create Login component".to_string(),
+            "".to_string(),
+            crate::plan::TaskType::Create,
+        );
+        task.acceptance_criteria = vec!["Renders email and password fields".to_string()];
+        plan.tasks.push(task);
+
+        app.current_plan = Some(plan);
+
+        let screen = render_to_string(&app, 100, 40);
+        assert!(screen.contains("Add login page"));
+        assert!(screen.contains("Build a login form"));
+        assert!(screen.contains("React"));
+        assert!(screen.contains("Unit test the form validation"));
+        assert!(screen.contains("Create Login component"));
+        assert!(screen.contains("Renders email and password fields"));
+        assert!(screen.contains("Approve"));
+    }
+
+    #[tokio::test]
+    async fn plan_mode_shows_empty_state_without_a_plan() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Plan;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("No active plan"));
+    }
+
+    fn test_approval_request(
+        tool_input: serde_json::Value,
+        capabilities: Vec<String>,
+    ) -> crate::tui::events::ToolApprovalRequest {
+        let (response_tx, _response_rx) = tokio::sync::mpsc::unbounded_channel();
+        crate::tui::events::ToolApprovalRequest {
+            request_id: uuid::Uuid::new_v4(),
+            tool_name: "write_file".to_string(),
+            tool_description: "Writes contents to a file".to_string(),
+            tool_input,
+            capabilities,
+            response_tx,
+            requested_at: std::time::Instant::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn approval_dialog_shows_tool_name_capabilities_and_summarized_params() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ToolApproval;
+        app.pending_approval = Some(test_approval_request(
+            serde_json::json!({"path": "src/main.rs", "content": "fn main() {}"}),
+            vec!["filesystem-write".to_string()],
+        ));
+
+        let screen = render_to_string(&app, 100, 30);
+        assert!(screen.contains("write_file"));
+        assert!(screen.contains("Writes contents to a file"));
+        assert!(screen.contains("filesystem-write"));
+        assert!(screen.contains("Parameters"));
+        assert!(screen.contains("path"));
+        // Compact view never shows the raw JSON block.
+        assert!(!screen.contains("Tool Input (JSON)"));
+    }
+
+    #[tokio::test]
+    async fn approval_dialog_details_view_shows_pretty_printed_json() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ToolApproval;
+        app.show_approval_details = true;
+        app.pending_approval = Some(test_approval_request(
+            serde_json::json!({"path": "src/main.rs"}),
+            vec![],
+        ));
+
+        let screen = render_to_string(&app, 100, 30);
+        assert!(screen.contains("Tool Input (JSON)"));
+        assert!(screen.contains("\"path\""));
+    }
 }
