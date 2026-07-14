@@ -460,7 +460,7 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
                 .border_style(Style::default().fg(Color::Cyan)),
         )
         .wrap(Wrap { trim: false })
-        .scroll((actual_scroll_offset as u16, 0));
+        .scroll((actual_scroll_offset, 0));
 
     f.render_widget(chat, area);
 }
