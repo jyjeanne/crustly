@@ -22,194 +22,213 @@ pub fn parse_plain_text(text: &str) -> Vec<Line<'static>> {
         .collect()
 }
 
-/// Parse markdown and convert to styled lines for Ratatui
-pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
-    let parser = Parser::new(markdown);
-    let mut lines = Vec::new();
-    let mut current_line = Vec::new();
-    let mut in_code_block = false;
-    let mut code_language = String::new();
-    let mut code_content = String::new();
-    let mut list_level: u32 = 0;
-    let mut heading_level = 1;
+/// One-pass converter from `pulldown_cmark` events to styled Ratatui lines.
+/// The fields are the accumulator state a single pass of the parser needs to
+/// carry between events (the in-progress line, whether we're inside a code
+/// block, the current heading/list nesting, etc.) - kept together as a
+/// struct rather than threaded through free functions as separate `&mut`
+/// parameters.
+struct MarkdownRenderer {
+    lines: Vec<Line<'static>>,
+    current_line: Vec<Span<'static>>,
+    in_code_block: bool,
+    code_language: String,
+    code_content: String,
+    list_level: u32,
+    heading_level: u32,
+}
 
-    for event in parser {
-        match event {
-            Event::Start(tag) => match tag {
-                Tag::Heading(level, ..) => {
-                    heading_level = level as u32;
-                }
-                Tag::CodeBlock(kind) => {
-                    in_code_block = true;
-                    code_language = match kind {
-                        CodeBlockKind::Fenced(lang) => lang.to_string(),
-                        CodeBlockKind::Indented => String::new(),
-                    };
+impl MarkdownRenderer {
+    fn new() -> Self {
+        Self {
+            lines: Vec::new(),
+            current_line: Vec::new(),
+            in_code_block: false,
+            code_language: String::new(),
+            code_content: String::new(),
+            list_level: 0,
+            heading_level: 1,
+        }
+    }
 
-                    // Add code block header if language is specified
-                    if !code_language.is_empty() {
-                        if !current_line.is_empty() {
-                            lines.push(Line::from(std::mem::take(&mut current_line)));
-                        }
-                        lines.push(Line::from(vec![
-                            Span::styled("╭─ ", Style::default().fg(Color::DarkGray)),
-                            Span::styled(
-                                code_language.clone(),
-                                Style::default()
-                                    .fg(Color::Cyan)
-                                    .add_modifier(Modifier::BOLD),
-                            ),
-                            Span::styled(" ─", Style::default().fg(Color::DarkGray)),
-                        ]));
-                    }
-                }
-                Tag::List(_) => {
-                    list_level += 1;
-                }
-                Tag::Strong => {
-                    // Bold text - will be handled in text event
-                }
-                Tag::Emphasis => {
-                    // Italic text - will be handled in text event
-                }
-                Tag::BlockQuote if !current_line.is_empty() => {
-                    lines.push(Line::from(std::mem::take(&mut current_line)));
-                }
-                _ => {}
-            },
+    fn flush_current_line(&mut self) {
+        if !self.current_line.is_empty() {
+            self.lines
+                .push(Line::from(std::mem::take(&mut self.current_line)));
+        }
+    }
 
-            Event::End(tag) => match tag {
-                Tag::Heading(..) if !current_line.is_empty() => {
-                    // Add heading prefix and style
-                    let prefix = match heading_level {
-                        1 => "# ",
-                        2 => "## ",
-                        3 => "### ",
-                        _ => "",
-                    };
+    fn start_code_block(&mut self, kind: CodeBlockKind) {
+        self.in_code_block = true;
+        self.code_language = match kind {
+            CodeBlockKind::Fenced(lang) => lang.to_string(),
+            CodeBlockKind::Indented => String::new(),
+        };
 
-                    let mut styled_line = vec![Span::styled(
-                        prefix.to_string(),
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    )];
-
-                    for span in &mut current_line {
-                        // Apply heading style to all spans in the line
-                        *span = span.clone().style(
-                            Style::default()
-                                .fg(Color::Cyan)
-                                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-                        );
-                    }
-
-                    styled_line.extend(std::mem::take(&mut current_line));
-                    lines.push(Line::from(styled_line));
-                    lines.push(Line::from("")); // Add spacing after heading
-                }
-                Tag::CodeBlock(_) => {
-                    if !current_line.is_empty() {
-                        lines.push(Line::from(std::mem::take(&mut current_line)));
-                    }
-
-                    // Use syntax highlighting if we have code content
-                    if !code_content.is_empty() {
-                        let highlighted_lines = if !code_language.is_empty() {
-                            highlight_code(&code_content, &code_language)
-                        } else {
-                            highlight_code(&code_content, "text")
-                        };
-                        lines.extend(highlighted_lines);
-                    }
-
-                    // Add footer if language was specified
-                    if !code_language.is_empty() {
-                        lines.push(Line::from(Span::styled(
-                            "╰────".to_string(),
-                            Style::default().fg(Color::DarkGray),
-                        )));
-                    }
-
-                    lines.push(Line::from("")); // Add spacing after code block
-                    in_code_block = false;
-                    code_language.clear();
-                    code_content.clear();
-                }
-                Tag::List(_) => {
-                    list_level = list_level.saturating_sub(1);
-                    if list_level == 0 {
-                        lines.push(Line::from("")); // Add spacing after list
-                    }
-                }
-                Tag::Paragraph => {
-                    if !current_line.is_empty() {
-                        lines.push(Line::from(std::mem::take(&mut current_line)));
-                    }
-                    lines.push(Line::from("")); // Add spacing after paragraph
-                }
-                Tag::Item if !current_line.is_empty() => {
-                    lines.push(Line::from(std::mem::take(&mut current_line)));
-                }
-                Tag::BlockQuote => {
-                    lines.push(Line::from("")); // Add spacing after blockquote
-                }
-                _ => {}
-            },
-
-            Event::Text(text) => {
-                let text_str = text.to_string();
-
-                if in_code_block {
-                    // Accumulate code content for syntax highlighting
-                    code_content.push_str(&text_str);
-                } else {
-                    // Regular text - add to current line
-                    current_line.push(Span::styled(text_str, Style::default()));
-                }
-            }
-
-            Event::Code(code) => {
-                // Inline code
-                current_line.push(Span::styled(
-                    format!("`{}`", code),
+        if !self.code_language.is_empty() {
+            self.flush_current_line();
+            self.lines.push(Line::from(vec![
+                Span::styled("╭─ ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    self.code_language.clone(),
                     Style::default()
-                        .fg(Color::Yellow)
-                        .bg(Color::Black)
+                        .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
-                ));
-            }
+                ),
+                Span::styled(" ─", Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+    }
 
-            Event::HardBreak | Event::SoftBreak if !current_line.is_empty() => {
-                lines.push(Line::from(std::mem::take(&mut current_line)));
-            }
-
-            Event::Rule => {
-                if !current_line.is_empty() {
-                    lines.push(Line::from(std::mem::take(&mut current_line)));
-                }
-                lines.push(Line::from(Span::styled(
-                    "────────────────────────────────────────".to_string(),
-                    Style::default().fg(Color::DarkGray),
-                )));
-                lines.push(Line::from(""));
-            }
-
+    fn handle_start_tag(&mut self, tag: Tag) {
+        match tag {
+            Tag::Heading(level, ..) => self.heading_level = level as u32,
+            Tag::CodeBlock(kind) => self.start_code_block(kind),
+            Tag::List(_) => self.list_level += 1,
+            Tag::BlockQuote => self.flush_current_line(),
             _ => {}
         }
     }
 
-    // Add any remaining content
-    if !current_line.is_empty() {
-        lines.push(Line::from(current_line));
+    fn end_heading(&mut self) {
+        if self.current_line.is_empty() {
+            return;
+        }
+
+        let prefix = match self.heading_level {
+            1 => "# ",
+            2 => "## ",
+            3 => "### ",
+            _ => "",
+        };
+        let mut styled_line = vec![Span::styled(
+            prefix.to_string(),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )];
+        for span in &mut self.current_line {
+            *span = span.clone().style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            );
+        }
+        styled_line.extend(std::mem::take(&mut self.current_line));
+        self.lines.push(Line::from(styled_line));
+        self.lines.push(Line::from("")); // Add spacing after heading
     }
 
-    // Remove trailing empty lines
-    while lines.last().is_some_and(|line| line.spans.is_empty()) {
-        lines.pop();
+    fn end_code_block(&mut self) {
+        self.flush_current_line();
+
+        if !self.code_content.is_empty() {
+            let highlighted_lines = if !self.code_language.is_empty() {
+                highlight_code(&self.code_content, &self.code_language)
+            } else {
+                highlight_code(&self.code_content, "text")
+            };
+            self.lines.extend(highlighted_lines);
+        }
+
+        if !self.code_language.is_empty() {
+            self.lines.push(Line::from(Span::styled(
+                "╰────".to_string(),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+
+        self.lines.push(Line::from("")); // Add spacing after code block
+        self.in_code_block = false;
+        self.code_language.clear();
+        self.code_content.clear();
     }
 
-    lines
+    fn end_list(&mut self) {
+        self.list_level = self.list_level.saturating_sub(1);
+        if self.list_level == 0 {
+            self.lines.push(Line::from("")); // Add spacing after list
+        }
+    }
+
+    fn end_paragraph(&mut self) {
+        self.flush_current_line();
+        self.lines.push(Line::from("")); // Add spacing after paragraph
+    }
+
+    fn handle_end_tag(&mut self, tag: Tag) {
+        match tag {
+            Tag::Heading(..) => self.end_heading(),
+            Tag::CodeBlock(_) => self.end_code_block(),
+            Tag::List(_) => self.end_list(),
+            Tag::Paragraph => self.end_paragraph(),
+            Tag::Item => self.flush_current_line(),
+            Tag::BlockQuote => self.lines.push(Line::from("")), // Add spacing after blockquote
+            _ => {}
+        }
+    }
+
+    fn handle_text(&mut self, text: pulldown_cmark::CowStr<'_>) {
+        let text_str = text.to_string();
+        if self.in_code_block {
+            // Accumulate code content for syntax highlighting
+            self.code_content.push_str(&text_str);
+        } else {
+            // Regular text - add to current line
+            self.current_line
+                .push(Span::styled(text_str, Style::default()));
+        }
+    }
+
+    fn handle_inline_code(&mut self, code: pulldown_cmark::CowStr<'_>) {
+        self.current_line.push(Span::styled(
+            format!("`{}`", code),
+            Style::default()
+                .fg(Color::Yellow)
+                .bg(Color::Black)
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
+
+    fn handle_rule(&mut self) {
+        self.flush_current_line();
+        self.lines.push(Line::from(Span::styled(
+            "────────────────────────────────────────".to_string(),
+            Style::default().fg(Color::DarkGray),
+        )));
+        self.lines.push(Line::from(""));
+    }
+
+    /// Drains any content still in progress and trims the trailing blank
+    /// lines the spacing rules above leave behind.
+    fn finish(mut self) -> Vec<Line<'static>> {
+        if !self.current_line.is_empty() {
+            self.lines.push(Line::from(self.current_line));
+        }
+        while self.lines.last().is_some_and(|line| line.spans.is_empty()) {
+            self.lines.pop();
+        }
+        self.lines
+    }
+}
+
+/// Parse markdown and convert to styled lines for Ratatui
+pub fn parse_markdown(markdown: &str) -> Vec<Line<'static>> {
+    let mut renderer = MarkdownRenderer::new();
+
+    for event in Parser::new(markdown) {
+        match event {
+            Event::Start(tag) => renderer.handle_start_tag(tag),
+            Event::End(tag) => renderer.handle_end_tag(tag),
+            Event::Text(text) => renderer.handle_text(text),
+            Event::Code(code) => renderer.handle_inline_code(code),
+            Event::HardBreak | Event::SoftBreak => renderer.flush_current_line(),
+            Event::Rule => renderer.handle_rule(),
+            _ => {}
+        }
+    }
+
+    renderer.finish()
 }
 
 /// Extract the raw content of the last fenced or indented code block in

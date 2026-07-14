@@ -590,44 +590,20 @@ async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result
     }
 }
 
-/// Start interactive chat session
-async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -> Result<()> {
-    use crate::{
-        db::Database,
-        llm::{
-            agent::AgentService,
-            tools::{
-                agent::AgentTool, ask_user::AskUserTool, bash::BashTool, code_exec::CodeExecTool,
-                context::ContextTool, doc_parser::DocParserTool, edit::EditTool, glob::GlobTool,
-                grep::GrepTool, http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool,
-                plan_tool::PlanTool, powershell::PowerShellTool, read::ReadTool,
-                registry::ToolRegistry, skill::SkillTool, task::TaskTool,
-                todo_write::TodoWriteTool, web_fetch::WebFetchTool, web_search::WebSearchTool,
-                write::WriteTool,
-            },
-        },
-        services::ServiceContext,
-        tui,
+/// Build the tool registry with the full set of built-in tools available to
+/// the interactive chat agent (MCP servers are registered separately, since
+/// that requires network I/O and per-server config - see
+/// `connect_configured_mcp_servers`).
+fn build_tool_registry() -> crate::llm::tools::registry::ToolRegistry {
+    use crate::llm::tools::{
+        agent::AgentTool, ask_user::AskUserTool, bash::BashTool, code_exec::CodeExecTool,
+        context::ContextTool, doc_parser::DocParserTool, edit::EditTool, glob::GlobTool,
+        grep::GrepTool, http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool,
+        plan_tool::PlanTool, powershell::PowerShellTool, read::ReadTool, registry::ToolRegistry,
+        skill::SkillTool, task::TaskTool, todo_write::TodoWriteTool, web_fetch::WebFetchTool,
+        web_search::WebSearchTool, write::WriteTool,
     };
 
-    println!("🦀 Starting Crustly AI Assistant...\n");
-
-    // Initialize database
-    tracing::info!("Connecting to database: {}", config.database.path.display());
-    let db = Database::connect(&config.database.path)
-        .await
-        .context("Failed to connect to database")?;
-
-    // Run migrations
-    db.run_migrations()
-        .await
-        .context("Failed to run database migrations")?;
-
-    // Select provider based on configuration using factory
-    let provider = crate::llm::provider::create_provider(config)?;
-
-    // Create tool registry
-    tracing::debug!("Setting up tool registry");
     let mut tool_registry = ToolRegistry::new();
     // Phase 1: Essential file operations
     tool_registry.register(Arc::new(ReadTool));
@@ -655,12 +631,19 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tool_registry.register(Arc::new(AgentTool));
     tool_registry.register(Arc::new(PowerShellTool));
 
-    // Connect to configured MCP servers (`[[mcp.servers]]`) and register
-    // their tools. Fixes a real gap: config.mcp.servers was previously
-    // parsed but never consumed anywhere, so configured servers had zero
-    // runtime effect. Failures are caught per-server (recorded in the
-    // status snapshot for the TUI's `/mcp` view) rather than aborting
-    // startup - one broken MCP server shouldn't block the whole TUI.
+    tool_registry
+}
+
+/// Connect to every configured MCP server (`[[mcp.servers]]`) and register
+/// their tools. Fixes a real gap: config.mcp.servers was previously parsed
+/// but never consumed anywhere, so configured servers had zero runtime
+/// effect. Failures are caught per-server (recorded in the status snapshot
+/// for the TUI's `/mcp` view) rather than aborting startup - one broken MCP
+/// server shouldn't block the whole TUI.
+async fn connect_configured_mcp_servers(
+    tool_registry: &mut crate::llm::tools::registry::ToolRegistry,
+    config: &crate::config::Config,
+) -> Vec<crate::mcp::McpServerStatus> {
     let mut mcp_status = Vec::new();
     for server in &config.mcp.servers {
         let args: Vec<&str> = server.args.iter().map(String::as_str).collect();
@@ -694,49 +677,24 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             }
         }
     }
+    mcp_status
+}
 
-    // Create service context
-    let service_context = ServiceContext::new(db.pool().clone());
-
-    // Get working directory
-    let working_directory = std::env::current_dir().unwrap_or_default();
-
-    // Create agent service with system prompt and working directory
-    let agent_service = Arc::new(
-        AgentService::new(provider.clone(), service_context.clone())
-            .with_system_prompt(SYSTEM_PROMPT.to_string())
-            .with_max_tool_iterations(20)
-            .with_working_directory(working_directory.clone()),
-    );
-
-    // Create TUI app first (so we can get the event sender)
-    tracing::debug!("Creating TUI app");
-    let mut app = tui::App::new(agent_service, service_context.clone());
-    app.set_ollama_host(ollama_host(config));
-    app.set_mcp_status(mcp_status);
-
-    // Get event sender from app
-    let event_sender = app.event_sender();
-
-    // Shared Auto Mode level (Interactive/AutoPlan/FullAuto), seeded from
-    // config and toggled at runtime by the TUI's Shift+Tab handler
-    // (App::cycle_auto_mode). Cloned into the approval callback below so
-    // toggling it in the TUI takes effect on the very next tool call.
-    let auto_mode = Arc::new(std::sync::Mutex::new(config.plan_mode.mode.clone()));
-    app.set_auto_mode_state(auto_mode.clone());
-
-    // Create approval callback that sends requests to TUI - unless Auto
-    // Mode is active, in which case low-risk tools are approved without
-    // prompting (see PlanExecMode doc comments for exactly what each level
-    // means). High-risk tools (bash/write_file/edit_file/code_exec) still
-    // prompt under AutoPlan; only FullAuto skips the prompt for those too.
-    // This does NOT touch AgentService::auto_approve_tools or the
-    // SecurityConfig policy chain in ToolRegistry::execute - both remain
-    // fully enforced regardless of Auto Mode, so deny-listed tools/paths/
-    // bash patterns stay blocked no matter what, and every auto-approved
-    // call still produces the same "User approved tool" log line as a
-    // manually-approved one (logged downstream in AgentService, not here).
-    let approval_callback: crate::llm::agent::ApprovalCallback = Arc::new(move |tool_info| {
+/// Build the tool-approval callback the agent invokes before executing a
+/// tool. Auto Mode (see `PlanExecMode` doc comments) lets low-risk tools
+/// through without prompting; everything else round-trips through the TUI
+/// event channel and blocks on the user's response. This does NOT touch
+/// `AgentService::auto_approve_tools` or the `SecurityConfig` policy chain in
+/// `ToolRegistry::execute` - both remain fully enforced regardless of Auto
+/// Mode, so deny-listed tools/paths/bash patterns stay blocked no matter
+/// what, and every auto-approved call still produces the same "User approved
+/// tool" log line as a manually-approved one (logged downstream in
+/// `AgentService`, not here).
+fn build_approval_callback(
+    event_sender: tokio::sync::mpsc::UnboundedSender<crate::tui::events::TuiEvent>,
+    auto_mode: Arc<std::sync::Mutex<crate::config::PlanExecMode>>,
+) -> crate::llm::agent::ApprovalCallback {
+    Arc::new(move |tool_info| {
         let sender = event_sender.clone();
         let auto_mode = auto_mode.clone();
         Box::pin(async move {
@@ -786,7 +744,67 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
 
             Ok(response.approved)
         })
-    });
+    })
+}
+
+/// Start interactive chat session
+async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -> Result<()> {
+    use crate::{db::Database, llm::agent::AgentService, services::ServiceContext, tui};
+
+    println!("🦀 Starting Crustly AI Assistant...\n");
+
+    // Initialize database
+    tracing::info!("Connecting to database: {}", config.database.path.display());
+    let db = Database::connect(&config.database.path)
+        .await
+        .context("Failed to connect to database")?;
+
+    // Run migrations
+    db.run_migrations()
+        .await
+        .context("Failed to run database migrations")?;
+
+    // Select provider based on configuration using factory
+    let provider = crate::llm::provider::create_provider(config)?;
+
+    // Create tool registry
+    tracing::debug!("Setting up tool registry");
+    let mut tool_registry = build_tool_registry();
+    let mcp_status = connect_configured_mcp_servers(&mut tool_registry, config).await;
+
+    // Create service context
+    let service_context = ServiceContext::new(db.pool().clone());
+
+    // Get working directory
+    let working_directory = std::env::current_dir().unwrap_or_default();
+
+    // Create agent service with system prompt and working directory
+    let agent_service = Arc::new(
+        AgentService::new(provider.clone(), service_context.clone())
+            .with_system_prompt(SYSTEM_PROMPT.to_string())
+            .with_max_tool_iterations(20)
+            .with_working_directory(working_directory.clone()),
+    );
+
+    // Create TUI app first (so we can get the event sender)
+    tracing::debug!("Creating TUI app");
+    let mut app = tui::App::new(agent_service, service_context.clone());
+    app.set_ollama_host(ollama_host(config));
+    app.set_mcp_status(mcp_status);
+
+    // Get event sender from app
+    let event_sender = app.event_sender();
+
+    // Shared Auto Mode level (Interactive/AutoPlan/FullAuto), seeded from
+    // config and toggled at runtime by the TUI's Shift+Tab handler
+    // (App::cycle_auto_mode). Cloned into the approval callback below so
+    // toggling it in the TUI takes effect on the very next tool call.
+    let auto_mode = Arc::new(std::sync::Mutex::new(config.plan_mode.mode.clone()));
+    app.set_auto_mode_state(auto_mode.clone());
+
+    // Create approval callback that sends requests to TUI - unless Auto Mode
+    // bypasses it (see `build_approval_callback` doc comment).
+    let approval_callback = build_approval_callback(event_sender, auto_mode);
 
     // Install the [security] policy chain (deny_tools/deny_paths/allow_bash).
     // Without this the whole section is inert: nothing is denied, and nothing

@@ -196,195 +196,210 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(header, area);
 }
 
-/// Render the chat messages
-fn render_chat(f: &mut Frame, app: &App, area: Rect) {
-    let mut lines: Vec<Line> = Vec::new();
-
-    // Show banner if there's a pending plan
-    if let Some(ref plan) = app.current_plan {
-        if matches!(plan.status, crate::plan::PlanStatus::PendingApproval) {
-            lines.push(Line::from(""));
-            lines.push(Line::from(vec![
-                Span::styled("  ⚠️  ", Style::default().fg(Color::Yellow)),
-                Span::styled(
-                    "Plan Pending Approval",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled("  ", Style::default()),
-                Span::styled("Press ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    "Ctrl+P",
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    " to review the plan, or switch to Plan Mode to approve/reject.",
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]));
-            lines.push(Line::from(Span::styled(
-                "  ─".repeat(30),
-                Style::default().fg(Color::Yellow),
-            )));
-            lines.push(Line::from(""));
-        }
+/// Banner shown above the chat log while a plan is awaiting approval.
+fn render_pending_plan_banner(app: &App) -> Vec<Line<'static>> {
+    let Some(ref plan) = app.current_plan else {
+        return Vec::new();
+    };
+    if !matches!(plan.status, crate::plan::PlanStatus::PendingApproval) {
+        return Vec::new();
     }
 
-    // Get the model name from the current session
-    let model_name = app
-        .current_session
-        .as_ref()
-        .and_then(|s| s.model.as_deref())
-        .unwrap_or("AI");
-
-    for msg in &app.messages {
-        // Add timestamp and role with better formatting
-        let timestamp = msg.timestamp.format("%H:%M:%S");
-
-        // Build role text and style
-        let (role_text, role_style, prefix) = if msg.role == "user" {
-            (
-                "You".to_string(),
+    vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ⚠️  ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                "Plan Pending Approval",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("Press ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Ctrl+P",
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
-                "  ",
-            )
-        } else {
-            (
-                format!("🤖 {}", model_name),
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-                "",
-            )
-        };
-
-        lines.push(Line::from(vec![
-            Span::styled(prefix, Style::default()),
-            Span::styled(role_text, role_style),
+            ),
             Span::styled(
-                format!(" ({})", timestamp),
+                " to review the plan, or switch to Plan Mode to approve/reject.",
                 Style::default().fg(Color::DarkGray),
             ),
-        ]));
+        ]),
+        Line::from(Span::styled(
+            "  ─".repeat(30),
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from(""),
+    ]
+}
 
-        // Render thinking block (collapsed by default, expanded with 't' key)
-        if let Some(ref thinking) = msg.thinking_text {
-            if msg.thinking_expanded {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        "[Thinking ▾] ",
-                        Style::default()
-                            .fg(Color::Magenta)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(
-                        "(press t to collapse)",
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]));
-                for thinking_line in thinking.lines() {
-                    lines.push(Line::from(vec![
-                        Span::styled("  │ ", Style::default().fg(Color::Magenta)),
-                        Span::styled(thinking_line.to_string(), Style::default().fg(Color::Gray)),
-                    ]));
-                }
-            } else {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        "[Thinking ▸] ",
-                        Style::default()
-                            .fg(Color::Magenta)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled("(press t to expand)", Style::default().fg(Color::DarkGray)),
-                ]));
-            }
-        }
+/// The runtime performance footer (currently Ollama only) shown under a
+/// message, when the provider actually reported timing metrics.
+fn render_perf_footer(msg: &super::app::DisplayMessage) -> Option<Line<'static>> {
+    let perf = msg.perf_metrics.as_ref()?;
 
-        // Assistant replies are markdown and are rendered as such. The user's own
-        // message is not - it is literal text, and parsing it as CommonMark eats
-        // the backslashes out of any Windows path they typed or pasted.
-        let mut content_lines = if msg.role == "user" {
-            parse_plain_text(&msg.content)
-        } else {
-            parse_markdown(&msg.content)
-        };
-        lines.append(&mut content_lines);
-
-        // Runtime performance metrics footer (currently Ollama only) - shown
-        // only when the provider actually reported them.
-        if let Some(ref perf) = msg.perf_metrics {
-            let mut spans = vec![Span::styled("  ⏱ ", Style::default().fg(Color::DarkGray))];
-            if let Some(eval_ms) = perf.eval_duration_ms {
-                spans.push(Span::styled(
-                    format!("{}ms generation", eval_ms),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-            if let Some(tps) = msg.tokens_per_second {
-                spans.push(Span::styled(
-                    format!(" · {:.0} tok/s", tps),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-            match perf.model_was_loaded {
-                Some(false) => {
-                    let load_ms = perf.load_duration_ms.unwrap_or(0);
-                    spans.push(Span::styled(
-                        format!(" · 🧊 cold start (model loaded in {}ms)", load_ms),
-                        Style::default().fg(Color::DarkGray),
-                    ));
-                }
-                Some(true) => {
-                    spans.push(Span::styled(
-                        " · 🔥 warm",
-                        Style::default().fg(Color::DarkGray),
-                    ));
-                }
-                None => {}
-            }
-            lines.push(Line::from(spans));
-        }
-
-        // Add spacing between messages
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "─".repeat(60),
+    let mut spans = vec![Span::styled("  ⏱ ", Style::default().fg(Color::DarkGray))];
+    if let Some(eval_ms) = perf.eval_duration_ms {
+        spans.push(Span::styled(
+            format!("{}ms generation", eval_ms),
             Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(""));
+        ));
     }
+    if let Some(tps) = msg.tokens_per_second {
+        spans.push(Span::styled(
+            format!(" · {:.0} tok/s", tps),
+            Style::default().fg(Color::DarkGray),
+        ));
+    }
+    match perf.model_was_loaded {
+        Some(false) => {
+            let load_ms = perf.load_duration_ms.unwrap_or(0);
+            spans.push(Span::styled(
+                format!(" · 🧊 cold start (model loaded in {}ms)", load_ms),
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        Some(true) => {
+            spans.push(Span::styled(
+                " · 🔥 warm",
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        None => {}
+    }
+    Some(Line::from(spans))
+}
 
-    // Add streaming response if present
-    if let Some(ref response) = app.streaming_response {
-        lines.push(Line::from(vec![
+/// Render the collapsed/expanded "thinking" block for a message, if present.
+fn render_thinking_block(msg: &super::app::DisplayMessage) -> Vec<Line<'static>> {
+    let Some(ref thinking) = msg.thinking_text else {
+        return Vec::new();
+    };
+
+    if !msg.thinking_expanded {
+        return vec![Line::from(vec![
             Span::styled(
-                format!("🤖 {} ", model_name),
+                "[Thinking ▸] ",
                 Style::default()
-                    .fg(Color::Green)
+                    .fg(Color::Magenta)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("[streaming]", Style::default().fg(Color::DarkGray)),
-        ]));
-
-        let mut streaming_lines = parse_markdown(response);
-        lines.append(&mut streaming_lines);
+            Span::styled("(press t to expand)", Style::default().fg(Color::DarkGray)),
+        ])];
     }
 
-    // Show processing indicator with animated spinner
-    if app.is_processing && app.streaming_response.is_none() {
-        let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-        let frame = spinner_frames[app.animation_frame % spinner_frames.len()];
-
-        lines.push(Line::from(""));
+    let mut lines = vec![Line::from(vec![
+        Span::styled(
+            "[Thinking ▾] ",
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            "(press t to collapse)",
+            Style::default().fg(Color::DarkGray),
+        ),
+    ])];
+    for thinking_line in thinking.lines() {
         lines.push(Line::from(vec![
+            Span::styled("  │ ", Style::default().fg(Color::Magenta)),
+            Span::styled(thinking_line.to_string(), Style::default().fg(Color::Gray)),
+        ]));
+    }
+    lines
+}
+
+/// Render one full message: role/timestamp header, thinking block, body, perf
+/// footer, and the trailing separator.
+fn render_message_lines(msg: &super::app::DisplayMessage, model_name: &str) -> Vec<Line<'static>> {
+    let timestamp = msg.timestamp.format("%H:%M:%S");
+    let (role_text, role_style, prefix) = if msg.role == "user" {
+        (
+            "You".to_string(),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+            "  ",
+        )
+    } else {
+        (
+            format!("🤖 {}", model_name),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+            "",
+        )
+    };
+
+    let mut lines = vec![Line::from(vec![
+        Span::styled(prefix, Style::default()),
+        Span::styled(role_text, role_style),
+        Span::styled(
+            format!(" ({})", timestamp),
+            Style::default().fg(Color::DarkGray),
+        ),
+    ])];
+
+    lines.extend(render_thinking_block(msg));
+
+    // Assistant replies are markdown and are rendered as such. The user's own
+    // message is not - it is literal text, and parsing it as CommonMark eats
+    // the backslashes out of any Windows path they typed or pasted.
+    if msg.role == "user" {
+        lines.extend(parse_plain_text(&msg.content));
+    } else {
+        lines.extend(parse_markdown(&msg.content));
+    };
+
+    lines.extend(render_perf_footer(msg));
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "─".repeat(60),
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(""));
+
+    lines
+}
+
+/// The in-progress assistant reply, streamed token-by-token.
+fn render_streaming_response(app: &App, model_name: &str) -> Vec<Line<'static>> {
+    let Some(ref response) = app.streaming_response else {
+        return Vec::new();
+    };
+
+    let mut lines = vec![Line::from(vec![
+        Span::styled(
+            format!("🤖 {} ", model_name),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("[streaming]", Style::default().fg(Color::DarkGray)),
+    ])];
+    lines.extend(parse_markdown(response));
+    lines
+}
+
+/// Animated "model is thinking" spinner, shown while waiting for the first
+/// streamed token.
+fn render_processing_indicator(app: &App, model_name: &str) -> Vec<Line<'static>> {
+    if !app.is_processing || app.streaming_response.is_some() {
+        return Vec::new();
+    }
+
+    let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    let frame = spinner_frames[app.animation_frame % spinner_frames.len()];
+
+    vec![
+        Line::from(""),
+        Line::from(vec![
             Span::styled(
                 format!("{} ", frame),
                 Style::default()
@@ -395,17 +410,42 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
                 format!("{} is thinking...", model_name),
                 Style::default().fg(Color::Yellow),
             ),
-        ]));
+        ]),
+    ]
+}
+
+/// `app.scroll_offset` is "lines scrolled up from the bottom" (0 = auto-scroll
+/// showing the latest messages); ratatui's `Paragraph::scroll` wants an
+/// absolute offset from the top, so convert between the two here.
+fn compute_scroll_offset(total_lines: usize, visible_height: usize, scroll_offset: usize) -> u16 {
+    let max_scroll = total_lines.saturating_sub(visible_height);
+    max_scroll.saturating_sub(scroll_offset) as u16
+}
+
+/// Render the chat messages
+fn render_chat(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.extend(render_pending_plan_banner(app));
+
+    // Get the model name from the current session
+    let model_name = app
+        .current_session
+        .as_ref()
+        .and_then(|s| s.model.as_deref())
+        .unwrap_or("AI");
+
+    for msg in &app.messages {
+        lines.extend(render_message_lines(msg, model_name));
     }
 
-    // Calculate scroll offset for ratatui
-    // app.scroll_offset represents "lines scrolled up from the bottom"
-    // 0 = at the bottom (auto-scroll, showing latest messages)
-    // N = scrolled up N lines from the bottom (showing older messages)
+    lines.extend(render_streaming_response(app, model_name));
+    lines.extend(render_processing_indicator(app, model_name));
+
     let total_lines = lines.len();
     let visible_height = area.height.saturating_sub(2) as usize; // Subtract borders
-    let max_scroll = total_lines.saturating_sub(visible_height);
-    let actual_scroll_offset = max_scroll.saturating_sub(app.scroll_offset);
+    let actual_scroll_offset =
+        compute_scroll_offset(total_lines, visible_height, app.scroll_offset);
 
     let chat = Paragraph::new(lines)
         .block(
@@ -647,480 +687,195 @@ fn render_mcp(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(widget, area);
 }
 
-/// Render the help screen
-fn render_help(f: &mut Frame, app: &App, area: Rect) {
-    let help_text = vec![
-        Line::from(vec![
-            Span::styled("🥐 ", Style::default().fg(Color::Rgb(218, 165, 32))),
-            Span::styled(
-                "Crustly Help",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            ),
-        ]),
+/// A single "key → description" row, the recurring building block of the help screen.
+fn help_row(key: &'static str, desc: impl Into<String>, key_color: Color) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            key,
+            Style::default().fg(key_color).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+        Span::styled(desc.into(), Style::default().fg(Color::White)),
+    ])
+}
+
+/// A single "✓ Name - description" row used in the FEATURES section.
+fn feature_row(name: &'static str, desc: &'static str) -> Line<'static> {
+    Line::from(vec![
+        Span::styled("  ✓ ", Style::default().fg(Color::Green)),
+        Span::styled(
+            name,
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(desc, Style::default().fg(Color::DarkGray)),
+    ])
+}
+
+/// Blank line + boxed section title + blank line, shared by every help section.
+fn help_section_header(title: &'static str) -> [Line<'static>; 3] {
+    [
         Line::from(""),
-        Line::from(Span::styled(
-            "╭─ GLOBAL COMMANDS ─────────────────────────────────────────╮",
-            Style::default().fg(Color::Cyan),
-        )),
+        Line::from(Span::styled(title, Style::default().fg(Color::Cyan))),
         Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+C       ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Quit application", Style::default().fg(Color::White)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+N       ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Create new chat session", Style::default().fg(Color::White)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+L       ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "List all sessions (switch sessions)",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+H       ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Show this help screen", Style::default().fg(Color::White)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+K       ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Clear current session messages",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+O       ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Show Model Info panel (provider, model, context, perf)",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+W       ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Switch to a different local Ollama model",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Shift+Tab    ",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Cycle Auto Mode: Interactive → AutoPlan → FullAuto",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            "╭─ CHAT MODE ───────────────────────────────────────────────╮",
-            Style::default().fg(Color::Cyan),
-        )),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                "  Enter        ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Send message to LLM", Style::default().fg(Color::White)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                if app.kitty_keyboard_protocol_active {
-                    "  Shift+Enter  "
-                } else {
-                    "  Alt+Enter    "
-                },
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "New line in message (multi-line input)",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  ↑ / ↓        ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Recall previous messages (edit and resend; moves the cursor in a multi-line draft)",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+Enter   ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Send message (legacy alias)",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  ←/→/↑/↓      ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Move cursor (Ctrl+←/→ jumps by word)",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Home/End     ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Jump to start/end of line",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Backspace    ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Delete character at cursor (Ctrl+Backspace/Delete: whole word)",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+Y       ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Copy last response (or its code block) to clipboard",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+V       ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Paste from system clipboard at cursor",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Escape       ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Clear input buffer", Style::default().fg(Color::White)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Page Up      ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Scroll chat history up", Style::default().fg(Color::White)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Page Down    ",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Scroll chat history down",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            "╭─ SESSION LIST ────────────────────────────────────────────╮",
-            Style::default().fg(Color::Cyan),
-        )),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                "  ↑/↓          ",
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Navigate through sessions",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Enter        ",
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Load selected session", Style::default().fg(Color::White)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Escape       ",
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Return to chat", Style::default().fg(Color::White)),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            "╭─ PLAN MODE ───────────────────────────────────────────────╮",
-            Style::default().fg(Color::Cyan),
-        )),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+P       ",
-                Style::default()
-                    .fg(Color::Blue)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Toggle Plan Mode view", Style::default().fg(Color::White)),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+A       ",
-                Style::default()
-                    .fg(Color::Blue)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Approve plan and start execution",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Ctrl+R       ",
-                Style::default()
-                    .fg(Color::Blue)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Reject plan and return to chat",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  ↑/↓          ",
-                Style::default()
-                    .fg(Color::Blue)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Scroll through plan tasks",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                "  Page Up/Down ",
-                Style::default()
-                    .fg(Color::Blue)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("→ ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "Scroll plan tasks faster",
-                Style::default().fg(Color::White),
-            ),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            "╭─ FEATURES ────────────────────────────────────────────────╮",
-            Style::default().fg(Color::Cyan),
-        )),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled(
-                "Markdown Rendering",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                " - Rich text with headings, lists, code",
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled(
-                "Syntax Highlighting",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                " - 100+ languages supported",
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled(
-                "Multi-line Input",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                " - Write long messages with ease",
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled(
-                "Session Management",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                " - Persistent conversation history",
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled(
-                "Streaming Responses",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                " - See responses as they're generated",
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled(
-                "Token & Cost Tracking",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                " - Monitor usage in real-time",
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("  ✓ ", Style::default().fg(Color::Green)),
-            Span::styled(
-                "Plan Mode",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                " - Structured task planning with approval",
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]),
+    ]
+}
+
+fn help_global_commands() -> Vec<Line<'static>> {
+    let mut lines =
+        help_section_header("╭─ GLOBAL COMMANDS ─────────────────────────────────────────╮")
+            .to_vec();
+    lines.extend([
+        help_row("  Ctrl+C       ", "Quit application", Color::Yellow),
+        help_row("  Ctrl+N       ", "Create new chat session", Color::Yellow),
+        help_row(
+            "  Ctrl+L       ",
+            "List all sessions (switch sessions)",
+            Color::Yellow,
+        ),
+        help_row("  Ctrl+H       ", "Show this help screen", Color::Yellow),
+        help_row(
+            "  Ctrl+K       ",
+            "Clear current session messages",
+            Color::Yellow,
+        ),
+        help_row(
+            "  Ctrl+O       ",
+            "Show Model Info panel (provider, model, context, perf)",
+            Color::Yellow,
+        ),
+        help_row(
+            "  Ctrl+W       ",
+            "Switch to a different local Ollama model",
+            Color::Yellow,
+        ),
+        help_row(
+            "  Shift+Tab    ",
+            "Cycle Auto Mode: Interactive → AutoPlan → FullAuto",
+            Color::Yellow,
+        ),
+    ]);
+    lines
+}
+
+fn help_chat_mode(app: &App) -> Vec<Line<'static>> {
+    let newline_key = if app.kitty_keyboard_protocol_active {
+        "  Shift+Enter  "
+    } else {
+        "  Alt+Enter    "
+    };
+
+    let mut lines =
+        help_section_header("╭─ CHAT MODE ───────────────────────────────────────────────╮")
+            .to_vec();
+    lines.extend([
+        help_row("  Enter        ", "Send message to LLM", Color::Green),
+        help_row(
+            newline_key,
+            "New line in message (multi-line input)",
+            Color::Green,
+        ),
+        help_row(
+            "  ↑ / ↓        ",
+            "Recall previous messages (edit and resend; moves the cursor in a multi-line draft)",
+            Color::Green,
+        ),
+        help_row(
+            "  Ctrl+Enter   ",
+            "Send message (legacy alias)",
+            Color::Green,
+        ),
+        help_row(
+            "  ←/→/↑/↓      ",
+            "Move cursor (Ctrl+←/→ jumps by word)",
+            Color::Green,
+        ),
+        help_row("  Home/End     ", "Jump to start/end of line", Color::Green),
+        help_row(
+            "  Backspace    ",
+            "Delete character at cursor (Ctrl+Backspace/Delete: whole word)",
+            Color::Green,
+        ),
+        help_row(
+            "  Ctrl+Y       ",
+            "Copy last response (or its code block) to clipboard",
+            Color::Green,
+        ),
+        help_row(
+            "  Ctrl+V       ",
+            "Paste from system clipboard at cursor",
+            Color::Green,
+        ),
+        help_row("  Escape       ", "Clear input buffer", Color::Green),
+        help_row("  Page Up      ", "Scroll chat history up", Color::Green),
+        help_row("  Page Down    ", "Scroll chat history down", Color::Green),
+    ]);
+    lines
+}
+
+fn help_session_list() -> Vec<Line<'static>> {
+    let mut lines =
+        help_section_header("╭─ SESSION LIST ────────────────────────────────────────────╮")
+            .to_vec();
+    lines.extend([
+        help_row(
+            "  ↑/↓          ",
+            "Navigate through sessions",
+            Color::Magenta,
+        ),
+        help_row("  Enter        ", "Load selected session", Color::Magenta),
+        help_row("  Escape       ", "Return to chat", Color::Magenta),
+    ]);
+    lines
+}
+
+fn help_plan_mode() -> Vec<Line<'static>> {
+    let mut lines =
+        help_section_header("╭─ PLAN MODE ───────────────────────────────────────────────╮")
+            .to_vec();
+    lines.extend([
+        help_row("  Ctrl+P       ", "Toggle Plan Mode view", Color::Blue),
+        help_row(
+            "  Ctrl+A       ",
+            "Approve plan and start execution",
+            Color::Blue,
+        ),
+        help_row(
+            "  Ctrl+R       ",
+            "Reject plan and return to chat",
+            Color::Blue,
+        ),
+        help_row("  ↑/↓          ", "Scroll through plan tasks", Color::Blue),
+        help_row("  Page Up/Down ", "Scroll plan tasks faster", Color::Blue),
+    ]);
+    lines
+}
+
+fn help_features() -> Vec<Line<'static>> {
+    let mut lines =
+        help_section_header("╭─ FEATURES ────────────────────────────────────────────────╮")
+            .to_vec();
+    lines.extend([
+        feature_row(
+            "Markdown Rendering",
+            " - Rich text with headings, lists, code",
+        ),
+        feature_row("Syntax Highlighting", " - 100+ languages supported"),
+        feature_row("Multi-line Input", " - Write long messages with ease"),
+        feature_row("Session Management", " - Persistent conversation history"),
+        feature_row(
+            "Streaming Responses",
+            " - See responses as they're generated",
+        ),
+        feature_row("Token & Cost Tracking", " - Monitor usage in real-time"),
+        feature_row("Plan Mode", " - Structured task planning with approval"),
+    ]);
+    lines
+}
+
+fn help_footer() -> Vec<Line<'static>> {
+    vec![
         Line::from(""),
         Line::from(""),
         Line::from(vec![
@@ -1136,7 +891,29 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
             ),
             Span::styled(" to return to chat", Style::default().fg(Color::DarkGray)),
         ]),
+    ]
+}
+
+/// Render the help screen
+fn render_help(f: &mut Frame, app: &App, area: Rect) {
+    let mut help_text = vec![
+        Line::from(vec![
+            Span::styled("🥐 ", Style::default().fg(Color::Rgb(218, 165, 32))),
+            Span::styled(
+                "Crustly Help",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            ),
+        ]),
+        Line::from(""),
     ];
+    help_text.extend(help_global_commands());
+    help_text.extend(help_chat_mode(app));
+    help_text.extend(help_session_list());
+    help_text.extend(help_plan_mode());
+    help_text.extend(help_features());
+    help_text.extend(help_footer());
 
     let help = Paragraph::new(help_text)
         .block(
@@ -1212,13 +989,50 @@ fn render_plan_help(f: &mut Frame, area: Rect) {
 
 /// Render the plan mode view
 #[allow(clippy::vec_init_then_push)]
-fn render_plan(f: &mut Frame, app: &App, area: Rect) {
-    if let Some(plan) = &app.current_plan {
-        // Render the plan document
-        let mut lines = vec![];
+/// One task entry in the plan document: title/status line, type/complexity
+/// line, and its acceptance criteria (if any).
+fn render_plan_task_lines(task: &crate::plan::PlanTask, idx: usize) -> Vec<Line<'_>> {
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled(format!(" {} ", task.status.icon()), Style::default()),
+            Span::styled(
+                format!("{}. ", idx + 1),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(&task.title, Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("    ", Style::default()),
+            Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(task.task_type.to_string(), Style::default().fg(Color::Cyan)),
+            Span::styled("  |  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Complexity: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(task.complexity_stars(), Style::default().fg(Color::Yellow)),
+        ]),
+    ];
 
-        // Plan header
+    if !task.acceptance_criteria.is_empty() {
         lines.push(Line::from(vec![
+            Span::styled("    ", Style::default()),
+            Span::styled("✓ Acceptance Criteria:", Style::default().fg(Color::Green)),
+        ]));
+        for criterion in &task.acceptance_criteria {
+            lines.push(Line::from(vec![
+                Span::styled("      • ", Style::default().fg(Color::DarkGray)),
+                Span::styled(criterion, Style::default().fg(Color::White)),
+            ]));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines
+}
+
+/// Full plan document body: header, status, description, tech stack, test
+/// strategy, task list, and the bottom action bar.
+fn render_plan_document(plan: &crate::plan::PlanDocument, area_width: usize) -> Vec<Line<'_>> {
+    let mut lines = vec![
+        Line::from(vec![
             Span::styled("📋 ", Style::default().fg(Color::Cyan)),
             Span::styled(
                 &plan.title,
@@ -1226,126 +1040,109 @@ fn render_plan(f: &mut Frame, app: &App, area: Rect) {
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
             ),
-        ]));
-
-        lines.push(Line::from(""));
-
-        // Status
-        lines.push(Line::from(vec![
+        ]),
+        Line::from(""),
+        Line::from(vec![
             Span::styled("Status: ", Style::default().fg(Color::DarkGray)),
             Span::styled(plan.status.to_string(), Style::default().fg(Color::Yellow)),
-        ]));
+        ]),
+        Line::from(""),
+    ];
 
-        lines.push(Line::from(""));
-
-        // Description
-        if !plan.description.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "📝 Description:",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            )));
-            lines.push(Line::from(Span::styled(
-                &plan.description,
-                Style::default().fg(Color::White),
-            )));
-            lines.push(Line::from(""));
-        }
-
-        // Technical Stack
-        if !plan.technical_stack.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "🛠️  Technical Stack:",
-                Style::default()
-                    .fg(Color::Blue)
-                    .add_modifier(Modifier::BOLD),
-            )));
-            for tech in &plan.technical_stack {
-                lines.push(Line::from(vec![
-                    Span::styled("    • ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(tech, Style::default().fg(Color::White)),
-                ]));
-            }
-            lines.push(Line::from(""));
-        }
-
-        // Test Strategy
-        if !plan.test_strategy.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "🧪 Test Strategy:",
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD),
-            )));
-            lines.push(Line::from(Span::styled(
-                &plan.test_strategy,
-                Style::default().fg(Color::White),
-            )));
-            lines.push(Line::from(""));
-        }
-
-        // Tasks
+    if !plan.description.is_empty() {
         lines.push(Line::from(Span::styled(
-            format!("📋 Tasks ({}):", plan.tasks.len()),
+            "📝 Description:",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(
+            &plan.description,
+            Style::default().fg(Color::White),
+        )));
+        lines.push(Line::from(""));
+    }
+
+    if !plan.technical_stack.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "🛠️  Technical Stack:",
+            Style::default()
+                .fg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+        )));
+        for tech in &plan.technical_stack {
+            lines.push(Line::from(vec![
+                Span::styled("    • ", Style::default().fg(Color::DarkGray)),
+                Span::styled(tech, Style::default().fg(Color::White)),
+            ]));
+        }
+        lines.push(Line::from(""));
+    }
+
+    if !plan.test_strategy.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "🧪 Test Strategy:",
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(
+            &plan.test_strategy,
+            Style::default().fg(Color::White),
+        )));
+        lines.push(Line::from(""));
+    }
+
+    lines.push(Line::from(Span::styled(
+        format!("📋 Tasks ({}):", plan.tasks.len()),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    for (idx, task) in plan.tasks.iter().enumerate() {
+        lines.extend(render_plan_task_lines(task, idx));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "─".repeat(area_width),
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(vec![
+        Span::styled("[Ctrl+A] ", Style::default().fg(Color::Green)),
+        Span::styled("Approve  ", Style::default().fg(Color::White)),
+        Span::styled("[Ctrl+R] ", Style::default().fg(Color::Yellow)),
+        Span::styled("Reject  ", Style::default().fg(Color::White)),
+        Span::styled("[Esc] ", Style::default().fg(Color::Red)),
+        Span::styled("Cancel", Style::default().fg(Color::White)),
+    ]));
+
+    lines
+}
+
+/// Placeholder shown in Plan Mode when there is no active plan yet.
+fn render_plan_empty_state() -> Vec<Line<'static>> {
+    vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "📋 Plan Mode",
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
-        )));
-        lines.push(Line::from(""));
-
-        for (idx, task) in plan.tasks.iter().enumerate() {
-            // Task line
-            lines.push(Line::from(vec![
-                Span::styled(format!(" {} ", task.status.icon()), Style::default()),
-                Span::styled(
-                    format!("{}. ", idx + 1),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled(&task.title, Style::default().fg(Color::White)),
-            ]));
-
-            // Task details (type and complexity)
-            lines.push(Line::from(vec![
-                Span::styled("    ", Style::default()),
-                Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(task.task_type.to_string(), Style::default().fg(Color::Cyan)),
-                Span::styled("  |  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Complexity: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(task.complexity_stars(), Style::default().fg(Color::Yellow)),
-            ]));
-
-            // Acceptance Criteria
-            if !task.acceptance_criteria.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::styled("    ", Style::default()),
-                    Span::styled("✓ Acceptance Criteria:", Style::default().fg(Color::Green)),
-                ]));
-                for criterion in &task.acceptance_criteria {
-                    lines.push(Line::from(vec![
-                        Span::styled("      • ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(criterion, Style::default().fg(Color::White)),
-                    ]));
-                }
-            }
-
-            lines.push(Line::from(""));
-        }
-
-        // Action bar
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "─".repeat(area.width as usize),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "No active plan. Switch to Chat mode to create a plan.",
             Style::default().fg(Color::DarkGray),
-        )));
-        lines.push(Line::from(vec![
-            Span::styled("[Ctrl+A] ", Style::default().fg(Color::Green)),
-            Span::styled("Approve  ", Style::default().fg(Color::White)),
-            Span::styled("[Ctrl+R] ", Style::default().fg(Color::Yellow)),
-            Span::styled("Reject  ", Style::default().fg(Color::White)),
-            Span::styled("[Esc] ", Style::default().fg(Color::Red)),
-            Span::styled("Cancel", Style::default().fg(Color::White)),
-        ]));
+        )),
+    ]
+}
+
+fn render_plan(f: &mut Frame, app: &App, area: Rect) {
+    if let Some(plan) = &app.current_plan {
+        let lines = render_plan_document(plan, area.width as usize);
 
         let paragraph = Paragraph::new(lines)
             .block(
@@ -1359,23 +1156,7 @@ fn render_plan(f: &mut Frame, app: &App, area: Rect) {
 
         f.render_widget(paragraph, area);
     } else {
-        // No plan available
-        let text = vec![
-            Line::from(""),
-            Line::from(Span::styled(
-                "📋 Plan Mode",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(""),
-            Line::from(Span::styled(
-                "No active plan. Switch to Chat mode to create a plan.",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ];
-
-        let paragraph = Paragraph::new(text)
+        let paragraph = Paragraph::new(render_plan_empty_state())
             .block(Block::default().borders(Borders::ALL))
             .alignment(ratatui::layout::Alignment::Center);
 
@@ -1409,203 +1190,237 @@ fn render_settings(f: &mut Frame, _app: &App, area: Rect) {
 }
 
 /// Render the tool approval dialog
-fn render_approval(f: &mut Frame, app: &App, area: Rect) {
-    if let Some(ref request) = app.pending_approval {
-        // Get the model name from the current session
-        let model_name = app
-            .current_session
-            .as_ref()
-            .and_then(|s| s.model.as_deref())
-            .unwrap_or("AI");
-        // Center the dialog
-        let dialog_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(0),
-                Constraint::Length(if app.show_approval_details { 30 } else { 20 }),
-                Constraint::Min(0),
-            ])
-            .split(area);
+/// Centers the approval dialog within `area`, sized to fit the extra JSON
+/// detail lines when `show_details` is on.
+fn approval_dialog_area(area: Rect, show_details: bool) -> Rect {
+    let dialog_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(if show_details { 30 } else { 20 }),
+            Constraint::Min(0),
+        ])
+        .split(area);
 
-        let center_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Min(0),
-                Constraint::Length(80),
-                Constraint::Min(0),
-            ])
-            .split(dialog_chunks[1]);
+    let center_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(80),
+            Constraint::Min(0),
+        ])
+        .split(dialog_chunks[1]);
 
-        let dialog_area = center_chunks[1];
+    center_chunks[1]
+}
 
-        // Build dialog content - calculate time remaining
-        let time_remaining = request.time_remaining();
-        let seconds_remaining = time_remaining.as_secs();
-        let time_color = if seconds_remaining < 60 {
-            Color::Red
-        } else if seconds_remaining < 180 {
-            Color::Yellow
-        } else {
-            Color::Green
-        };
+/// Header lines: time-remaining countdown, tool name, and description.
+fn render_approval_header<'a>(
+    request: &'a super::events::ToolApprovalRequest,
+    model_name: &'a str,
+) -> Vec<Line<'a>> {
+    let seconds_remaining = request.time_remaining().as_secs();
+    let time_color = if seconds_remaining < 60 {
+        Color::Red
+    } else if seconds_remaining < 180 {
+        Color::Yellow
+    } else {
+        Color::Green
+    };
 
-        let mut lines = vec![
-            Line::from(""),
-            Line::from(vec![
-                Span::styled("🔒 ", Style::default().fg(Color::Yellow)),
-                Span::styled(
-                    "Permission Request",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-                Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("⏱️  ", Style::default().fg(time_color)),
-                Span::styled(
-                    format!(
-                        "{}m {}s remaining",
-                        seconds_remaining / 60,
-                        seconds_remaining % 60
-                    ),
-                    Style::default().fg(time_color),
-                ),
-            ]),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled(
-                    format!("{} wants to use the tool: ", model_name),
-                    Style::default().fg(Color::White),
-                ),
-                Span::styled(
-                    &request.tool_name,
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled("Description: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&request.tool_description, Style::default().fg(Color::White)),
-            ]),
-            Line::from(""),
-        ];
-
-        // Show capabilities
-        if !request.capabilities.is_empty() {
-            lines.push(Line::from(vec![Span::styled(
-                "⚠️  Capabilities: ",
-                Style::default().fg(Color::Yellow),
-            )]));
-            for cap in &request.capabilities {
-                lines.push(Line::from(vec![
-                    Span::styled("   • ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(cap, Style::default().fg(Color::Red)),
-                ]));
-            }
-            lines.push(Line::from(""));
-        }
-
-        // Show input parameters (basic or detailed)
-        if app.show_approval_details {
-            lines.push(Line::from(vec![Span::styled(
-                "Tool Input (JSON):",
-                Style::default().fg(Color::DarkGray),
-            )]));
-            lines.push(Line::from(""));
-            let json_str = serde_json::to_string_pretty(&request.tool_input)
-                .unwrap_or_else(|_| "{}".to_string());
-            for line in json_str.lines() {
-                lines.push(Line::from(vec![Span::styled(
-                    line.to_string(),
-                    Style::default().fg(Color::Green),
-                )]));
-            }
-            lines.push(Line::from(""));
-        } else {
-            // Show simplified input
-            if let Some(obj) = request.tool_input.as_object() {
-                if !obj.is_empty() {
-                    lines.push(Line::from(vec![Span::styled(
-                        "Parameters: ",
-                        Style::default().fg(Color::DarkGray),
-                    )]));
-                    for (key, value) in obj.iter().take(3) {
-                        let value_str = match value {
-                            serde_json::Value::String(s) => {
-                                if s.len() > 50 {
-                                    format!(
-                                        "\"{}...\"",
-                                        crate::utils::truncate_at_char_boundary(s, 47)
-                                    )
-                                } else {
-                                    format!("\"{}\"", s)
-                                }
-                            }
-                            _ => value.to_string(),
-                        };
-                        lines.push(Line::from(vec![
-                            Span::styled(format!("   {}: ", key), Style::default().fg(Color::Cyan)),
-                            Span::styled(value_str, Style::default().fg(Color::White)),
-                        ]));
-                    }
-                    if obj.len() > 3 {
-                        lines.push(Line::from(vec![
-                            Span::styled("   ... ", Style::default().fg(Color::DarkGray)),
-                            Span::styled(
-                                format!("({} more)", obj.len() - 3),
-                                Style::default().fg(Color::DarkGray),
-                            ),
-                        ]));
-                    }
-                    lines.push(Line::from(""));
-                }
-            }
-        }
-
-        // Show action buttons
-        lines.push(Line::from(""));
-        lines.push(Line::from(vec![
+    vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("🔒 ", Style::default().fg(Color::Yellow)),
             Span::styled(
-                "[A]",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("pprove  ", Style::default().fg(Color::White)),
-            Span::styled(
-                "[D]",
+                "Permission Request",
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
-            Span::styled("eny  ", Style::default().fg(Color::White)),
+            Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("⏱️  ", Style::default().fg(time_color)),
             Span::styled(
-                "[V]",
+                format!(
+                    "{}m {}s remaining",
+                    seconds_remaining / 60,
+                    seconds_remaining % 60
+                ),
+                Style::default().fg(time_color),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                format!("{} wants to use the tool: ", model_name),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(
+                &request.tool_name,
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("iew Details  ", Style::default().fg(Color::White)),
-            Span::styled(
-                "[Esc]",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" Cancel", Style::default().fg(Color::White)),
-        ]));
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Description: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(&request.tool_description, Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+    ]
+}
 
-        let dialog = Paragraph::new(lines)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Red))
-                    .title(Span::styled(
-                        " ⚠️  PERMISSION REQUIRED ",
-                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                    )),
-            )
-            .alignment(Alignment::Left);
-
-        f.render_widget(dialog, dialog_area);
+/// The "⚠️ Capabilities:" bullet list, empty when the tool declares none.
+fn render_approval_capabilities(request: &super::events::ToolApprovalRequest) -> Vec<Line<'_>> {
+    if request.capabilities.is_empty() {
+        return Vec::new();
     }
+
+    let mut lines = vec![Line::from(vec![Span::styled(
+        "⚠️  Capabilities: ",
+        Style::default().fg(Color::Yellow),
+    )])];
+    for cap in &request.capabilities {
+        lines.push(Line::from(vec![
+            Span::styled("   • ", Style::default().fg(Color::DarkGray)),
+            Span::styled(cap, Style::default().fg(Color::Red)),
+        ]));
+    }
+    lines.push(Line::from(""));
+    lines
+}
+
+/// Full pretty-printed JSON of the tool input, used when the user has
+/// toggled "View Details".
+fn render_approval_input_detailed(request: &super::events::ToolApprovalRequest) -> Vec<Line<'_>> {
+    let mut lines = vec![
+        Line::from(vec![Span::styled(
+            "Tool Input (JSON):",
+            Style::default().fg(Color::DarkGray),
+        )]),
+        Line::from(""),
+    ];
+    let json_str =
+        serde_json::to_string_pretty(&request.tool_input).unwrap_or_else(|_| "{}".to_string());
+    for line in json_str.lines() {
+        lines.push(Line::from(vec![Span::styled(
+            line.to_string(),
+            Style::default().fg(Color::Green),
+        )]));
+    }
+    lines.push(Line::from(""));
+    lines
+}
+
+/// The first three tool-input parameters (truncated), used in the compact
+/// (non-detailed) view of the approval dialog.
+fn render_approval_input_summary(request: &super::events::ToolApprovalRequest) -> Vec<Line<'_>> {
+    let Some(obj) = request.tool_input.as_object() else {
+        return Vec::new();
+    };
+    if obj.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lines = vec![Line::from(vec![Span::styled(
+        "Parameters: ",
+        Style::default().fg(Color::DarkGray),
+    )])];
+    for (key, value) in obj.iter().take(3) {
+        let value_str = match value {
+            serde_json::Value::String(s) => {
+                if s.len() > 50 {
+                    format!("\"{}...\"", crate::utils::truncate_at_char_boundary(s, 47))
+                } else {
+                    format!("\"{}\"", s)
+                }
+            }
+            _ => value.to_string(),
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!("   {}: ", key), Style::default().fg(Color::Cyan)),
+            Span::styled(value_str, Style::default().fg(Color::White)),
+        ]));
+    }
+    if obj.len() > 3 {
+        lines.push(Line::from(vec![
+            Span::styled("   ... ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("({} more)", obj.len() - 3),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+    }
+    lines.push(Line::from(""));
+    lines
+}
+
+/// The bottom `[A]pprove [D]eny [V]iew Details [Esc] Cancel` action row.
+fn render_approval_actions() -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            "[A]",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("pprove  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[D]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("eny  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[V]",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("iew Details  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Esc]",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Cancel", Style::default().fg(Color::White)),
+    ])
+}
+
+fn render_approval(f: &mut Frame, app: &App, area: Rect) {
+    let Some(ref request) = app.pending_approval else {
+        return;
+    };
+
+    let model_name = app
+        .current_session
+        .as_ref()
+        .and_then(|s| s.model.as_deref())
+        .unwrap_or("AI");
+    let dialog_area = approval_dialog_area(area, app.show_approval_details);
+
+    let mut lines = render_approval_header(request, model_name);
+    lines.extend(render_approval_capabilities(request));
+    if app.show_approval_details {
+        lines.extend(render_approval_input_detailed(request));
+    } else {
+        lines.extend(render_approval_input_summary(request));
+    }
+    lines.push(Line::from(""));
+    lines.push(render_approval_actions());
+
+    let dialog = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Red))
+                .title(Span::styled(
+                    " ⚠️  PERMISSION REQUIRED ",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                )),
+        )
+        .alignment(Alignment::Left);
+
+    f.render_widget(dialog, dialog_area);
 }
 
 /// Render the file picker
