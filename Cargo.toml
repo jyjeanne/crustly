@@ -29,7 +29,7 @@ ratatui = { version = "0.28", features = ["all-widgets"] }
 crossterm = { version = "0.28", features = ["event-stream"] }
 tui-textarea = "0.6"
 tui-tree-widget = "0.24"
-ratatui-image = "2.0"
+ratatui-image = "11.0"
 viuer = "0.7"
 arboard = "3.4"
 
