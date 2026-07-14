@@ -22,8 +22,13 @@ struct GrepInput {
     #[serde(default)]
     path: Option<String>,
 
-    /// Use regex instead of literal string
-    #[serde(default)]
+    /// Whether to treat `pattern` as a regex. Defaults to true - Claude
+    /// Code's and qwen-code's grep tools always treat pattern as a full
+    /// regex with no literal/regex toggle at all, so a model trained on
+    /// either never sends this field and expects regex semantics by
+    /// default. Set to false to search for `pattern` as a literal string
+    /// instead (regex metacharacters are escaped).
+    #[serde(default = "default_true")]
     regex: bool,
 
     /// Case insensitive search
@@ -59,7 +64,7 @@ impl Tool for GrepTool {
     }
 
     fn description(&self) -> &str {
-        "Search for patterns in file contents. Supports literal string or regex search with context lines."
+        "Search for patterns in file contents. Supports full regex syntax (e.g. \"log.*Error\", \"function\\s+\\w+\") with context lines. Set regex: false to search for pattern as a literal string instead."
     }
 
     fn input_schema(&self) -> Value {
@@ -68,7 +73,7 @@ impl Tool for GrepTool {
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "Pattern to search for (literal string or regex)"
+                    "description": "The regular expression pattern to search for in file contents"
                 },
                 "path": {
                     "type": "string",
@@ -76,8 +81,8 @@ impl Tool for GrepTool {
                 },
                 "regex": {
                     "type": "boolean",
-                    "description": "Treat pattern as regex instead of literal string",
-                    "default": false
+                    "description": "Whether to treat pattern as a regex. Defaults to true; set to false to search for pattern as a literal string instead.",
+                    "default": true
                 },
                 "case_insensitive": {
                     "type": "boolean",
@@ -378,5 +383,67 @@ mod tests {
         assert!(result.success, "{:?}", result.error);
         assert!(result.output.contains("match.rs"));
         assert!(!result.output.contains("match.txt"));
+    }
+
+    /// Regression: Claude Code's and qwen-code's grep tools always treat
+    /// `pattern` as a regex - there's no literal/regex toggle in either -
+    /// so a model trained on either never sends `regex` and expects regex
+    /// semantics by default. Before this fix, an omitted `regex` field
+    /// defaulted to literal-string matching, so `.` in a pattern like
+    /// `fn.run` would only match a literal dot instead of "any character",
+    /// silently missing matches a Claude Code/qwen-code-trained model
+    /// expects to find.
+    #[tokio::test]
+    async fn test_pattern_is_regex_by_default() {
+        let temp_dir = TempDir::new().unwrap();
+        // "fn.run" as a regex matches this via `.` = "any character"; as a
+        // literal string it would not (no literal dot between fn and run).
+        tokio::fs::write(temp_dir.path().join("code.rs"), "fnXrun")
+            .await
+            .unwrap();
+
+        let tool = GrepTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        // No `regex` field at all - matches what a Claude Code/qwen-code-
+        // trained model actually sends.
+        let input = serde_json::json!({ "pattern": "fn.run" });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(
+            result.output.contains("code.rs"),
+            "expected regex '.' to match any character by default, got: {:?}",
+            result.output
+        );
+    }
+
+    /// `regex: false` must still work as an explicit opt-out into literal
+    /// string matching (regex metacharacters escaped).
+    #[tokio::test]
+    async fn test_regex_false_still_searches_literally() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join("code.rs"), "fnXrun\nfn.run")
+            .await
+            .unwrap();
+
+        let tool = GrepTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({ "pattern": "fn.run", "regex": false });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(
+            result.output.contains("fn.run"),
+            "literal '.' must match the literal dot"
+        );
+        assert!(
+            !result.output.contains("fnXrun"),
+            "with regex: false, '.' must not match an arbitrary character, got: {:?}",
+            result.output
+        );
     }
 }
