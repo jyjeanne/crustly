@@ -8,6 +8,29 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Longest tool-input rendering written to the log. A `write_file` call carries a
+/// whole file body and a `web_fetch` a whole page; logging those in full on every
+/// call would bury the line this exists to make readable.
+const INPUT_PREVIEW_CHARS: usize = 300;
+
+/// Render a tool's arguments for the execution log, truncated to
+/// [`INPUT_PREVIEW_CHARS`].
+///
+/// The point is diagnostic: a model that asks for the wrong command produces a
+/// tool that "succeeds" with empty output, which is indistinguishable from a
+/// broken tool unless the arguments are visible.
+///
+/// Truncation is on `char` boundaries, never bytes - a cut through the middle of a
+/// multi-byte character would panic on a path or prompt containing non-ASCII.
+fn preview_input(input: &Value) -> String {
+    let rendered = input.to_string();
+    if rendered.chars().count() <= INPUT_PREVIEW_CHARS {
+        return rendered;
+    }
+    let truncated: String = rendered.chars().take(INPUT_PREVIEW_CHARS).collect();
+    format!("{truncated} …[truncated]")
+}
+
 /// Registry of available tools
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn Tool>>,
@@ -113,8 +136,16 @@ impl ToolRegistry {
             )));
         }
 
-        // Execute the tool
-        tracing::info!("Executing tool: {}", name);
+        // Execute the tool. Log the arguments, not just the name: when a model
+        // sends a command other than the one it was asked for, the only symptom
+        // is a tool that "succeeds" with empty or surprising output, and without
+        // the input there is no way to tell a broken tool from a model that asked
+        // for the wrong thing.
+        tracing::info!(
+            "Executing tool: {} with input: {}",
+            name,
+            preview_input(&input)
+        );
         let result = tool.execute(input, context).await?;
 
         if result.success {
@@ -196,6 +227,37 @@ mod tests {
     use crate::llm::tools::r#trait::ToolCapability;
     use async_trait::async_trait;
     use uuid::Uuid;
+
+    /// The whole point of logging the input: seeing the command the model actually
+    /// sent. A model that asks for the wrong command yields a tool that "succeeds"
+    /// with empty output, which is indistinguishable from a broken tool otherwise.
+    #[test]
+    fn preview_input_shows_the_command() {
+        let input = serde_json::json!({ "command": "ls -la" });
+        assert_eq!(preview_input(&input), r#"{"command":"ls -la"}"#);
+    }
+
+    #[test]
+    fn preview_input_truncates_a_large_payload() {
+        // e.g. a write_file carrying a whole file body.
+        let input = serde_json::json!({ "content": "x".repeat(5_000) });
+        let preview = preview_input(&input);
+        assert!(preview.ends_with(" …[truncated]"), "got: {preview}");
+        assert!(
+            preview.chars().count() <= INPUT_PREVIEW_CHARS + " …[truncated]".chars().count(),
+            "preview should be bounded, got {} chars",
+            preview.chars().count(),
+        );
+    }
+
+    /// Truncating by byte index would panic mid-character. Tool inputs carry paths
+    /// and prompts, which are routinely non-ASCII - and this runs on every call.
+    #[test]
+    fn preview_input_truncates_on_char_boundaries() {
+        let input = serde_json::json!({ "path": "é".repeat(5_000) });
+        let preview = preview_input(&input); // must not panic
+        assert!(preview.ends_with(" …[truncated]"));
+    }
 
     /// Mock tool for testing
     struct MockTool {
