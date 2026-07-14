@@ -197,14 +197,15 @@ impl Tool for GrepTool {
             )
             .await?;
         } else {
-            self.search_directory(
-                &search_path,
-                &regex,
-                &input,
-                &mut matches,
-                &mut total_matches,
-            )
-            .await?;
+            for path in collect_searchable_files(&search_path).await? {
+                if let Some(limit) = input.limit {
+                    if matches.len() >= limit {
+                        break;
+                    }
+                }
+                self.search_file(&path, &regex, &input, &mut matches, &mut total_matches)
+                    .await?;
+            }
         }
 
         if matches.is_empty() {
@@ -309,46 +310,33 @@ impl GrepTool {
 
         Ok(())
     }
+}
 
-    fn search_directory<'a>(
-        &'a self,
-        dir: &'a PathBuf,
-        regex: &'a regex::Regex,
-        input: &'a GrepInput,
-        matches: &'a mut Vec<String>,
-        total_matches: &'a mut usize,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
-        Box::pin(async move {
-            let mut entries = fs::read_dir(dir).await.map_err(ToolError::Io)?;
+/// Enumerate every regular file under `dir`, respecting `.gitignore`,
+/// `.git/info/exclude`, and the global gitignore (matches ripgrep's - and
+/// therefore qwen-code's `grep_search` and Claude Code's `Grep` - default
+/// behavior). Hidden files/directories are skipped, matching the previous
+/// manual-walk behavior this replaces. Sorted for deterministic output.
+///
+/// The `ignore` crate's walker is synchronous (blocking I/O per step), so
+/// the walk itself runs on a blocking thread; only the per-file content
+/// search remains on the async path.
+async fn collect_searchable_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    let dir = dir.to_path_buf();
+    let mut files = tokio::task::spawn_blocking(move || {
+        ignore::WalkBuilder::new(&dir)
+            .hidden(true)
+            .build()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().is_some_and(|ft| ft.is_file()))
+            .map(|entry| entry.into_path())
+            .collect::<Vec<_>>()
+    })
+    .await
+    .map_err(|e| ToolError::Internal(format!("directory walk failed: {e}")))?;
 
-            while let Some(entry) = entries.next_entry().await.map_err(ToolError::Io)? {
-                let path = entry.path();
-
-                // Check limit
-                if let Some(limit) = input.limit {
-                    if matches.len() >= limit {
-                        return Ok(());
-                    }
-                }
-
-                if path.is_file() {
-                    self.search_file(&path, regex, input, matches, total_matches)
-                        .await?;
-                } else if path.is_dir() {
-                    // Skip hidden directories
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        if name.starts_with('.') {
-                            continue;
-                        }
-                    }
-                    self.search_directory(&path, regex, input, matches, total_matches)
-                        .await?;
-                }
-            }
-
-            Ok(())
-        })
-    }
+    files.sort();
+    Ok(files)
 }
 
 #[cfg(test)]
@@ -443,6 +431,55 @@ mod tests {
         assert!(
             !result.output.contains("fnXrun"),
             "with regex: false, '.' must not match an arbitrary character, got: {:?}",
+            result.output
+        );
+    }
+
+    /// Regression: an unbounded recursive search must not wade into
+    /// directories the project's own `.gitignore` excludes (build output,
+    /// vendored deps, etc.) - both ripgrep-backed grep_search (qwen-code)
+    /// and Claude Code's Grep respect `.gitignore` by default.
+    #[tokio::test]
+    async fn test_search_respects_gitignore() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join(".gitignore"), "ignored_dir/\n")
+            .await
+            .unwrap();
+        tokio::fs::create_dir(temp_dir.path().join("ignored_dir"))
+            .await
+            .unwrap();
+        tokio::fs::write(
+            temp_dir.path().join("ignored_dir/noise.txt"),
+            "needle in a haystack that should be ignored",
+        )
+        .await
+        .unwrap();
+        tokio::fs::write(
+            temp_dir.path().join("real.txt"),
+            "needle in a haystack that should be found",
+        )
+        .await
+        .unwrap();
+
+        // A gitignore-aware walker only activates inside an actual repo
+        // (or with a `.git` directory present) for some ignore-crate
+        // configurations; make this deterministic by giving it one.
+        tokio::fs::create_dir(temp_dir.path().join(".git"))
+            .await
+            .unwrap();
+
+        let tool = GrepTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({ "pattern": "needle", "regex": false });
+        let result = tool.execute(input, &context).await.unwrap();
+
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("real.txt"));
+        assert!(
+            !result.output.contains("ignored_dir"),
+            "gitignored directory must be skipped, got: {:?}",
             result.output
         );
     }
