@@ -898,23 +898,24 @@ default_model = "qwen2.5-coder-7b-instruct"
 
 #### Gemma 4 (Google)
 
-Google's latest generation, released 2025. Excellent instruction following and reasoning; strong on code review and explanation tasks.
+Google's latest generation. Excellent instruction following and reasoning; strong on code review and explanation tasks.
 
 | Version | VRAM / RAM | Context | Notes |
 |---------|-----------|---------|-------|
 | **Gemma-3-4B-IT** ⭐ | 4 GB VRAM / 8 GB RAM | 128K | Runs on almost any machine |
 | Gemma-3-12B-IT | 9 GB VRAM / 20 GB RAM | 128K | Best Gemma balance for coding |
 | Gemma-3-27B-IT | 20 GB VRAM / 40 GB RAM | 128K | Highest quality in the family |
+| **Gemma 4 26B A4B (MoE)** ⭐ | 12 GB VRAM / 32 GB RAM | 256K | 128 experts, 8 active (~3.8B active params/token); native tool calling, vision, and thinking mode |
 
-> Note: At the time of writing, "Gemma 4" GGUF weights are available via community conversions on HuggingFace. LM Studio's discover tab may list them as `gemma-3-*` — these are the same models.
+> Gemma 4 26B A4B is a Mixture-of-Experts model: 25.2B total parameters but only ~3.8B active per token (8 active / 128 total experts + 1 shared), giving dense-26B-class quality at a fraction of the compute/VRAM cost. Apache 2.0 licensed. Also available in `12b`, `31b` (dense), `e2b`/`e4b` (edge-optimized), and `31b-cloud` (Ollama-hosted) variants — see [`ollama.com/library/gemma4:26b`](https://ollama.com/library/gemma4:26b). Full architecture, tool-calling, MoE routing, JSON output, and Crustly integration reference: [`docs/models/gemma-4-26b-a4b/`](docs/models/gemma-4-26b-a4b/).
 
-**LM Studio search term:** `gemma-3-12b-it`
-**Ollama:** `ollama pull gemma3:12b`
+**LM Studio search term:** `gemma-3-12b-it` (Gemma-3) / check HuggingFace for Gemma 4 26B A4B GGUF quants
+**Ollama:** `ollama pull gemma3:12b` (Gemma-3) / `ollama pull gemma4:26b` (Gemma 4 26B A4B MoE)
 
 **Minimum system requirements:**
-- RAM: **8 GB** (4B model); 20 GB (12B); 40 GB (27B)
-- GPU (optional): Any NVIDIA/AMD with 4 GB+ VRAM for 4B model
-- Storage: ~3 GB (4B Q4), ~7 GB (12B Q4), ~17 GB (27B Q4)
+- RAM: **8 GB** (4B model); 20 GB (12B); 40 GB (27B); 32 GB (26B A4B MoE)
+- GPU (optional): Any NVIDIA/AMD with 4 GB+ VRAM for 4B model; RTX 3060 12 GB+ recommended for 26B A4B MoE
+- Storage: ~3 GB (4B Q4), ~7 GB (12B Q4), ~17 GB (27B Q4), ~18 GB (26B A4B MoE Q4_K_M, Ollama's default quant)
 
 **Config for LM Studio:**
 ```toml
@@ -922,6 +923,17 @@ Google's latest generation, released 2025. Excellent instruction following and r
 api_key = "lm-studio"
 base_url = "http://localhost:1234/v1"
 default_model = "gemma-3-12b-it"
+```
+
+**Config for Ollama (Gemma 4 26B A4B MoE):**
+```toml
+[providers.ollama]
+enabled = true
+default_model = "gemma4:26b"
+num_ctx = 65536      # good latency/quality balance; model supports up to 262144
+temperature = 1.0    # Google/Ollama's standardized recommendation
+top_p = 0.95
+top_k = 64
 ```
 
 ---
@@ -1704,6 +1716,7 @@ Crustly: [executes bash tool] ✅ 145 tests passed
 | Qwen2.5-Coder 14B | `ollama pull qwen2.5-coder:14b` | 24 GB | ★★★★★ | ✅ Excellent | Higher quality code generation |
 | Qwen2.5-Coder 32B | `ollama pull qwen2.5-coder:32b` | 48 GB | ★★★★★ | ✅ Excellent | Near-GPT-4 code quality |
 | Llama 3.3 70B | `ollama pull llama3.3:70b` | 64 GB | ★★★★★ | ✅ Full | Complex multi-file tasks |
+| **Gemma 4 26B A4B (MoE)** ⭐ | `ollama pull gemma4:26b` | 32 GB | ★★★★★ | ✅ Excellent | 256K context, repo-wide analysis, agentic workflows |
 
 > ⚠️ **Tool calling is required** for Crustly's plan mode and file operations. All models in the table above support it. **Avoid DeepSeek Coder V2** — a tokenizer bug causes empty tool-call responses in both Ollama and LM Studio.
 

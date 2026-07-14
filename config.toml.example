@@ -112,6 +112,33 @@ default_model = "qwen2.5-coder-7b-instruct"
 # top_p = 0.90
 # top_k = 20
 #
+# Option C - Gemma 4 26B A4B (MoE, 8 active / 128 total experts + 1 shared,
+# 25.2B total / 3.8B active params, 256K context, native tool calling, vision,
+# and thinking):
+# ollama pull gemma4:26b
+# Sampling values below are Google/Ollama's standardized recommendation
+# (ollama.com/library/gemma4:26b) "across all use cases", including agentic
+# and tool-calling workflows - see docs/models/gemma-4-26b-a4b/ for the full
+# reference. Lower temperature (e.g. 0.1-0.2) is a Crustly-side option if you
+# want stricter determinism for tool calls/JSON output, at the cost of
+# deviating from the vendor's tuned defaults.
+# [providers.ollama]
+# enabled = true
+# host = "http://localhost:11434"
+# default_model = "gemma4:26b"
+# keep_alive = "5m"
+# num_ctx = 65536       # Model supports up to 262144; 65536 balances context vs. memory/latency
+# temperature = 1.0
+# top_p = 0.95
+# top_k = 64
+#
+# Other Gemma 4 tags (swap default_model above, same sampling values apply):
+#   gemma4:e2b / gemma4:e4b - edge/effective-parameter models, 128K context,
+#                             lower RAM (~8-16 GB), also support audio input
+#   gemma4:12b              - 128K context, dense, mid-size
+#   gemma4:31b               - 256K context, dense, highest quality, heaviest
+#   gemma4:31b-cloud         - Ollama-hosted, no local GPU/RAM required
+#
 # Env var equivalents: OLLAMA_HOST (or OLLAMA_BASE_URL), OLLAMA_MODEL
 #
 # Model management from the command line (list/pull/delete/show/embed):

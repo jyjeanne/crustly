@@ -584,6 +584,7 @@ impl Provider for OllamaProvider {
             "llama3.1:8b".to_string(),
             "qwen2.5-coder:7b".to_string(),
             "gemma3:12b".to_string(),
+            "gemma4:26b".to_string(),
             "mistral:latest".to_string(),
             "deepseek-r1:14b".to_string(),
             "ornith:9b".to_string(),
@@ -831,6 +832,14 @@ mod tests {
     fn test_validate_model_always_true() {
         let provider = OllamaProvider::default_local();
         assert!(provider.validate_model("anything-the-user-pulled:latest"));
+    }
+
+    #[test]
+    fn test_supported_models_includes_gemma4() {
+        let provider = OllamaProvider::default_local();
+        assert!(provider
+            .supported_models()
+            .contains(&"gemma4:26b".to_string()));
     }
 
     #[test]

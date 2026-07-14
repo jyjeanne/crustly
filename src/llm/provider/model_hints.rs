@@ -22,6 +22,7 @@ pub fn is_vision_model(model_name: &str) -> bool {
         "phi-3-vision",
         "phi3-vision",
         "idefics",
+        "gemma4",
     ];
     VISION_PATTERNS.iter().any(|p| model_lc.contains(p))
 }
@@ -35,6 +36,7 @@ mod tests {
         assert!(is_vision_model("llava:13b"));
         assert!(is_vision_model("llama3.2-vision:11b-instruct-fp16"));
         assert!(is_vision_model("MiniCPM-V-2.6"));
+        assert!(is_vision_model("gemma4:26b"));
     }
 
     #[test]
