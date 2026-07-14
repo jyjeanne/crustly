@@ -10,8 +10,8 @@ use crate::llm::agent::AgentService;
 use crate::plan::PlanDocument;
 use crate::services::{MessageService, PlanService, ServiceContext, SessionService};
 use anyhow::Result;
+use ratatui_textarea::{CursorMove, TextArea};
 use std::sync::{Arc, Mutex};
-use tui_textarea::{CursorMove, TextArea};
 use uuid::Uuid;
 
 /// Display message for UI rendering

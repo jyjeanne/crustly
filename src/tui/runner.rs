@@ -94,7 +94,10 @@ async fn run_inner(stdout: io::Stdout, app: &mut App) -> Result<()> {
 }
 
 /// Main event loop
-async fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
+async fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()>
+where
+    <B as Backend>::Error: std::error::Error + Send + Sync + 'static,
+{
     loop {
         // Render
         terminal.draw(|f| render::render(f, app))?;
@@ -139,4 +142,62 @@ async fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Resu
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use crate::llm::agent::AgentService;
+    use crate::llm::provider::{
+        LLMRequest, LLMResponse, Provider, ProviderStream, Result as ProviderResult,
+    };
+    use crate::services::ServiceContext;
+    use async_trait::async_trait;
+    use ratatui::backend::TestBackend;
+    use std::sync::Arc;
+
+    struct DummyProvider;
+
+    #[async_trait]
+    impl Provider for DummyProvider {
+        async fn complete(&self, _request: LLMRequest) -> ProviderResult<LLMResponse> {
+            unimplemented!("run_loop test never calls complete()")
+        }
+        async fn stream(&self, _request: LLMRequest) -> ProviderResult<ProviderStream> {
+            unimplemented!("run_loop test never calls stream()")
+        }
+        fn name(&self) -> &str {
+            "dummy"
+        }
+        fn default_model(&self) -> &str {
+            "dummy-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["dummy-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(4096)
+        }
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    #[tokio::test]
+    async fn run_loop_exits_immediately_when_should_quit_is_set() {
+        let db = Database::connect_in_memory().await.expect("in-memory db");
+        db.run_migrations().await.expect("run migrations");
+        let context = ServiceContext::new(db.pool().clone());
+        let agent_service = Arc::new(AgentService::new(Arc::new(DummyProvider), context.clone()));
+        let mut app = App::new(agent_service, context);
+        app.should_quit = true;
+
+        let backend = TestBackend::new(20, 10);
+        let mut terminal = Terminal::new(backend).expect("create terminal");
+
+        run_loop(&mut terminal, &mut app)
+            .await
+            .expect("run_loop should exit cleanly once should_quit is set");
+    }
 }
