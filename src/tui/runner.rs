@@ -94,7 +94,10 @@ async fn run_inner(stdout: io::Stdout, app: &mut App) -> Result<()> {
 }
 
 /// Main event loop
-async fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
+async fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()>
+where
+    <B as Backend>::Error: std::error::Error + Send + Sync + 'static,
+{
     loop {
         // Render
         terminal.draw(|f| render::render(f, app))?;

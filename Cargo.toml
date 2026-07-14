@@ -26,10 +26,10 @@ clap_complete = "4.5"
 
 # TUI
 ratatui = { version = "0.30", features = ["all-widgets"] }
-crossterm = { version = "0.28", features = ["event-stream"] }
-tui-textarea = "0.6"
+crossterm = { version = "0.29", features = ["event-stream"] }
+ratatui-textarea = "0.9"
 tui-tree-widget = "0.24"
-ratatui-image = "2.0"
+ratatui-image = { version = "11.0", default-features = false, features = ["image-defaults", "crossterm"] }
 viuer = "0.7"
 arboard = "3.4"
 
