@@ -124,7 +124,7 @@ quick-xml = "0.31"
 [dev-dependencies]
 rstest = "0.26"
 proptest = "1.4"
-mockall = "0.12"
+mockall = "0.15"
 criterion = { version = "0.5", features = ["html_reports"] }
 insta = { version = "1.34", features = ["json", "yaml"] }
 tempfile = "3.9"
