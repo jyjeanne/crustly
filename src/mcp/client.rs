@@ -223,6 +223,40 @@ impl McpTool {
     }
 }
 
+#[async_trait]
+impl Tool for McpTool {
+    fn name(&self) -> &str {
+        &self.namespaced_name
+    }
+
+    fn description(&self) -> &str {
+        self.def.description.as_deref().unwrap_or("MCP tool")
+    }
+
+    fn input_schema(&self) -> Value {
+        self.def
+            .input_schema
+            .clone()
+            .unwrap_or_else(|| serde_json::json!({}))
+    }
+
+    fn capabilities(&self) -> Vec<ToolCapability> {
+        vec![] // MCP tools declare no built-in capabilities
+    }
+
+    async fn execute(
+        &self,
+        input: Value,
+        _ctx: &ToolExecutionContext,
+    ) -> crate::llm::tools::Result<ToolResult> {
+        let mut client = self.client.lock().await;
+        match client.call_tool(&self.def.name, input).await {
+            Ok(output) => Ok(ToolResult::success(output)),
+            Err(e) => Ok(ToolResult::error(e.to_string())),
+        }
+    }
+}
+
 #[cfg(test)]
 mod mcp_tool_naming_tests {
     use super::*;
@@ -255,39 +289,5 @@ mod mcp_tool_naming_tests {
             "tool name must match ^[a-zA-Z0-9_-]+$: {name}"
         );
         assert!(name.len() <= 64, "tool name must be <=64 chars: {name}");
-    }
-}
-
-#[async_trait]
-impl Tool for McpTool {
-    fn name(&self) -> &str {
-        &self.namespaced_name
-    }
-
-    fn description(&self) -> &str {
-        self.def.description.as_deref().unwrap_or("MCP tool")
-    }
-
-    fn input_schema(&self) -> Value {
-        self.def
-            .input_schema
-            .clone()
-            .unwrap_or_else(|| serde_json::json!({}))
-    }
-
-    fn capabilities(&self) -> Vec<ToolCapability> {
-        vec![] // MCP tools declare no built-in capabilities
-    }
-
-    async fn execute(
-        &self,
-        input: Value,
-        _ctx: &ToolExecutionContext,
-    ) -> crate::llm::tools::Result<ToolResult> {
-        let mut client = self.client.lock().await;
-        match client.call_tool(&self.def.name, input).await {
-            Ok(output) => Ok(ToolResult::success(output)),
-            Err(e) => Ok(ToolResult::error(e.to_string())),
-        }
     }
 }

@@ -38,8 +38,9 @@ struct GrepInput {
     #[serde(default)]
     context: Option<usize>,
 
-    /// File pattern to filter (e.g., "*.rs")
-    #[serde(default)]
+    /// File pattern to filter (e.g., "*.rs"). Accepts `glob` as an alias -
+    /// the field name sent by Claude Code's and qwen-code's grep tools.
+    #[serde(alias = "glob", default)]
     file_pattern: Option<String>,
 
     /// Maximum number of matches to return
@@ -95,7 +96,11 @@ impl Tool for GrepTool {
                 },
                 "file_pattern": {
                     "type": "string",
-                    "description": "File pattern to filter (e.g., '*.rs', '*.{js,ts}')"
+                    "description": "File pattern to filter (e.g., '*.rs', '*.{js,ts}'). Alias: glob."
+                },
+                "glob": {
+                    "type": "string",
+                    "description": "Alias of 'file_pattern'."
                 },
                 "limit": {
                     "type": "integer",
@@ -338,5 +343,40 @@ impl GrepTool {
 
             Ok(())
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    /// Regression: Claude Code's and qwen-code's grep tools send `glob`,
+    /// not `file_pattern`. A model trained on either must still be able to
+    /// filter by file pattern.
+    #[tokio::test]
+    async fn test_grep_accepts_glob_alias_for_file_pattern() {
+        let temp_dir = TempDir::new().unwrap();
+        tokio::fs::write(temp_dir.path().join("match.rs"), "needle here")
+            .await
+            .unwrap();
+        tokio::fs::write(temp_dir.path().join("match.txt"), "needle here")
+            .await
+            .unwrap();
+
+        let tool = GrepTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({
+            "pattern": "needle",
+            "glob": "*.rs"
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("match.rs"));
+        assert!(!result.output.contains("match.txt"));
     }
 }

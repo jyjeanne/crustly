@@ -3,6 +3,7 @@
 //! Provides an abstraction for tools that can be called by LLM agents,
 //! including file operations, shell commands, and more.
 
+pub mod aliases;
 pub mod cache;
 pub mod error;
 pub mod registry;
