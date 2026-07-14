@@ -140,17 +140,44 @@ fn init_debug_logging(config: LogConfig) -> Result<LoggerGuard, Box<dyn std::err
         .ok();
     }
 
-    // Set up rolling file appender (daily rotation)
-    let file_appender = tracing_appender::rolling::daily(&config.log_dir, &config.log_prefix);
+    // Set up rolling file appender (daily rotation).
+    //
+    // The `.log` suffix is not decoration: `get_log_path` and `cleanup_old_logs`
+    // both select files by `extension() == "log"`. `rolling::daily(dir, prefix)`
+    // alone produces `crustly.2026-07-14`, whose extension is the date - so those
+    // two never matched their own output. Logs were written but were invisible to
+    // the tooling, and rotation never deleted anything.
+    let file_appender = tracing_appender::rolling::Builder::new()
+        .rotation(tracing_appender::rolling::Rotation::DAILY)
+        .filename_prefix(&config.log_prefix)
+        .filename_suffix("log")
+        .build(&config.log_dir)?;
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
-    // Build environment filter
-    let env_filter = EnvFilter::from_default_env()
-        .add_directive(config.log_level.into())
+    // Build environment filter.
+    //
+    // The level directive is scoped to `crustly`. A bare `config.log_level`
+    // directive would set the *global* default instead, turning on DEBUG for
+    // every dependency and burying our own lines in third-party noise.
+    //
+    // Directives are applied in order and the last match wins, so RUST_LOG is
+    // parsed last: setting it overrides these defaults rather than fighting them.
+    let mut env_filter = EnvFilter::default()
+        .add_directive("warn".parse()?)
+        .add_directive(format!("crustly={}", config.log_level).parse()?)
         .add_directive("sqlx=warn".parse()?)
         .add_directive("hyper=warn".parse()?)
         .add_directive("reqwest=warn".parse()?)
         .add_directive("tower=warn".parse()?);
+
+    if let Ok(rust_log) = std::env::var(EnvFilter::DEFAULT_ENV) {
+        for directive in rust_log.split(',').filter(|d| !d.trim().is_empty()) {
+            match directive.parse() {
+                Ok(d) => env_filter = env_filter.add_directive(d),
+                Err(e) => eprintln!("Ignoring invalid RUST_LOG directive {directive:?}: {e}"),
+            }
+        }
+    }
 
     // Initialize subscriber with file logging
     tracing_subscriber::registry()
@@ -306,5 +333,61 @@ mod tests {
         let log_dir_str = config.log_dir.to_string_lossy();
         assert!(log_dir_str.contains(".crustly"));
         assert!(log_dir_str.contains("logs"));
+    }
+
+    /// Regression: the file appender must produce names that `get_log_path` and
+    /// `cleanup_old_logs` can actually find. Both select on `extension() == "log"`.
+    ///
+    /// `rolling::daily(dir, prefix)` names files `crustly.2026-07-14`, whose
+    /// extension is the *date*. Debug logs were written but were invisible to
+    /// every tool that looked for them, and rotation never deleted a single file.
+    /// This asserts the two halves agree, without duplicating the naming rule.
+    #[test]
+    fn debug_log_files_are_findable_by_the_readers() {
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+
+        // Build the appender exactly as init_debug_logging does, and write to it.
+        let mut appender = tracing_appender::rolling::Builder::new()
+            .rotation(tracing_appender::rolling::Rotation::DAILY)
+            .filename_prefix("crustly")
+            .filename_suffix("log")
+            .build(dir.path())
+            .unwrap();
+        writeln!(appender, "hello").unwrap();
+        appender.flush().unwrap();
+
+        let written: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .collect();
+        assert_eq!(written.len(), 1, "expected exactly one log file");
+
+        // The readers' predicate. If this fails, the log is unreachable.
+        assert_eq!(
+            written[0].extension().and_then(|e| e.to_str()),
+            Some("log"),
+            "log file {:?} is not discoverable by get_log_path/cleanup_old_logs, \
+             which filter on extension == \"log\"",
+            written[0].file_name().unwrap(),
+        );
+    }
+
+    /// The debug filter must not raise the *global* level to DEBUG - that buries
+    /// crustly's own lines under third-party noise. Scope it to `crustly`.
+    #[test]
+    fn debug_filter_is_scoped_to_crustly() {
+        let filter = EnvFilter::default()
+            .add_directive("warn".parse().unwrap())
+            .add_directive(format!("crustly={}", Level::DEBUG).parse().unwrap());
+
+        // `Level`'s Display is uppercase ("DEBUG"); EnvFilter must accept it.
+        let rendered = filter.to_string();
+        assert!(
+            rendered.to_lowercase().contains("crustly=debug"),
+            "expected a crustly-scoped debug directive, got {rendered:?}"
+        );
     }
 }

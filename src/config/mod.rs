@@ -292,6 +292,48 @@ pub struct ProviderConfigs {
     pub ollama: Option<OllamaProviderConfig>,
 }
 
+impl ProviderConfigs {
+    /// Point the provider that `create_provider` will actually select at `model`,
+    /// overriding its `default_model` for this run only (nothing is written back
+    /// to config.toml).
+    ///
+    /// Backs `--model`. The predicates below mirror `create_provider`'s selection
+    /// order (Qwen, then Ollama, then OpenAI, then Anthropic) *exactly*, including
+    /// the fact that only Ollama honours `enabled` - the Qwen and OpenAI branches
+    /// select on `base_url`/`api_key` alone and ignore `enabled = false`. Mirroring
+    /// the real behaviour rather than the intended behaviour is deliberate: if the
+    /// override landed on a provider the factory does not pick, `--model` would
+    /// silently do nothing while reporting success.
+    ///
+    /// Returns the name of the provider that took the override, or `None` if no
+    /// provider is configured to take it.
+    pub fn override_default_model(&mut self, model: &str) -> Option<&'static str> {
+        if let Some(qwen) = self.qwen.as_mut() {
+            if qwen.base_url.is_some() || qwen.api_key.is_some() {
+                qwen.default_model = Some(model.to_string());
+                return Some("qwen");
+            }
+        }
+        if let Some(ollama) = self.ollama.as_mut() {
+            if ollama.enabled {
+                ollama.default_model = Some(model.to_string());
+                return Some("ollama");
+            }
+        }
+        if let Some(openai) = self.openai.as_mut() {
+            if openai.base_url.is_some() || openai.api_key.is_some() {
+                openai.default_model = Some(model.to_string());
+                return Some("openai");
+            }
+        }
+        if let Some(anthropic) = self.anthropic.as_mut() {
+            anthropic.default_model = Some(model.to_string());
+            return Some("anthropic");
+        }
+        None
+    }
+}
+
 /// Individual provider configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderConfig {
@@ -365,6 +407,30 @@ pub struct QwenProviderConfig {
     /// explicitly set here.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repetition_penalty: Option<f32>,
+}
+
+impl Default for QwenProviderConfig {
+    /// Hand-written rather than derived so `enabled` agrees with serde's
+    /// `default_enabled` (true). A derived `Default` would say `false` and quietly
+    /// disagree with what deserializing an empty `[providers.qwen]` produces.
+    fn default() -> Self {
+        Self {
+            enabled: default_enabled(),
+            api_key: None,
+            base_url: None,
+            default_model: None,
+            tool_parser: None,
+            enable_thinking: false,
+            thinking_budget: None,
+            region: None,
+            // `None` is meaningful, not merely empty: crustly applies model-aware
+            // sampling defaults when these are unset. Pinning concrete numbers
+            // here would silently override that per-model tuning.
+            top_p: None,
+            top_k: None,
+            repetition_penalty: None,
+        }
+    }
 }
 
 /// Native Ollama provider configuration (`/api/chat`, via `ollama-rs`).
@@ -859,6 +925,74 @@ impl Config {
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
+
+    /// `--model` must land on the provider `create_provider` will actually select.
+    /// If it set the model on a *different* provider, the override would silently
+    /// do nothing while the CLI reported success - the user would believe they were
+    /// testing one model while running another.
+    #[test]
+    fn model_override_targets_the_selected_provider() {
+        // Ollama enabled, no Qwen: Ollama is selected, so Ollama takes the model.
+        let mut providers = ProviderConfigs {
+            ollama: Some(OllamaProviderConfig {
+                enabled: true,
+                default_model: Some("ornith:9b".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            providers.override_default_model("qwen2.5-coder:7b"),
+            Some("ollama")
+        );
+        assert_eq!(
+            providers.ollama.as_ref().unwrap().default_model.as_deref(),
+            Some("qwen2.5-coder:7b"),
+        );
+    }
+
+    /// Qwen outranks Ollama in `create_provider`, so it must outrank it here too.
+    #[test]
+    fn model_override_respects_provider_precedence() {
+        let mut providers = ProviderConfigs {
+            qwen: Some(QwenProviderConfig {
+                base_url: Some("http://localhost:8000/v1".to_string()),
+                ..Default::default()
+            }),
+            ollama: Some(OllamaProviderConfig {
+                enabled: true,
+                default_model: Some("ornith:9b".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(providers.override_default_model("qwen3-8b"), Some("qwen"));
+        assert_eq!(
+            providers.qwen.as_ref().unwrap().default_model.as_deref(),
+            Some("qwen3-8b"),
+        );
+        // Ollama is not the selected provider, so it must be left alone.
+        assert_eq!(
+            providers.ollama.as_ref().unwrap().default_model.as_deref(),
+            Some("ornith:9b"),
+            "override must not touch a provider that will not be selected",
+        );
+    }
+
+    /// A disabled Ollama is not selected, so it must not silently swallow the
+    /// override - the CLI needs the `None` to report a real error.
+    #[test]
+    fn model_override_reports_when_no_provider_can_take_it() {
+        let mut providers = ProviderConfigs {
+            ollama: Some(OllamaProviderConfig {
+                enabled: false,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(providers.override_default_model("qwen2.5-coder:7b"), None);
+        assert!(providers.ollama.as_ref().unwrap().default_model.is_none());
+    }
 
     /// A read-only `allow_bash` list must let those exact commands run without an
     /// approval prompt (Trusted) while still denying everything else - including

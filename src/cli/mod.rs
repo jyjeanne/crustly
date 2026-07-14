@@ -142,6 +142,14 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub config: Option<String>,
 
+    /// Override the model for this run, e.g. `qwen2.5-coder:7b`.
+    ///
+    /// Applies to whichever provider is active, without editing config.toml.
+    /// Long-only: `auto-plan` already uses `-m` for `--max-iterations`, and a
+    /// global short `-m` would collide with it.
+    #[arg(long, global = true)]
+    pub model: Option<String>,
+
     /// Subcommand to execute
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -327,7 +335,26 @@ pub async fn run() -> Result<()> {
     }
 
     // Load configuration
-    let config = load_config(cli.config.as_deref()).await?;
+    let mut config = load_config(cli.config.as_deref()).await?;
+
+    // Apply `--model` before any provider is built. `create_provider` reads
+    // `default_model` off whichever provider config it selects, so overriding the
+    // field here reaches every provider and every subcommand with no further
+    // plumbing - and nothing is written back to config.toml.
+    if let Some(model) = &cli.model {
+        match config.providers.override_default_model(model) {
+            Some(provider) => {
+                tracing::info!("Model overridden via --model: {model} (provider: {provider})");
+            }
+            None => {
+                anyhow::bail!(
+                    "--model {model} was given, but no provider is configured to run it.\n\
+                     Configure a provider in config.toml first (see `crustly init`)."
+                );
+            }
+        }
+    }
+    let config = config;
 
     match cli.command {
         None | Some(Commands::Chat { session: _ }) => {
