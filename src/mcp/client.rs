@@ -201,13 +201,60 @@ pub struct McpTool {
     client: Arc<Mutex<MCPClient>>,
 }
 
+/// Build the namespaced tool name exposed to the model for an MCP tool.
+///
+/// `__` (not `::`) because most providers validate function-call names
+/// against `^[a-zA-Z0-9_-]{1,64}$` - a `:` is rejected by OpenAI/Qwen
+/// (DashScope) tool-calling and would make every MCP tool uncallable the
+/// moment a server is configured. `__` also matches the namespacing
+/// convention used by Claude Code and qwen-code (`mcp__{server}__{tool}`),
+/// so a model trained on either guesses Crustly's MCP tool names correctly.
+pub fn namespaced_tool_name(server_name: &str, tool_name: &str) -> String {
+    format!("mcp__{}__{}", server_name, tool_name)
+}
+
 impl McpTool {
     pub fn new(server_name: &str, def: McpToolDef, client: Arc<Mutex<MCPClient>>) -> Self {
         Self {
-            namespaced_name: format!("mcp::{}::{}", server_name, def.name),
+            namespaced_name: namespaced_tool_name(server_name, &def.name),
             def,
             client,
         }
+    }
+}
+
+#[cfg(test)]
+mod mcp_tool_naming_tests {
+    use super::*;
+
+    /// Regression: a `:` in the tool name is rejected by OpenAI/Qwen
+    /// function-calling name validation (`^[a-zA-Z0-9_-]{1,64}$`), which
+    /// would make every MCP tool uncallable under those providers.
+    #[test]
+    fn namespaced_tool_name_contains_no_colons() {
+        let name = namespaced_tool_name("github", "get_me");
+        assert!(!name.contains(':'), "tool name must not contain ':': {name}");
+    }
+
+    /// Must match the `mcp__{server}__{tool}` convention used by Claude
+    /// Code and qwen-code, so models trained on either guess correctly.
+    #[test]
+    fn namespaced_tool_name_uses_double_underscore_convention() {
+        assert_eq!(
+            namespaced_tool_name("github", "get_me"),
+            "mcp__github__get_me"
+        );
+    }
+
+    #[test]
+    fn namespaced_tool_name_matches_provider_function_name_pattern() {
+        let name = namespaced_tool_name("my-server_1", "some_tool");
+        assert!(
+            name.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-'),
+            "tool name must match ^[a-zA-Z0-9_-]+$: {name}"
+        );
+        assert!(name.len() <= 64, "tool name must be <=64 chars: {name}");
     }
 }
 
