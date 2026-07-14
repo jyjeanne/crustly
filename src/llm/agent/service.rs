@@ -402,6 +402,29 @@ impl AgentService {
         self
     }
 
+    /// The system prompt with the current environment appended.
+    ///
+    /// The working directory is passed to *tools* via `ToolExecutionContext`, but
+    /// was never told to the *model*: the prompt instructs it to "operate on the
+    /// current working directory" while never saying what that directory is. A
+    /// model asked to "list files in the current folder" therefore has to guess at
+    /// its own location - which is exactly when they invent paths (`~/`, `/tmp`) or
+    /// fabricate contents outright.
+    ///
+    /// Appended at send time rather than baked into the `SYSTEM_PROMPT` constant
+    /// because the directory is only known at runtime, and a sub-agent may be
+    /// running in a different one.
+    fn system_prompt_with_env(&self) -> Option<String> {
+        let base = self.default_system_prompt.as_ref()?;
+        Some(format!(
+            "{base}\n\n## Environment\n\nCurrent working directory: {}\n\n\
+             This is what \"the current directory/folder\" refers to. Paths you pass to \
+             tools are resolved relative to it, so prefer relative paths. Do not assume \
+             anything about its contents - list it.",
+            self.working_directory.display()
+        ))
+    }
+
     /// Control whether this service wires a SubAgentLauncher into tool contexts.
     /// Set to false for sub-agents to prevent recursive spawning.
     pub fn with_allow_sub_agents(mut self, allow: bool) -> Self {
@@ -625,9 +648,10 @@ impl AgentService {
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
 
-        // Add system prompt if available
-        if let Some(system_prompt) = &self.default_system_prompt {
-            context.system_prompt = Some(system_prompt.clone());
+        // Add system prompt if available, with the working directory appended so
+        // the model knows where "the current directory" actually is.
+        if let Some(system_prompt) = self.system_prompt_with_env() {
+            context.system_prompt = Some(system_prompt);
         }
 
         // Auto-inject PDF content when the user message references a .pdf file
@@ -1430,9 +1454,10 @@ impl AgentService {
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
 
-        // Add system prompt if available
-        if let Some(system_prompt) = &self.default_system_prompt {
-            context.system_prompt = Some(system_prompt.clone());
+        // Add system prompt if available, with the working directory appended so
+        // the model knows where "the current directory" actually is.
+        if let Some(system_prompt) = self.system_prompt_with_env() {
+            context.system_prompt = Some(system_prompt);
         }
 
         // Auto-inject PDF content when the user message references a .pdf file
@@ -1747,6 +1772,42 @@ mod tests {
             .unwrap();
 
         assert!(!response.content.is_empty());
+    }
+
+    /// Regression: the working directory was threaded into `ToolExecutionContext`
+    /// but never into the system prompt, so the prompt told the model to "operate
+    /// on the current working directory" without ever saying which one that was.
+    /// Asked to list "the current folder", the model had to guess where it was -
+    /// and guessing is when they invent `~/` paths or fabricate contents.
+    #[tokio::test]
+    async fn system_prompt_tells_the_model_the_working_directory() {
+        let (agent_service, _session_id) = create_test_service().await;
+        let workdir = std::env::temp_dir().join("crustly-cwd-test");
+
+        let agent_service = agent_service
+            .with_system_prompt("You are a helpful assistant.".to_string())
+            .with_working_directory(workdir.clone());
+
+        let prompt = agent_service
+            .system_prompt_with_env()
+            .expect("a system prompt was set");
+
+        assert!(
+            prompt.contains(&workdir.display().to_string()),
+            "the model must be told its working directory; prompt was:\n{prompt}"
+        );
+        assert!(
+            prompt.contains("You are a helpful assistant."),
+            "the base prompt must be preserved, not replaced"
+        );
+    }
+
+    /// With no system prompt configured there is nothing to append to, and the
+    /// environment block must not conjure one into existence.
+    #[tokio::test]
+    async fn system_prompt_with_env_is_none_when_no_prompt_is_set() {
+        let (agent_service, _session_id) = create_test_service().await;
+        assert!(agent_service.system_prompt_with_env().is_none());
     }
 
     /// Mock provider that simulates tool use
