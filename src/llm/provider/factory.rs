@@ -195,11 +195,11 @@ fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     Ok(None)
 }
 
-/// Try to create Qwen provider if configured
+/// Try to create Qwen provider if configured and enabled.
 fn try_create_qwen(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     let qwen_config = match &config.providers.qwen {
-        Some(cfg) => cfg,
-        None => return Ok(None),
+        Some(cfg) if cfg.enabled => cfg,
+        _ => return Ok(None),
     };
 
     // Local Qwen (vLLM, LM Studio, etc.)
@@ -280,11 +280,11 @@ fn configure_qwen(mut provider: QwenProvider, config: &QwenProviderConfig) -> Qw
     provider
 }
 
-/// Try to create OpenAI provider if configured
+/// Try to create OpenAI provider if configured and enabled.
 fn try_create_openai(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     let openai_config = match &config.providers.openai {
-        Some(cfg) => cfg,
-        None => return Ok(None),
+        Some(cfg) if cfg.enabled => cfg,
+        _ => return Ok(None),
     };
 
     // Local LLM (LM Studio, Ollama, etc.)
@@ -323,6 +323,17 @@ fn create_anthropic(config: &Config) -> Result<Arc<dyn Provider>> {
     let anthropic_config = config.providers.anthropic.as_ref().context(
         "No provider configured.\n\nPlease set one of:\n  - ANTHROPIC_API_KEY for Claude\n  - OPENAI_API_KEY for OpenAI/GPT\n  - OPENAI_BASE_URL for local LLMs (LM Studio, Ollama)\n  - QWEN_BASE_URL for local Qwen (vLLM)\n  - DASHSCOPE_API_KEY for DashScope cloud\n\nExample for vLLM with Qwen:\n  export QWEN_BASE_URL=\"http://localhost:8000/v1/chat/completions\"",
     )?;
+
+    // Anthropic is the terminal fallback, so a disabled one cannot quietly fall
+    // through to another provider the way the others can - it must say so, rather
+    // than fail later with a misleading "API key not set".
+    if !anthropic_config.enabled {
+        anyhow::bail!(
+            "No provider is enabled. `providers.anthropic` is the last fallback and it \
+             has `enabled = false`.\n\nEnable a provider in config.toml, or remove its \
+             `enabled = false`."
+        );
+    }
 
     let api_key = anthropic_config
         .api_key
@@ -506,6 +517,97 @@ mod tests {
         assert!(result.is_ok());
         let provider = result.unwrap();
         assert_eq!(provider.name(), "openai");
+    }
+
+    /// Regression: `enabled = false` was read from config but never checked by the
+    /// Qwen, OpenAI or Anthropic branches - only Ollama honoured it. A provider the
+    /// user had explicitly turned off would still be selected, purely on the
+    /// presence of an api_key/base_url, and would silently take over as soon as the
+    /// provider above it in the priority order was removed.
+    #[test]
+    fn disabled_openai_is_skipped_in_favour_of_the_next_provider() {
+        let config = Config {
+            providers: ProviderConfigs {
+                openai: Some(ProviderConfig {
+                    enabled: false,
+                    api_key: Some("test-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let provider = create_provider(&config).expect("anthropic should be selected");
+        assert_eq!(
+            provider.name(),
+            "anthropic",
+            "a disabled OpenAI must not be selected despite having an api_key",
+        );
+    }
+
+    #[test]
+    fn disabled_qwen_is_skipped_in_favour_of_the_next_provider() {
+        let config = Config {
+            providers: ProviderConfigs {
+                qwen: Some(QwenProviderConfig {
+                    enabled: false,
+                    base_url: Some("http://localhost:8000/v1".to_string()),
+                    ..Default::default()
+                }),
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let provider = create_provider(&config).expect("anthropic should be selected");
+        assert_eq!(
+            provider.name(),
+            "anthropic",
+            "a disabled Qwen must not be selected despite having a base_url",
+        );
+    }
+
+    /// Anthropic is the terminal fallback: disabling it cannot fall through to
+    /// anything, so it must fail with an explanation rather than the misleading
+    /// "Anthropic API key not set" it would otherwise hit.
+    #[test]
+    fn disabled_anthropic_fallback_fails_with_a_clear_message() {
+        let config = Config {
+            providers: ProviderConfigs {
+                anthropic: Some(ProviderConfig {
+                    enabled: false,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // `Arc<dyn Provider>` is not Debug, so `expect_err` is unavailable here.
+        let msg = match create_provider(&config) {
+            Ok(p) => panic!("expected an error, but got provider {:?}", p.name()),
+            Err(e) => e.to_string(),
+        };
+        assert!(
+            msg.contains("No provider is enabled"),
+            "expected an explanation that nothing is enabled, got: {msg}"
+        );
     }
 
     #[test]

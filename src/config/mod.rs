@@ -298,18 +298,17 @@ impl ProviderConfigs {
     /// to config.toml).
     ///
     /// Backs `--model`. The predicates below mirror `create_provider`'s selection
-    /// order (Qwen, then Ollama, then OpenAI, then Anthropic) *exactly*, including
-    /// the fact that only Ollama honours `enabled` - the Qwen and OpenAI branches
-    /// select on `base_url`/`api_key` alone and ignore `enabled = false`. Mirroring
-    /// the real behaviour rather than the intended behaviour is deliberate: if the
-    /// override landed on a provider the factory does not pick, `--model` would
-    /// silently do nothing while reporting success.
+    /// order (Qwen, then Ollama, then OpenAI, then Anthropic) and its enablement
+    /// rules exactly. They must stay in step: if the override landed on a provider
+    /// the factory does not pick, `--model` would silently do nothing while
+    /// reporting success - the user would think they were testing one model while
+    /// running another.
     ///
     /// Returns the name of the provider that took the override, or `None` if no
-    /// provider is configured to take it.
+    /// provider is enabled and configured to take it.
     pub fn override_default_model(&mut self, model: &str) -> Option<&'static str> {
         if let Some(qwen) = self.qwen.as_mut() {
-            if qwen.base_url.is_some() || qwen.api_key.is_some() {
+            if qwen.enabled && (qwen.base_url.is_some() || qwen.api_key.is_some()) {
                 qwen.default_model = Some(model.to_string());
                 return Some("qwen");
             }
@@ -321,14 +320,16 @@ impl ProviderConfigs {
             }
         }
         if let Some(openai) = self.openai.as_mut() {
-            if openai.base_url.is_some() || openai.api_key.is_some() {
+            if openai.enabled && (openai.base_url.is_some() || openai.api_key.is_some()) {
                 openai.default_model = Some(model.to_string());
                 return Some("openai");
             }
         }
         if let Some(anthropic) = self.anthropic.as_mut() {
-            anthropic.default_model = Some(model.to_string());
-            return Some("anthropic");
+            if anthropic.enabled {
+                anthropic.default_model = Some(model.to_string());
+                return Some("anthropic");
+            }
         }
         None
     }
@@ -992,6 +993,37 @@ mod tests {
         };
         assert_eq!(providers.override_default_model("qwen2.5-coder:7b"), None);
         assert!(providers.ollama.as_ref().unwrap().default_model.is_none());
+    }
+
+    /// The override must skip a disabled provider for the same reason
+    /// `create_provider` does - otherwise `--model` would set the model on a
+    /// provider that never runs and report success.
+    #[test]
+    fn model_override_skips_disabled_providers() {
+        let mut providers = ProviderConfigs {
+            // Disabled, but has a base_url - the exact shape that used to be
+            // selected anyway.
+            qwen: Some(QwenProviderConfig {
+                enabled: false,
+                base_url: Some("http://localhost:8000/v1".to_string()),
+                ..Default::default()
+            }),
+            ollama: Some(OllamaProviderConfig {
+                enabled: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            providers.override_default_model("qwen2.5-coder:7b"),
+            Some("ollama"),
+            "the disabled Qwen must be skipped, so Ollama takes the override",
+        );
+        assert!(
+            providers.qwen.as_ref().unwrap().default_model.is_none(),
+            "a disabled provider must not receive the override",
+        );
     }
 
     /// A read-only `allow_bash` list must let those exact commands run without an
