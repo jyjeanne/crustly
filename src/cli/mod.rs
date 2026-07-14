@@ -596,12 +596,13 @@ async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result
 /// `connect_configured_mcp_servers`).
 fn build_tool_registry() -> crate::llm::tools::registry::ToolRegistry {
     use crate::llm::tools::{
-        agent::AgentTool, ask_user::AskUserTool, bash::BashTool, code_exec::CodeExecTool,
-        context::ContextTool, doc_parser::DocParserTool, edit::EditTool, glob::GlobTool,
-        grep::GrepTool, http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool,
-        plan_tool::PlanTool, powershell::PowerShellTool, read::ReadTool, registry::ToolRegistry,
-        skill::SkillTool, task::TaskTool, todo_write::TodoWriteTool, web_fetch::WebFetchTool,
-        web_search::WebSearchTool, write::WriteTool,
+        agent::AgentTool, apply_patch::ApplyPatchTool, ask_user::AskUserTool, bash::BashTool,
+        code_exec::CodeExecTool, context::ContextTool, doc_parser::DocParserTool, edit::EditTool,
+        glob::GlobTool, grep::GrepTool, http::HttpClientTool, ls::LsTool,
+        notebook::NotebookEditTool, plan_tool::PlanTool, powershell::PowerShellTool,
+        read::ReadTool, registry::ToolRegistry, skill::SkillTool, task::TaskTool,
+        todo_write::TodoWriteTool, web_fetch::WebFetchTool, web_search::WebSearchTool,
+        write::WriteTool,
     };
 
     let mut tool_registry = ToolRegistry::new();
@@ -609,6 +610,7 @@ fn build_tool_registry() -> crate::llm::tools::registry::ToolRegistry {
     tool_registry.register(Arc::new(ReadTool));
     tool_registry.register(Arc::new(WriteTool));
     tool_registry.register(Arc::new(EditTool));
+    tool_registry.register(Arc::new(ApplyPatchTool));
     tool_registry.register(Arc::new(BashTool));
     tool_registry.register(Arc::new(LsTool));
     tool_registry.register(Arc::new(GlobTool));
@@ -874,13 +876,13 @@ async fn cmd_run(
         llm::{
             agent::AgentService,
             tools::{
-                agent::AgentTool, ask_user::AskUserTool, bash::BashTool, code_exec::CodeExecTool,
-                context::ContextTool, doc_parser::DocParserTool, edit::EditTool, glob::GlobTool,
-                grep::GrepTool, http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool,
-                plan_tool::PlanTool, powershell::PowerShellTool, read::ReadTool,
-                registry::ToolRegistry, skill::SkillTool, task::TaskTool,
-                todo_write::TodoWriteTool, web_fetch::WebFetchTool, web_search::WebSearchTool,
-                write::WriteTool,
+                agent::AgentTool, apply_patch::ApplyPatchTool, ask_user::AskUserTool,
+                bash::BashTool, code_exec::CodeExecTool, context::ContextTool,
+                doc_parser::DocParserTool, edit::EditTool, glob::GlobTool, grep::GrepTool,
+                http::HttpClientTool, ls::LsTool, notebook::NotebookEditTool, plan_tool::PlanTool,
+                powershell::PowerShellTool, read::ReadTool, registry::ToolRegistry,
+                skill::SkillTool, task::TaskTool, todo_write::TodoWriteTool,
+                web_fetch::WebFetchTool, web_search::WebSearchTool, write::WriteTool,
             },
         },
         services::{ServiceContext, SessionService},
@@ -901,6 +903,7 @@ async fn cmd_run(
     tool_registry.register(Arc::new(ReadTool));
     tool_registry.register(Arc::new(WriteTool));
     tool_registry.register(Arc::new(EditTool));
+    tool_registry.register(Arc::new(ApplyPatchTool));
     tool_registry.register(Arc::new(BashTool));
     tool_registry.register(Arc::new(LsTool));
     tool_registry.register(Arc::new(GlobTool));
@@ -1549,11 +1552,12 @@ mod tests {
         let registry = build_tool_registry();
 
         // One entry per Phase 1-4 tool registered in build_tool_registry.
-        assert_eq!(registry.count(), 21);
+        assert_eq!(registry.count(), 22);
         for name in [
             "read_file",
             "write_file",
             "edit_file",
+            "apply_patch",
             "bash",
             "ls",
             "glob",

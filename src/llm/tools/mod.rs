@@ -11,6 +11,7 @@ pub mod sandbox;
 mod r#trait;
 
 // Tool implementations - Phase 1: Essential File Operations
+pub mod apply_patch;
 pub mod bash;
 pub mod edit;
 pub mod glob;

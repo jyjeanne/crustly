@@ -16,14 +16,16 @@
 //! qwen-code and Crustly's own tool schemas) - a name for a capability
 //! Crustly doesn't implement, or whose input format genuinely differs, is
 //! intentionally left out rather than pointed at something that would
-//! deserialize into nonsense. Two notable omissions:
-//! - qwen-code's `save_memory` - Crustly has no equivalent write-to-memory
-//!   tool (`session_context` is read-only).
-//! - Codex's `apply_patch` - not a renamed `edit_file`. It's a distinct
-//!   multi-file patch-script format (`*** Begin Patch` / `*** Update File:`
-//!   / `@@` hunks / `*** End Patch`); aliasing the name alone would still
-//!   fail because `edit_file` can't parse that payload. Needs its own
-//!   parser tool.
+//! deserialize into nonsense. One notable omission: qwen-code's
+//! `save_memory` - Crustly has no equivalent write-to-memory tool
+//! (`session_context` is read-only).
+//!
+//! Codex's `apply_patch` isn't in this table at all, by design: it's not a
+//! renamed `edit_file`, it's a distinct multi-file patch-script format
+//! (`*** Begin Patch` / `*** Update File:` / `@@` hunks / `*** End Patch`)
+//! that `edit_file` can't parse. It's registered as its own real tool -
+//! `apply_patch.rs` - under the exact name Codex uses, so no alias is
+//! needed.
 pub const TOOL_ALIASES: &[(&str, &str)] = &[
     // qwen-code (packages/core/src/tools/tool-names.ts and per-tool
     // schemas) - verified against source, not guessed. Field-shape
