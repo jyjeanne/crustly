@@ -92,7 +92,7 @@ urlencoding = "2.1"
 # Syntax & Parsing
 syntect = { version = "5.2", default-features = false, features = ["default-fancy"] }
 tree-sitter = "0.20"
-pulldown-cmark = "0.9"
+pulldown-cmark = "0.13"
 
 # LSP
 tower-lsp = "0.20"
