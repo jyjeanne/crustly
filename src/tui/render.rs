@@ -1900,9 +1900,7 @@ fn render_model_download_confirm_delete(f: &mut Frame, model: &str, area: Rect) 
     let lines = vec![
         Line::from(vec![Span::styled(
             format!("🗑️ Delete '{}'?", model),
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )]),
         Line::from(""),
         Line::from(Span::styled(
@@ -1933,9 +1931,7 @@ fn render_model_download_confirm_delete(f: &mut Frame, model: &str, area: Rect) 
                 .border_style(Style::default().fg(Color::Red))
                 .title(Span::styled(
                     " Confirm Delete ",
-                    Style::default()
-                        .fg(Color::Red)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
                 )),
         )
         .wrap(Wrap { trim: false });

@@ -2681,11 +2681,10 @@ mod tests {
         assert!(app
             .model_download_installed
             .contains(&"qwen2.5-coder:7b".to_string()));
-        assert!(app
-            .messages
-            .iter()
-            .any(|m| m.content.contains("Failed to delete 'qwen2.5-coder:7b'")
-                && m.content.contains("model is in use")));
+        assert!(app.messages.iter().any(|m| m
+            .content
+            .contains("Failed to delete 'qwen2.5-coder:7b'")
+            && m.content.contains("model is in use")));
     }
 
     /// Up recalls the last submitted message into the input without resending
