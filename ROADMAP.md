@@ -1,6 +1,6 @@
 # Crustly Roadmap
 
-**Current Version:** 0.4.1 — May 2026
+**Current Version:** 0.5.0 — July 2026
 **Author:** Jeremy JEANNE
 
 ---
@@ -45,12 +45,21 @@
 - `keep_alive` / `num_ctx` control; `OLLAMA_HOST`/`OLLAMA_MODEL` env vars
 - See [`ollama-rs-integration-plan.md`](./ollama-rs-integration-plan.md) for the full design and implementation status
 
+### v0.5 — Gemini Provider & Claude Code / Qwen Compatibility
+- Native Google Gemini provider (streaming, function calling, vision, extended thinking, structured output) — also serves Gemma 3/4 through the same API
+- `apply_patch` tool: Codex-compatible multi-file patch support (22nd built-in tool)
+- Tool name alias layer plus `file_path`/`directory`/`shell` argument compatibility for Claude Code and Qwen-trained models
+- `grep` regex-by-default, `.gitignore`-aware `grep`/`glob`, hardened Qwen Hermes tool-call parsing
+- Prior-read enforcement for `edit_file`/`write_file`/`apply_patch`
+- Bug fixes: macOS symlinked-root path boundary check, `pulldown-cmark` 0.13 markdown renderer compatibility
+- Completed `ratatui` 0.28 → 0.30 upgrade, migrating off unmaintained `tui-textarea`
+
 ---
 
 ## Upcoming Milestones
 
-### v0.5 — Stability & Developer Experience
-**Target:** Q3 2026
+### v0.6 — Stability & Developer Experience
+**Target:** Q4 2026
 
 - [ ] **Integration test suite** — full chat/tool/approval flows with a mock provider (no live API calls required)
 - [ ] **CI/CD pipeline** — GitHub Actions: `cargo test`, `cargo clippy`, `cargo fmt --check`, `cargo audit` on every PR
@@ -59,8 +68,8 @@
 - [ ] **Git status bar** — current branch, dirty/clean state, uncommitted changes count shown in footer
 - [ ] **Approval memory** — "always allow this tool for this session" option; configurable per-tool whitelist
 
-### v0.6 — Performance & Robustness
-**Target:** Q4 2026
+### v0.7 — Performance & Robustness
+**Target:** Q1 2027
 
 - [ ] **Benchmark suite** — `cargo bench` targets for DB operations, syntax highlighting, and TUI rendering
 - [ ] **Message pagination** — virtual list rendering so large sessions (1000+ messages) don't degrade TUI performance
@@ -69,8 +78,8 @@
 - [ ] **Structured error dialog** — TUI overlay showing full error with copy-to-clipboard; all errors written to `.crustly/logs/`
 - [ ] **Rate-limit countdown** — show remaining backoff time in the status bar when a provider returns 429
 
-### v0.7 — LSP & Code Intelligence
-**Target:** Q1 2027
+### v0.8 — LSP & Code Intelligence
+**Target:** Q2 2027
 
 - [ ] **LSP client** — wire up `tower-lsp` for symbol definitions, references, and diagnostics
 - [ ] **Diagnostics injection** — include active compiler errors in the agent context automatically
@@ -78,8 +87,8 @@
 - [ ] **Hover information** — surface type signatures and docs in a side panel
 - [ ] **Multi-language support** — Rust, TypeScript, Python, Go language servers
 
-### v0.8 — Plugin System
-**Target:** Q2 2027
+### v0.9 — Plugin System
+**Target:** Q3 2027
 
 - [ ] **Plugin API design** — stable ABI for custom tools and providers
 - [ ] **WASM runtime** — sandboxed plugin execution via `wasmtime`
@@ -88,9 +97,9 @@
 - [ ] **Example plugins** — `git-tool`, `docker-tool`, `jira-tool`
 
 ### v1.0 — Production Release
-**Target:** Q3 2027
+**Target:** Q4 2027
 
-- [ ] All v0.5–v0.8 milestones complete and stable
+- [ ] All v0.6–v0.9 milestones complete and stable
 - [ ] External security audit (API key handling, tool sandbox, path traversal)
 - [ ] Cross-platform validation (Linux Ubuntu/Arch, macOS Intel/Apple Silicon, Windows 11)
 - [ ] Package manager distribution (Homebrew, AUR, Scoop, Chocolatey)
@@ -108,7 +117,6 @@
 | Web interface | Optional `crustly serve` command exposing a browser UI |
 | Multi-user / team | Shared sessions, role-based approval, audit log export |
 | Telemetry (opt-in) | Anonymous usage stats; cost analytics charts in TUI |
-| Google Gemini provider | HTTP client implementation |
 | Azure OpenAI provider | Azure-specific auth and endpoint routing |
 | `crustly run` pipelines | Chain multiple prompts with conditional logic in a YAML file |
 

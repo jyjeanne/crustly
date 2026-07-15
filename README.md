@@ -47,7 +47,7 @@
 
 | Feature | Description | Benefit |
 |---------|-------------|---------|
-| 🔧 **Built-in Tools** | 21 tools: files, shell, web, agents, skills | Direct code manipulation from chat |
+| 🔧 **Built-in Tools** | 22 tools: files, shell, web, agents, skills | Direct code manipulation from chat |
 | 🔒 **Interactive Approval** | Permission dialogs for dangerous operations | Full control over what AI can do |
 | 🎨 **Syntax Highlighting** | 100+ languages with line numbers | Beautiful code display in terminal |
 | 🏠 **Local LLM Support** | Run with LM Studio/Ollama | 100% private, $0 cost, offline |
@@ -97,6 +97,28 @@ Crustly: [creates comprehensive docs]
 ---
 
 ## ✨ What's New
+
+### v0.5.0 — Gemini Provider & Claude Code / Qwen Compatibility
+
+#### Native Google Gemini Provider
+Gemini joins Anthropic and OpenAI as a third fully-implemented cloud provider. It also serves Google's open-weight **Gemma 3/4** models through the same API — no local GPU or Ollama required, and Gemma usage through the Gemini API is free of charge. Supports streaming, function calling, vision, extended thinking (`thinkingConfig`/`includeThoughts`), and JSON/structured output (`responseSchema`). See the **Supported AI Providers** section below for setup.
+
+#### `apply_patch` Tool
+A new 22nd built-in tool: real Codex-compatible multi-file patch support, so the model can describe a coordinated set of file edits in a single structured patch instead of issuing one `edit_file` call per file.
+
+#### Claude Code / Qwen Compatibility Layer
+A round of interoperability fixes so Crustly's tool set behaves the same way regardless of which model is driving it:
+
+- **Tool name alias layer** — models trained on Claude Code's or Qwen's tool names resolve to Crustly's built-in tools without a prompt-side mapping
+- **`file_path`/`directory` argument aliases and `shell` field compatibility** — accepts the parameter names Claude Code and Qwen actually send
+- **`grep` defaults to regex** and both **`grep`/`glob` now respect `.gitignore`**, matching Claude Code/qwen-code semantics
+- **Prior-read enforcement** — `edit_file`, `write_file`, and `apply_patch` now require the target file to have been read first in the session, catching a class of blind overwrite mistakes
+- **Hardened Qwen Hermes tool-call parsing** — resilient to truncated or malformed JSON tool calls, and MCP tool naming/`edit_file` schema is now compatible with Qwen/Claude Code
+
+#### Bug Fixes & Dependency Upgrades
+- Fixed the macOS-only path boundary check incorrectly rejecting valid paths to not-yet-existing files under a symlinked root
+- Updated the markdown renderer for the `pulldown-cmark` 0.13 API
+- Completed the `ratatui` 0.28 → 0.30 upgrade, migrating off the now-unmaintained `tui-textarea`
 
 ### Phase 4 Tools — Claw Code Parity (v0.4.1)
 
