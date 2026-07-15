@@ -141,6 +141,12 @@ pub struct App {
     pub model_download_status: Option<String>,
     pub model_download_fraction: Option<f64>,
     model_download_task: Option<tokio::task::JoinHandle<()>>,
+    /// Installed model awaiting delete confirmation ('Y'/Enter confirms,
+    /// 'N'/Esc cancels back to the suggestion list).
+    pub model_download_confirm_delete: Option<String>,
+    /// Installed model currently being deleted, if any.
+    pub model_download_deleting: Option<String>,
+    model_download_delete_task: Option<tokio::task::JoinHandle<()>>,
     ollama_host: String,
 
     // Provider Switch dialog state (Ctrl+W, native Ollama provider)
@@ -212,6 +218,9 @@ impl App {
             model_download_status: None,
             model_download_fraction: None,
             model_download_task: None,
+            model_download_confirm_delete: None,
+            model_download_deleting: None,
+            model_download_delete_task: None,
             ollama_host: "http://localhost:11434".to_string(),
             provider_switch_models: Vec::new(),
             provider_switch_selected: 0,
@@ -630,6 +639,36 @@ impl App {
                     let models = super::ollama_download::fetch_installed_models(host).await;
                     let _ = sender.send(TuiEvent::OllamaModelsListed(models));
                 });
+            }
+            TuiEvent::OllamaDeleteFinished { model, error } => {
+                self.model_download_deleting = None;
+                self.model_download_delete_task = None;
+
+                let content = match &error {
+                    None => format!("🗑️ Deleted '{}'.", model),
+                    Some(e) => format!("❌ Failed to delete '{}': {}", model, e),
+                };
+                let notification = DisplayMessage {
+                    id: Uuid::new_v4(),
+                    role: "system".to_string(),
+                    content,
+                    thinking_text: None,
+                    thinking_expanded: false,
+                    timestamp: chrono::Utc::now(),
+                    token_count: None,
+                    cost: None,
+                    provider_name: None,
+                    perf_metrics: None,
+                    tokens_per_second: None,
+                };
+                self.messages.push(notification);
+
+                if error.is_none() {
+                    self.model_download_installed.retain(|m| m != &model);
+                    self.refresh_model_download_suggestions();
+                }
+
+                self.switch_mode(AppMode::Chat).await?;
             }
         }
         Ok(())
@@ -2011,6 +2050,8 @@ impl App {
         self.model_download_running = false;
         self.model_download_status = None;
         self.model_download_fraction = None;
+        self.model_download_confirm_delete = None;
+        self.model_download_deleting = None;
         self.refresh_model_download_suggestions();
 
         let host = self.ollama_host.clone();
@@ -2049,25 +2090,60 @@ impl App {
         self.model_download_task = Some(handle);
     }
 
+    /// Start deleting `model` in the background. No-op if a pull or delete
+    /// is already running (only one operation at a time from this dialog).
+    async fn start_model_delete(&mut self, model: String) {
+        if self.model_download_running || self.model_download_deleting.is_some() {
+            return;
+        }
+
+        self.model_download_deleting = Some(model.clone());
+
+        let host = self.ollama_host.clone();
+        let sender = self.event_sender();
+        let handle = super::ollama_download::spawn_delete(host, model, sender).await;
+        self.model_download_delete_task = Some(handle);
+    }
+
     /// Handle keys in the Model Download dialog.
     async fn handle_model_download_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
         use super::events::keys;
         use crossterm::event::KeyCode;
 
+        // Confirming a delete: only Y/Enter confirms, N/Esc cancels back to
+        // the suggestion list (without closing the whole dialog).
+        if let Some(model) = self.model_download_confirm_delete.clone() {
+            match event.code {
+                KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+                    self.model_download_confirm_delete = None;
+                    self.start_model_delete(model).await;
+                }
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                    self.model_download_confirm_delete = None;
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
         if keys::is_cancel(&event) {
-            // Cancel an in-flight pull (if any) and close the dialog.
+            // Cancel an in-flight pull/delete (if any) and close the dialog.
             if let Some(handle) = self.model_download_task.take() {
                 handle.abort();
             }
+            if let Some(handle) = self.model_download_delete_task.take() {
+                handle.abort();
+            }
             self.model_download_running = false;
+            self.model_download_deleting = None;
             self.model_download_status = None;
             self.model_download_fraction = None;
             self.switch_mode(AppMode::Chat).await?;
             return Ok(());
         }
 
-        // While a pull is running, only Esc (handled above) does anything.
-        if self.model_download_running {
+        // While a pull or delete is running, only Esc (handled above) does anything.
+        if self.model_download_running || self.model_download_deleting.is_some() {
             return Ok(());
         }
 
@@ -2086,6 +2162,17 @@ impl App {
             {
                 self.model_download_input = suggestion.clone();
                 self.refresh_model_download_suggestions();
+            }
+        } else if event.code == KeyCode::Delete {
+            // Ask for confirmation before deleting the highlighted model -
+            // only installed models can be deleted.
+            if let Some(name) = self
+                .model_download_suggestions
+                .get(self.model_download_selected)
+            {
+                if self.model_download_installed.iter().any(|m| m == name) {
+                    self.model_download_confirm_delete = Some(name.clone());
+                }
             }
         } else if keys::is_enter(&event) {
             let model = self.model_download_input.trim().to_string();
@@ -2458,6 +2545,147 @@ mod tests {
             .iter()
             .any(|m| m.content.contains("Failed to pull 'bogus-model'")
                 && m.content.contains("model not found")));
+    }
+
+    /// Delete only asks for confirmation when the highlighted suggestion is
+    /// actually installed - curated-but-not-pulled entries can't be deleted.
+    #[tokio::test]
+    async fn delete_key_ignored_for_uninstalled_suggestion() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        // Freshly opened dialog has no installed models yet.
+        assert!(app.model_download_installed.is_empty());
+
+        app.handle_model_download_key(key(KeyCode::Delete))
+            .await
+            .unwrap();
+
+        assert!(app.model_download_confirm_delete.is_none());
+    }
+
+    #[tokio::test]
+    async fn delete_key_on_installed_model_asks_for_confirmation() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        app.handle_event(TuiEvent::OllamaModelsListed(vec![
+            "qwen2.5-coder:7b".to_string()
+        ]))
+        .await
+        .unwrap();
+        let idx = app
+            .model_download_suggestions
+            .iter()
+            .position(|s| s == "qwen2.5-coder:7b")
+            .expect("installed model should be in suggestions");
+        app.model_download_selected = idx;
+
+        app.handle_model_download_key(key(KeyCode::Delete))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.model_download_confirm_delete,
+            Some("qwen2.5-coder:7b".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn confirm_delete_n_cancels_back_to_list() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        app.model_download_confirm_delete = Some("qwen2.5-coder:7b".to_string());
+
+        app.handle_model_download_key(key(KeyCode::Char('n')))
+            .await
+            .unwrap();
+
+        assert!(app.model_download_confirm_delete.is_none());
+        assert!(app.model_download_deleting.is_none());
+        assert_eq!(app.mode, AppMode::ModelDownload);
+    }
+
+    #[tokio::test]
+    async fn confirm_delete_esc_cancels_back_to_list_without_closing_dialog() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        app.model_download_confirm_delete = Some("qwen2.5-coder:7b".to_string());
+
+        app.handle_model_download_key(key(KeyCode::Esc))
+            .await
+            .unwrap();
+
+        assert!(app.model_download_confirm_delete.is_none());
+        assert_eq!(
+            app.mode,
+            AppMode::ModelDownload,
+            "Esc during confirmation should not close the whole dialog"
+        );
+    }
+
+    #[tokio::test]
+    async fn confirm_delete_y_starts_delete() {
+        let mut app = test_app().await;
+        app.open_model_download().await.unwrap();
+        app.model_download_confirm_delete = Some("qwen2.5-coder:7b".to_string());
+
+        app.handle_model_download_key(key(KeyCode::Char('y')))
+            .await
+            .unwrap();
+
+        assert!(app.model_download_confirm_delete.is_none());
+        assert_eq!(
+            app.model_download_deleting,
+            Some("qwen2.5-coder:7b".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_delete_finished_success_removes_from_installed_and_posts_message() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_installed = vec!["qwen2.5-coder:7b".to_string()];
+        app.model_download_deleting = Some("qwen2.5-coder:7b".to_string());
+
+        app.handle_event(TuiEvent::OllamaDeleteFinished {
+            model: "qwen2.5-coder:7b".to_string(),
+            error: None,
+        })
+        .await
+        .unwrap();
+
+        assert!(app.model_download_deleting.is_none());
+        assert_eq!(app.mode, AppMode::Chat);
+        assert!(!app
+            .model_download_installed
+            .contains(&"qwen2.5-coder:7b".to_string()));
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Deleted 'qwen2.5-coder:7b'")));
+    }
+
+    #[tokio::test]
+    async fn handle_ollama_delete_finished_failure_keeps_installed_and_posts_error() {
+        let mut app = test_app().await;
+        app.model_download_installed = vec!["qwen2.5-coder:7b".to_string()];
+        app.model_download_deleting = Some("qwen2.5-coder:7b".to_string());
+
+        app.handle_event(TuiEvent::OllamaDeleteFinished {
+            model: "qwen2.5-coder:7b".to_string(),
+            error: Some("model is in use".to_string()),
+        })
+        .await
+        .unwrap();
+
+        assert!(app.model_download_deleting.is_none());
+        assert!(app
+            .model_download_installed
+            .contains(&"qwen2.5-coder:7b".to_string()));
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Failed to delete 'qwen2.5-coder:7b'")
+                && m.content.contains("model is in use")));
     }
 
     /// Up recalls the last submitted message into the input without resending

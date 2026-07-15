@@ -167,6 +167,45 @@ pub async fn spawn_pull(
     })
 }
 
+/// Start deleting `model` in the background, forwarding the result through
+/// `event_sender`. Returns the `JoinHandle` so the caller can `.abort()` it
+/// (e.g. on Esc), mirroring `spawn_pull` - though a delete is a single
+/// request/response rather than a stream, so there's no progress to forward.
+#[cfg(feature = "ollama")]
+pub async fn spawn_delete(
+    host: String,
+    model: String,
+    event_sender: UnboundedSender<TuiEvent>,
+) -> JoinHandle<()> {
+    use crate::llm::provider::ollama_models;
+
+    tokio::spawn(async move {
+        let result = ollama_models::delete_model(&host, &model).await;
+        let _ = event_sender.send(TuiEvent::OllamaDeleteFinished {
+            model,
+            error: result.err().map(|e| e.to_string()),
+        });
+    })
+}
+
+#[cfg(not(feature = "ollama"))]
+pub async fn spawn_delete(
+    _host: String,
+    model: String,
+    event_sender: UnboundedSender<TuiEvent>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let _ = event_sender.send(TuiEvent::OllamaDeleteFinished {
+            model,
+            error: Some(
+                "This build of crustly was compiled without the 'ollama' feature. \
+                 Rebuild with `--features ollama` (or `all-llm`)."
+                    .to_string(),
+            ),
+        });
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

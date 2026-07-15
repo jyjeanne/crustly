@@ -70,6 +70,12 @@ pub enum TuiEvent {
         error: Option<String>,
     },
 
+    /// An Ollama model delete finished (`error` is `None` on success).
+    OllamaDeleteFinished {
+        model: String,
+        error: Option<String>,
+    },
+
     /// Locally-installed Ollama models were (re)loaded for the Provider
     /// Switch dialog's model list.
     ProviderSwitchModelsListed(Vec<String>),
