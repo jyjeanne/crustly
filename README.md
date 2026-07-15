@@ -21,32 +21,32 @@
 
 ## Table of Contents
 
-- [📸 Screenshots](#screenshots)
-- [🎯 Main Coding Features](#main-coding-features)
-- [✨ What's New](#whats-new)
-- [🔒 Interactive Approval System](#interactive-approval-system)
-- [⚠️ Important Disclaimers](#important-disclaimers)
-- [🌐 Supported AI Providers](#supported-ai-providers)
-- [🧩 Reference Coding Models & Hardware Requirements](#reference-coding-models--hardware-requirements)
-- [🚀 Quick Start](#quick-start)
-- [📋 A Note on Claude Max and GitHub Copilot](#a-note-on-claude-max-and-github-copilot)
-- [🏠 Running Crustly with Local LLMs](#running-crustly-with-local-llms)
-- [💡 Best Practices for Using Crustly](#best-practices-for-using-crustly)
-- [👨‍💻 Why Crustly for Coding?](#why-crustly-for-coding)
-- [📋 Plan Mode — Structured Task Planning](#plan-mode-structured-task-planning)
-- [🧪 Manual Testing Guide](#manual-testing-guide)
-- [📊 Performance](#performance)
-- [🏗️ Architecture](#architecture)
-- [📁 Project Structure](#project-structure)
-- [🔍 Debug and Logging](#debug-and-logging)
-- [🛠️ Development](#development)
-- [📖 Documentation](#documentation)
-- [🤝 Contributing](#contributing)
-- [🐛 Known Issues & Platform-Specific Notes](#known-issues-platform-specific-notes)
-- [📄 License](#license)
-- [🙏 Acknowledgments](#acknowledgments)
-- [📞 Support](#support)
-- [📈 Status](#status)
+- [📸 Screenshots](#-screenshots)
+- [🎯 Main Coding Features](#-main-coding-features)
+- [✨ What's New](#-whats-new)
+- [🔒 Interactive Approval System](#-interactive-approval-system)
+- [⚠️ Important Disclaimers](#️-important-disclaimers)
+- [🌐 Supported AI Providers](#-supported-ai-providers)
+- [🧩 Reference Coding Models & Hardware Requirements](#-reference-coding-models--hardware-requirements)
+- [🚀 Quick Start](#-quick-start)
+- [📋 A Note on Claude Max and GitHub Copilot](#-a-note-on-claude-max-and-github-copilot)
+- [🏠 Running Crustly with Local LLMs](#-running-crustly-with-local-llms)
+- [💡 Best Practices for Using Crustly](#-best-practices-for-using-crustly)
+- [👨‍💻 Why Crustly for Coding?](#-why-crustly-for-coding)
+- [📋 Plan Mode — Structured Task Planning](#-plan-mode--structured-task-planning)
+- [🧪 Manual Testing Guide](#-manual-testing-guide)
+- [📊 Performance](#-performance)
+- [🏗️ Architecture](#️-architecture)
+- [📁 Project Structure](#-project-structure)
+- [🔍 Debug and Logging](#-debug-and-logging)
+- [🛠️ Development](#️-development)
+- [📖 Documentation](#-documentation)
+- [🤝 Contributing](#-contributing)
+- [🐛 Known Issues & Platform-Specific Notes](#-known-issues--platform-specific-notes)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+- [📞 Support](#-support)
+- [📈 Status](#-status)
 
 ---
 
@@ -962,7 +962,7 @@ See [LICENSE.md](LICENSE.md) for details.
 
 ## 📈 Status
 
-Crustly is under active development — see the **[✨ What's New](#whats-new)**
+Crustly is under active development — see the **[✨ What's New](#-whats-new)**
 section above and **[CHANGELOG.md](CHANGELOG.md)** for the current feature
 set, and **[ROADMAP.md](ROADMAP.md)** for what's shipped vs. planned. The
 Sprint 0-12 development log from the pre-1.0 bring-up phase is archived at
