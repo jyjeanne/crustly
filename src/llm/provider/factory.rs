@@ -559,6 +559,110 @@ mod tests {
         assert_eq!(provider.name(), "openai");
     }
 
+    #[test]
+    fn test_create_provider_with_gemini() {
+        let config = Config {
+            providers: ProviderConfigs {
+                gemini: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("test-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let provider = create_provider(&config).expect("gemini should be selected");
+        assert_eq!(provider.name(), "gemini");
+        assert_eq!(provider.default_model(), "gemini-2.5-flash");
+    }
+
+    #[test]
+    fn test_create_provider_with_gemini_custom_base_url_and_model() {
+        let config = Config {
+            providers: ProviderConfigs {
+                gemini: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("test-key".to_string()),
+                    base_url: Some("https://gemini-proxy.internal/v1beta".to_string()),
+                    default_model: Some("gemma-4-31b-it".to_string()),
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let provider = create_provider(&config).expect("gemini should be selected");
+        assert_eq!(provider.name(), "gemini");
+        assert_eq!(provider.default_model(), "gemma-4-31b-it");
+    }
+
+    #[test]
+    fn gemini_without_api_key_falls_through_to_anthropic() {
+        let config = Config {
+            providers: ProviderConfigs {
+                gemini: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: None,
+                    base_url: None,
+                    default_model: None,
+                }),
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let provider = create_provider(&config).expect("anthropic should be selected");
+        assert_eq!(
+            provider.name(),
+            "anthropic",
+            "gemini with no api_key must not be selected",
+        );
+    }
+
+    #[test]
+    fn disabled_gemini_is_skipped_in_favour_of_the_next_provider() {
+        let config = Config {
+            providers: ProviderConfigs {
+                gemini: Some(ProviderConfig {
+                    enabled: false,
+                    api_key: Some("test-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let provider = create_provider(&config).expect("anthropic should be selected");
+        assert_eq!(
+            provider.name(),
+            "anthropic",
+            "a disabled Gemini must not be selected despite having an api_key",
+        );
+    }
+
     /// Regression: `enabled = false` was read from config but never checked by the
     /// Qwen, OpenAI or Anthropic branches - only Ollama honoured it. A provider the
     /// user had explicitly turned off would still be selected, purely on the

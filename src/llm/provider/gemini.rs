@@ -328,48 +328,60 @@ impl GeminiProvider {
 
     async fn handle_error(&self, response: reqwest::Response) -> ProviderError {
         let status = response.status().as_u16();
-
         let retry_after = response
             .headers()
             .get("retry-after")
             .and_then(|v| v.to_str().ok().and_then(|s| s.parse::<u64>().ok()));
+        let error_body = response.json::<GeminiErrorResponse>().await.ok();
 
-        if let Ok(error_body) = response.json::<GeminiErrorResponse>().await {
-            let message = if status == 429 {
-                if let Some(secs) = retry_after {
-                    format!(
-                        "{} (retry after {} seconds)",
-                        error_body.error.message, secs
-                    )
-                } else {
-                    format!(
-                        "{} (rate limited, please retry later)",
-                        error_body.error.message
-                    )
-                }
+        build_gemini_error(status, retry_after, error_body)
+    }
+}
+
+/// Turn a Gemini error response (or its absence) into a `ProviderError`.
+///
+/// Kept free of any `reqwest` I/O so the message-formatting and status-code
+/// branches can be unit tested directly, without a live HTTP response.
+fn build_gemini_error(
+    status: u16,
+    retry_after: Option<u64>,
+    error_body: Option<GeminiErrorResponse>,
+) -> ProviderError {
+    if let Some(error_body) = error_body {
+        let message = if status == 429 {
+            if let Some(secs) = retry_after {
+                format!(
+                    "{} (retry after {} seconds)",
+                    error_body.error.message, secs
+                )
             } else {
-                error_body.error.message
-            };
+                format!(
+                    "{} (rate limited, please retry later)",
+                    error_body.error.message
+                )
+            }
+        } else {
+            error_body.error.message
+        };
 
-            return if status == 429 {
-                ProviderError::RateLimitExceeded(message)
-            } else {
-                ProviderError::ApiError {
-                    status,
-                    message,
-                    error_type: error_body.error.status,
-                }
-            };
-        }
-
-        if status == 429 {
-            ProviderError::RateLimitExceeded("Rate limit exceeded, please retry later".to_string())
+        return if status == 429 {
+            ProviderError::RateLimitExceeded(message)
         } else {
             ProviderError::ApiError {
                 status,
-                message: "Unknown error".to_string(),
-                error_type: None,
+                message,
+                error_type: error_body.error.status,
             }
+        };
+    }
+
+    if status == 429 {
+        ProviderError::RateLimitExceeded("Rate limit exceeded, please retry later".to_string())
+    } else {
+        ProviderError::ApiError {
+            status,
+            message: "Unknown error".to_string(),
+            error_type: None,
         }
     }
 }
@@ -379,6 +391,140 @@ fn gemini_role(role: &Role) -> &'static str {
         Role::User | Role::System => "user",
         Role::Assistant => "model",
     }
+}
+
+/// Parse a `streamGenerateContent?alt=sse` response body into our generic
+/// stream events.
+///
+/// Pure and network-free (operates on the already-collected SSE text) so the
+/// chunk-accumulation, thinking/text/tool-call routing, and finish-reason
+/// mapping can all be unit tested directly, without a live HTTP response.
+fn parse_gemini_sse(text: &str, model: &str) -> Vec<StreamEvent> {
+    let mut events: Vec<StreamEvent> = Vec::new();
+    let mut text_block_started = false;
+    let mut next_block_index = 0usize;
+    let mut final_usage = TokenUsage {
+        input_tokens: 0,
+        output_tokens: 0,
+    };
+    let mut final_finish_reason: Option<String> = None;
+    let mut saw_tool_call = false;
+
+    events.push(StreamEvent::MessageStart {
+        message: StreamMessage {
+            id: format!("gemini_{}", uuid::Uuid::new_v4()),
+            model: model.to_string(),
+            role: Role::Assistant,
+            usage: TokenUsage {
+                input_tokens: 0,
+                output_tokens: 0,
+            },
+        },
+    });
+
+    for line in text.lines() {
+        let Some(json_str) = line.strip_prefix("data: ") else {
+            continue;
+        };
+        if json_str.trim().is_empty() {
+            continue;
+        }
+
+        match serde_json::from_str::<GeminiResponse>(json_str) {
+            Ok(chunk) => {
+                if let Some(usage) = chunk.usage_metadata {
+                    final_usage = TokenUsage {
+                        input_tokens: usage.prompt_token_count,
+                        output_tokens: usage.candidates_token_count + usage.thoughts_token_count,
+                    };
+                }
+
+                if let Some(candidate) = chunk.candidates.into_iter().next() {
+                    if let Some(reason) = candidate.finish_reason {
+                        final_finish_reason = Some(reason);
+                    }
+                    if let Some(content) = candidate.content {
+                        for part in content.parts {
+                            if let Some(text) = part.text {
+                                if text.is_empty() {
+                                    continue;
+                                }
+                                if part.thought == Some(true) {
+                                    events.push(StreamEvent::ContentBlockDelta {
+                                        index: 0,
+                                        delta: ContentDelta::ThinkingDelta { thinking: text },
+                                    });
+                                    continue;
+                                }
+                                if !text_block_started {
+                                    text_block_started = true;
+                                    events.push(StreamEvent::ContentBlockStart {
+                                        index: 0,
+                                        content_block: ContentBlock::Text {
+                                            text: String::new(),
+                                        },
+                                    });
+                                    next_block_index = 1;
+                                }
+                                events.push(StreamEvent::ContentBlockDelta {
+                                    index: 0,
+                                    delta: ContentDelta::TextDelta { text },
+                                });
+                            } else if let Some(fc) = part.function_call {
+                                saw_tool_call = true;
+                                let idx = next_block_index;
+                                next_block_index += 1;
+                                events.push(StreamEvent::ContentBlockStart {
+                                    index: idx,
+                                    content_block: ContentBlock::ToolUse {
+                                        id: format!("gemini_call_{}", uuid::Uuid::new_v4()),
+                                        name: fc.name,
+                                        input: fc.args,
+                                    },
+                                });
+                                events.push(StreamEvent::ContentBlockStop { index: idx });
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse Gemini stream chunk: {}. Data: {}",
+                    e,
+                    json_str.chars().take(200).collect::<String>()
+                );
+            }
+        }
+    }
+
+    if text_block_started {
+        events.push(StreamEvent::ContentBlockStop { index: 0 });
+    }
+
+    let stop_reason = if saw_tool_call {
+        Some(StopReason::ToolUse)
+    } else {
+        final_finish_reason.as_deref().and_then(|r| match r {
+            "STOP" => Some(StopReason::EndTurn),
+            "MAX_TOKENS" => Some(StopReason::MaxTokens),
+            _ => None,
+        })
+    };
+
+    if stop_reason.is_some() {
+        events.push(StreamEvent::MessageDelta {
+            delta: MessageDelta {
+                stop_reason,
+                stop_sequence: None,
+            },
+            usage: final_usage,
+            perf_metrics: None,
+        });
+    }
+    events.push(StreamEvent::MessageStop);
+
+    events
 }
 
 #[async_trait]
@@ -478,130 +624,7 @@ impl Provider for GeminiProvider {
         }
 
         let text = String::from_utf8_lossy(&raw_bytes);
-        let mut events: Vec<StreamEvent> = Vec::new();
-        let mut text_block_started = false;
-        let mut next_block_index = 0usize;
-        let mut final_usage = TokenUsage {
-            input_tokens: 0,
-            output_tokens: 0,
-        };
-        let mut final_finish_reason: Option<String> = None;
-        let mut saw_tool_call = false;
-
-        events.push(StreamEvent::MessageStart {
-            message: StreamMessage {
-                id: format!("gemini_{}", uuid::Uuid::new_v4()),
-                model: model.clone(),
-                role: Role::Assistant,
-                usage: TokenUsage {
-                    input_tokens: 0,
-                    output_tokens: 0,
-                },
-            },
-        });
-
-        for line in text.lines() {
-            let Some(json_str) = line.strip_prefix("data: ") else {
-                continue;
-            };
-            if json_str.trim().is_empty() {
-                continue;
-            }
-
-            match serde_json::from_str::<GeminiResponse>(json_str) {
-                Ok(chunk) => {
-                    if let Some(usage) = chunk.usage_metadata {
-                        final_usage = TokenUsage {
-                            input_tokens: usage.prompt_token_count,
-                            output_tokens: usage.candidates_token_count
-                                + usage.thoughts_token_count,
-                        };
-                    }
-
-                    if let Some(candidate) = chunk.candidates.into_iter().next() {
-                        if let Some(reason) = candidate.finish_reason {
-                            final_finish_reason = Some(reason);
-                        }
-                        if let Some(content) = candidate.content {
-                            for part in content.parts {
-                                if let Some(text) = part.text {
-                                    if text.is_empty() {
-                                        continue;
-                                    }
-                                    if part.thought == Some(true) {
-                                        events.push(StreamEvent::ContentBlockDelta {
-                                            index: 0,
-                                            delta: ContentDelta::ThinkingDelta { thinking: text },
-                                        });
-                                        continue;
-                                    }
-                                    if !text_block_started {
-                                        text_block_started = true;
-                                        events.push(StreamEvent::ContentBlockStart {
-                                            index: 0,
-                                            content_block: ContentBlock::Text {
-                                                text: String::new(),
-                                            },
-                                        });
-                                        next_block_index = 1;
-                                    }
-                                    events.push(StreamEvent::ContentBlockDelta {
-                                        index: 0,
-                                        delta: ContentDelta::TextDelta { text },
-                                    });
-                                } else if let Some(fc) = part.function_call {
-                                    saw_tool_call = true;
-                                    let idx = next_block_index;
-                                    next_block_index += 1;
-                                    events.push(StreamEvent::ContentBlockStart {
-                                        index: idx,
-                                        content_block: ContentBlock::ToolUse {
-                                            id: format!("gemini_call_{}", uuid::Uuid::new_v4()),
-                                            name: fc.name,
-                                            input: fc.args,
-                                        },
-                                    });
-                                    events.push(StreamEvent::ContentBlockStop { index: idx });
-                                }
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to parse Gemini stream chunk: {}. Data: {}",
-                        e,
-                        json_str.chars().take(200).collect::<String>()
-                    );
-                }
-            }
-        }
-
-        if text_block_started {
-            events.push(StreamEvent::ContentBlockStop { index: 0 });
-        }
-
-        let stop_reason = if saw_tool_call {
-            Some(StopReason::ToolUse)
-        } else {
-            final_finish_reason.as_deref().and_then(|r| match r {
-                "STOP" => Some(StopReason::EndTurn),
-                "MAX_TOKENS" => Some(StopReason::MaxTokens),
-                _ => None,
-            })
-        };
-
-        if stop_reason.is_some() {
-            events.push(StreamEvent::MessageDelta {
-                delta: MessageDelta {
-                    stop_reason,
-                    stop_sequence: None,
-                },
-                usage: final_usage,
-                perf_metrics: None,
-            });
-        }
-        events.push(StreamEvent::MessageStop);
+        let events = parse_gemini_sse(&text, &model);
 
         let event_stream = futures::stream::iter(events.into_iter().map(Ok::<_, ProviderError>));
         Ok(Box::pin(event_stream))
@@ -1045,5 +1068,286 @@ mod tests {
             .expect("thinking config must be set");
         assert_eq!(tc.thinking_budget, 4096);
         assert_eq!(tc.include_thoughts, Some(true));
+    }
+
+    #[test]
+    fn test_json_mode_sets_response_mime_type() {
+        let provider = GeminiProvider::new("test-key".to_string());
+        let request = LLMRequest::new("gemini-2.5-flash", vec![Message::user("hi")])
+            .with_response_format(serde_json::json!({"type": "json_object"}));
+        let gemini_req = provider.to_gemini_request(&request);
+        let gen_config = gemini_req.generation_config.unwrap();
+        assert_eq!(
+            gen_config.response_mime_type.as_deref(),
+            Some("application/json")
+        );
+        assert!(gen_config.response_schema.is_none());
+    }
+
+    #[test]
+    fn test_full_json_schema_sets_response_schema() {
+        let provider = GeminiProvider::new("test-key".to_string());
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {"answer": {"type": "string"}}
+        });
+        let request = LLMRequest::new("gemini-2.5-flash", vec![Message::user("hi")])
+            .with_response_format(schema.clone());
+        let gemini_req = provider.to_gemini_request(&request);
+        let gen_config = gemini_req.generation_config.unwrap();
+        assert!(gen_config.response_mime_type.is_none());
+        assert_eq!(gen_config.response_schema, Some(schema));
+    }
+
+    #[test]
+    fn test_inline_image_becomes_inline_data_part() {
+        let provider = GeminiProvider::new("test-key".to_string());
+        let messages = vec![Message {
+            role: Role::User,
+            content: vec![ContentBlock::Image {
+                source: ImageSource::Base64 {
+                    media_type: "image/png".to_string(),
+                    data: "base64data".to_string(),
+                },
+            }],
+        }];
+        let request = LLMRequest::new("gemini-2.5-flash", messages);
+        let gemini_req = provider.to_gemini_request(&request);
+        assert_eq!(gemini_req.contents.len(), 1);
+        let part = &gemini_req.contents[0].parts[0];
+        assert!(part.text.is_none());
+    }
+
+    #[test]
+    fn test_image_url_source_is_skipped_without_panicking() {
+        let provider = GeminiProvider::new("test-key".to_string());
+        let messages = vec![Message {
+            role: Role::User,
+            content: vec![ContentBlock::Image {
+                source: ImageSource::Url {
+                    url: "https://example.com/cat.png".to_string(),
+                },
+            }],
+        }];
+        let request = LLMRequest::new("gemini-2.5-flash", messages);
+        let gemini_req = provider.to_gemini_request(&request);
+        assert!(gemini_req.contents.is_empty());
+    }
+
+    #[test]
+    fn test_context_window_all_known_models() {
+        let provider = GeminiProvider::new("test-key".to_string());
+        assert_eq!(provider.context_window("gemini-3-pro"), Some(2_000_000));
+        assert_eq!(provider.context_window("gemini-2.5-flash"), Some(1_000_000));
+        assert_eq!(
+            provider.context_window("gemini-2.5-flash-lite"),
+            Some(1_000_000)
+        );
+        assert_eq!(provider.context_window("gemini-2.0-flash"), Some(1_000_000));
+        assert_eq!(
+            provider.context_window("gemini-2.0-flash-lite"),
+            Some(1_000_000)
+        );
+        assert_eq!(provider.context_window("gemma-4-26b-a4b-it"), Some(128_000));
+        assert_eq!(provider.context_window("gemma-3-27b-it"), Some(128_000));
+        assert_eq!(provider.context_window("gemma-3-12b-it"), Some(128_000));
+        assert_eq!(provider.context_window("gemma-3-4b-it"), Some(128_000));
+        assert_eq!(provider.context_window("gemma-3-1b-it"), Some(32_000));
+    }
+
+    #[test]
+    fn test_calculate_cost_all_known_models() {
+        let provider = GeminiProvider::new("test-key".to_string());
+        assert!(provider.calculate_cost("gemini-3-pro", 1_000_000, 1_000_000) > 0.0);
+        assert!(provider.calculate_cost("gemini-2.5-flash-lite", 1_000_000, 1_000_000) > 0.0);
+        assert!(provider.calculate_cost("gemini-2.0-flash", 1_000_000, 1_000_000) > 0.0);
+        assert!(provider.calculate_cost("gemini-2.0-flash-lite", 1_000_000, 1_000_000) > 0.0);
+        assert_eq!(
+            provider.calculate_cost("gemma-3-27b-it", 1_000_000, 1_000_000),
+            0.0
+        );
+        assert_eq!(
+            provider.calculate_cost("totally-unknown-model", 1_000_000, 1_000_000),
+            0.0
+        );
+    }
+
+    // ── build_gemini_error ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_build_gemini_error_rate_limit_with_retry_after() {
+        let body = GeminiErrorResponse {
+            error: GeminiError {
+                message: "Quota exceeded".to_string(),
+                status: Some("RESOURCE_EXHAUSTED".to_string()),
+            },
+        };
+        let err = build_gemini_error(429, Some(30), Some(body));
+        match err {
+            ProviderError::RateLimitExceeded(msg) => {
+                assert!(msg.contains("Quota exceeded"));
+                assert!(msg.contains("30 seconds"));
+            }
+            other => panic!("expected RateLimitExceeded, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_build_gemini_error_rate_limit_without_retry_after() {
+        let body = GeminiErrorResponse {
+            error: GeminiError {
+                message: "Quota exceeded".to_string(),
+                status: None,
+            },
+        };
+        let err = build_gemini_error(429, None, Some(body));
+        match err {
+            ProviderError::RateLimitExceeded(msg) => assert!(msg.contains("rate limited")),
+            other => panic!("expected RateLimitExceeded, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_build_gemini_error_rate_limit_no_body() {
+        let err = build_gemini_error(429, None, None);
+        assert!(matches!(err, ProviderError::RateLimitExceeded(_)));
+    }
+
+    #[test]
+    fn test_build_gemini_error_api_error_with_body() {
+        let body = GeminiErrorResponse {
+            error: GeminiError {
+                message: "Invalid argument".to_string(),
+                status: Some("INVALID_ARGUMENT".to_string()),
+            },
+        };
+        let err = build_gemini_error(400, None, Some(body));
+        match err {
+            ProviderError::ApiError {
+                status,
+                message,
+                error_type,
+            } => {
+                assert_eq!(status, 400);
+                assert_eq!(message, "Invalid argument");
+                assert_eq!(error_type.as_deref(), Some("INVALID_ARGUMENT"));
+            }
+            other => panic!("expected ApiError, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_build_gemini_error_no_body_falls_back_to_unknown() {
+        let err = build_gemini_error(500, None, None);
+        match err {
+            ProviderError::ApiError {
+                status, message, ..
+            } => {
+                assert_eq!(status, 500);
+                assert_eq!(message, "Unknown error");
+            }
+            other => panic!("expected ApiError, got {:?}", other),
+        }
+    }
+
+    // ── parse_gemini_sse ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_parse_gemini_sse_text_response() {
+        let sse = "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hello\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":2}}\n\n";
+        let events = parse_gemini_sse(sse, "gemini-2.5-flash");
+
+        assert!(matches!(
+            events.first(),
+            Some(StreamEvent::MessageStart { .. })
+        ));
+        assert!(events.iter().any(|e| matches!(
+            e,
+            StreamEvent::ContentBlockDelta {
+                delta: ContentDelta::TextDelta { text },
+                ..
+            } if text == "Hello"
+        )));
+        let message_delta = events.iter().find_map(|e| match e {
+            StreamEvent::MessageDelta { delta, usage, .. } => Some((delta, usage)),
+            _ => None,
+        });
+        let (delta, usage) = message_delta.expect("expected a MessageDelta event");
+        assert_eq!(delta.stop_reason, Some(StopReason::EndTurn));
+        assert_eq!(usage.input_tokens, 5);
+        assert_eq!(usage.output_tokens, 2);
+        assert!(matches!(events.last(), Some(StreamEvent::MessageStop)));
+    }
+
+    #[test]
+    fn test_parse_gemini_sse_thinking_part() {
+        let sse = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"reasoning\",\"thought\":true}]}}]}\n\n";
+        let events = parse_gemini_sse(sse, "gemini-2.5-pro");
+        assert!(events.iter().any(|e| matches!(
+            e,
+            StreamEvent::ContentBlockDelta {
+                delta: ContentDelta::ThinkingDelta { thinking },
+                ..
+            } if thinking == "reasoning"
+        )));
+    }
+
+    #[test]
+    fn test_parse_gemini_sse_function_call() {
+        let sse = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"read_file\",\"args\":{\"path\":\"a.txt\"}}}]},\"finishReason\":\"STOP\"}]}\n\n";
+        let events = parse_gemini_sse(sse, "gemini-2.5-flash");
+        assert!(events.iter().any(|e| matches!(
+            e,
+            StreamEvent::ContentBlockStart {
+                content_block: ContentBlock::ToolUse { name, .. },
+                ..
+            } if name == "read_file"
+        )));
+        let stop_reason = events.iter().find_map(|e| match e {
+            StreamEvent::MessageDelta { delta, .. } => delta.stop_reason.clone(),
+            _ => None,
+        });
+        assert_eq!(
+            stop_reason,
+            Some(StopReason::ToolUse),
+            "a function call must report ToolUse regardless of finishReason"
+        );
+    }
+
+    #[test]
+    fn test_parse_gemini_sse_max_tokens() {
+        let sse = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"cut off\"}]},\"finishReason\":\"MAX_TOKENS\"}]}\n\n";
+        let events = parse_gemini_sse(sse, "gemini-2.5-flash");
+        let stop_reason = events.iter().find_map(|e| match e {
+            StreamEvent::MessageDelta { delta, .. } => delta.stop_reason.clone(),
+            _ => None,
+        });
+        assert_eq!(stop_reason, Some(StopReason::MaxTokens));
+    }
+
+    #[test]
+    fn test_parse_gemini_sse_skips_malformed_lines() {
+        let sse = "data: not valid json\n\ndata: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}]},\"finishReason\":\"STOP\"}]}\n\n";
+        let events = parse_gemini_sse(sse, "gemini-2.5-flash");
+        assert!(events.iter().any(|e| matches!(
+            e,
+            StreamEvent::ContentBlockDelta {
+                delta: ContentDelta::TextDelta { text },
+                ..
+            } if text == "ok"
+        )));
+    }
+
+    #[test]
+    fn test_parse_gemini_sse_ignores_non_data_lines() {
+        let sse = "event: ping\n\ndata: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hi\"}]},\"finishReason\":\"STOP\"}]}\n\n";
+        let events = parse_gemini_sse(sse, "gemini-2.5-flash");
+        assert!(events.iter().any(|e| matches!(
+            e,
+            StreamEvent::ContentBlockDelta {
+                delta: ContentDelta::TextDelta { text },
+                ..
+            } if text == "hi"
+        )));
     }
 }
