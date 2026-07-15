@@ -5,6 +5,7 @@
 use super::{
     anthropic::AnthropicProvider,
     error::ProviderError,
+    gemini::GeminiProvider,
     openai::OpenAIProvider,
     qwen::{QwenProvider, ToolCallParser},
     Provider,
@@ -122,7 +123,8 @@ impl Provider for FailoverProvider {
 /// 1. Qwen (if configured with credentials)
 /// 2. Ollama native (if `providers.ollama` is configured)
 /// 3. OpenAI / OpenAI-compatible local (LM Studio, Ollama via `/v1`, LocalAI)
-/// 4. Anthropic (default fallback)
+/// 4. Gemini (Google AI Studio - Gemini and Gemma models)
+/// 5. Anthropic (default fallback)
 ///
 /// Ollama sits between Qwen and OpenAI so that existing setups using only
 /// `providers.openai.base_url` (LM Studio, Ollama-via-compat) keep resolving
@@ -143,8 +145,46 @@ pub fn create_provider(config: &Config) -> Result<Arc<dyn Provider>> {
         return Ok(provider);
     }
 
+    // Try Gemini (also serves Gemma models via the same API)
+    if let Some(provider) = try_create_gemini(config)? {
+        return Ok(provider);
+    }
+
     // Fall back to Anthropic
     create_anthropic(config)
+}
+
+/// Try to create Gemini provider if configured and enabled.
+///
+/// Serves both Gemini models and Google's open-weight Gemma models (Gemma 3,
+/// Gemma 4) through the same API — configuring `providers.gemini` is enough
+/// to run Gemma 4 remotely without local Ollama inference.
+fn try_create_gemini(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
+    let gemini_config = match &config.providers.gemini {
+        Some(cfg) if cfg.enabled => cfg,
+        _ => return Ok(None),
+    };
+
+    let api_key = match &gemini_config.api_key {
+        Some(key) => key.clone(),
+        None => return Ok(None),
+    };
+
+    tracing::info!("Using Gemini provider");
+    println!("✨ Using Google Gemini\n");
+
+    let mut provider = match &gemini_config.base_url {
+        Some(base_url) => GeminiProvider::with_base_url(api_key, base_url.clone()),
+        None => GeminiProvider::new(api_key),
+    };
+
+    if let Some(model) = &gemini_config.default_model {
+        tracing::info!("Using custom default model: {}", model);
+        println!("📦 Model: {}\n", model);
+        provider = provider.with_default_model(model.clone());
+    }
+
+    Ok(Some(Arc::new(provider)))
 }
 
 /// Try to create the native Ollama provider if `providers.ollama` is configured.
@@ -321,7 +361,7 @@ fn configure_openai(mut provider: OpenAIProvider, config: &ProviderConfig) -> Op
 /// Create Anthropic provider (default fallback)
 fn create_anthropic(config: &Config) -> Result<Arc<dyn Provider>> {
     let anthropic_config = config.providers.anthropic.as_ref().context(
-        "No provider configured.\n\nPlease set one of:\n  - ANTHROPIC_API_KEY for Claude\n  - OPENAI_API_KEY for OpenAI/GPT\n  - OPENAI_BASE_URL for local LLMs (LM Studio, Ollama)\n  - QWEN_BASE_URL for local Qwen (vLLM)\n  - DASHSCOPE_API_KEY for DashScope cloud\n\nExample for vLLM with Qwen:\n  export QWEN_BASE_URL=\"http://localhost:8000/v1/chat/completions\"",
+        "No provider configured.\n\nPlease set one of:\n  - ANTHROPIC_API_KEY for Claude\n  - OPENAI_API_KEY for OpenAI/GPT\n  - OPENAI_BASE_URL for local LLMs (LM Studio, Ollama)\n  - GEMINI_API_KEY for Google Gemini/Gemma\n  - QWEN_BASE_URL for local Qwen (vLLM)\n  - DASHSCOPE_API_KEY for DashScope cloud\n\nExample for vLLM with Qwen:\n  export QWEN_BASE_URL=\"http://localhost:8000/v1/chat/completions\"",
     )?;
 
     // Anthropic is the terminal fallback, so a disabled one cannot quietly fall

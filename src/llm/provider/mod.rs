@@ -19,6 +19,7 @@ pub use types::*;
 pub mod anthropic;
 pub mod azure;
 pub mod factory;
+pub mod gemini;
 #[cfg(feature = "ollama")]
 pub mod ollama;
 #[cfg(feature = "ollama")]
@@ -29,6 +30,7 @@ pub mod qwen;
 pub use anthropic::AnthropicProvider;
 pub use azure::AzureOpenAIProvider;
 pub use factory::create_provider;
+pub use gemini::GeminiProvider;
 #[cfg(feature = "ollama")]
 pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;

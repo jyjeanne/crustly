@@ -11,7 +11,7 @@ Crustly is a high-performance terminal AI assistant for software development wri
 - **Async Runtime:** Tokio
 - **TUI Framework:** Ratatui with Crossterm
 - **Database:** SQLite with sqlx (WAL mode for concurrent reads)
-- **LLM Providers:** Anthropic, OpenAI, AWS Bedrock, Ollama (via crabrace registry)
+- **LLM Providers:** Anthropic, OpenAI, Google Gemini (also serves Gemma 3/4), AWS Bedrock, Ollama (via crabrace registry)
 - **Tools Framework:** 21+ built-in tools for file operations, shell execution, web access, and agent orchestration
 
 ## Common Development Commands
@@ -110,7 +110,7 @@ The codebase is organized around several key architectural layers:
 - `file.rs` - File operations and workspace management
 
 **LLM Layer (`src/llm/`):**
-- `provider/` - LLM provider implementations (Anthropic, OpenAI, Bedrock, Ollama)
+- `provider/` - LLM provider implementations (Anthropic, OpenAI, Gemini/Gemma, Bedrock, Ollama)
 - `agent/` - Agent service orchestrating LLM interactions
 - `tools/` - Tool execution framework (21+ tools)
 - `prompt/` - Prompt templates and management

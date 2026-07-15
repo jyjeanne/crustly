@@ -338,7 +338,7 @@ Claude: ✅ "I've created the config file at config.json"
 
 ## 🌐 Supported AI Providers
 
-Crustly currently has **2 fully implemented providers**: **Anthropic** and **OpenAI**. The OpenAI provider is compatible with any OpenAI-compatible API, enabling local LLMs and alternative providers.
+Crustly currently has **3 fully implemented cloud providers**: **Anthropic**, **OpenAI**, and **Google Gemini**. The OpenAI provider is compatible with any OpenAI-compatible API, enabling local LLMs and alternative providers.
 
 ### Implemented Providers
 
@@ -352,6 +352,12 @@ Crustly currently has **2 fully implemented providers**: **Anthropic** and **Ope
 - **Setup**: `export OPENAI_API_KEY="sk-YOUR_KEY"`
 - **Features**: Streaming, tools, cost tracking
 - **Compatible with**: Any OpenAI-compatible API endpoint
+
+#### ✅ Google Gemini (Fully Supported — also serves Gemma)
+- **Models**: gemini-3-pro, gemini-2.5-pro/flash/flash-lite, gemini-2.0-flash, and Google's open-weight **Gemma 4** (`gemma-4-31b-it`, `gemma-4-26b-a4b-it`) and **Gemma 3** models served through the same API
+- **Setup**: `export GEMINI_API_KEY="AIza..."` (get a free key at [aistudio.google.com](https://aistudio.google.com/apikey))
+- **Features**: Streaming, function calling, vision, extended thinking (`thinkingConfig`/`includeThoughts`), JSON/structured output (`responseSchema`)
+- **Why it matters for Gemma**: running Gemma 4/3 through this provider needs no local GPU, no Ollama, and Gemma usage through the Gemini API is free of charge — set `default_model = "gemma-4-31b-it"` under `[providers.gemini]` to use it. See `config.toml.example` for a ready-to-use snippet.
 
 ### OpenAI-Compatible Providers
 
@@ -370,7 +376,6 @@ The OpenAI provider works with **any OpenAI-compatible API**, including:
 | Provider | Status | Notes |
 |----------|--------|-------|
 | **AWS Bedrock** | ✅ Supported | Enable with `--features aws-bedrock`; uses standard AWS credentials |
-| Google Gemini | 📅 Planned | — |
 | Azure OpenAI | 📅 Planned | — |
 | Cerebras | 📅 Planned | — |
 | Huggingface | 📅 Planned | — |

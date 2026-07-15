@@ -44,6 +44,19 @@ default_model = "qwen2.5-coder-7b-instruct"
 # default_model = "claude-3-5-sonnet-20240620"  # Optional: override default
 
 # ========================================
+# Google Gemini Provider (also serves Gemma models)
+# ========================================
+# Runs Gemini (gemini-3-pro, gemini-2.5-pro/flash, gemini-2.0-flash) and
+# Google's open-weight Gemma models (gemma-4-31b-it, gemma-4-26b-a4b-it,
+# gemma-3-27b-it, ...) through the same generateContent API - no local GPU
+# or Ollama required, and Gemma usage through this endpoint is free of charge.
+# [providers.gemini]
+# enabled = true
+# api_key = "AIza..."  # Or use GEMINI_API_KEY environment variable
+# default_model = "gemini-2.5-flash"  # Or e.g. "gemma-4-31b-it" for Gemma via API
+# base_url = "https://generativelanguage.googleapis.com/v1beta"  # Optional override
+
+# ========================================
 # Qwen Provider (Local vLLM / DashScope Cloud)
 # ========================================
 # For local Qwen deployment (vLLM, LM Studio with Qwen models):

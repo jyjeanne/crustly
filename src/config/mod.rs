@@ -298,8 +298,8 @@ impl ProviderConfigs {
     /// to config.toml).
     ///
     /// Backs `--model`. The predicates below mirror `create_provider`'s selection
-    /// order (Qwen, then Ollama, then OpenAI, then Anthropic) and its enablement
-    /// rules exactly. They must stay in step: if the override landed on a provider
+    /// order (Qwen, then Ollama, then OpenAI, then Gemini, then Anthropic) and its
+    /// enablement rules exactly. They must stay in step: if the override landed on a provider
     /// the factory does not pick, `--model` would silently do nothing while
     /// reporting success - the user would think they were testing one model while
     /// running another.
@@ -323,6 +323,12 @@ impl ProviderConfigs {
             if openai.enabled && (openai.base_url.is_some() || openai.api_key.is_some()) {
                 openai.default_model = Some(model.to_string());
                 return Some("openai");
+            }
+        }
+        if let Some(gemini) = self.gemini.as_mut() {
+            if gemini.enabled && gemini.api_key.is_some() {
+                gemini.default_model = Some(model.to_string());
+                return Some("gemini");
             }
         }
         if let Some(anthropic) = self.anthropic.as_mut() {
