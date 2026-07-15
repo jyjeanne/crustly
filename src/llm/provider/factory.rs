@@ -290,6 +290,19 @@ fn configure_qwen(mut provider: QwenProvider, config: &QwenProviderConfig) -> Qw
         if tool_parser == ToolCallParser::NativeQwen {
             println!("🔧 Using native Qwen function calling (✿FUNCTION✿ markers)\n");
         }
+    } else if config
+        .default_model
+        .as_deref()
+        .is_some_and(|m| m.to_lowercase().contains("coder-next"))
+    {
+        // Qwen3-Coder-Next's recommended vLLM/SGLang serving recipe
+        // (`--tool-call-parser qwen3_coder --enable-auto-tool-choice`)
+        // returns tool calls via the structured OpenAI `tool_calls` field,
+        // not the Hermes `<tool_call>` text tags that `QwenProvider::local`
+        // otherwise defaults to for local deployments - so an explicit
+        // override is needed here to match that server behavior.
+        provider = provider.with_tool_parser(ToolCallParser::OpenAI);
+        tracing::info!("Auto-selected OpenAI tool parser for Qwen3-Coder-Next");
     }
 
     // Set thinking mode
@@ -780,6 +793,78 @@ mod tests {
         assert!(result.is_ok());
         let provider = result.unwrap();
         assert_eq!(provider.name(), "qwen");
+    }
+
+    /// Qwen3-Coder-Next's documented vLLM/SGLang serving recipe
+    /// (`--tool-call-parser qwen3_coder --enable-auto-tool-choice`) emits
+    /// tool calls via the structured OpenAI `tool_calls` field, so
+    /// `configure_qwen` must not leave it on `QwenProvider::local`'s Hermes
+    /// default when no explicit `tool_parser` is configured.
+    #[test]
+    fn configure_qwen_auto_selects_openai_parser_for_coder_next() {
+        let config = QwenProviderConfig {
+            enabled: true,
+            api_key: None,
+            base_url: Some("http://localhost:8000/v1".to_string()),
+            default_model: Some("qwen3-coder-next".to_string()),
+            tool_parser: None,
+            enable_thinking: false,
+            thinking_budget: None,
+            region: None,
+            top_p: None,
+            top_k: None,
+            repetition_penalty: None,
+        };
+
+        let provider = configure_qwen(QwenProvider::local(config.base_url.clone().unwrap()), &config);
+
+        assert_eq!(provider.tool_parser(), ToolCallParser::OpenAI);
+    }
+
+    /// An explicit `tool_parser` config always wins over the Coder-Next
+    /// auto-selection - a user who deliberately picked Hermes should get it.
+    #[test]
+    fn configure_qwen_explicit_tool_parser_overrides_coder_next_auto_selection() {
+        let config = QwenProviderConfig {
+            enabled: true,
+            api_key: None,
+            base_url: Some("http://localhost:8000/v1".to_string()),
+            default_model: Some("qwen3-coder-next".to_string()),
+            tool_parser: Some("native".to_string()),
+            enable_thinking: false,
+            thinking_budget: None,
+            region: None,
+            top_p: None,
+            top_k: None,
+            repetition_penalty: None,
+        };
+
+        let provider = configure_qwen(QwenProvider::local(config.base_url.clone().unwrap()), &config);
+
+        assert_eq!(provider.tool_parser(), ToolCallParser::NativeQwen);
+    }
+
+    /// Other local Qwen3 models must keep the existing Hermes default -
+    /// the auto-selection is scoped to Coder-Next specifically.
+    #[test]
+    fn configure_qwen_keeps_hermes_default_for_other_models() {
+        let config = QwenProviderConfig {
+            enabled: true,
+            api_key: None,
+            base_url: Some("http://localhost:8000/v1".to_string()),
+            default_model: Some("qwen3-8b".to_string()),
+            tool_parser: None,
+            enable_thinking: false,
+            thinking_budget: None,
+            region: None,
+            top_p: None,
+            top_k: None,
+            repetition_penalty: None,
+        };
+
+        let provider = configure_qwen(QwenProvider::local(config.base_url.clone().unwrap()), &config);
+
+        assert_eq!(provider.tool_parser(), ToolCallParser::Hermes);
     }
 
     #[test]

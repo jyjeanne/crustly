@@ -172,6 +172,10 @@ thinking_budget = 5000  # Optional: limit thinking tokens
 
 ## Supported Models
 
+### Qwen3-Coder-Next & Qwen3.6
+- `qwen3-coder-next` - Agentic coding MoE (80B total / ~3B active, 256K context). Auto-selects the OpenAI tool parser (see [Local Deployment with vLLM](#local-deployment-with-vllm)) since its official serving recipe returns structured `tool_calls`, not Hermes tags.
+- `qwen3.6-27b` - Reasoning + coding (256K context locally; cloud releases may support up to 1M)
+
 ### Qwen3 Series
 - `qwen3-235b-a22b` - Flagship MoE model (131K context)
 - `qwen3-32b` - High performance (131K context)
@@ -221,6 +225,32 @@ default_model = "Qwen/Qwen3-8B"
 tool_parser = "hermes"
 enable_thinking = true
 ```
+
+### Qwen3-Coder-Next (vLLM / SGLang)
+
+Qwen3-Coder-Next's official serving recipe uses the dedicated `qwen3_coder`
+tool-call parser, which returns tool calls via the structured OpenAI
+`tool_calls` field rather than Hermes `<tool_call>` tags:
+
+```bash
+vllm serve Qwen/Qwen3-Coder-Next \
+    --enable-auto-tool-choice \
+    --tool-call-parser qwen3_coder \
+    --port 8000
+```
+
+Crustly detects `coder-next` in `default_model` and automatically switches
+the OpenAI tool parser on for you, so no `tool_parser` setting is required:
+
+```toml
+[providers.qwen]
+enabled = true
+base_url = "http://localhost:8000/v1/chat/completions"
+default_model = "qwen3-coder-next"
+```
+
+Set `tool_parser` explicitly (e.g. `"hermes"`) only if you're running a
+different tool-call parser than the recipe above.
 
 ## Local Deployment with LM Studio
 

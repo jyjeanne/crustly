@@ -6,6 +6,8 @@
 //! - Local deployment (vLLM, LM Studio) and DashScope cloud API
 //!
 //! ## Supported Models
+//! - qwen3-coder-next (Qwen3-Coder-Next MoE, 80B/~3B active, 256K context)
+//! - qwen3.6-27b (Qwen3.6 reasoning + coding, 256K context)
 //! - qwen3-235b-a22b (Qwen3 MoE flagship)
 //! - qwen3-32b (Qwen3 32B)
 //! - qwen3-14b (Qwen3 14B)
@@ -136,6 +138,13 @@ impl QwenProvider {
     pub fn with_tool_parser(mut self, parser: ToolCallParser) -> Self {
         self.tool_parser = parser;
         self
+    }
+
+    /// Current tool-call parsing mode, for tests in other modules (e.g.
+    /// `factory::configure_qwen`'s auto-selection logic).
+    #[cfg(test)]
+    pub(crate) fn tool_parser(&self) -> ToolCallParser {
+        self.tool_parser
     }
 
     /// Override sampling parameters sent with every request. Any field left
@@ -1464,6 +1473,9 @@ impl Provider for QwenProvider {
 
     fn supported_models(&self) -> Vec<String> {
         vec![
+            // Qwen3-Coder-Next and Qwen3.6 (256K context)
+            "qwen3-coder-next".to_string(),
+            "qwen3.6-27b".to_string(),
             // Qwen3 models
             "qwen3-235b-a22b".to_string(),
             "qwen3-32b".to_string(),
@@ -1495,6 +1507,9 @@ impl Provider for QwenProvider {
 
     fn context_window(&self, model: &str) -> Option<u32> {
         match model {
+            // Qwen3-Coder-Next and Qwen3.6 (256K native context)
+            "qwen3-coder-next" => Some(262_144),
+            "qwen3.6-27b" => Some(262_144),
             // Qwen3 models
             "qwen3-235b-a22b" => Some(131_072),
             "qwen3-32b" => Some(131_072),
@@ -2168,6 +2183,8 @@ Here's my analysis of the code."#;
         assert!(models.contains(&"qwen3-8b".to_string()));
         assert!(models.contains(&"qwen2.5-coder-14b-instruct".to_string()));
         assert!(models.contains(&"qwen-max".to_string()));
+        assert!(models.contains(&"qwen3-coder-next".to_string()));
+        assert!(models.contains(&"qwen3.6-27b".to_string()));
     }
 
     #[test]
@@ -2175,6 +2192,8 @@ Here's my analysis of the code."#;
         let provider = QwenProvider::dashscope_intl("test-key".to_string());
         assert_eq!(provider.context_window("qwen3-8b"), Some(131_072));
         assert_eq!(provider.context_window("qwen-max"), Some(32_768));
+        assert_eq!(provider.context_window("qwen3-coder-next"), Some(262_144));
+        assert_eq!(provider.context_window("qwen3.6-27b"), Some(262_144));
     }
 
     #[test]
