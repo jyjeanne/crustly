@@ -1715,6 +1715,14 @@ fn render_provider_switch(f: &mut Frame, app: &App, area: Rect) {
 /// name input + suggestions list, or a live progress bar while a pull is
 /// in flight.
 fn render_model_download(f: &mut Frame, app: &App, area: Rect) {
+    if let Some(model) = &app.model_download_confirm_delete {
+        render_model_download_confirm_delete(f, model, area);
+        return;
+    }
+    if let Some(model) = &app.model_download_deleting {
+        render_model_download_deleting(f, model, area);
+        return;
+    }
     if app.model_download_running {
         render_model_download_progress(f, app, area);
         return;
@@ -1798,6 +1806,11 @@ fn render_model_download(f: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled(" Pull  ", Style::default().fg(Color::White)),
         Span::styled(
+            "[Del]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Delete installed  ", Style::default().fg(Color::White)),
+        Span::styled(
             "[Esc]",
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         ),
@@ -1871,6 +1884,77 @@ fn render_model_download_progress(f: &mut Frame, app: &App, area: Rect) {
                 .border_style(Style::default().fg(Color::Yellow))
                 .title(Span::styled(
                     " Downloading… ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the confirmation step before deleting a locally-installed model
+/// (Del in the suggestion list).
+fn render_model_download_confirm_delete(f: &mut Frame, model: &str, area: Rect) {
+    let lines = vec![
+        Line::from(vec![Span::styled(
+            format!("🗑️ Delete '{}'?", model),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  This removes the model from disk. You can re-pull it later.",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                "[Y/Enter]",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Confirm delete  ", Style::default().fg(Color::White)),
+            Span::styled(
+                "[N/Esc]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Cancel", Style::default().fg(Color::White)),
+        ]),
+    ];
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Red))
+                .title(Span::styled(
+                    " Confirm Delete ",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the brief in-flight state while a delete request is running.
+fn render_model_download_deleting(f: &mut Frame, model: &str, area: Rect) {
+    let lines = vec![Line::from(vec![Span::styled(
+        format!("🗑️ Deleting '{}'…", model),
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    )])];
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(Span::styled(
+                    " Deleting… ",
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
@@ -2172,6 +2256,27 @@ mod tests {
         assert!(screen.contains("Downloading 'qwen2.5-coder:7b'"));
         assert!(screen.contains("pulling abc123"));
         assert!(screen.contains("50%"));
+    }
+
+    #[tokio::test]
+    async fn model_download_confirm_delete_shows_prompt() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_confirm_delete = Some("qwen2.5-coder:7b".to_string());
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Delete 'qwen2.5-coder:7b'?"));
+        assert!(screen.contains("Confirm delete"));
+    }
+
+    #[tokio::test]
+    async fn model_download_deleting_shows_status() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+        app.model_download_deleting = Some("qwen2.5-coder:7b".to_string());
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Deleting 'qwen2.5-coder:7b'"));
     }
 
     #[tokio::test]
