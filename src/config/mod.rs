@@ -298,8 +298,8 @@ impl ProviderConfigs {
     /// to config.toml).
     ///
     /// Backs `--model`. The predicates below mirror `create_provider`'s selection
-    /// order (Qwen, then Ollama, then OpenAI, then Anthropic) and its enablement
-    /// rules exactly. They must stay in step: if the override landed on a provider
+    /// order (Qwen, then Ollama, then OpenAI, then Gemini, then Anthropic) and its
+    /// enablement rules exactly. They must stay in step: if the override landed on a provider
     /// the factory does not pick, `--model` would silently do nothing while
     /// reporting success - the user would think they were testing one model while
     /// running another.
@@ -323,6 +323,12 @@ impl ProviderConfigs {
             if openai.enabled && (openai.base_url.is_some() || openai.api_key.is_some()) {
                 openai.default_model = Some(model.to_string());
                 return Some("openai");
+            }
+        }
+        if let Some(gemini) = self.gemini.as_mut() {
+            if gemini.enabled && gemini.api_key.is_some() {
+                gemini.default_model = Some(model.to_string());
+                return Some("gemini");
             }
         }
         if let Some(anthropic) = self.anthropic.as_mut() {
@@ -1024,6 +1030,73 @@ mod tests {
             providers.qwen.as_ref().unwrap().default_model.is_none(),
             "a disabled provider must not receive the override",
         );
+    }
+
+    /// Gemini sits between OpenAI and Anthropic in `create_provider`'s chain,
+    /// and requires an api_key (not just `enabled`) to be selected - the
+    /// override predicate must match both conditions exactly.
+    #[test]
+    fn model_override_targets_gemini_when_it_is_the_selected_provider() {
+        let mut providers = ProviderConfigs {
+            gemini: Some(ProviderConfig {
+                enabled: true,
+                api_key: Some("test-key".to_string()),
+                base_url: None,
+                default_model: None,
+            }),
+            anthropic: Some(ProviderConfig {
+                enabled: true,
+                api_key: Some("anthropic-key".to_string()),
+                base_url: None,
+                default_model: None,
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            providers.override_default_model("gemma-4-31b-it"),
+            Some("gemini")
+        );
+        assert_eq!(
+            providers.gemini.as_ref().unwrap().default_model.as_deref(),
+            Some("gemma-4-31b-it"),
+        );
+        assert!(
+            providers
+                .anthropic
+                .as_ref()
+                .unwrap()
+                .default_model
+                .is_none(),
+            "override must not touch a provider that will not be selected",
+        );
+    }
+
+    /// A Gemini section without an api_key is not a runnable provider, so the
+    /// override must fall through to Anthropic, mirroring `try_create_gemini`.
+    #[test]
+    fn model_override_skips_gemini_without_api_key() {
+        let mut providers = ProviderConfigs {
+            gemini: Some(ProviderConfig {
+                enabled: true,
+                api_key: None,
+                base_url: None,
+                default_model: None,
+            }),
+            anthropic: Some(ProviderConfig {
+                enabled: true,
+                api_key: Some("anthropic-key".to_string()),
+                base_url: None,
+                default_model: None,
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            providers.override_default_model("claude-3-5-sonnet-20240620"),
+            Some("anthropic")
+        );
+        assert!(providers.gemini.as_ref().unwrap().default_model.is_none());
     }
 
     /// A read-only `allow_bash` list must let those exact commands run without an
