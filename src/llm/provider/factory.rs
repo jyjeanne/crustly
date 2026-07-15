@@ -816,7 +816,10 @@ mod tests {
             repetition_penalty: None,
         };
 
-        let provider = configure_qwen(QwenProvider::local(config.base_url.clone().unwrap()), &config);
+        let provider = configure_qwen(
+            QwenProvider::local(config.base_url.clone().unwrap()),
+            &config,
+        );
 
         assert_eq!(provider.tool_parser(), ToolCallParser::OpenAI);
     }
@@ -839,7 +842,10 @@ mod tests {
             repetition_penalty: None,
         };
 
-        let provider = configure_qwen(QwenProvider::local(config.base_url.clone().unwrap()), &config);
+        let provider = configure_qwen(
+            QwenProvider::local(config.base_url.clone().unwrap()),
+            &config,
+        );
 
         assert_eq!(provider.tool_parser(), ToolCallParser::NativeQwen);
     }
@@ -862,7 +868,10 @@ mod tests {
             repetition_penalty: None,
         };
 
-        let provider = configure_qwen(QwenProvider::local(config.base_url.clone().unwrap()), &config);
+        let provider = configure_qwen(
+            QwenProvider::local(config.base_url.clone().unwrap()),
+            &config,
+        );
 
         assert_eq!(provider.tool_parser(), ToolCallParser::Hermes);
     }
