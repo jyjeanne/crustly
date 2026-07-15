@@ -21,31 +21,32 @@
 
 ## Table of Contents
 
-- [📸 Screenshots](#screenshots)
-- [🎯 Main Coding Features](#main-coding-features)
-- [✨ What's New](#whats-new)
-- [🔒 Interactive Approval System](#interactive-approval-system)
-- [⚠️ Important Disclaimers](#important-disclaimers)
-- [🌐 Supported AI Providers](#supported-ai-providers)
-- [🚀 Quick Start](#quick-start)
-- [📋 A Note on Claude Max and GitHub Copilot](#a-note-on-claude-max-and-github-copilot)
-- [🏠 Running Crustly with Local LLMs](#running-crustly-with-local-llms)
-- [💡 Best Practices for Using Crustly](#best-practices-for-using-crustly)
-- [👨‍💻 Why Crustly for Coding?](#why-crustly-for-coding)
-- [📋 Plan Mode — Structured Task Planning](#plan-mode-structured-task-planning)
-- [🧪 Manual Testing Guide](#manual-testing-guide)
-- [📊 Performance](#performance)
-- [🏗️ Architecture](#architecture)
-- [📁 Project Structure](#project-structure)
-- [🔍 Debug and Logging](#debug-and-logging)
-- [🛠️ Development](#development)
-- [📖 Documentation](#documentation)
-- [🤝 Contributing](#contributing)
-- [🐛 Known Issues & Platform-Specific Notes](#known-issues-platform-specific-notes)
-- [📄 License](#license)
-- [🙏 Acknowledgments](#acknowledgments)
-- [📞 Support](#support)
-- [📈 Status](#status)
+- [📸 Screenshots](#-screenshots)
+- [🎯 Main Coding Features](#-main-coding-features)
+- [✨ What's New](#-whats-new)
+- [🔒 Interactive Approval System](#-interactive-approval-system)
+- [⚠️ Important Disclaimers](#️-important-disclaimers)
+- [🌐 Supported AI Providers](#-supported-ai-providers)
+- [🧩 Reference Coding Models & Hardware Requirements](#-reference-coding-models--hardware-requirements)
+- [🚀 Quick Start](#-quick-start)
+- [📋 A Note on Claude Max and GitHub Copilot](#-a-note-on-claude-max-and-github-copilot)
+- [🏠 Running Crustly with Local LLMs](#-running-crustly-with-local-llms)
+- [💡 Best Practices for Using Crustly](#-best-practices-for-using-crustly)
+- [👨‍💻 Why Crustly for Coding?](#-why-crustly-for-coding)
+- [📋 Plan Mode — Structured Task Planning](#-plan-mode--structured-task-planning)
+- [🧪 Manual Testing Guide](#-manual-testing-guide)
+- [📊 Performance](#-performance)
+- [🏗️ Architecture](#️-architecture)
+- [📁 Project Structure](#-project-structure)
+- [🔍 Debug and Logging](#-debug-and-logging)
+- [🛠️ Development](#️-development)
+- [📖 Documentation](#-documentation)
+- [🤝 Contributing](#-contributing)
+- [🐛 Known Issues & Platform-Specific Notes](#-known-issues--platform-specific-notes)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+- [📞 Support](#-support)
+- [📈 Status](#-status)
 
 ---
 
@@ -419,6 +420,59 @@ cargo run
 ```
 
 See [LM_STUDIO_GUIDE.md](docs/guides/LM_STUDIO_GUIDE.md) for complete setup instructions.
+
+---
+
+## 🧩 Reference Coding Models & Hardware Requirements
+
+Three models cover the three roles a coding agent needs — writing code, planning/reasoning, and reviewing/documenting — and are Crustly's current reference points for each:
+
+| Model | Role | Params | Context (Crustly) | Provider | Serving |
+|---|---|---|---|---|---|
+| **[Qwen3-Coder-Next](https://huggingface.co/Qwen/Qwen3-Coder-Next)** ⭐ | Primary coding agent | 80B MoE (~3B active/token) | 256K | `providers.qwen` (local) | vLLM / SGLang |
+| **Qwen3.6-27B** | Reasoning & planning | 27B dense | 256K (open-weight); cloud releases may support up to 1M | `providers.qwen` (local or DashScope) | vLLM / SGLang / DashScope |
+| **Gemma 4 26B** (`gemma-4-26b-a4b-it`) | Architecture, docs, review | 25.2B MoE (~3.8B active/token) | 128K via Gemini API; up to 256K on the Ollama-hosted GGUF | `providers.gemini` (free) or native Ollama | Gemini API or Ollama |
+
+All three are wired up in Crustly's provider layer today: `qwen3-coder-next` and `qwen3.6-27b` are registered in the Qwen provider with their real 256K context window, and the provider auto-selects the OpenAI tool-call parser for Qwen3-Coder-Next to match its documented vLLM/SGLang serving recipe. Gemma 4 26B is served through the Gemini provider free of charge, or locally via `ollama pull gemma4:26b`. See [QWEN_INTEGRATION.md](docs/guides/QWEN_INTEGRATION.md) for Qwen setup/config and [LM_STUDIO_GUIDE.md](docs/guides/LM_STUDIO_GUIDE.md#gemma-4-google) for the Gemma 4 hardware breakdown.
+
+### Hardware requirements
+
+> Figures below are estimated from published parameter counts using standard quantization overhead (~0.55–0.6 bytes/param at Q4/INT4, 2 bytes/param at BF16/FP16) — the same method used elsewhere in this README and in [LM_STUDIO_GUIDE.md](docs/guides/LM_STUDIO_GUIDE.md). Check each model's card for vendor-confirmed numbers before provisioning production hardware.
+
+#### Qwen3-Coder-Next (80B MoE, ~3B active/token)
+
+Designed for datacenter/workstation vLLM or SGLang serving rather than a single consumer GPU — the full expert set must be resident for production-grade throughput.
+
+| Deployment | VRAM | System RAM | Notes |
+|---|---|---|---|
+| **BF16/FP16 (vLLM/SGLang default)** | ~160 GB | 32 GB+ | Needs multi-GPU, e.g. 2× A100/H100 80GB, or split across 4× 48GB workstation GPUs with tensor parallelism |
+| **AWQ/GPTQ INT4 (vLLM quantized)** | ~45–50 GB | 32 GB+ | Fits a single 80GB A100/H100, or 2× 24GB consumer GPUs (e.g. RTX 4090) with tensor parallelism |
+| Disk | ~45 GB (INT4) – ~160 GB (BF16 safetensors) | — | — |
+
+```bash
+vllm serve Qwen/Qwen3-Coder-Next \
+    --enable-auto-tool-choice \
+    --tool-call-parser qwen3_coder
+```
+
+No local GPU? Use DashScope cloud instead (`api_key` + `region` under `[providers.qwen]` — see [QWEN_INTEGRATION.md](docs/guides/QWEN_INTEGRATION.md)) once Qwen3-Coder-Next is available there.
+
+#### Qwen3.6-27B (27B dense)
+
+Comparable footprint to other 27B-class dense models already in this README (Gemma-3-27B-IT, Qwen2.5-Coder-32B).
+
+| Deployment | VRAM | System RAM | Notes |
+|---|---|---|---|
+| **Q4_K_M (GGUF via Ollama/LM Studio)** | ~20 GB | 40 GB | Best speed/quality balance for local use |
+| **BF16/FP16 (vLLM/SGLang)** | ~54 GB | 32 GB+ | Fits a single 80GB A100/H100 |
+| Cloud (DashScope) | none | none | Recommended default for the reasoning/planning tier if you don't have a spare GPU |
+
+#### Gemma 4 26B (25.2B MoE, ~3.8B active/token)
+
+| Deployment | VRAM | System RAM | Notes |
+|---|---|---|---|
+| **Gemini API** (`providers.gemini`) | none | none | Free of charge, 128K context, no GPU or Ollama required — recommended default |
+| **Ollama** (`ollama pull gemma4:26b`, Q4_K_M) | ~12 GB | 32 GB | Up to 256K context locally; see the exact config snippet in [LM_STUDIO_GUIDE.md](docs/guides/LM_STUDIO_GUIDE.md#gemma-4-google) |
 
 ---
 
@@ -908,7 +962,7 @@ See [LICENSE.md](LICENSE.md) for details.
 
 ## 📈 Status
 
-Crustly is under active development — see the **[✨ What's New](#whats-new)**
+Crustly is under active development — see the **[✨ What's New](#-whats-new)**
 section above and **[CHANGELOG.md](CHANGELOG.md)** for the current feature
 set, and **[ROADMAP.md](ROADMAP.md)** for what's shipped vs. planned. The
 Sprint 0-12 development log from the pre-1.0 bring-up phase is archived at

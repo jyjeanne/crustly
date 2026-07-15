@@ -5,6 +5,13 @@ For the forward-looking plan, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
+### Unreleased
+
+#### Qwen3-Coder-Next & Qwen3.6-27B Support
+Added `qwen3-coder-next` and `qwen3.6-27b` to the Qwen provider's known model list with their real 256K context window (previously fell back to a conservative 32K default, triggering premature context compaction). The provider also now auto-selects the OpenAI tool parser when `default_model` contains `coder-next`, matching Qwen3-Coder-Next's documented vLLM/SGLang serving recipe (`--tool-call-parser qwen3_coder`), which returns structured `tool_calls` rather than Hermes `<tool_call>` tags. See [QWEN_INTEGRATION.md](docs/guides/QWEN_INTEGRATION.md) for the updated serving instructions.
+
+---
+
 ### v0.5.0 — Gemini Provider & Claude Code / Qwen Compatibility
 
 #### Native Google Gemini Provider
