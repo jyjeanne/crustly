@@ -5,7 +5,7 @@ Generated from `Cargo.toml` + `cargo metadata` by `scripts/generate-architecture
 ## Crate
 
 - **Name:** crustly
-- **Version:** 0.4.1
+- **Version:** 0.5.0
 - **Edition:** 2021
 - **License:** FSL-1.1-MIT
 - **Rust edition:** 2021
@@ -49,7 +49,7 @@ Generated from `Cargo.toml` + `cargo metadata` by `scripts/generate-architecture
 
 - `ratatui`
 - `crossterm`
-- `tui-textarea`
+- `ratatui-textarea`
 - `tui-tree-widget`
 - `ratatui-image`
 - `viuer`
