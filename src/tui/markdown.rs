@@ -2,7 +2,7 @@
 //!
 //! Converts markdown text to styled Ratatui widgets.
 
-use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -82,10 +82,10 @@ impl MarkdownRenderer {
 
     fn handle_start_tag(&mut self, tag: Tag) {
         match tag {
-            Tag::Heading(level, ..) => self.heading_level = level as u32,
+            Tag::Heading { level, .. } => self.heading_level = level as u32,
             Tag::CodeBlock(kind) => self.start_code_block(kind),
             Tag::List(_) => self.list_level += 1,
-            Tag::BlockQuote => self.flush_current_line(),
+            Tag::BlockQuote(_) => self.flush_current_line(),
             _ => {}
         }
     }
@@ -156,14 +156,14 @@ impl MarkdownRenderer {
         self.lines.push(Line::from("")); // Add spacing after paragraph
     }
 
-    fn handle_end_tag(&mut self, tag: Tag) {
+    fn handle_end_tag(&mut self, tag: TagEnd) {
         match tag {
-            Tag::Heading(..) => self.end_heading(),
-            Tag::CodeBlock(_) => self.end_code_block(),
-            Tag::List(_) => self.end_list(),
-            Tag::Paragraph => self.end_paragraph(),
-            Tag::Item => self.flush_current_line(),
-            Tag::BlockQuote => self.lines.push(Line::from("")), // Add spacing after blockquote
+            TagEnd::Heading(_) => self.end_heading(),
+            TagEnd::CodeBlock => self.end_code_block(),
+            TagEnd::List(_) => self.end_list(),
+            TagEnd::Paragraph => self.end_paragraph(),
+            TagEnd::Item => self.flush_current_line(),
+            TagEnd::BlockQuote(_) => self.lines.push(Line::from("")), // Add spacing after blockquote
             _ => {}
         }
     }
@@ -247,7 +247,7 @@ pub fn last_code_block(markdown: &str) -> Option<String> {
                 in_code_block = true;
                 current.clear();
             }
-            Event::End(Tag::CodeBlock(_)) => {
+            Event::End(TagEnd::CodeBlock) => {
                 in_code_block = false;
                 last = Some(std::mem::take(&mut current));
             }
