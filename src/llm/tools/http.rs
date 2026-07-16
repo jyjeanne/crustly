@@ -176,7 +176,10 @@ impl Tool for HttpClientTool {
         // SSRF guard: reject an IP-literal host in a blocked range up
         // front (it never goes through DNS, so the resolver below would
         // never see it); the resolver then covers domain names, including
-        // ones that only resolve to an internal address (DNS rebinding).
+        // ones that only resolve to an internal address (DNS rebinding);
+        // checked_redirect_policy covers a redirect to a blocked address,
+        // which check_url_not_blocked alone would never see since it only
+        // runs once, before the request.
         if let Err(reason) = super::ssrf_guard::check_url_not_blocked(&input.url) {
             return Ok(ToolResult::error(reason));
         }
@@ -186,7 +189,7 @@ impl Tool for HttpClientTool {
             Client::builder()
                 .timeout(StdDuration::from_secs(input.timeout_secs))
                 .redirect(if input.follow_redirects {
-                    reqwest::redirect::Policy::limited(10)
+                    super::ssrf_guard::checked_redirect_policy(10)
                 } else {
                     reqwest::redirect::Policy::none()
                 }),

@@ -151,6 +151,33 @@ pub fn guard(builder: reqwest::ClientBuilder) -> reqwest::ClientBuilder {
     builder.dns_resolver(Arc::new(SsrfSafeResolver))
 }
 
+/// A [`reqwest::redirect::Policy`] that behaves like
+/// [`reqwest::redirect::Policy::limited`] but also re-validates every
+/// redirect target with [`check_url_not_blocked`] before following it.
+///
+/// `check_url_not_blocked` alone only ever sees the URL the caller
+/// supplied - a single `.send()` call auto-follows redirects internally,
+/// so a malicious server can pass the initial check with a normal public
+/// URL and then respond `302 Location: http://169.254.169.254/...`, which
+/// reqwest would otherwise follow with no further validation at all. This
+/// policy is invoked once per hop, so every redirect target gets the same
+/// check the initial URL did.
+pub fn checked_redirect_policy(max_redirects: usize) -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(move |attempt| {
+        // Mirrors `Policy::limited`'s own bound (`previous().len() > max`),
+        // since a custom policy replaces that built-in cap entirely rather
+        // than layering on top of it.
+        if attempt.previous().len() > max_redirects {
+            return attempt.error(format!("too many redirects (max {})", max_redirects));
+        }
+        if let Err(reason) = check_url_not_blocked(attempt.url().as_str()) {
+            tracing::warn!("web_fetch/http: blocking redirect: {}", reason);
+            return attempt.error(reason);
+        }
+        attempt.follow()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,5 +236,56 @@ mod tests {
     #[test]
     fn check_url_not_blocked_allows_normal_domain() {
         assert!(check_url_not_blocked("https://example.com/page").is_ok());
+    }
+
+    /// Regression: `check_url_not_blocked` only ever validated the URL the
+    /// caller supplied, once, before the request. A single `.send()` call
+    /// auto-follows redirects internally with no further validation, so a
+    /// server that passes the initial check could 302 straight into a
+    /// blocked address and the response would be returned to the model
+    /// anyway. This drives a real redirect through a real reqwest client
+    /// configured with `checked_redirect_policy` (bypassing
+    /// `check_url_not_blocked` for the *initial* URL on purpose, since a
+    /// loopback test server is itself only reachable via a loopback
+    /// address - the point under test is what happens to the *redirect*,
+    /// which is exactly the hop the old code never re-checked).
+    #[tokio::test]
+    async fn checked_redirect_policy_blocks_redirect_to_blocked_address() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test server");
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let response = "HTTP/1.1 302 Found\r\n\
+                 Location: http://169.254.169.254/latest/meta-data/\r\n\
+                 Content-Length: 0\r\n\
+                 Connection: close\r\n\
+                 \r\n";
+            let _ = socket.write_all(response.as_bytes()).await;
+        });
+
+        let client = reqwest::Client::builder()
+            .redirect(checked_redirect_policy(10))
+            .build()
+            .expect("build client");
+
+        let result = client.get(format!("http://{}/", addr)).send().await;
+
+        match result {
+            Err(e) => assert!(
+                e.is_redirect(),
+                "expected the blocked redirect to surface as a redirect error, got: {e}"
+            ),
+            Ok(resp) => panic!(
+                "expected the redirect to the cloud metadata endpoint to be blocked, \
+                 but the client followed it: {:?}",
+                resp
+            ),
+        }
     }
 }

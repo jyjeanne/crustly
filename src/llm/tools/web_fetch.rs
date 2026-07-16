@@ -164,7 +164,9 @@ impl Tool for WebFetchTool {
         // in a blocked range up front (it never goes through DNS, so the
         // resolver below would never see it); the resolver then covers
         // domain names, including ones that only resolve to an internal
-        // address (DNS rebinding).
+        // address (DNS rebinding); checked_redirect_policy covers a
+        // redirect to a blocked address, which check_url_not_blocked alone
+        // would never see since it only runs once, before the request.
         if let Err(reason) = super::ssrf_guard::check_url_not_blocked(&input.url) {
             return Ok(ToolResult::error(reason));
         }
@@ -173,7 +175,7 @@ impl Tool for WebFetchTool {
             reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(input.timeout_secs))
                 .user_agent("crustly/0.4 (https://github.com/jyjeanne/crustly)")
-                .redirect(reqwest::redirect::Policy::limited(10)),
+                .redirect(super::ssrf_guard::checked_redirect_policy(10)),
         )
         .build()
         .map_err(|e| ToolError::Execution(format!("Failed to build HTTP client: {}", e)))?;
