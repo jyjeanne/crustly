@@ -75,6 +75,24 @@ struct SamplingOverrides {
     repetition_penalty: Option<f32>,
 }
 
+/// Find `needle` in `haystack`, searching only from byte offset `start`
+/// onward, and return its absolute byte offset in `haystack` if found.
+///
+/// This crate's tag-stripping code (Hermes `<tool_call>`, `<think>`, native
+/// Qwen `FN_NAME`/`FN_RESULT`/`FN_EXIT` markers) all need this same
+/// operation: find a closing marker that comes *after* a given opening
+/// marker's position. Searching the whole string instead of `haystack[start..]`
+/// is the specific bug shape that hit two of the four call sites this
+/// replaces: a stray occurrence of `needle` earlier in the string produces
+/// an offset before `start`, and code that then slices `haystack[start..end]`
+/// panics (`end < start`), or - if it instead treats that offset as "still
+/// ahead of us" and removes text up to it before looping - can end up
+/// re-including the unconsumed opening marker on every iteration and never
+/// make progress, growing the string without bound instead of shrinking it.
+fn find_after(haystack: &str, start: usize, needle: &str) -> Option<usize> {
+    haystack[start..].find(needle).map(|rel| start + rel)
+}
+
 /// Qwen provider for Alibaba's Qwen models
 #[derive(Clone)]
 pub struct QwenProvider {
@@ -266,8 +284,8 @@ impl QwenProvider {
         // Find all <tool_call> ... </tool_call> blocks
         let mut remaining = text;
         while let Some(start) = remaining.find("<tool_call>") {
-            if let Some(end) = remaining[start..].find("</tool_call>") {
-                let tool_call_content = &remaining[start + 11..start + end];
+            if let Some(end) = find_after(remaining, start, "</tool_call>") {
+                let tool_call_content = &remaining[start + 11..end];
                 let trimmed = tool_call_content.trim();
 
                 // Parse the JSON inside. Failures are logged rather than
@@ -300,7 +318,7 @@ impl QwenProvider {
                     }
                 }
 
-                remaining = &remaining[start + end + 12..];
+                remaining = &remaining[end + 12..];
             } else {
                 break;
             }
@@ -452,14 +470,11 @@ impl QwenProvider {
             return (None, text.to_string());
         }
 
-        // Look for <think> ... </think> blocks. The closing tag must be
-        // searched for *after* the opening one: searching the whole string
-        // finds a stray `</think>` that precedes the real `<think>` (e.g.
-        // the model discusses the tag syntax before opening one), which
-        // used to panic by slicing `text[start + 7..end]` with `end < start`.
+        // Look for <think> ... </think> blocks. See `find_after`'s doc
+        // comment for why the closing tag must be searched for after the
+        // opening one, not across the whole string.
         if let Some(start) = text.find("<think>") {
-            if let Some(end_rel) = text[start + 7..].find("</think>") {
-                let end = start + 7 + end_rel;
+            if let Some(end) = find_after(text, start + 7, "</think>") {
                 let thinking = text[start + 7..end].trim().to_string();
                 let before = &text[..start];
                 let after = &text[end + 8..];
@@ -997,17 +1012,12 @@ impl QwenProvider {
                             // truncated JSON fragment visible to the user.
                             let mut clean_text = remaining.clone();
                             while let Some(start) = clean_text.find("<tool_call>") {
-                                // Search for the closing tag *after* `start`.
-                                // Searching the whole string finds a stray
-                                // `</tool_call>` that precedes this opening
-                                // tag, giving `end < start`; the removal
-                                // below then re-includes (and duplicates)
-                                // the `<tool_call>` tag instead of consuming
-                                // it, so the string never shrinks and the
-                                // loop runs forever, growing `clean_text`
-                                // without bound.
-                                if let Some(end_rel) = clean_text[start..].find("</tool_call>") {
-                                    let end = start + end_rel;
+                                // See `find_after`'s doc comment: searching
+                                // the whole string here (instead of from
+                                // `start`) is what used to make this loop
+                                // spin forever, growing `clean_text` without
+                                // bound instead of shrinking it.
+                                if let Some(end) = find_after(&clean_text, start, "</tool_call>") {
                                     clean_text = format!(
                                         "{}{}",
                                         &clean_text[..start],
@@ -1076,10 +1086,8 @@ impl QwenProvider {
                             let mut clean_text = remaining.clone();
                             // Remove function call blocks
                             while let Some(start) = clean_text.find(FN_NAME) {
-                                let end_pos = clean_text[start..]
-                                    .find(FN_RESULT)
-                                    .or_else(|| clean_text[start..].find(FN_EXIT))
-                                    .map(|p| start + p)
+                                let end_pos = find_after(&clean_text, start, FN_RESULT)
+                                    .or_else(|| find_after(&clean_text, start, FN_EXIT))
                                     .unwrap_or(clean_text.len());
                                 clean_text =
                                     format!("{}{}", &clean_text[..start], &clean_text[end_pos..]);
@@ -1811,6 +1819,31 @@ struct QwenError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_after_ignores_a_match_before_start() {
+        // A stray "b" before `start` must not be returned - this is the
+        // exact bug shape that hit two of the four call sites this helper
+        // replaces.
+        let haystack = "b...a...b";
+        let start = haystack.find('a').unwrap();
+        assert_eq!(find_after(haystack, start, "b"), Some(8));
+    }
+
+    #[test]
+    fn find_after_returns_none_when_nothing_matches_after_start() {
+        let haystack = "b...a";
+        let start = haystack.find('a').unwrap();
+        assert_eq!(find_after(haystack, start, "b"), None);
+    }
+
+    #[test]
+    fn find_after_returns_an_absolute_offset_not_a_relative_one() {
+        let haystack = "xxxxSTARTyyyEND";
+        let start = haystack.find("START").unwrap();
+        let end = find_after(haystack, start, "END").unwrap();
+        assert_eq!(&haystack[end..], "END");
+    }
 
     /// Build the synthetic `QwenResponse` the buffered streaming path assembles
     /// from accumulated `delta.content`, then reuse the shared parser + event
