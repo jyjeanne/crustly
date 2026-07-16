@@ -109,6 +109,16 @@ pub struct App {
     pub is_processing: bool,
     pub streaming_response: Option<String>,
     pub error_message: Option<String>,
+    /// The session a `send_message` call is currently outstanding for, if
+    /// any. Tracked separately from `is_processing` (which reflects only
+    /// whether the *currently displayed* session has a request in flight)
+    /// so that switching sessions can tell the difference between "the
+    /// previous session's request is still running in the background" and
+    /// "nothing is actually happening for the session now on screen" -
+    /// without this, switching away and back left `is_processing`/
+    /// `streaming_response` permanently stuck showing whatever state the
+    /// abandoned session's request last left them in.
+    processing_session: Option<Uuid>,
 
     // Animation state
     pub animation_frame: usize,
@@ -197,6 +207,7 @@ impl App {
             mcp_status: Vec::new(),
             is_processing: false,
             streaming_response: None,
+            processing_session: None,
             error_message: None,
             animation_frame: 0,
             splash_shown_at: Some(std::time::Instant::now()),
@@ -539,6 +550,14 @@ impl App {
                 if self.event_belongs_to_current_session(session_id) {
                     self.complete_response(response).await?;
                 } else {
+                    // The request itself has genuinely finished, even
+                    // though its result isn't being shown - if we don't
+                    // clear this, switching back to `session_id` later
+                    // would incorrectly still think a request is in
+                    // flight for it.
+                    if self.processing_session == Some(session_id) {
+                        self.processing_session = None;
+                    }
                     tracing::debug!(
                         "Dropping response for session {} - no longer the active session",
                         session_id
@@ -552,6 +571,9 @@ impl App {
                     }
                     self.show_error(error);
                 } else {
+                    if self.processing_session == Some(session_id) {
+                        self.processing_session = None;
+                    }
                     tracing::debug!(
                         "Dropping error for session {} - no longer the active session: {}",
                         session_id,
@@ -1142,6 +1164,7 @@ impl App {
         self.messages.clear();
         self.scroll_offset = 0;
         self.mode = AppMode::Chat;
+        self.sync_processing_state_for_current_session();
 
         // Reload sessions list
         self.load_sessions().await?;
@@ -1176,6 +1199,7 @@ impl App {
         self.current_session = Some(session);
         self.messages = messages.into_iter().map(DisplayMessage::from).collect();
         self.scroll_offset = 0;
+        self.sync_processing_state_for_current_session();
 
         Ok(())
     }
@@ -1218,6 +1242,7 @@ impl App {
     async fn send_message(&mut self, content: String) -> Result<()> {
         if let Some(session) = &self.current_session {
             self.is_processing = true;
+            self.processing_session = Some(session.id);
             self.error_message = None;
 
             // Analyze and transform the prompt before sending to agent
@@ -1308,6 +1333,33 @@ impl App {
             .is_some_and(|s| s.id == session_id)
     }
 
+    /// Recompute `is_processing`/`streaming_response` for whichever session
+    /// just became current.
+    ///
+    /// Call this after every `self.current_session = Some(...)` assignment
+    /// (`create_new_session`, `load_session`). Without it, switching away
+    /// from a session mid-request left `is_processing` stuck `true` and
+    /// `streaming_response` frozen on the abandoned session's partial reply
+    /// forever: `complete_response`/`show_error` (the only two places that
+    /// used to reset them) are only ever reached for the *current*
+    /// session's own completion, and the stale-session events that arrive
+    /// afterward are correctly dropped by `event_belongs_to_current_session`
+    /// without ever running either. `processing_session` tracks which
+    /// session (if any) genuinely still has a request in flight, so this
+    /// can tell "switched to a session with nothing happening" (the common
+    /// case: reset both) apart from "switched back to a session whose
+    /// request is still running" (keep showing the spinner, but the
+    /// partial text that arrived while away was never accumulated, so
+    /// `streaming_response` restarts empty rather than showing something
+    /// wrong).
+    fn sync_processing_state_for_current_session(&mut self) {
+        let current_id = self.current_session.as_ref().map(|s| s.id);
+        self.is_processing = current_id.is_some() && self.processing_session == current_id;
+        if !self.is_processing {
+            self.streaming_response = None;
+        }
+    }
+
     /// Append a streaming chunk
     fn append_streaming_chunk(&mut self, chunk: String) {
         if let Some(ref mut response) = self.streaming_response {
@@ -1326,6 +1378,7 @@ impl App {
     ) -> Result<()> {
         self.is_processing = false;
         self.streaming_response = None;
+        self.processing_session = None;
 
         // Check task completion FIRST (before moving response.content)
         let task_failed = if self.executing_plan {
@@ -1945,6 +1998,7 @@ impl App {
     fn show_error(&mut self, error: String) {
         self.is_processing = false;
         self.streaming_response = None;
+        self.processing_session = None;
         self.error_message = Some(error);
         // Auto-scroll to show the error
         self.scroll_offset = 0;
@@ -3719,8 +3773,12 @@ mod tests {
         let session_a_id = app.current_session.as_ref().unwrap().id;
 
         app.create_new_session().await.unwrap();
+        let session_b_id = app.current_session.as_ref().unwrap().id;
         let messages_before = app.messages.len();
+        // Session B has its own genuine in-flight request - distinct from
+        // session A's stale one, which the event below carries.
         app.is_processing = true;
+        app.processing_session = Some(session_b_id);
 
         let stale_response = crate::llm::agent::AgentResponse {
             message_id: Uuid::new_v4(),
@@ -3749,6 +3807,72 @@ mod tests {
         assert!(
             app.is_processing,
             "a stale session's completion must not clear is_processing for the current session's own in-flight request"
+        );
+    }
+
+    /// Regression: this is the actual bug the earlier tests above didn't
+    /// catch (they only checked that a stale event doesn't corrupt an
+    /// *already-correct* is_processing value, not that switching sessions
+    /// itself sets that value correctly). Switching away from a session
+    /// mid-request used to leave `is_processing` stuck `true` and
+    /// `streaming_response` frozen on the abandoned reply forever: nothing
+    /// reset them for the newly-current session, since `complete_response`/
+    /// `show_error` only run for the session that's current *at the time
+    /// its own event arrives*, and the stale event that would eventually
+    /// arrive for the abandoned session is correctly dropped without
+    /// calling either.
+    #[tokio::test]
+    async fn switching_sessions_clears_a_stuck_processing_state_from_the_previous_session() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+
+        // Simulate a request in flight for session A.
+        app.is_processing = true;
+        app.processing_session = Some(session_a_id);
+        app.streaming_response = Some("partial reply for A".to_string());
+
+        // User switches away before the request resolves.
+        app.create_new_session().await.unwrap();
+        let session_b_id = app.current_session.as_ref().unwrap().id;
+        assert_ne!(session_a_id, session_b_id);
+
+        assert!(
+            !app.is_processing,
+            "switching to a session with nothing in flight must clear is_processing, \
+             not leave it stuck from the abandoned session"
+        );
+        assert!(
+            app.streaming_response.is_none(),
+            "switching away must not leave a different session's partial reply visible"
+        );
+    }
+
+    /// The other half of the same fix: switching *back* to a session whose
+    /// request genuinely is still outstanding must correctly show the
+    /// processing state again, rather than clearing it unconditionally.
+    #[tokio::test]
+    async fn switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state()
+    {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+        app.is_processing = true;
+        app.processing_session = Some(session_a_id);
+        app.streaming_response = Some("partial reply for A".to_string());
+
+        app.create_new_session().await.unwrap();
+        assert!(
+            !app.is_processing,
+            "sanity: session B has nothing in flight"
+        );
+
+        app.load_session(session_a_id).await.unwrap();
+
+        assert!(
+            app.is_processing,
+            "switching back to a session whose request is still outstanding \
+             must show the processing state again"
         );
     }
 }
