@@ -27,14 +27,22 @@ pub enum TuiEvent {
     /// Agent started processing
     AgentProcessing,
 
-    /// Agent sent a response chunk (streaming)
-    ResponseChunk(String),
+    /// Agent sent a response chunk (streaming), tagged with the session the
+    /// request was made against. `send_message` spawns the agent call as a
+    /// detached background task; if the user switches sessions (or starts a
+    /// second request) before it resolves, the event loop must be able to
+    /// tell "this chunk belongs to a session that isn't on screen anymore"
+    /// and drop it, instead of appending a stale request's output into
+    /// whatever session happens to be current when the event arrives.
+    ResponseChunk(Uuid, String),
 
-    /// Agent completed response
-    ResponseComplete(AgentResponse),
+    /// Agent completed response, tagged with the originating session (see
+    /// `ResponseChunk`).
+    ResponseComplete(Uuid, AgentResponse),
 
-    /// An error occurred
-    Error(String),
+    /// An error occurred while handling a message for the given session
+    /// (see `ResponseChunk`).
+    Error(Uuid, String),
 
     /// Request to switch UI mode
     SwitchMode(AppMode),

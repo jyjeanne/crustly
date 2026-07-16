@@ -525,14 +525,36 @@ impl App {
             TuiEvent::MessageSubmitted(content) => {
                 self.send_message(content).await?;
             }
-            TuiEvent::ResponseChunk(chunk) => {
-                self.append_streaming_chunk(chunk);
+            TuiEvent::ResponseChunk(session_id, chunk) => {
+                if self.event_belongs_to_current_session(session_id) {
+                    self.append_streaming_chunk(chunk);
+                } else {
+                    tracing::debug!(
+                        "Dropping response chunk for session {} - no longer the active session",
+                        session_id
+                    );
+                }
             }
-            TuiEvent::ResponseComplete(response) => {
-                self.complete_response(response).await?;
+            TuiEvent::ResponseComplete(session_id, response) => {
+                if self.event_belongs_to_current_session(session_id) {
+                    self.complete_response(response).await?;
+                } else {
+                    tracing::debug!(
+                        "Dropping response for session {} - no longer the active session",
+                        session_id
+                    );
+                }
             }
-            TuiEvent::Error(error) => {
-                self.show_error(error);
+            TuiEvent::Error(session_id, error) => {
+                if self.event_belongs_to_current_session(session_id) {
+                    self.show_error(error);
+                } else {
+                    tracing::debug!(
+                        "Dropping error for session {} - no longer the active session: {}",
+                        session_id,
+                        error
+                    );
+                }
             }
             TuiEvent::SwitchMode(mode) => {
                 self.switch_mode(mode).await?;
@@ -1234,7 +1256,7 @@ impl App {
             let event_sender_chunks = event_sender.clone();
             let forwarder_handle = tokio::spawn(async move {
                 while let Some(chunk) = chunk_rx.recv().await {
-                    let _ = event_sender_chunks.send(TuiEvent::ResponseChunk(chunk));
+                    let _ = event_sender_chunks.send(TuiEvent::ResponseChunk(session_id, chunk));
                 }
             });
 
@@ -1257,16 +1279,30 @@ impl App {
 
                 match result {
                     Ok(response) => {
-                        let _ = event_sender.send(TuiEvent::ResponseComplete(response));
+                        let _ = event_sender.send(TuiEvent::ResponseComplete(session_id, response));
                     }
                     Err(e) => {
-                        let _ = event_sender.send(TuiEvent::Error(e.to_string()));
+                        let _ = event_sender.send(TuiEvent::Error(session_id, e.to_string()));
                     }
                 }
             });
         }
 
         Ok(())
+    }
+
+    /// Whether `session_id` (the session an in-flight `send_message` call
+    /// was made against) is still the session on screen. `send_message`
+    /// spawns the agent call as a detached background task with no
+    /// cancellation; if the user switches sessions (or fires off a second
+    /// request) before it resolves, its `ResponseChunk`/`ResponseComplete`/
+    /// `Error` events must be dropped rather than mutating whatever session
+    /// happens to be current when they arrive - otherwise one session's
+    /// streamed reply gets appended to a different session's transcript.
+    fn event_belongs_to_current_session(&self, session_id: Uuid) -> bool {
+        self.current_session
+            .as_ref()
+            .is_some_and(|s| s.id == session_id)
     }
 
     /// Append a streaming chunk
@@ -3537,5 +3573,96 @@ mod tests {
             .messages
             .iter()
             .any(|m| m.content.contains("Switched to Ollama model")));
+    }
+
+    /// Regression: `send_message` spawns the agent call as a detached
+    /// background task; its `ResponseChunk`/`ResponseComplete` events used
+    /// to be applied unconditionally to whatever session was current when
+    /// they arrived. If the user switched sessions while a request was
+    /// still in flight, session A's streamed reply got appended to session
+    /// B's in-memory transcript. Events are now tagged with the session
+    /// they were made against and dropped if that session is no longer
+    /// current.
+    #[tokio::test]
+    async fn stale_session_response_chunk_is_dropped_after_switching_sessions() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+
+        // Switch to a different session while "session A's" request is
+        // still notionally in flight.
+        app.create_new_session().await.unwrap();
+        let session_b_id = app.current_session.as_ref().unwrap().id;
+        assert_ne!(session_a_id, session_b_id);
+
+        app.handle_event(TuiEvent::ResponseChunk(
+            session_a_id,
+            "stale chunk from session A".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        assert!(
+            app.streaming_response.is_none(),
+            "a chunk tagged with a session that is no longer current must not be applied: {:?}",
+            app.streaming_response
+        );
+
+        // A chunk tagged with the *current* session must still be applied.
+        app.handle_event(TuiEvent::ResponseChunk(
+            session_b_id,
+            "live chunk from session B".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        assert_eq!(
+            app.streaming_response.as_deref(),
+            Some("live chunk from session B")
+        );
+    }
+
+    /// Same guard, for the completed-response path: a stale session's
+    /// completed response must not be appended to a different session's
+    /// message list, and must not clear `is_processing` for a request the
+    /// user is still actively waiting on in the current session.
+    #[tokio::test]
+    async fn stale_session_response_complete_is_dropped_after_switching_sessions() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+
+        app.create_new_session().await.unwrap();
+        let messages_before = app.messages.len();
+        app.is_processing = true;
+
+        let stale_response = crate::llm::agent::AgentResponse {
+            message_id: Uuid::new_v4(),
+            content: "reply that belongs to session A".to_string(),
+            thinking_text: None,
+            stop_reason: None,
+            usage: crate::llm::provider::TokenUsage {
+                input_tokens: 1,
+                output_tokens: 1,
+            },
+            cost: 0.0,
+            model: "test-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            perf_metrics: None,
+        };
+
+        app.handle_event(TuiEvent::ResponseComplete(session_a_id, stale_response))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.messages.len(),
+            messages_before,
+            "a stale session's completed response must not be appended to the current session"
+        );
+        assert!(
+            app.is_processing,
+            "a stale session's completion must not clear is_processing for the current session's own in-flight request"
+        );
     }
 }
