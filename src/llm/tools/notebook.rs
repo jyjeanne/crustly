@@ -170,6 +170,19 @@ impl Tool for NotebookEditTool {
 
         let input: NotebookInput = serde_json::from_value(input)?;
 
+        // Enforce project boundary. Unlike write_file/edit_file, which
+        // reject an out-of-bounds path before the approval prompt is even
+        // shown, this tool had no such check: a user approving "edit this
+        // notebook" had no signal that the path actually escapes the
+        // project (e.g. `../../../../home/otheruser/notebook.ipynb` or an
+        // absolute path), letting a sub-agent overwrite arbitrary .ipynb
+        // files anywhere the process can reach.
+        if let Err(reason) =
+            crate::llm::tools::sandbox::check_path(&input.path, &context.working_directory)
+        {
+            return Ok(ToolResult::error(reason));
+        }
+
         // Resolve path
         let path = if PathBuf::from(&input.path).is_absolute() {
             PathBuf::from(&input.path)
@@ -319,5 +332,78 @@ impl Tool for NotebookEditTool {
             result_message,
             path.display()
         )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    fn minimal_notebook_json() -> &'static str {
+        r#"{"cells":[{"cell_type":"code","source":["print(1)"],"metadata":{}}],"metadata":{},"nbformat":4,"nbformat_minor":5}"#
+    }
+
+    #[tokio::test]
+    async fn test_add_cell_within_working_directory_succeeds() {
+        let temp_dir = TempDir::new().unwrap();
+        let nb_path = temp_dir.path().join("test.ipynb");
+        std::fs::write(&nb_path, minimal_notebook_json()).unwrap();
+
+        let tool = NotebookEditTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+
+        let input = serde_json::json!({
+            "path": nb_path.to_str().unwrap(),
+            "operation": "add_cell",
+            "cell_type": "markdown",
+            "source": ["# New cell"]
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("Added"));
+    }
+
+    /// Regression: `execute` had no `sandbox::check_path` call at all.
+    /// Unlike `write_file`/`edit_file` (which reject an out-of-bounds path
+    /// *before* the approval prompt is shown), a user approving "edit this
+    /// notebook" had no signal that the path actually escapes the project -
+    /// letting a sub-agent overwrite an arbitrary `.ipynb` file anywhere the
+    /// process can reach.
+    #[tokio::test]
+    async fn test_path_outside_working_directory_is_denied() {
+        let outside_dir = TempDir::new().unwrap();
+        let outside_nb = outside_dir.path().join("victim.ipynb");
+        std::fs::write(&outside_nb, minimal_notebook_json()).unwrap();
+
+        let project_dir = TempDir::new().unwrap();
+        let tool = NotebookEditTool;
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(project_dir.path().to_path_buf());
+
+        let input = serde_json::json!({
+            "path": outside_nb.to_str().unwrap(),
+            "operation": "clear_outputs"
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(
+            !result.success,
+            "a path outside the working directory must be denied"
+        );
+
+        // The file outside the project must be untouched.
+        let unchanged = std::fs::read_to_string(&outside_nb).unwrap();
+        assert_eq!(unchanged, minimal_notebook_json());
+    }
+
+    #[test]
+    fn test_tool_schema() {
+        let tool = NotebookEditTool;
+        assert_eq!(tool.name(), "notebook_edit");
+        assert!(tool.requires_approval());
     }
 }

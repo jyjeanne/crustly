@@ -244,6 +244,26 @@ impl Tool for McpTool {
         vec![] // MCP tools declare no built-in capabilities
     }
 
+    /// MCP tools always require approval, regardless of the (empty)
+    /// `capabilities()` above.
+    ///
+    /// `Tool::requires_approval()`'s default implementation only returns
+    /// `true` when `capabilities()` contains a dangerous flag
+    /// (`WriteFiles`/`ExecuteShell`/`SystemModification`) - and since MCP
+    /// tools always report zero capabilities (the MCP protocol doesn't give
+    /// Crustly a way to know what a server-defined tool actually does),
+    /// that default silently resolved to `false` for every MCP tool from
+    /// every configured server. Any tool an MCP server exposed - shell
+    /// exec, arbitrary file write, network exfiltration - ran immediately
+    /// with no approval prompt, while the equivalent built-in tool
+    /// (`bash`, `write_file`) was correctly gated. Since capabilities are
+    /// unknowable for an external server, the only safe default is to
+    /// always require approval, the same as any other tool this crate
+    /// cannot vouch for.
+    fn requires_approval(&self) -> bool {
+        true
+    }
+
     async fn execute(
         &self,
         input: Value,
@@ -254,6 +274,61 @@ impl Tool for McpTool {
             Ok(output) => Ok(ToolResult::success(output)),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
+    }
+}
+
+#[cfg(test)]
+mod mcp_tool_approval_tests {
+    use super::*;
+
+    /// Regression: `requires_approval()` used to fall through to the trait
+    /// default, which only returns `true` when `capabilities()` reports a
+    /// dangerous flag - and MCP tools always report zero capabilities (the
+    /// MCP protocol gives Crustly no way to know what a server-defined tool
+    /// actually does), so every MCP-sourced tool from every configured
+    /// server ran with no approval prompt at all.
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn mcp_tool_always_requires_approval_regardless_of_empty_capabilities() {
+        // `cat` is only spawned to obtain real ChildStdin/ChildStdout
+        // handles for the struct literal below - no MCP handshake is
+        // performed and none of its stdio is ever used.
+        let mut child = tokio::process::Command::new("cat")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn cat for test fixture");
+        let stdin = child.stdin.take().expect("stdin");
+        let stdout = tokio::io::BufReader::new(child.stdout.take().expect("stdout"));
+
+        let client = MCPClient {
+            server_name: "test-server".to_string(),
+            stdin,
+            stdout,
+            _child: child,
+            next_id: 1,
+            healthy: true,
+        };
+
+        let tool = McpTool::new(
+            "test-server",
+            McpToolDef {
+                name: "some_tool".to_string(),
+                description: None,
+                input_schema: None,
+            },
+            Arc::new(Mutex::new(client)),
+        );
+
+        assert!(
+            tool.capabilities().is_empty(),
+            "this test assumes MCP tools report no capabilities"
+        );
+        assert!(
+            tool.requires_approval(),
+            "an MCP tool with empty capabilities must still require approval"
+        );
     }
 }
 

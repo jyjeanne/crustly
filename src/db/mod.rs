@@ -65,6 +65,19 @@ impl Database {
                     sqlx::query("PRAGMA busy_timeout = 5000")
                         .execute(&mut *conn)
                         .await?;
+                    // SQLite disables foreign-key enforcement per-connection
+                    // by default. Every migration declares
+                    // `ON DELETE CASCADE` between sessions and their
+                    // messages/plans/plan_tasks/files/episodic_memories/
+                    // compaction_records, but without this pragma none of
+                    // it ever fired: deleting a session left every child
+                    // row permanently orphaned, and a message write racing
+                    // a session delete could succeed with a session_id
+                    // pointing at nothing, since there was no constraint to
+                    // reject it.
+                    sqlx::query("PRAGMA foreign_keys = ON")
+                        .execute(&mut *conn)
+                        .await?;
                     Ok(())
                 })
             })
@@ -80,6 +93,16 @@ impl Database {
     pub async fn connect_in_memory() -> Result<Self> {
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
+            .after_connect(|conn, _meta| {
+                Box::pin(async move {
+                    // Match connect()'s enforcement so tests exercise the
+                    // same FK behavior production runs under.
+                    sqlx::query("PRAGMA foreign_keys = ON")
+                        .execute(&mut *conn)
+                        .await?;
+                    Ok(())
+                })
+            })
             .connect("sqlite::memory:")
             .await
             .context("Failed to connect to in-memory database")?;
@@ -197,5 +220,87 @@ mod tests {
 
         drop(db);
         let _ = std::fs::remove_dir_all(&expected_dir);
+    }
+
+    /// Regression: SQLite disables foreign-key enforcement per-connection
+    /// by default, and nothing turned it on. Every migration declares
+    /// `ON DELETE CASCADE` between `sessions` and its child tables, but
+    /// without `PRAGMA foreign_keys = ON` none of it ever fired - a
+    /// `messages` row could reference a `session_id` that does not exist,
+    /// and deleting a session left every child row orphaned instead of
+    /// cascading. This checks the constraint is actually live.
+    #[tokio::test]
+    async fn foreign_keys_are_enforced() {
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+
+        let bogus_session_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp();
+
+        let result = sqlx::query(
+            "INSERT INTO messages (id, session_id, role, content, sequence, created_at) \
+             VALUES (?, ?, 'user', 'hello', 1, ?)",
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(&bogus_session_id)
+        .bind(now)
+        .execute(db.pool())
+        .await;
+
+        assert!(
+            result.is_err(),
+            "inserting a message for a session_id that does not exist must fail \
+             with foreign keys enforced"
+        );
+    }
+
+    /// Regression companion: with the constraint live, deleting a session
+    /// must actually cascade-delete its messages (the behavior every
+    /// migration's `ON DELETE CASCADE` already declared but which never
+    /// fired before `PRAGMA foreign_keys = ON` was added).
+    #[tokio::test]
+    async fn deleting_a_session_cascades_to_its_messages() {
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp();
+
+        sqlx::query("INSERT INTO sessions (id, created_at, updated_at) VALUES (?, ?, ?)")
+            .bind(&session_id)
+            .bind(now)
+            .bind(now)
+            .execute(db.pool())
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "INSERT INTO messages (id, session_id, role, content, sequence, created_at) \
+             VALUES (?, ?, 'user', 'hello', 1, ?)",
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(&session_id)
+        .bind(now)
+        .execute(db.pool())
+        .await
+        .unwrap();
+
+        sqlx::query("DELETE FROM sessions WHERE id = ?")
+            .bind(&session_id)
+            .execute(db.pool())
+            .await
+            .unwrap();
+
+        let remaining: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE session_id = ?")
+                .bind(&session_id)
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+
+        assert_eq!(
+            remaining, 0,
+            "deleting a session must cascade-delete its messages, not orphan them"
+        );
     }
 }
