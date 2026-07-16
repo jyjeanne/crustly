@@ -547,6 +547,9 @@ impl App {
             }
             TuiEvent::Error(session_id, error) => {
                 if self.event_belongs_to_current_session(session_id) {
+                    if self.executing_plan {
+                        self.fail_current_plan_task(&error).await?;
+                    }
                     self.show_error(error);
                 } else {
                     tracing::debug!(
@@ -1903,6 +1906,39 @@ impl App {
         }
 
         Ok(())
+    }
+
+    /// Regression: if the agent call for the current plan task errored
+    /// (provider/network failure), the event loop used to route it to
+    /// `show_error`, which resets `is_processing`/`streaming_response` but
+    /// never touched `executing_plan` or the task's status. The task was
+    /// left permanently `InProgress`, `executing_plan` stayed `true`, and
+    /// no further task was ever dispatched - the plan was stuck with no
+    /// recovery path. Mark the in-progress task `Failed` and stop
+    /// auto-execution so the user sees what happened and can retry/reject
+    /// the plan instead of watching a silently frozen spinner.
+    async fn fail_current_plan_task(&mut self, error: &str) -> Result<()> {
+        self.executing_plan = false;
+
+        let Some(plan) = &mut self.current_plan else {
+            return Ok(());
+        };
+
+        if let Some(task) = plan
+            .tasks
+            .iter_mut()
+            .find(|t| matches!(t.status, crate::plan::TaskStatus::InProgress))
+        {
+            task.status = crate::plan::TaskStatus::Failed;
+            task.notes = Some(format!("Task failed: {}", error));
+            tracing::warn!(
+                "Plan task '{}' failed and auto-execution stopped: {}",
+                task.title,
+                error
+            );
+        }
+
+        self.save_plan().await
     }
 
     /// Show an error message
@@ -3620,6 +3656,56 @@ mod tests {
             app.streaming_response.as_deref(),
             Some("live chunk from session B")
         );
+    }
+
+    /// Regression: an agent error mid-plan-execution used to leave the
+    /// in-progress task stuck forever with `executing_plan` still `true`
+    /// and no further task ever dispatched. The error must instead mark
+    /// the task `Failed` and stop auto-execution so the plan isn't left in
+    /// a silently frozen state.
+    #[tokio::test]
+    async fn plan_task_error_marks_task_failed_and_stops_auto_execution() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_id = app.current_session.as_ref().unwrap().id;
+
+        let mut plan = crate::plan::PlanDocument::new(
+            session_id,
+            "Test plan".to_string(),
+            "A plan".to_string(),
+        );
+        let mut task = crate::plan::PlanTask::new(
+            1,
+            "Do the thing".to_string(),
+            "Description".to_string(),
+            crate::plan::TaskType::Edit,
+        );
+        task.status = crate::plan::TaskStatus::InProgress;
+        plan.add_task(task);
+        app.current_plan = Some(plan);
+        app.executing_plan = true;
+
+        app.handle_event(TuiEvent::Error(
+            session_id,
+            "provider timed out".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        assert!(
+            !app.executing_plan,
+            "auto-execution must stop after an agent error"
+        );
+        let task = &app.current_plan.as_ref().unwrap().tasks[0];
+        assert!(
+            matches!(task.status, crate::plan::TaskStatus::Failed),
+            "the in-progress task must be marked Failed, got {:?}",
+            task.status
+        );
+        assert!(app
+            .error_message
+            .as_ref()
+            .is_some_and(|m| m.contains("provider timed out")));
     }
 
     /// Same guard, for the completed-response path: a stale session's
