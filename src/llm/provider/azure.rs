@@ -42,12 +42,36 @@ impl AzureOpenAIProvider {
             resource_name, deployment_id
         );
 
-        let inner = OpenAIProvider::with_base_url(api_key, base_url);
+        // Azure OpenAI's REST API requires `api-key: <key>` for key-based
+        // auth; `Authorization: Bearer <key>` (OpenAIProvider's default) is
+        // only valid there for Entra ID/AAD tokens, which this provider
+        // doesn't implement. Without this, every request failed 401
+        // Unauthorized regardless of how valid the key was.
+        let inner = OpenAIProvider::with_base_url(api_key, base_url).with_api_key_header();
 
         Self {
             inner,
             resource_name,
             deployment_id,
+        }
+    }
+
+    /// Build from a caller-supplied endpoint URL directly, rather than
+    /// assembling one from `resource_name`/`deployment_id`.
+    ///
+    /// Used for config-driven setup (`AZURE_OPENAI_ENDPOINT` /
+    /// `providers.azure.base_url`), where the user supplies the full
+    /// deployment endpoint - matching how every other provider's `base_url`
+    /// override is used elsewhere in this crate (Gemini, OpenAI-local) -
+    /// rather than a bare resource name Crustly would need to assemble a
+    /// URL from.
+    pub fn with_endpoint(api_key: String, endpoint: String) -> Self {
+        let inner = OpenAIProvider::with_base_url(api_key, endpoint).with_api_key_header();
+
+        Self {
+            inner,
+            resource_name: String::new(),
+            deployment_id: String::new(),
         }
     }
 

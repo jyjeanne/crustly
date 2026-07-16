@@ -28,6 +28,19 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
+/// How the API key is sent. OpenAI (and every OpenAI-compatible local
+/// server this provider also drives) expects `Authorization: Bearer <key>`.
+/// Azure OpenAI's REST API rejects that for key-based auth - it requires a
+/// plain `api-key: <key>` header instead (`Bearer` is only valid there for
+/// Entra ID/AAD tokens, which this provider doesn't implement) - so
+/// `AzureOpenAIProvider` selects the other variant via
+/// [`OpenAIProvider::with_api_key_header`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AuthStyle {
+    Bearer,
+    ApiKeyHeader,
+}
+
 /// OpenAI provider for GPT models
 #[derive(Clone)]
 pub struct OpenAIProvider {
@@ -35,6 +48,7 @@ pub struct OpenAIProvider {
     base_url: String,
     client: Client,
     custom_default_model: Option<String>,
+    auth_style: AuthStyle,
 }
 
 impl OpenAIProvider {
@@ -53,6 +67,7 @@ impl OpenAIProvider {
             base_url: DEFAULT_OPENAI_API_URL.to_string(),
             client,
             custom_default_model: None,
+            auth_style: AuthStyle::Bearer,
         }
     }
 
@@ -71,6 +86,7 @@ impl OpenAIProvider {
             base_url,
             client,
             custom_default_model: None,
+            auth_style: AuthStyle::Bearer,
         }
     }
 
@@ -89,12 +105,24 @@ impl OpenAIProvider {
             base_url,
             client,
             custom_default_model: None,
+            auth_style: AuthStyle::Bearer,
         }
     }
 
     /// Set custom default model (useful for local LLMs with specific model names)
     pub fn with_default_model(mut self, model: String) -> Self {
         self.custom_default_model = Some(model);
+        self
+    }
+
+    /// Send the API key as a plain `api-key` header instead of
+    /// `Authorization: Bearer`. Azure OpenAI's REST API requires this for
+    /// key-based auth - `Bearer` is only valid there for Entra ID/AAD
+    /// tokens - so every request made with the default `Bearer` style
+    /// failed with 401 Unauthorized for any Azure OpenAI user, with no
+    /// working code path. Used by `AzureOpenAIProvider`.
+    pub(crate) fn with_api_key_header(mut self) -> Self {
+        self.auth_style = AuthStyle::ApiKeyHeader;
         self
     }
 
@@ -111,12 +139,25 @@ impl OpenAIProvider {
 
         // Only add authorization if not using local
         if self.api_key != "not-needed" {
-            headers.insert(
-                reqwest::header::AUTHORIZATION,
-                format!("Bearer {}", self.api_key.trim())
-                    .parse()
-                    .map_err(|_| ProviderError::InvalidApiKey)?,
-            );
+            match self.auth_style {
+                AuthStyle::Bearer => {
+                    headers.insert(
+                        reqwest::header::AUTHORIZATION,
+                        format!("Bearer {}", self.api_key.trim())
+                            .parse()
+                            .map_err(|_| ProviderError::InvalidApiKey)?,
+                    );
+                }
+                AuthStyle::ApiKeyHeader => {
+                    headers.insert(
+                        "api-key",
+                        self.api_key
+                            .trim()
+                            .parse()
+                            .map_err(|_| ProviderError::InvalidApiKey)?,
+                    );
+                }
+            }
         }
 
         headers.insert(
@@ -1090,6 +1131,46 @@ mod tests {
         let provider =
             OpenAIProvider::local("http://localhost:1234/v1/chat/completions".to_string());
         assert_eq!(provider.api_key, "not-needed");
+    }
+
+    /// Regression: `AzureOpenAIProvider` wraps `OpenAIProvider`, whose
+    /// `headers()` unconditionally sent `Authorization: Bearer <key>`.
+    /// Azure OpenAI's REST API requires the plain `api-key: <key>` header
+    /// for key-based auth - `Bearer` is only valid there for Entra ID/AAD
+    /// tokens - so every real Azure OpenAI request failed 401 Unauthorized
+    /// regardless of how valid the configured key was.
+    #[test]
+    fn with_api_key_header_sends_api_key_not_bearer() {
+        let provider = OpenAIProvider::with_base_url(
+            "azure-secret".to_string(),
+            "https://example.openai.azure.com/openai/deployments/x/chat/completions".to_string(),
+        )
+        .with_api_key_header();
+
+        let headers = provider.headers().expect("headers build");
+        assert_eq!(
+            headers.get("api-key").and_then(|v| v.to_str().ok()),
+            Some("azure-secret"),
+            "Azure auth must use a plain api-key header"
+        );
+        assert!(
+            !headers.contains_key(reqwest::header::AUTHORIZATION),
+            "must not also send Authorization: Bearer - Azure key-based auth doesn't accept it"
+        );
+    }
+
+    /// The default (non-Azure) auth style must be unaffected.
+    #[test]
+    fn default_auth_style_still_sends_bearer() {
+        let provider = OpenAIProvider::new("plain-openai-key".to_string());
+        let headers = provider.headers().expect("headers build");
+        assert_eq!(
+            headers
+                .get(reqwest::header::AUTHORIZATION)
+                .and_then(|v| v.to_str().ok()),
+            Some("Bearer plain-openai-key")
+        );
+        assert!(!headers.contains_key("api-key"));
     }
 
     #[test]

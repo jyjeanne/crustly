@@ -4,6 +4,7 @@
 
 use super::{
     anthropic::AnthropicProvider,
+    azure::AzureOpenAIProvider,
     error::ProviderError,
     gemini::GeminiProvider,
     openai::OpenAIProvider,
@@ -124,11 +125,19 @@ impl Provider for FailoverProvider {
 /// 2. Ollama native (if `providers.ollama` is configured)
 /// 3. OpenAI / OpenAI-compatible local (LM Studio, Ollama via `/v1`, LocalAI)
 /// 4. Gemini (Google AI Studio - Gemini and Gemma models)
-/// 5. Anthropic (default fallback)
+/// 5. Azure OpenAI (if `providers.azure` is configured)
+/// 6. Anthropic (default fallback)
 ///
 /// Ollama sits between Qwen and OpenAI so that existing setups using only
 /// `providers.openai.base_url` (LM Studio, Ollama-via-compat) keep resolving
 /// exactly as before when `providers.ollama` is absent.
+///
+/// Azure sits just before the Anthropic fallback: `providers.azure` was
+/// previously fully modeled and settable (including via
+/// `AZURE_OPENAI_KEY`/`AZURE_OPENAI_ENDPOINT`) but silently ignored here -
+/// a user who configured only Azure got no error naming the problem, either
+/// picking up an unrelated provider or landing on the generic "No provider
+/// configured" message, which doesn't mention Azure at all.
 pub fn create_provider(config: &Config) -> Result<Arc<dyn Provider>> {
     // Try Qwen first
     if let Some(provider) = try_create_qwen(config)? {
@@ -150,8 +159,48 @@ pub fn create_provider(config: &Config) -> Result<Arc<dyn Provider>> {
         return Ok(provider);
     }
 
+    // Try Azure OpenAI
+    if let Some(provider) = try_create_azure(config)? {
+        return Ok(provider);
+    }
+
     // Fall back to Anthropic
     create_anthropic(config)
+}
+
+/// Try to create the Azure OpenAI provider if configured and enabled.
+///
+/// `providers.azure.base_url` is expected to be the full deployment
+/// endpoint (e.g. `https://{resource}.openai.azure.com/openai/deployments/
+/// {deployment}/chat/completions?api-version=2024-02-15-preview`), matching
+/// how every other provider's `base_url` override is used in this factory -
+/// not just the bare resource name.
+fn try_create_azure(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
+    let azure_config = match &config.providers.azure {
+        Some(cfg) if cfg.enabled => cfg,
+        _ => return Ok(None),
+    };
+
+    let api_key = match &azure_config.api_key {
+        Some(key) => key.clone(),
+        None => return Ok(None),
+    };
+    let base_url = match &azure_config.base_url {
+        Some(url) => url.clone(),
+        None => return Ok(None),
+    };
+
+    tracing::info!("Using Azure OpenAI provider");
+    println!("🔷 Using Azure OpenAI\n");
+
+    let mut provider = AzureOpenAIProvider::with_endpoint(api_key, base_url);
+    if let Some(model) = &azure_config.default_model {
+        tracing::info!("Using custom default model: {}", model);
+        println!("📦 Model: {}\n", model);
+        provider = provider.with_default_model(model.clone());
+    }
+
+    Ok(Some(Arc::new(provider)))
 }
 
 /// Try to create Gemini provider if configured and enabled.
@@ -570,6 +619,69 @@ mod tests {
         assert!(result.is_ok());
         let provider = result.unwrap();
         assert_eq!(provider.name(), "openai");
+    }
+
+    /// Regression: `providers.azure` was fully modeled and settable
+    /// (including via `AZURE_OPENAI_KEY`/`AZURE_OPENAI_ENDPOINT`) but
+    /// `create_provider` never tried it - a user who configured only Azure
+    /// silently fell through to whatever came next instead of getting
+    /// Azure OpenAI.
+    #[test]
+    fn test_create_provider_with_azure() {
+        let config = Config {
+            providers: ProviderConfigs {
+                azure: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("azure-key".to_string()),
+                    base_url: Some(
+                        "https://my-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2024-02-15-preview"
+                            .to_string(),
+                    ),
+                    default_model: None,
+                }),
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = create_provider(&config);
+        assert!(result.is_ok());
+        let provider = result.unwrap();
+        assert_eq!(provider.name(), "azure-openai");
+    }
+
+    /// A disabled Azure config must not be selected despite having an
+    /// api_key and base_url - it must fall through to the next provider.
+    #[test]
+    fn test_disabled_azure_falls_through_to_anthropic() {
+        let config = Config {
+            providers: ProviderConfigs {
+                azure: Some(ProviderConfig {
+                    enabled: false,
+                    api_key: Some("azure-key".to_string()),
+                    base_url: Some("https://my-resource.openai.azure.com/...".to_string()),
+                    default_model: None,
+                }),
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = create_provider(&config);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().name(), "anthropic");
     }
 
     #[test]
