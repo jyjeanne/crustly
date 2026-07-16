@@ -157,12 +157,26 @@ impl Tool for WebFetchTool {
     async fn execute(&self, input: Value, _context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: WebFetchInput = serde_json::from_value(input)?;
 
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(input.timeout_secs))
-            .user_agent("crustly/0.4 (https://github.com/jyjeanne/crustly)")
-            .redirect(reqwest::redirect::Policy::limited(10))
-            .build()
-            .map_err(|e| ToolError::Execution(format!("Failed to build HTTP client: {}", e)))?;
+        // SSRF guard: this tool requires no approval ("read-only fetch"),
+        // so it's the highest-risk network tool in the crate - a model
+        // could otherwise be steered into fetching a cloud metadata
+        // endpoint or an internal-only service. Reject an IP-literal host
+        // in a blocked range up front (it never goes through DNS, so the
+        // resolver below would never see it); the resolver then covers
+        // domain names, including ones that only resolve to an internal
+        // address (DNS rebinding).
+        if let Err(reason) = super::ssrf_guard::check_url_not_blocked(&input.url) {
+            return Ok(ToolResult::error(reason));
+        }
+
+        let client = super::ssrf_guard::guard(
+            reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(input.timeout_secs))
+                .user_agent("crustly/0.4 (https://github.com/jyjeanne/crustly)")
+                .redirect(reqwest::redirect::Policy::limited(10)),
+        )
+        .build()
+        .map_err(|e| ToolError::Execution(format!("Failed to build HTTP client: {}", e)))?;
 
         let response = client.get(&input.url).send().await.map_err(|e| {
             if e.is_timeout() {
@@ -267,5 +281,30 @@ mod tests {
         let tool = WebFetchTool;
         let result = tool.validate_input(&serde_json::json!({ "url": "https://example.com" }));
         assert!(result.is_ok());
+    }
+
+    /// Regression: this tool requires no approval ("read-only fetch"), so
+    /// without an SSRF guard a model could be steered into requesting the
+    /// cloud-metadata endpoint (or any other internal service) directly by
+    /// IP literal, with the response fed straight back into its own
+    /// context.
+    #[tokio::test]
+    async fn execute_denies_cloud_metadata_endpoint() {
+        let tool = WebFetchTool;
+        let context = ToolExecutionContext::new(uuid::Uuid::new_v4());
+        let input = serde_json::json!({ "url": "http://169.254.169.254/latest/meta-data/" });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(!result.success, "must deny the cloud metadata endpoint");
+    }
+
+    #[tokio::test]
+    async fn execute_denies_loopback_address() {
+        let tool = WebFetchTool;
+        let context = ToolExecutionContext::new(uuid::Uuid::new_v4());
+        let input = serde_json::json!({ "url": "http://127.0.0.1:6379/" });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(!result.success, "must deny loopback addresses");
     }
 }

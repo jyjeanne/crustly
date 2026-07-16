@@ -9,6 +9,7 @@ pub mod error;
 pub mod file_read_cache;
 pub mod registry;
 pub mod sandbox;
+pub mod ssrf_guard;
 mod r#trait;
 
 // Tool implementations - Phase 1: Essential File Operations

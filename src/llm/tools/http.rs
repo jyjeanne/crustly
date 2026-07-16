@@ -173,16 +173,26 @@ impl Tool for HttpClientTool {
 
         let method = parse_method(&input.method)?;
 
+        // SSRF guard: reject an IP-literal host in a blocked range up
+        // front (it never goes through DNS, so the resolver below would
+        // never see it); the resolver then covers domain names, including
+        // ones that only resolve to an internal address (DNS rebinding).
+        if let Err(reason) = super::ssrf_guard::check_url_not_blocked(&input.url) {
+            return Ok(ToolResult::error(reason));
+        }
+
         // Build client with timeout
-        let client = Client::builder()
-            .timeout(StdDuration::from_secs(input.timeout_secs))
-            .redirect(if input.follow_redirects {
-                reqwest::redirect::Policy::limited(10)
-            } else {
-                reqwest::redirect::Policy::none()
-            })
-            .build()
-            .map_err(|e| ToolError::Execution(format!("Failed to build HTTP client: {}", e)))?;
+        let client = super::ssrf_guard::guard(
+            Client::builder()
+                .timeout(StdDuration::from_secs(input.timeout_secs))
+                .redirect(if input.follow_redirects {
+                    reqwest::redirect::Policy::limited(10)
+                } else {
+                    reqwest::redirect::Policy::none()
+                }),
+        )
+        .build()
+        .map_err(|e| ToolError::Execution(format!("Failed to build HTTP client: {}", e)))?;
 
         // Build request
         let mut request = client.request(method.clone(), &input.url);
@@ -311,5 +321,39 @@ impl Tool for HttpClientTool {
         tool_result.metadata.insert("url".to_string(), input.url);
 
         Ok(tool_result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression: no SSRF guard existed - a model could request the
+    /// cloud-metadata endpoint (or any other internal service) directly by
+    /// IP literal.
+    #[tokio::test]
+    async fn execute_denies_cloud_metadata_endpoint() {
+        let tool = HttpClientTool;
+        let context = ToolExecutionContext::new(uuid::Uuid::new_v4()).with_auto_approve(true);
+        let input = serde_json::json!({
+            "method": "GET",
+            "url": "http://169.254.169.254/latest/meta-data/"
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(!result.success, "must deny the cloud metadata endpoint");
+    }
+
+    #[tokio::test]
+    async fn execute_denies_loopback_address() {
+        let tool = HttpClientTool;
+        let context = ToolExecutionContext::new(uuid::Uuid::new_v4()).with_auto_approve(true);
+        let input = serde_json::json!({
+            "method": "GET",
+            "url": "http://127.0.0.1:6379/"
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(!result.success, "must deny loopback addresses");
     }
 }
