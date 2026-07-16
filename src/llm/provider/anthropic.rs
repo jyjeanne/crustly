@@ -281,48 +281,9 @@ impl Provider for AnthropicProvider {
         )
         .await?;
 
-        // Parse Server-Sent Events stream
-        let byte_stream = response.bytes_stream();
-        let event_stream = byte_stream.map(|chunk_result| {
-            chunk_result
-                .map_err(|e| ProviderError::StreamError(e.to_string()))
-                .and_then(|chunk| {
-                    // Parse SSE format: "data: {json}\n\n"
-                    let text = String::from_utf8_lossy(&chunk);
-
-                    // Split by SSE event delimiter
-                    for line in text.lines() {
-                        if let Some(json_str) = line.strip_prefix("data: ") {
-                            if json_str == "[DONE]" {
-                                tracing::trace!("Stream completed with [DONE] marker");
-                                continue;
-                            }
-
-                            // Parse the JSON event
-                            return serde_json::from_str::<StreamEvent>(json_str).map_err(|e| {
-                                tracing::warn!(
-                                    "Failed to parse SSE event JSON: {}. Data: {}",
-                                    e,
-                                    json_str.chars().take(200).collect::<String>()
-                                );
-                                ProviderError::JsonError(e)
-                            });
-                        } else if !line.trim().is_empty()
-                            && !line.starts_with("event:")
-                            && !line.starts_with("id:")
-                            && !line.starts_with("retry:")
-                        {
-                            // Log unexpected SSE line formats for debugging
-                            tracing::debug!("Unexpected SSE line format: {}", line);
-                        }
-                    }
-
-                    // Skip non-data lines (e.g., "event: message_start")
-                    Ok(StreamEvent::Ping)
-                })
-        });
-
-        Ok(Box::pin(event_stream))
+        Ok(Box::pin(parse_anthropic_sse_stream(
+            response.bytes_stream(),
+        )))
     }
 
     fn supports_streaming(&self) -> bool {
@@ -379,6 +340,71 @@ impl Provider for AnthropicProvider {
 
         input_cost_total + output_cost_total
     }
+}
+
+/// Turn a raw HTTP byte stream into a stream of parsed Anthropic SSE events.
+///
+/// A 1:1 `.map()` over network chunks used to sit here, which is wrong on
+/// both sides: a single chunk can carry more than one `"data: {json}\n\n"`
+/// event (only the first was ever returned, silently dropping the rest),
+/// and a single event's JSON can be split across two chunks (a normal
+/// TCP/HTTP occurrence), which failed to parse and aborted the whole
+/// stream. `scan` carries a byte buffer across chunks so a line is only
+/// decoded once a `\n` has actually arrived, and `flat_map` lets one chunk
+/// yield any number of events (including zero, for a chunk that only
+/// advanced the buffer). Factored out of `stream()` so it can be exercised
+/// directly with a synthetic chunk sequence, without a mock HTTP server.
+fn parse_anthropic_sse_stream(
+    byte_stream: impl futures::Stream<Item = reqwest::Result<bytes::Bytes>> + Send + 'static,
+) -> impl futures::Stream<Item = Result<StreamEvent>> + Send + 'static {
+    byte_stream
+        .scan(Vec::<u8>::new(), |buf, chunk_result| {
+            let events: Vec<Result<StreamEvent>> = match chunk_result {
+                Err(e) => vec![Err(ProviderError::StreamError(e.to_string()))],
+                Ok(chunk) => {
+                    buf.extend_from_slice(&chunk);
+                    let mut events = Vec::new();
+
+                    // Splitting on the raw `\n` byte is safe even for UTF-8
+                    // text containing multi-byte characters: 0x0A never
+                    // appears as a continuation byte, so this never cuts a
+                    // character in half.
+                    while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+                        let line_bytes: Vec<u8> = buf.drain(..=pos).collect();
+                        let decoded = String::from_utf8_lossy(&line_bytes);
+                        let line = decoded.trim_end_matches(['\r', '\n']);
+
+                        if let Some(json_str) = line.strip_prefix("data: ") {
+                            if json_str == "[DONE]" {
+                                tracing::trace!("Stream completed with [DONE] marker");
+                                continue;
+                            }
+                            match serde_json::from_str::<StreamEvent>(json_str) {
+                                Ok(event) => events.push(Ok(event)),
+                                Err(e) => {
+                                    tracing::warn!(
+                                        "Failed to parse SSE event JSON: {}. Data: {}",
+                                        e,
+                                        json_str.chars().take(200).collect::<String>()
+                                    );
+                                    events.push(Err(ProviderError::JsonError(e)));
+                                }
+                            }
+                        } else if !line.trim().is_empty()
+                            && !line.starts_with("event:")
+                            && !line.starts_with("id:")
+                            && !line.starts_with("retry:")
+                        {
+                            tracing::debug!("Unexpected SSE line format: {}", line);
+                        }
+                    }
+
+                    events
+                }
+            };
+            futures::future::ready(Some(events))
+        })
+        .flat_map(futures::stream::iter)
 }
 
 // Anthropic-specific request format
@@ -476,6 +502,62 @@ mod tests {
         // Test Haiku pricing (least expensive)
         let cost = provider.calculate_cost("claude-3-haiku-20240307", 1_000_000, 1_000_000);
         assert_eq!(cost, 1.5); // $0.25 input + $1.25 output
+    }
+
+    /// Regression: the old `.map()` over network chunks only ever returned
+    /// the *first* `data:` line found in a chunk. Two complete SSE events
+    /// delivered together in a single network read used to silently drop
+    /// the second one.
+    #[tokio::test]
+    async fn sse_stream_yields_every_event_in_a_single_chunk() {
+        let chunk = concat!(
+            "data: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+            "data: {\"type\":\"content_block_stop\",\"index\":1}\n\n",
+        );
+        let byte_stream = futures::stream::iter(vec![Ok::<bytes::Bytes, reqwest::Error>(
+            bytes::Bytes::from(chunk),
+        )]);
+
+        let events: Vec<StreamEvent> = parse_anthropic_sse_stream(byte_stream)
+            .map(|r| r.expect("event must parse"))
+            .collect()
+            .await;
+
+        let indices: Vec<usize> = events
+            .iter()
+            .map(|e| match e {
+                StreamEvent::ContentBlockStop { index } => *index,
+                other => panic!("expected ContentBlockStop, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(indices, vec![0, 1], "both events in the chunk must survive");
+    }
+
+    /// Regression: the old code decoded each network chunk independently,
+    /// so a single SSE event's JSON split across two TCP reads (a normal
+    /// occurrence, not a corner case) failed to parse as JSON and aborted
+    /// the whole stream with a `JsonError`.
+    #[tokio::test]
+    async fn sse_stream_reassembles_an_event_split_across_chunks() {
+        let full_line = "data: {\"type\":\"content_block_stop\",\"index\":7}\n\n";
+        let split_at = full_line.find("\"index\"").unwrap();
+        let (first_half, second_half) = full_line.split_at(split_at);
+
+        let byte_stream = futures::stream::iter(vec![
+            Ok::<bytes::Bytes, reqwest::Error>(bytes::Bytes::from(first_half.to_string())),
+            Ok::<bytes::Bytes, reqwest::Error>(bytes::Bytes::from(second_half.to_string())),
+        ]);
+
+        let events: Vec<StreamEvent> = parse_anthropic_sse_stream(byte_stream)
+            .map(|r| r.expect("event must parse even though its JSON arrived in two chunks"))
+            .collect()
+            .await;
+
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            StreamEvent::ContentBlockStop { index } => assert_eq!(*index, 7),
+            other => panic!("expected ContentBlockStop, got {other:?}"),
+        }
     }
 
     #[test]
