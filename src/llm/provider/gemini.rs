@@ -75,17 +75,27 @@ impl GeminiProvider {
         self
     }
 
-    fn headers(&self) -> reqwest::header::HeaderMap {
+    /// The API key is user/config-supplied and commonly picks up a trailing
+    /// newline or other whitespace; `HeaderValue::parse` rejects any byte
+    /// outside the printable-ASCII header range, so an `.expect()` here used
+    /// to crash the whole process on the very first request. Trim first and
+    /// return a proper error for anything still invalid instead of panicking.
+    fn headers(&self) -> Result<reqwest::header::HeaderMap> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             "x-goog-api-key",
-            self.api_key.parse().expect("Invalid API key format"),
+            self.api_key
+                .trim()
+                .parse()
+                .map_err(|_| ProviderError::InvalidApiKey)?,
         );
         headers.insert(
             reqwest::header::CONTENT_TYPE,
-            "application/json".parse().unwrap(),
+            "application/json"
+                .parse()
+                .expect("static content-type string is always a valid header value"),
         );
-        headers
+        Ok(headers)
     }
 
     fn generate_url(&self, model: &str) -> String {
@@ -556,7 +566,7 @@ impl Provider for GeminiProvider {
                 let response = self
                     .client
                     .post(&url)
-                    .headers(self.headers())
+                    .headers(self.headers()?)
                     .json(&gemini_request)
                     .send()
                     .await?;
@@ -595,7 +605,7 @@ impl Provider for GeminiProvider {
                 let response = self
                     .client
                     .post(&url)
-                    .headers(self.headers())
+                    .headers(self.headers()?)
                     .json(&gemini_request)
                     .send()
                     .await?;

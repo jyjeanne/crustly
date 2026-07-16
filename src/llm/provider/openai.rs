@@ -98,26 +98,35 @@ impl OpenAIProvider {
         self
     }
 
-    /// Build request headers
-    fn headers(&self) -> reqwest::header::HeaderMap {
+    /// Build request headers.
+    ///
+    /// The API key is user/config-supplied and commonly picks up a trailing
+    /// newline or other whitespace (e.g. loaded from a file/env var);
+    /// `HeaderValue::parse` rejects any byte outside the printable-ASCII
+    /// header range, so an `.expect()` here used to crash the whole process
+    /// on the very first request. Trim first and return a proper error for
+    /// anything still invalid instead of panicking.
+    fn headers(&self) -> Result<reqwest::header::HeaderMap> {
         let mut headers = reqwest::header::HeaderMap::new();
 
         // Only add authorization if not using local
         if self.api_key != "not-needed" {
             headers.insert(
                 reqwest::header::AUTHORIZATION,
-                format!("Bearer {}", self.api_key)
+                format!("Bearer {}", self.api_key.trim())
                     .parse()
-                    .expect("Invalid API key format"),
+                    .map_err(|_| ProviderError::InvalidApiKey)?,
             );
         }
 
         headers.insert(
             reqwest::header::CONTENT_TYPE,
-            "application/json".parse().unwrap(),
+            "application/json"
+                .parse()
+                .expect("static content-type string is always a valid header value"),
         );
 
-        headers
+        Ok(headers)
     }
 
     /// Convert our generic request to OpenAI-specific format
@@ -497,7 +506,7 @@ impl Provider for OpenAIProvider {
                 let response = self
                     .client
                     .post(&self.base_url)
-                    .headers(self.headers())
+                    .headers(self.headers()?)
                     .json(&openai_request)
                     .send()
                     .await?;
@@ -558,7 +567,7 @@ impl Provider for OpenAIProvider {
                 let response = self
                     .client
                     .post(&self.base_url)
-                    .headers(self.headers())
+                    .headers(self.headers()?)
                     .json(&openai_request)
                     .send()
                     .await?;

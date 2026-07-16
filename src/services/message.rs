@@ -29,15 +29,16 @@ impl MessageService {
     ) -> Result<Message> {
         let repo = MessageRepository::new(self.context.pool());
 
-        // Get the next sequence number for this session
-        let sequence = self.get_next_sequence(session_id).await?;
-
-        let message = Message {
+        // `sequence` is a placeholder: MessageRepository::create computes the
+        // real value atomically (MAX(sequence)+1 in the same INSERT
+        // statement) and writes it back, so two concurrent calls for the
+        // same session can never be assigned the same sequence number.
+        let mut message = Message {
             id: Uuid::new_v4(),
             session_id,
             role,
             content,
-            sequence,
+            sequence: 0,
             created_at: Utc::now(),
             token_count: None,
             cost: None,
@@ -45,7 +46,7 @@ impl MessageService {
             perf_metrics_json: None,
         };
 
-        repo.create(&message)
+        repo.create(&mut message)
             .await
             .context("Failed to create message")?;
 
@@ -53,7 +54,7 @@ impl MessageService {
             "Created new message: {} in session {} (seq: {})",
             message.id,
             session_id,
-            sequence
+            message.sequence
         );
         Ok(message)
     }
@@ -166,12 +167,6 @@ impl MessageService {
         repo.count_by_session(session_id)
             .await
             .context("Failed to count messages in session")
-    }
-
-    /// Get the next sequence number for a session
-    async fn get_next_sequence(&self, session_id: Uuid) -> Result<i32> {
-        let count = self.count_messages_in_session(session_id).await?;
-        Ok((count + 1) as i32)
     }
 
     /// Get the last message in a session

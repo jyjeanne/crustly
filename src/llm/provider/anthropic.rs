@@ -49,22 +49,37 @@ impl AnthropicProvider {
         Self { api_key, client }
     }
 
-    /// Build request headers
-    fn headers(&self) -> reqwest::header::HeaderMap {
+    /// Build request headers.
+    ///
+    /// The API key is user/config-supplied (env var, keyring, file) and
+    /// commonly picks up a trailing newline or other whitespace (e.g.
+    /// `export KEY=$(cat key.txt)` without `-n`); `HeaderValue::parse`
+    /// rejects any byte outside the printable-ASCII header range, so an
+    /// `.expect()` here used to crash the whole process on the very first
+    /// request. Trim first (covers the common case) and return a proper
+    /// error for anything still invalid instead of panicking.
+    fn headers(&self) -> Result<reqwest::header::HeaderMap> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             "x-api-key",
-            self.api_key.parse().expect("Invalid API key format"),
+            self.api_key
+                .trim()
+                .parse()
+                .map_err(|_| ProviderError::InvalidApiKey)?,
         );
         headers.insert(
             "anthropic-version",
-            ANTHROPIC_VERSION.parse().expect("Invalid version"),
+            ANTHROPIC_VERSION
+                .parse()
+                .expect("static version string is always a valid header value"),
         );
         headers.insert(
             reqwest::header::CONTENT_TYPE,
-            "application/json".parse().unwrap(),
+            "application/json"
+                .parse()
+                .expect("static content-type string is always a valid header value"),
         );
-        headers
+        Ok(headers)
     }
 
     /// Convert our generic request to Anthropic-specific format
@@ -195,7 +210,7 @@ impl Provider for AnthropicProvider {
                 let response = self
                     .client
                     .post(ANTHROPIC_API_URL)
-                    .headers(self.headers())
+                    .headers(self.headers()?)
                     .json(&anthropic_request)
                     .send()
                     .await?;
@@ -251,7 +266,7 @@ impl Provider for AnthropicProvider {
                 let response = self
                     .client
                     .post(ANTHROPIC_API_URL)
-                    .headers(self.headers())
+                    .headers(self.headers()?)
                     .json(&anthropic_request)
                     .send()
                     .await?;

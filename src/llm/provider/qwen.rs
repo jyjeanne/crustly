@@ -205,26 +205,34 @@ impl QwenProvider {
         )
     }
 
-    /// Build request headers
-    fn headers(&self) -> reqwest::header::HeaderMap {
+    /// Build request headers.
+    ///
+    /// The API key is user/config-supplied and commonly picks up a trailing
+    /// newline or other whitespace; `HeaderValue::parse` rejects any byte
+    /// outside the printable-ASCII header range, so an `.expect()` here used
+    /// to crash the whole process on the very first request. Trim first and
+    /// return a proper error for anything still invalid instead of panicking.
+    fn headers(&self) -> Result<reqwest::header::HeaderMap> {
         let mut headers = reqwest::header::HeaderMap::new();
 
         // Only add authorization if not using local
         if !self.is_local() {
             headers.insert(
                 reqwest::header::AUTHORIZATION,
-                format!("Bearer {}", self.api_key)
+                format!("Bearer {}", self.api_key.trim())
                     .parse()
-                    .expect("Invalid API key format"),
+                    .map_err(|_| ProviderError::InvalidApiKey)?,
             );
         }
 
         headers.insert(
             reqwest::header::CONTENT_TYPE,
-            "application/json".parse().unwrap(),
+            "application/json"
+                .parse()
+                .expect("static content-type string is always a valid header value"),
         );
 
-        headers
+        Ok(headers)
     }
 
     /// Format tools in Hermes style for Qwen3
@@ -444,9 +452,14 @@ impl QwenProvider {
             return (None, text.to_string());
         }
 
-        // Look for <think> ... </think> blocks
+        // Look for <think> ... </think> blocks. The closing tag must be
+        // searched for *after* the opening one: searching the whole string
+        // finds a stray `</think>` that precedes the real `<think>` (e.g.
+        // the model discusses the tag syntax before opening one), which
+        // used to panic by slicing `text[start + 7..end]` with `end < start`.
         if let Some(start) = text.find("<think>") {
-            if let Some(end) = text.find("</think>") {
+            if let Some(end_rel) = text[start + 7..].find("</think>") {
+                let end = start + 7 + end_rel;
                 let thinking = text[start + 7..end].trim().to_string();
                 let before = &text[..start];
                 let after = &text[end + 8..];
@@ -984,7 +997,17 @@ impl QwenProvider {
                             // truncated JSON fragment visible to the user.
                             let mut clean_text = remaining.clone();
                             while let Some(start) = clean_text.find("<tool_call>") {
-                                if let Some(end) = clean_text.find("</tool_call>") {
+                                // Search for the closing tag *after* `start`.
+                                // Searching the whole string finds a stray
+                                // `</tool_call>` that precedes this opening
+                                // tag, giving `end < start`; the removal
+                                // below then re-includes (and duplicates)
+                                // the `<tool_call>` tag instead of consuming
+                                // it, so the string never shrinks and the
+                                // loop runs forever, growing `clean_text`
+                                // without bound.
+                                if let Some(end_rel) = clean_text[start..].find("</tool_call>") {
+                                    let end = start + end_rel;
                                     clean_text = format!(
                                         "{}{}",
                                         &clean_text[..start],
@@ -1261,7 +1284,7 @@ impl Provider for QwenProvider {
                 let response = self
                     .client
                     .post(&self.base_url)
-                    .headers(self.headers())
+                    .headers(self.headers()?)
                     .json(&qwen_request)
                     .send()
                     .await?;
@@ -1302,7 +1325,7 @@ impl Provider for QwenProvider {
                 let response = self
                     .client
                     .post(&self.base_url)
-                    .headers(self.headers())
+                    .headers(self.headers()?)
                     .json(&qwen_request)
                     .send()
                     .await?;
@@ -2159,6 +2182,55 @@ mod tests {
         }
     }
 
+    /// Regression: the display-text cleanup loop searched for `</tool_call>`
+    /// across the *whole* remaining string instead of only after the
+    /// matching `<tool_call>`. A stray `</tool_call>` preceding the real
+    /// opening tag made `end < start`, so the removal re-included (and
+    /// duplicated) the `<tool_call>` tag on every iteration instead of
+    /// consuming it - the string grew without bound and the loop never
+    /// terminated. This test would hang forever before the fix.
+    #[test]
+    fn test_from_qwen_response_stray_closing_tag_before_real_call_does_not_loop_forever() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+
+        let content = "As discussed, a stray </tool_call> can show up in text. \
+             Now the real one:\n\
+             <tool_call>\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/main.rs\"}}\n</tool_call>\n\
+             All done.";
+
+        let response = QwenResponse {
+            id: "qwen-stray-close-tag-test".to_string(),
+            model: "qwen3-8b".to_string(),
+            choices: vec![QwenChoice {
+                index: 0,
+                message: QwenMessage {
+                    role: "assistant".to_string(),
+                    content: Some(content.to_string()),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                finish_reason: Some("stop".to_string()),
+            }],
+            usage: QwenUsage {
+                prompt_tokens: 5,
+                completion_tokens: 10,
+            },
+        };
+
+        let known_tools = vec!["read_file".to_string()];
+        let llm_response = provider.from_qwen_response(response, &known_tools);
+
+        let names: Vec<String> = llm_response
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::ToolUse { name, .. } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(names, vec!["read_file"]);
+    }
+
     #[test]
     fn test_thinking_extraction() {
         let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
@@ -2173,6 +2245,24 @@ Here's my analysis of the code."#;
         assert!(thinking.is_some());
         assert!(thinking.unwrap().contains("analyze this code"));
         assert!(remaining.contains("Here's my analysis"));
+        assert!(!remaining.contains("<think>"));
+    }
+
+    /// Regression: a stray `</think>` preceding the real `<think>` (e.g. the
+    /// model discusses the tag syntax before opening one) used to panic by
+    /// slicing `text[start + 7..end]` with `end < start`, because the
+    /// closing tag was searched for across the whole string instead of only
+    /// after the opening tag.
+    #[test]
+    fn test_thinking_extraction_out_of_order_tags_does_not_panic() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string())
+            .with_thinking(true);
+
+        let text =
+            "Explaining tags: first </think> comes up, then <think>real thought</think> follows.";
+
+        let (thinking, remaining) = provider.extract_thinking(text);
+        assert_eq!(thinking, Some("real thought".to_string()));
         assert!(!remaining.contains("<think>"));
     }
 

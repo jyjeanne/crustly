@@ -20,8 +20,13 @@ pub struct CompactionRecord {
 
 /// Compact the context: summarise turns [0..N-10], preserve the last 10 verbatim.
 ///
-/// The DB record is written first; if that fails the context is left unchanged.
+/// The whole post-compaction result (summary, preserved messages, new token
+/// count) is computed first and written to the DB in a single INSERT; `ctx`
+/// is only mutated after that write succeeds, so a DB failure genuinely
+/// leaves the context unchanged and never leaves a placeholder record behind.
 pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<CompactionRecord> {
+    use crate::llm::provider::types::{ContentBlock, Message, Role};
+
     let total_turns = ctx.messages.len();
 
     // Need at least 11 messages to compact (preserve last 10)
@@ -32,47 +37,20 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
         );
     }
 
-    let preserve_from = total_turns.saturating_sub(10);
+    // Never split a tool_use/tool_result pair across the boundary: a
+    // ToolResult message with no matching ToolUse in the preserved slice
+    // would violate the provider API contract on the next request.
+    let mut preserve_from = total_turns.saturating_sub(10);
+    while preserve_from > 0 && message_has_tool_result(&ctx.messages[preserve_from]) {
+        preserve_from -= 1;
+    }
+
     let tokens_before = ctx.token_count as i32;
 
     // Build a plain-text summary of the turns being compacted
     let summary = summarise_turns(&ctx.messages[..preserve_from]);
 
-    // Write CompactionRecord to DB first (atomicity)
-    let record = CompactionRecord {
-        id: Uuid::new_v4(),
-        session_id: ctx.session_id,
-        turn_range_start: 0,
-        turn_range_end: preserve_from as i32,
-        tokens_before,
-        tokens_after: 0, // updated below
-        summary_text: summary.clone(),
-        created_at: Utc::now(),
-    };
-
-    sqlx::query(
-        "INSERT INTO compaction_records \
-         (id, session_id, turn_range_start, turn_range_end, tokens_before, tokens_after, summary_text, created_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(record.id.to_string())
-    .bind(record.session_id.to_string())
-    .bind(record.turn_range_start)
-    .bind(record.turn_range_end)
-    .bind(record.tokens_before)
-    .bind(0_i32) // placeholder; updated after
-    .bind(&record.summary_text)
-    .bind(record.created_at.timestamp())
-    .execute(pool)
-    .await?;
-
-    // Only modify context after DB write succeeds
-    let preserved = ctx.messages.drain(preserve_from..).collect::<Vec<_>>();
-    ctx.messages.clear();
-
-    // Inject the compaction summary as a system message
-    use crate::llm::provider::types::{ContentBlock, Message, Role};
-    ctx.messages.push(Message {
+    let summary_message = Message {
         role: Role::System,
         content: vec![ContentBlock::Text {
             text: format!(
@@ -80,12 +58,13 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
                 preserve_from, summary
             ),
         }],
-    });
-    ctx.messages.extend(preserved);
+    };
 
-    // Recalculate token count
-    let new_token_count: usize = ctx
-        .messages
+    let mut new_messages = Vec::with_capacity(total_turns - preserve_from + 1);
+    new_messages.push(summary_message);
+    new_messages.extend(ctx.messages[preserve_from..].iter().cloned());
+
+    let new_token_count: usize = new_messages
         .iter()
         .map(|m| {
             m.content
@@ -107,19 +86,48 @@ pub async fn compact(ctx: &mut AgentContext, pool: &sqlx::SqlitePool) -> Result<
         })
         .sum::<usize>();
 
+    let record = CompactionRecord {
+        id: Uuid::new_v4(),
+        session_id: ctx.session_id,
+        turn_range_start: 0,
+        turn_range_end: preserve_from as i32,
+        tokens_before,
+        tokens_after: new_token_count as i32,
+        summary_text: summary,
+        created_at: Utc::now(),
+    };
+
+    // Single atomic write with the final tokens_after already known — no
+    // placeholder row, no second statement that can fail after the context
+    // has already been mutated.
+    sqlx::query(
+        "INSERT INTO compaction_records \
+         (id, session_id, turn_range_start, turn_range_end, tokens_before, tokens_after, summary_text, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(record.id.to_string())
+    .bind(record.session_id.to_string())
+    .bind(record.turn_range_start)
+    .bind(record.turn_range_end)
+    .bind(record.tokens_before)
+    .bind(record.tokens_after)
+    .bind(&record.summary_text)
+    .bind(record.created_at.timestamp())
+    .execute(pool)
+    .await?;
+
+    // Only mutate the live context after the DB write has succeeded.
+    ctx.messages = new_messages;
     ctx.token_count = new_token_count;
 
-    let tokens_after = new_token_count as i32;
-    sqlx::query("UPDATE compaction_records SET tokens_after = ? WHERE id = ?")
-        .bind(tokens_after)
-        .bind(record.id.to_string())
-        .execute(pool)
-        .await?;
+    Ok(record)
+}
 
-    Ok(CompactionRecord {
-        tokens_after,
-        ..record
-    })
+fn message_has_tool_result(msg: &crate::llm::provider::types::Message) -> bool {
+    use crate::llm::provider::types::ContentBlock;
+    msg.content
+        .iter()
+        .any(|b| matches!(b, ContentBlock::ToolResult { .. }))
 }
 
 fn summarise_turns(messages: &[crate::llm::provider::types::Message]) -> String {
@@ -304,6 +312,90 @@ mod tests {
         assert!(
             record.tokens_after >= 0,
             "tokens_after must be non-negative"
+        );
+    }
+
+    /// Regression: the naive `total_turns - 10` boundary operated on raw
+    /// messages, not conversational turns. One logical tool-use turn is two
+    /// separate `Message` entries (an assistant `ToolUse` message, then a
+    /// user `ToolResult` message); if the boundary fell exactly on the
+    /// `ToolResult` half, the preserved slice began with an orphaned tool
+    /// result that has no matching tool use in the preserved history -
+    /// which providers reject. The boundary must be pulled back to keep
+    /// such a pair together.
+    #[tokio::test]
+    async fn compaction_never_splits_a_tool_use_result_pair() {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query(
+            "CREATE TABLE compaction_records (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                turn_range_start INTEGER NOT NULL,
+                turn_range_end INTEGER NOT NULL,
+                tokens_before INTEGER NOT NULL,
+                tokens_after INTEGER NOT NULL,
+                summary_text TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let session_id = Uuid::new_v4();
+        let mut ctx = AgentContext::new(session_id, 5000);
+
+        // 20 messages -> naive preserve_from = 20 - 10 = 10. Message 9 is
+        // the assistant's ToolUse and message 10 is the matching
+        // ToolResult, so the naive boundary would land exactly between them.
+        for i in 0..20 {
+            let msg = if i == 9 {
+                Message {
+                    role: Role::Assistant,
+                    content: vec![ContentBlock::ToolUse {
+                        id: "call_1".to_string(),
+                        name: "read_file".to_string(),
+                        input: serde_json::json!({"path": "a.rs"}),
+                    }],
+                }
+            } else if i == 10 {
+                Message {
+                    role: Role::User,
+                    content: vec![ContentBlock::ToolResult {
+                        tool_use_id: "call_1".to_string(),
+                        content: "file contents".to_string(),
+                        is_error: None,
+                    }],
+                }
+            } else {
+                Message {
+                    role: if i % 2 == 0 {
+                        Role::User
+                    } else {
+                        Role::Assistant
+                    },
+                    content: vec![ContentBlock::Text {
+                        text: format!("Turn {} content with padding to consume budget", i),
+                    }],
+                }
+            };
+            ctx.add_message(msg);
+        }
+
+        compact(&mut ctx, &pool).await.unwrap();
+
+        // The first preserved message (index 1, after the summary) must not
+        // be an orphaned ToolResult - the paired ToolUse must have been
+        // pulled into the preserved set too.
+        let first_preserved = &ctx.messages[1];
+        let is_orphaned_tool_result = first_preserved
+            .content
+            .iter()
+            .any(|b| matches!(b, ContentBlock::ToolResult { .. }));
+        assert!(
+            !is_orphaned_tool_result,
+            "first preserved message must not be a ToolResult with no matching ToolUse: {:?}",
+            first_preserved
         );
     }
 }
