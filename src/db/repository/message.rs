@@ -43,33 +43,51 @@ impl MessageRepository {
         Ok(messages)
     }
 
-    /// Create a new message
-    pub async fn create(&self, message: &Message) -> Result<()> {
-        sqlx::query(
+    /// Create a new message.
+    ///
+    /// `message.sequence` is computed here, not trusted from the caller: the
+    /// service layer used to read `COUNT(*)` and add 1 in a separate
+    /// round-trip before this INSERT, which is a classic read-then-write
+    /// race - two concurrent `create_message` calls for the same session
+    /// (e.g. overlapping tool-result persistence) could read the same count
+    /// and insert duplicate sequence numbers with no error, silently
+    /// corrupting message ordering. Computing `MAX(sequence) + 1` inside the
+    /// same INSERT statement makes the read and write atomic: SQLite holds
+    /// the writer lock for the whole statement, so no other connection can
+    /// interleave between the subquery and the insert. `message.sequence` is
+    /// overwritten with the value SQLite actually assigned.
+    pub async fn create(&self, message: &mut Message) -> Result<()> {
+        let sequence: i32 = sqlx::query_scalar(
             r#"
             INSERT INTO messages (id, session_id, role, content, sequence,
                                  created_at, token_count, cost, provider_name, perf_metrics_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?,
+                    (SELECT COALESCE(MAX(sequence), 0) + 1 FROM messages WHERE session_id = ?),
+                    ?, ?, ?, ?, ?)
+            RETURNING sequence
             "#,
         )
         .bind(message.id.to_string())
         .bind(message.session_id.to_string())
         .bind(&message.role)
         .bind(&message.content)
-        .bind(message.sequence)
+        .bind(message.session_id.to_string())
         .bind(message.created_at.timestamp())
         .bind(message.token_count)
         .bind(message.cost)
         .bind(&message.provider_name)
         .bind(&message.perf_metrics_json)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .context("Failed to create message")?;
 
+        message.sequence = sequence;
+
         tracing::debug!(
-            "Created message: {} in session: {}",
+            "Created message: {} in session: {} (seq: {})",
             message.id,
-            message.session_id
+            message.session_id,
+            sequence
         );
         Ok(())
     }
@@ -175,9 +193,9 @@ mod tests {
             .expect("Failed to create session");
 
         // Create message
-        let message = Message::new(session.id, "user".to_string(), "Hello!".to_string(), 1);
+        let mut message = Message::new(session.id, "user".to_string(), "Hello!".to_string(), 1);
         message_repo
-            .create(&message)
+            .create(&mut message)
             .await
             .expect("Failed to create message");
 
@@ -232,14 +250,14 @@ mod tests {
 
         // Create multiple messages
         for i in 0..3 {
-            let msg = Message::new(
+            let mut msg = Message::new(
                 session.id,
                 "user".to_string(),
                 format!("Message {}", i),
                 i + 1,
             );
             message_repo
-                .create(&msg)
+                .create(&mut msg)
                 .await
                 .expect("Failed to create message");
         }

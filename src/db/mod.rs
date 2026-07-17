@@ -65,6 +65,19 @@ impl Database {
                     sqlx::query("PRAGMA busy_timeout = 5000")
                         .execute(&mut *conn)
                         .await?;
+                    // SQLite disables foreign-key enforcement per-connection
+                    // by default. Every migration declares
+                    // `ON DELETE CASCADE` between sessions and their
+                    // messages/plans/plan_tasks/files/episodic_memories/
+                    // compaction_records, but without this pragma none of
+                    // it ever fired: deleting a session left every child
+                    // row permanently orphaned, and a message write racing
+                    // a session delete could succeed with a session_id
+                    // pointing at nothing, since there was no constraint to
+                    // reject it.
+                    sqlx::query("PRAGMA foreign_keys = ON")
+                        .execute(&mut *conn)
+                        .await?;
                     Ok(())
                 })
             })
@@ -80,6 +93,16 @@ impl Database {
     pub async fn connect_in_memory() -> Result<Self> {
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
+            .after_connect(|conn, _meta| {
+                Box::pin(async move {
+                    // Match connect()'s enforcement so tests exercise the
+                    // same FK behavior production runs under.
+                    sqlx::query("PRAGMA foreign_keys = ON")
+                        .execute(&mut *conn)
+                        .await?;
+                    Ok(())
+                })
+            })
             .connect("sqlite::memory:")
             .await
             .context("Failed to connect to in-memory database")?;
@@ -98,12 +121,53 @@ impl Database {
         !self.pool.is_closed()
     }
 
-    /// Run database migrations
+    /// Run database migrations.
+    ///
+    /// Runs with foreign-key enforcement explicitly turned off on the
+    /// connection it uses, then restores it before returning that
+    /// connection to the pool.
+    ///
+    /// `connect()`'s `after_connect` hook enables `PRAGMA foreign_keys = ON`
+    /// on every connection, including whichever one this pulls from the
+    /// pool. That is wrong for a migration run specifically:
+    /// `20251028000002_modernize_schema.sql`'s "Sessions Table Updates"
+    /// section does `DROP TABLE sessions` while the *old* `messages`/`files`
+    /// tables (from `20251028000001_initial_schema.sql`) still declare
+    /// `FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE`
+    /// and are not dropped/rebuilt until later in the same file. With FK
+    /// enforcement active, SQLite treats `DROP TABLE` on a table other rows
+    /// reference as an implicit `DELETE FROM` of every one of its rows
+    /// first - which fires the cascade and silently destroys every row in
+    /// the not-yet-migrated `messages`/`files` tables before the
+    /// migration's own `INSERT INTO messages_new ... SELECT ... FROM
+    /// messages` ever runs, leaving `messages_new`/`files_new` empty. Any
+    /// database that has not yet applied that migration (e.g. a long-
+    /// dormant install upgrading straight to a version with FK enforcement
+    /// enabled) would have every message and tracked file permanently
+    /// erased, with the migration itself reporting success.
     pub async fn run_migrations(&self) -> Result<()> {
-        sqlx::migrate!("./migrations")
-            .run(&self.pool)
+        let mut conn = self
+            .pool
+            .acquire()
             .await
-            .context("Failed to run database migrations")?;
+            .context("Failed to acquire a connection to run migrations")?;
+
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&mut *conn)
+            .await
+            .context("Failed to disable foreign keys for migration")?;
+
+        let migration_result = sqlx::migrate!("./migrations").run(&mut conn).await;
+
+        // Restore FK enforcement on this connection before returning it to
+        // the pool, regardless of migration outcome, so it matches the
+        // invariant every other pooled connection has via `after_connect`.
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&mut *conn)
+            .await
+            .context("Failed to re-enable foreign keys after migration")?;
+
+        migration_result.context("Failed to run database migrations")?;
 
         tracing::info!("Database migrations completed");
         Ok(())
@@ -197,5 +261,180 @@ mod tests {
 
         drop(db);
         let _ = std::fs::remove_dir_all(&expected_dir);
+    }
+
+    /// Regression: SQLite disables foreign-key enforcement per-connection
+    /// by default, and nothing turned it on. Every migration declares
+    /// `ON DELETE CASCADE` between `sessions` and its child tables, but
+    /// without `PRAGMA foreign_keys = ON` none of it ever fired - a
+    /// `messages` row could reference a `session_id` that does not exist,
+    /// and deleting a session left every child row orphaned instead of
+    /// cascading. This checks the constraint is actually live.
+    #[tokio::test]
+    async fn foreign_keys_are_enforced() {
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+
+        let bogus_session_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp();
+
+        let result = sqlx::query(
+            "INSERT INTO messages (id, session_id, role, content, sequence, created_at) \
+             VALUES (?, ?, 'user', 'hello', 1, ?)",
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(&bogus_session_id)
+        .bind(now)
+        .execute(db.pool())
+        .await;
+
+        assert!(
+            result.is_err(),
+            "inserting a message for a session_id that does not exist must fail \
+             with foreign keys enforced"
+        );
+    }
+
+    /// Regression companion: with the constraint live, deleting a session
+    /// must actually cascade-delete its messages (the behavior every
+    /// migration's `ON DELETE CASCADE` already declared but which never
+    /// fired before `PRAGMA foreign_keys = ON` was added).
+    #[tokio::test]
+    async fn deleting_a_session_cascades_to_its_messages() {
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp();
+
+        sqlx::query("INSERT INTO sessions (id, created_at, updated_at) VALUES (?, ?, ?)")
+            .bind(&session_id)
+            .bind(now)
+            .bind(now)
+            .execute(db.pool())
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "INSERT INTO messages (id, session_id, role, content, sequence, created_at) \
+             VALUES (?, ?, 'user', 'hello', 1, ?)",
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(&session_id)
+        .bind(now)
+        .execute(db.pool())
+        .await
+        .unwrap();
+
+        sqlx::query("DELETE FROM sessions WHERE id = ?")
+            .bind(&session_id)
+            .execute(db.pool())
+            .await
+            .unwrap();
+
+        let remaining: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE session_id = ?")
+                .bind(&session_id)
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+
+        assert_eq!(
+            remaining, 0,
+            "deleting a session must cascade-delete its messages, not orphan them"
+        );
+    }
+
+    /// Regression: turning on `PRAGMA foreign_keys` made
+    /// `20251028000002_modernize_schema.sql` destructive for a database
+    /// that hasn't yet applied it. That migration's "Sessions Table
+    /// Updates" section does `DROP TABLE sessions` while the *old*
+    /// `messages`/`files` tables (from `20251028000001_initial_schema.sql`)
+    /// still carry `FOREIGN KEY (session_id) REFERENCES sessions(id) ON
+    /// DELETE CASCADE` and aren't dropped/rebuilt until later in the same
+    /// file. With FK enforcement active, SQLite treats `DROP TABLE` on a
+    /// referenced table as an implicit delete of every one of its rows
+    /// first - cascading and destroying every row in the not-yet-migrated
+    /// `messages` table before the migration's own `INSERT INTO
+    /// messages_new ... SELECT ... FROM messages` ever runs.
+    ///
+    /// This reproduces the real upgrade path faithfully: a database that
+    /// has applied only migration 1 (via a standalone runtime `Migrator`
+    /// pointed at a directory containing just that one file, so
+    /// `_sqlx_migrations` gets a real, correctly-checksummed row for it),
+    /// with real user data inserted using migration 1's schema, then
+    /// upgraded via the actual embedded `run_migrations()` used in
+    /// production.
+    #[tokio::test]
+    async fn migrating_from_pre_modernization_schema_preserves_existing_messages() {
+        let db = Database::connect_in_memory().await.unwrap();
+
+        // Apply *only* migration 1, via a standalone directory containing
+        // just that file, so `_sqlx_migrations` ends up with a real row
+        // for it (correct version + checksum) exactly as sqlx would
+        // compute for any real database frozen at this schema version.
+        let migration_1_dir = tempfile::tempdir().unwrap();
+        let migration_1_sql = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/migrations/20251028000001_initial_schema.sql"
+        ))
+        .unwrap();
+        std::fs::write(
+            migration_1_dir
+                .path()
+                .join("20251028000001_initial_schema.sql"),
+            migration_1_sql,
+        )
+        .unwrap();
+
+        sqlx::migrate::Migrator::new(migration_1_dir.path())
+            .await
+            .expect("load migration 1 as a standalone source")
+            .run(db.pool())
+            .await
+            .expect("apply migration 1 only");
+
+        // Insert real user data using migration 1's schema, exactly as an
+        // existing installation frozen at this version would have.
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let message_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().timestamp();
+        sqlx::query(
+            "INSERT INTO sessions (id, title, model, provider, created_at, updated_at) \
+             VALUES (?, 'Test', 'test-model', 'test-provider', ?, ?)",
+        )
+        .bind(&session_id)
+        .bind(now)
+        .bind(now)
+        .execute(db.pool())
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO messages (id, session_id, role, content, created_at) \
+             VALUES (?, ?, 'user', 'irreplaceable chat history', ?)",
+        )
+        .bind(&message_id)
+        .bind(&session_id)
+        .bind(now)
+        .execute(db.pool())
+        .await
+        .unwrap();
+
+        // Upgrade via the real, fully embedded migrator - this is exactly
+        // what production does on every startup.
+        db.run_migrations().await.expect("upgrade migrations");
+
+        let surviving_content: Option<String> =
+            sqlx::query_scalar("SELECT content FROM messages WHERE id = ?")
+                .bind(&message_id)
+                .fetch_optional(db.pool())
+                .await
+                .unwrap();
+
+        assert_eq!(
+            surviving_content.as_deref(),
+            Some("irreplaceable chat history"),
+            "upgrading from the pre-modernization schema must not lose existing messages"
+        );
     }
 }

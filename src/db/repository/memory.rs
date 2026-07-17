@@ -54,10 +54,16 @@ impl EpisodicMemoryRepository {
 
         for (id, session_id, summary_text, token_count, files_json, decisions_json, ts) in rows {
             if token_count > remaining {
-                // Contract 6: truncate instead of skipping the oversized summary
+                // Contract 6: truncate instead of skipping the oversized summary.
+                // `max_chars` is a byte budget, not a char count, so it can land
+                // mid-character (e.g. multi-byte UTF-8 text); slicing directly
+                // would panic ("byte index N is not a char boundary").
                 let max_chars = (remaining as usize) * 4;
                 let truncated = if max_chars < summary_text.len() {
-                    format!("{}…", &summary_text[..max_chars])
+                    format!(
+                        "{}…",
+                        crate::utils::truncate_at_char_boundary(&summary_text, max_chars)
+                    )
                 } else {
                     summary_text.clone()
                 };
@@ -212,5 +218,37 @@ mod tests {
             ctx.token_count > tokens_before,
             "token count must increase after injection"
         );
+    }
+
+    /// Regression: `list_recent` truncated an oversized summary with a raw
+    /// byte-index slice (`&summary_text[..max_chars]`). `max_chars` is a
+    /// byte budget derived from a token count, not a char count, so for
+    /// multi-byte text it can land mid-character and panic ("byte index N
+    /// is not a char boundary"). `token_count` is stored independently of
+    /// the text's actual byte length, so setting it high here forces the
+    /// truncation path against 3-byte-per-char text at an offset (200) that
+    /// does not land on a character boundary.
+    #[tokio::test]
+    async fn list_recent_truncates_multibyte_summary_without_panicking() {
+        let pool = create_test_pool().await;
+        let repo = EpisodicMemoryRepository::new(pool.clone());
+
+        repo.insert(EpisodicMemory {
+            id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            summary_text: "€".repeat(300), // 900 bytes, 3 bytes/char
+            token_count: 1000,
+            files_touched: vec![],
+            decisions: vec![],
+            created_at: chrono::Utc::now(),
+        })
+        .await
+        .unwrap();
+
+        // remaining=50 -> max_chars=200, which is not a char boundary in a
+        // string made entirely of 3-byte characters (200 / 3 = 66.67).
+        let result = repo.list_recent(10, 50).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].summary_text.ends_with('…'));
     }
 }

@@ -109,6 +109,16 @@ pub struct App {
     pub is_processing: bool,
     pub streaming_response: Option<String>,
     pub error_message: Option<String>,
+    /// The session a `send_message` call is currently outstanding for, if
+    /// any. Tracked separately from `is_processing` (which reflects only
+    /// whether the *currently displayed* session has a request in flight)
+    /// so that switching sessions can tell the difference between "the
+    /// previous session's request is still running in the background" and
+    /// "nothing is actually happening for the session now on screen" -
+    /// without this, switching away and back left `is_processing`/
+    /// `streaming_response` permanently stuck showing whatever state the
+    /// abandoned session's request last left them in.
+    processing_session: Option<Uuid>,
 
     // Animation state
     pub animation_frame: usize,
@@ -197,6 +207,7 @@ impl App {
             mcp_status: Vec::new(),
             is_processing: false,
             streaming_response: None,
+            processing_session: None,
             error_message: None,
             animation_frame: 0,
             splash_shown_at: Some(std::time::Instant::now()),
@@ -525,14 +536,50 @@ impl App {
             TuiEvent::MessageSubmitted(content) => {
                 self.send_message(content).await?;
             }
-            TuiEvent::ResponseChunk(chunk) => {
-                self.append_streaming_chunk(chunk);
+            TuiEvent::ResponseChunk(session_id, chunk) => {
+                if self.event_belongs_to_current_session(session_id) {
+                    self.append_streaming_chunk(chunk);
+                } else {
+                    tracing::debug!(
+                        "Dropping response chunk for session {} - no longer the active session",
+                        session_id
+                    );
+                }
             }
-            TuiEvent::ResponseComplete(response) => {
-                self.complete_response(response).await?;
+            TuiEvent::ResponseComplete(session_id, response) => {
+                if self.event_belongs_to_current_session(session_id) {
+                    self.complete_response(response).await?;
+                } else {
+                    // The request itself has genuinely finished, even
+                    // though its result isn't being shown - if we don't
+                    // clear this, switching back to `session_id` later
+                    // would incorrectly still think a request is in
+                    // flight for it.
+                    if self.processing_session == Some(session_id) {
+                        self.processing_session = None;
+                    }
+                    tracing::debug!(
+                        "Dropping response for session {} - no longer the active session",
+                        session_id
+                    );
+                }
             }
-            TuiEvent::Error(error) => {
-                self.show_error(error);
+            TuiEvent::Error(session_id, error) => {
+                if self.event_belongs_to_current_session(session_id) {
+                    if self.executing_plan {
+                        self.fail_current_plan_task(&error).await?;
+                    }
+                    self.show_error(error);
+                } else {
+                    if self.processing_session == Some(session_id) {
+                        self.processing_session = None;
+                    }
+                    tracing::debug!(
+                        "Dropping error for session {} - no longer the active session: {}",
+                        session_id,
+                        error
+                    );
+                }
             }
             TuiEvent::SwitchMode(mode) => {
                 self.switch_mode(mode).await?;
@@ -1117,6 +1164,7 @@ impl App {
         self.messages.clear();
         self.scroll_offset = 0;
         self.mode = AppMode::Chat;
+        self.sync_processing_state_for_current_session();
 
         // Reload sessions list
         self.load_sessions().await?;
@@ -1151,6 +1199,7 @@ impl App {
         self.current_session = Some(session);
         self.messages = messages.into_iter().map(DisplayMessage::from).collect();
         self.scroll_offset = 0;
+        self.sync_processing_state_for_current_session();
 
         Ok(())
     }
@@ -1193,6 +1242,7 @@ impl App {
     async fn send_message(&mut self, content: String) -> Result<()> {
         if let Some(session) = &self.current_session {
             self.is_processing = true;
+            self.processing_session = Some(session.id);
             self.error_message = None;
 
             // Analyze and transform the prompt before sending to agent
@@ -1234,7 +1284,7 @@ impl App {
             let event_sender_chunks = event_sender.clone();
             let forwarder_handle = tokio::spawn(async move {
                 while let Some(chunk) = chunk_rx.recv().await {
-                    let _ = event_sender_chunks.send(TuiEvent::ResponseChunk(chunk));
+                    let _ = event_sender_chunks.send(TuiEvent::ResponseChunk(session_id, chunk));
                 }
             });
 
@@ -1257,16 +1307,57 @@ impl App {
 
                 match result {
                     Ok(response) => {
-                        let _ = event_sender.send(TuiEvent::ResponseComplete(response));
+                        let _ = event_sender.send(TuiEvent::ResponseComplete(session_id, response));
                     }
                     Err(e) => {
-                        let _ = event_sender.send(TuiEvent::Error(e.to_string()));
+                        let _ = event_sender.send(TuiEvent::Error(session_id, e.to_string()));
                     }
                 }
             });
         }
 
         Ok(())
+    }
+
+    /// Whether `session_id` (the session an in-flight `send_message` call
+    /// was made against) is still the session on screen. `send_message`
+    /// spawns the agent call as a detached background task with no
+    /// cancellation; if the user switches sessions (or fires off a second
+    /// request) before it resolves, its `ResponseChunk`/`ResponseComplete`/
+    /// `Error` events must be dropped rather than mutating whatever session
+    /// happens to be current when they arrive - otherwise one session's
+    /// streamed reply gets appended to a different session's transcript.
+    fn event_belongs_to_current_session(&self, session_id: Uuid) -> bool {
+        self.current_session
+            .as_ref()
+            .is_some_and(|s| s.id == session_id)
+    }
+
+    /// Recompute `is_processing`/`streaming_response` for whichever session
+    /// just became current.
+    ///
+    /// Call this after every `self.current_session = Some(...)` assignment
+    /// (`create_new_session`, `load_session`). Without it, switching away
+    /// from a session mid-request left `is_processing` stuck `true` and
+    /// `streaming_response` frozen on the abandoned session's partial reply
+    /// forever: `complete_response`/`show_error` (the only two places that
+    /// used to reset them) are only ever reached for the *current*
+    /// session's own completion, and the stale-session events that arrive
+    /// afterward are correctly dropped by `event_belongs_to_current_session`
+    /// without ever running either. `processing_session` tracks which
+    /// session (if any) genuinely still has a request in flight, so this
+    /// can tell "switched to a session with nothing happening" (the common
+    /// case: reset both) apart from "switched back to a session whose
+    /// request is still running" (keep showing the spinner, but the
+    /// partial text that arrived while away was never accumulated, so
+    /// `streaming_response` restarts empty rather than showing something
+    /// wrong).
+    fn sync_processing_state_for_current_session(&mut self) {
+        let current_id = self.current_session.as_ref().map(|s| s.id);
+        self.is_processing = current_id.is_some() && self.processing_session == current_id;
+        if !self.is_processing {
+            self.streaming_response = None;
+        }
     }
 
     /// Append a streaming chunk
@@ -1287,6 +1378,7 @@ impl App {
     ) -> Result<()> {
         self.is_processing = false;
         self.streaming_response = None;
+        self.processing_session = None;
 
         // Check task completion FIRST (before moving response.content)
         let task_failed = if self.executing_plan {
@@ -1869,10 +1961,44 @@ impl App {
         Ok(())
     }
 
+    /// Regression: if the agent call for the current plan task errored
+    /// (provider/network failure), the event loop used to route it to
+    /// `show_error`, which resets `is_processing`/`streaming_response` but
+    /// never touched `executing_plan` or the task's status. The task was
+    /// left permanently `InProgress`, `executing_plan` stayed `true`, and
+    /// no further task was ever dispatched - the plan was stuck with no
+    /// recovery path. Mark the in-progress task `Failed` and stop
+    /// auto-execution so the user sees what happened and can retry/reject
+    /// the plan instead of watching a silently frozen spinner.
+    async fn fail_current_plan_task(&mut self, error: &str) -> Result<()> {
+        self.executing_plan = false;
+
+        let Some(plan) = &mut self.current_plan else {
+            return Ok(());
+        };
+
+        if let Some(task) = plan
+            .tasks
+            .iter_mut()
+            .find(|t| matches!(t.status, crate::plan::TaskStatus::InProgress))
+        {
+            task.status = crate::plan::TaskStatus::Failed;
+            task.notes = Some(format!("Task failed: {}", error));
+            tracing::warn!(
+                "Plan task '{}' failed and auto-execution stopped: {}",
+                task.title,
+                error
+            );
+        }
+
+        self.save_plan().await
+    }
+
     /// Show an error message
     fn show_error(&mut self, error: String) {
         self.is_processing = false;
         self.streaming_response = None;
+        self.processing_session = None;
         self.error_message = Some(error);
         // Auto-scroll to show the error
         self.scroll_offset = 0;
@@ -3537,5 +3663,216 @@ mod tests {
             .messages
             .iter()
             .any(|m| m.content.contains("Switched to Ollama model")));
+    }
+
+    /// Regression: `send_message` spawns the agent call as a detached
+    /// background task; its `ResponseChunk`/`ResponseComplete` events used
+    /// to be applied unconditionally to whatever session was current when
+    /// they arrived. If the user switched sessions while a request was
+    /// still in flight, session A's streamed reply got appended to session
+    /// B's in-memory transcript. Events are now tagged with the session
+    /// they were made against and dropped if that session is no longer
+    /// current.
+    #[tokio::test]
+    async fn stale_session_response_chunk_is_dropped_after_switching_sessions() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+
+        // Switch to a different session while "session A's" request is
+        // still notionally in flight.
+        app.create_new_session().await.unwrap();
+        let session_b_id = app.current_session.as_ref().unwrap().id;
+        assert_ne!(session_a_id, session_b_id);
+
+        app.handle_event(TuiEvent::ResponseChunk(
+            session_a_id,
+            "stale chunk from session A".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        assert!(
+            app.streaming_response.is_none(),
+            "a chunk tagged with a session that is no longer current must not be applied: {:?}",
+            app.streaming_response
+        );
+
+        // A chunk tagged with the *current* session must still be applied.
+        app.handle_event(TuiEvent::ResponseChunk(
+            session_b_id,
+            "live chunk from session B".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        assert_eq!(
+            app.streaming_response.as_deref(),
+            Some("live chunk from session B")
+        );
+    }
+
+    /// Regression: an agent error mid-plan-execution used to leave the
+    /// in-progress task stuck forever with `executing_plan` still `true`
+    /// and no further task ever dispatched. The error must instead mark
+    /// the task `Failed` and stop auto-execution so the plan isn't left in
+    /// a silently frozen state.
+    #[tokio::test]
+    async fn plan_task_error_marks_task_failed_and_stops_auto_execution() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_id = app.current_session.as_ref().unwrap().id;
+
+        let mut plan = crate::plan::PlanDocument::new(
+            session_id,
+            "Test plan".to_string(),
+            "A plan".to_string(),
+        );
+        let mut task = crate::plan::PlanTask::new(
+            1,
+            "Do the thing".to_string(),
+            "Description".to_string(),
+            crate::plan::TaskType::Edit,
+        );
+        task.status = crate::plan::TaskStatus::InProgress;
+        plan.add_task(task);
+        app.current_plan = Some(plan);
+        app.executing_plan = true;
+
+        app.handle_event(TuiEvent::Error(
+            session_id,
+            "provider timed out".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        assert!(
+            !app.executing_plan,
+            "auto-execution must stop after an agent error"
+        );
+        let task = &app.current_plan.as_ref().unwrap().tasks[0];
+        assert!(
+            matches!(task.status, crate::plan::TaskStatus::Failed),
+            "the in-progress task must be marked Failed, got {:?}",
+            task.status
+        );
+        assert!(app
+            .error_message
+            .as_ref()
+            .is_some_and(|m| m.contains("provider timed out")));
+    }
+
+    /// Same guard, for the completed-response path: a stale session's
+    /// completed response must not be appended to a different session's
+    /// message list, and must not clear `is_processing` for a request the
+    /// user is still actively waiting on in the current session.
+    #[tokio::test]
+    async fn stale_session_response_complete_is_dropped_after_switching_sessions() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+
+        app.create_new_session().await.unwrap();
+        let session_b_id = app.current_session.as_ref().unwrap().id;
+        let messages_before = app.messages.len();
+        // Session B has its own genuine in-flight request - distinct from
+        // session A's stale one, which the event below carries.
+        app.is_processing = true;
+        app.processing_session = Some(session_b_id);
+
+        let stale_response = crate::llm::agent::AgentResponse {
+            message_id: Uuid::new_v4(),
+            content: "reply that belongs to session A".to_string(),
+            thinking_text: None,
+            stop_reason: None,
+            usage: crate::llm::provider::TokenUsage {
+                input_tokens: 1,
+                output_tokens: 1,
+            },
+            cost: 0.0,
+            model: "test-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            perf_metrics: None,
+        };
+
+        app.handle_event(TuiEvent::ResponseComplete(session_a_id, stale_response))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.messages.len(),
+            messages_before,
+            "a stale session's completed response must not be appended to the current session"
+        );
+        assert!(
+            app.is_processing,
+            "a stale session's completion must not clear is_processing for the current session's own in-flight request"
+        );
+    }
+
+    /// Regression: this is the actual bug the earlier tests above didn't
+    /// catch (they only checked that a stale event doesn't corrupt an
+    /// *already-correct* is_processing value, not that switching sessions
+    /// itself sets that value correctly). Switching away from a session
+    /// mid-request used to leave `is_processing` stuck `true` and
+    /// `streaming_response` frozen on the abandoned reply forever: nothing
+    /// reset them for the newly-current session, since `complete_response`/
+    /// `show_error` only run for the session that's current *at the time
+    /// its own event arrives*, and the stale event that would eventually
+    /// arrive for the abandoned session is correctly dropped without
+    /// calling either.
+    #[tokio::test]
+    async fn switching_sessions_clears_a_stuck_processing_state_from_the_previous_session() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+
+        // Simulate a request in flight for session A.
+        app.is_processing = true;
+        app.processing_session = Some(session_a_id);
+        app.streaming_response = Some("partial reply for A".to_string());
+
+        // User switches away before the request resolves.
+        app.create_new_session().await.unwrap();
+        let session_b_id = app.current_session.as_ref().unwrap().id;
+        assert_ne!(session_a_id, session_b_id);
+
+        assert!(
+            !app.is_processing,
+            "switching to a session with nothing in flight must clear is_processing, \
+             not leave it stuck from the abandoned session"
+        );
+        assert!(
+            app.streaming_response.is_none(),
+            "switching away must not leave a different session's partial reply visible"
+        );
+    }
+
+    /// The other half of the same fix: switching *back* to a session whose
+    /// request genuinely is still outstanding must correctly show the
+    /// processing state again, rather than clearing it unconditionally.
+    #[tokio::test]
+    async fn switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state()
+    {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+        app.is_processing = true;
+        app.processing_session = Some(session_a_id);
+        app.streaming_response = Some("partial reply for A".to_string());
+
+        app.create_new_session().await.unwrap();
+        assert!(
+            !app.is_processing,
+            "sanity: session B has nothing in flight"
+        );
+
+        app.load_session(session_a_id).await.unwrap();
+
+        assert!(
+            app.is_processing,
+            "switching back to a session whose request is still outstanding \
+             must show the processing state again"
+        );
     }
 }

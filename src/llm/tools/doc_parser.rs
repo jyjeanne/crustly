@@ -102,6 +102,18 @@ impl Tool for DocParserTool {
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
         let input: DocParserInput = serde_json::from_value(input)?;
 
+        // Enforce project boundary. This tool has no approval gate
+        // (`requires_approval` is `false` - reading documents is "generally
+        // safe"), so without this check an absolute path or a `../` escape
+        // let the model read any file on the host the process can access
+        // (e.g. `~/.aws/credentials` renamed/copied to a `.txt`) with zero
+        // human in the loop.
+        if let Err(reason) =
+            crate::llm::tools::sandbox::check_path(&input.path, &context.working_directory)
+        {
+            return Ok(ToolResult::error(reason));
+        }
+
         // Resolve path relative to working directory
         let path = if PathBuf::from(&input.path).is_absolute() {
             PathBuf::from(&input.path)
@@ -160,12 +172,17 @@ impl Tool for DocParserTool {
             }
         };
 
-        // Apply character limit if specified
+        // Apply character limit if specified. `max_chars` is a byte budget
+        // here (despite the name), not a char count, so it can land
+        // mid-character for any non-ASCII document (PDFs/DOCX/HTML in
+        // other languages, or with smart quotes/em-dashes) - a raw
+        // `&text[..max_chars]` slice would panic ("byte index N is not a
+        // char boundary").
         let text = if let Some(max_chars) = input.max_chars {
             if text.len() > max_chars {
                 format!(
                     "{}...\n\n[Truncated: {} of {} characters shown]",
-                    &text[..max_chars],
+                    crate::utils::truncate_at_char_boundary(&text, max_chars),
                     max_chars,
                     text.len()
                 )
@@ -547,21 +564,35 @@ impl DocParserTool {
 mod tests {
     use super::*;
     use std::io::Write;
-    use tempfile::NamedTempFile;
+    use tempfile::TempDir;
     use uuid::Uuid;
+
+    /// Write `content` to `name` inside a fresh temp dir and return a
+    /// context whose working directory is that temp dir - required now
+    /// that `execute` enforces the project boundary, matching the pattern
+    /// used by every other filesystem tool's tests (see read.rs).
+    fn context_with_file(name: &str, content: &str) -> (TempDir, PathBuf, ToolExecutionContext) {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join(name);
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        write!(file, "{}", content).unwrap();
+        file.flush().unwrap();
+
+        let context = ToolExecutionContext::new(Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+        (temp_dir, file_path, context)
+    }
 
     #[tokio::test]
     async fn test_parse_text_file() {
-        let mut temp_file = NamedTempFile::with_suffix(".txt").unwrap();
-        writeln!(temp_file, "This is a test document.\nWith multiple lines.").unwrap();
-        temp_file.flush().unwrap();
+        let (_temp_dir, file_path, context) = context_with_file(
+            "test.txt",
+            "This is a test document.\nWith multiple lines.\n",
+        );
 
         let tool = DocParserTool;
-        let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
-
         let input = serde_json::json!({
-            "path": temp_file.path().to_str().unwrap()
+            "path": file_path.to_str().unwrap()
         });
 
         let result = tool.execute(input, &context).await.unwrap();
@@ -572,16 +603,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_markdown_file() {
-        let mut temp_file = NamedTempFile::with_suffix(".md").unwrap();
-        writeln!(temp_file, "# Header\n\nSome **bold** text.").unwrap();
-        temp_file.flush().unwrap();
+        let (_temp_dir, file_path, context) =
+            context_with_file("test.md", "# Header\n\nSome **bold** text.\n");
 
         let tool = DocParserTool;
-        let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
-
         let input = serde_json::json!({
-            "path": temp_file.path().to_str().unwrap()
+            "path": file_path.to_str().unwrap()
         });
 
         let result = tool.execute(input, &context).await.unwrap();
@@ -592,16 +619,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_json_file() {
-        let mut temp_file = NamedTempFile::with_suffix(".json").unwrap();
-        writeln!(temp_file, r#"{{"name": "test", "value": 42}}"#).unwrap();
-        temp_file.flush().unwrap();
+        let (_temp_dir, file_path, context) =
+            context_with_file("test.json", r#"{"name": "test", "value": 42}"#);
 
         let tool = DocParserTool;
-        let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
-
         let input = serde_json::json!({
-            "path": temp_file.path().to_str().unwrap()
+            "path": file_path.to_str().unwrap()
         });
 
         let result = tool.execute(input, &context).await.unwrap();
@@ -612,20 +635,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_html_file() {
-        let mut temp_file = NamedTempFile::with_suffix(".html").unwrap();
-        writeln!(
-            temp_file,
-            "<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>"
-        )
-        .unwrap();
-        temp_file.flush().unwrap();
+        let (_temp_dir, file_path, context) = context_with_file(
+            "test.html",
+            "<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>",
+        );
 
         let tool = DocParserTool;
-        let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
-
         let input = serde_json::json!({
-            "path": temp_file.path().to_str().unwrap(),
+            "path": file_path.to_str().unwrap(),
             "include_metadata": true
         });
 
@@ -637,20 +654,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_max_chars_truncation() {
-        let mut temp_file = NamedTempFile::with_suffix(".txt").unwrap();
-        writeln!(
-            temp_file,
-            "This is a very long document that should be truncated."
-        )
-        .unwrap();
-        temp_file.flush().unwrap();
+        let (_temp_dir, file_path, context) = context_with_file(
+            "test.txt",
+            "This is a very long document that should be truncated.",
+        );
 
         let tool = DocParserTool;
-        let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
-
         let input = serde_json::json!({
-            "path": temp_file.path().to_str().unwrap(),
+            "path": file_path.to_str().unwrap(),
             "max_chars": 10
         });
 
@@ -659,18 +670,32 @@ mod tests {
         assert!(result.output.contains("Truncated"));
     }
 
+    /// Regression: `max_chars` truncation sliced at a raw byte index
+    /// (`&text[..max_chars]`), which panics if that index lands mid-UTF-8-
+    /// character. `max_chars: 5` on 3-byte-per-char text puts the cut at
+    /// byte 5, which is not a char boundary.
     #[tokio::test]
-    async fn test_unsupported_format() {
-        let mut temp_file = NamedTempFile::with_suffix(".xyz").unwrap();
-        writeln!(temp_file, "Some content").unwrap();
-        temp_file.flush().unwrap();
+    async fn test_max_chars_truncation_does_not_panic_on_multibyte_text() {
+        let (_temp_dir, file_path, context) = context_with_file("test.txt", &"€".repeat(20));
 
         let tool = DocParserTool;
-        let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
-
         let input = serde_json::json!({
-            "path": temp_file.path().to_str().unwrap()
+            "path": file_path.to_str().unwrap(),
+            "max_chars": 5
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.output.contains("Truncated"));
+    }
+
+    #[tokio::test]
+    async fn test_unsupported_format() {
+        let (_temp_dir, file_path, context) = context_with_file("test.xyz", "Some content");
+
+        let tool = DocParserTool;
+        let input = serde_json::json!({
+            "path": file_path.to_str().unwrap()
         });
 
         let result = tool.execute(input, &context).await.unwrap();
@@ -680,17 +705,49 @@ mod tests {
 
     #[tokio::test]
     async fn test_nonexistent_file() {
+        let temp_dir = TempDir::new().unwrap();
         let tool = DocParserTool;
         let session_id = Uuid::new_v4();
-        let context = ToolExecutionContext::new(session_id);
+        let context = ToolExecutionContext::new(session_id)
+            .with_working_directory(temp_dir.path().to_path_buf());
 
         let input = serde_json::json!({
-            "path": "/nonexistent/document.pdf"
+            "path": temp_dir.path().join("nonexistent/document.pdf").to_str().unwrap()
         });
 
         let result = tool.execute(input, &context).await.unwrap();
         assert!(!result.success);
         assert!(result.error.unwrap().contains("not found"));
+    }
+
+    /// Regression: `execute` had no `sandbox::check_path` call at all, so an
+    /// absolute path (or a `../` escape) let the model read any file on the
+    /// host the process can access - with no approval prompt, since this
+    /// tool's `requires_approval()` is `false`. This is the actual bug
+    /// fix under test; the tests above only needed updating to keep
+    /// passing under the new (correct) boundary enforcement.
+    #[tokio::test]
+    async fn test_path_outside_working_directory_is_denied() {
+        let outside_dir = TempDir::new().unwrap();
+        let outside_file = outside_dir.path().join("secret.txt");
+        std::fs::write(&outside_file, "top secret contents").unwrap();
+
+        let project_dir = TempDir::new().unwrap();
+        let tool = DocParserTool;
+        let session_id = Uuid::new_v4();
+        let context = ToolExecutionContext::new(session_id)
+            .with_working_directory(project_dir.path().to_path_buf());
+
+        let input = serde_json::json!({
+            "path": outside_file.to_str().unwrap()
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(
+            !result.success,
+            "a path outside the working directory must be denied"
+        );
+        assert!(!result.output.contains("top secret contents"));
     }
 
     #[test]
