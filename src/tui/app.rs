@@ -3886,4 +3886,55 @@ mod tests {
              must show the processing state again"
         );
     }
+
+    /// Regression: `send_message` never checked `is_processing` before
+    /// spawning a new agent call, so pressing Enter again while a response
+    /// was still streaming spawned a second concurrent
+    /// `send_message_with_tools_and_mode_streaming` call against the same
+    /// session - racing the first for message ordering and DB writes.
+    #[tokio::test]
+    async fn send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_id = app.current_session.as_ref().unwrap().id;
+        app.is_processing = true;
+        app.processing_session = Some(session_id);
+        let messages_before = app.messages.len();
+
+        app.send_message("second submission while streaming".to_string())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.messages.len(),
+            messages_before,
+            "a second submission for the same in-flight session must not \
+             append another user message or spawn another agent call"
+        );
+    }
+
+    /// The guard must be scoped to *the current session's* in-flight
+    /// request, not global - switching to a fresh session while another
+    /// session is still processing must still allow sending.
+    #[tokio::test]
+    async fn send_message_still_works_for_a_different_session_than_the_one_processing() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_a_id = app.current_session.as_ref().unwrap().id;
+        app.is_processing = true;
+        app.processing_session = Some(session_a_id);
+
+        app.create_new_session().await.unwrap();
+        let messages_before = app.messages.len();
+
+        app.send_message("hello from session B".to_string())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.messages.len(),
+            messages_before + 1,
+            "session B has nothing in flight, so its own submission must go through"
+        );
+    }
 }

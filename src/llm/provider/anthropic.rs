@@ -523,6 +523,37 @@ mod tests {
         assert_eq!(cost, 1.5); // $0.25 input + $1.25 output
     }
 
+    #[test]
+    fn test_cost_calculation_falls_back_to_family_tier_for_unlisted_model_ids() {
+        let provider = AnthropicProvider::new("test-key".to_string());
+
+        // Newer dated model IDs (e.g. what `ModelRouter::default_anthropic`
+        // routes to) aren't in the exact-match table, but should still be
+        // priced via the opus/sonnet/haiku substring fallback instead of
+        // silently returning $0.00.
+        assert_eq!(
+            provider.calculate_cost("claude-opus-4-7", 1_000_000, 1_000_000),
+            90.0
+        );
+        assert_eq!(
+            provider.calculate_cost("claude-sonnet-4-6", 1_000_000, 1_000_000),
+            18.0
+        );
+        assert_eq!(
+            provider.calculate_cost("claude-haiku-4-5-20251001", 1_000_000, 1_000_000),
+            1.5
+        );
+    }
+
+    #[test]
+    fn test_cost_calculation_unknown_model_family_returns_zero() {
+        let provider = AnthropicProvider::new("test-key".to_string());
+        assert_eq!(
+            provider.calculate_cost("totally-unknown-model", 1000, 1000),
+            0.0
+        );
+    }
+
     /// Regression: the old `.map()` over network chunks only ever returned
     /// the *first* `data:` line found in a chunk. Two complete SSE events
     /// delivered together in a single network read used to silently drop

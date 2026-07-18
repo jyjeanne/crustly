@@ -1831,6 +1831,32 @@ mod tests {
         assert!(agent_service.system_prompt_with_env().is_none());
     }
 
+    /// Regression: `AgentServiceLauncher::launch` used to build the
+    /// sub-agent's `AgentService` with `.with_auto_approve_tools(true)`,
+    /// which skipped the human-approval gate entirely for every tool call a
+    /// sub-agent made. It must build with approval left at its safe default
+    /// (`false`, no callback) instead, so approval-requiring tools are
+    /// denied rather than silently auto-approved.
+    #[tokio::test]
+    async fn sub_agent_launcher_does_not_auto_approve_tools() {
+        use crate::llm::tools::SubAgentLauncher;
+
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        let pool = db.pool().clone();
+        let context = ServiceContext::new(pool);
+        let provider = Arc::new(MockProvider);
+        let registry = Arc::new(crate::llm::tools::ToolRegistry::new());
+
+        let launcher =
+            AgentServiceLauncher::new(provider, context, registry, std::env::temp_dir(), None);
+
+        let result = launcher
+            .launch(Uuid::new_v4(), "test sub-agent", "do something")
+            .await;
+        assert!(result.is_ok());
+    }
+
     /// Mock provider that simulates tool use
     struct MockProviderWithTools {
         call_count: std::sync::Mutex<usize>,

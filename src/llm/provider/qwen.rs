@@ -36,6 +36,19 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(180); // Longer for reason
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
+/// No real model emits more than a handful of parallel tool calls in one
+/// response, so a streamed tool-call delta's `index` (read straight off the
+/// wire with no upper bound from the endpoint) is capped here.
+const MAX_TOOL_CALL_INDEX: usize = 128;
+
+/// Whether a streamed tool-call delta's index is safe to use for growing
+/// `tool_call_builders`. Guards against a malformed/hostile endpoint
+/// response (e.g. `"index": 500000000`) forcing a huge allocation - fatal
+/// here since the crate is built with `panic = "abort"`.
+fn tool_call_index_in_bounds(idx: usize) -> bool {
+    idx <= MAX_TOOL_CALL_INDEX
+}
+
 /// Tool call parsing mode for Qwen models
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolCallParser {
@@ -1415,15 +1428,7 @@ impl Provider for QwenProvider {
                         full_content.push_str(content);
                     }
                     for tc in &delta.tool_calls {
-                        // `tc.index` comes straight off the wire with no upper
-                        // bound. No real model emits more than a handful of
-                        // parallel tool calls, so cap the resize to guard
-                        // against a malformed/hostile endpoint response (e.g.
-                        // `"index": 500000000`) forcing a huge allocation -
-                        // fatal here since the crate is built with
-                        // `panic = "abort"`.
-                        const MAX_TOOL_CALL_INDEX: usize = 128;
-                        if tc.index > MAX_TOOL_CALL_INDEX {
+                        if !tool_call_index_in_bounds(tc.index) {
                             tracing::warn!(
                                 "Ignoring tool call delta with out-of-range index {}",
                                 tc.index
@@ -2357,6 +2362,20 @@ Here's my analysis of the code."#;
         let cost = provider.calculate_cost("qwen-turbo", 1_000_000, 1_000_000);
         // (1M * 0.3) + (1M * 0.6) = 0.3 + 0.6 = 0.9
         assert!((cost - 0.9).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_calculate_cost_unknown_cloud_model_returns_zero() {
+        let provider = QwenProvider::dashscope_intl("test-key".to_string());
+        assert_eq!(provider.calculate_cost("qwen3-coder-next", 1000, 1000), 0.0);
+    }
+
+    #[test]
+    fn test_tool_call_index_in_bounds() {
+        assert!(tool_call_index_in_bounds(0));
+        assert!(tool_call_index_in_bounds(MAX_TOOL_CALL_INDEX));
+        assert!(!tool_call_index_in_bounds(MAX_TOOL_CALL_INDEX + 1));
+        assert!(!tool_call_index_in_bounds(500_000_000));
     }
 
     #[test]

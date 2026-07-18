@@ -28,6 +28,37 @@ struct JsonRpcResponse {
     error: Option<Value>,
 }
 
+/// Outcome of checking one raw line read from the server against the
+/// request `send_request` is waiting on.
+#[derive(Debug, PartialEq)]
+enum ResponseMatch {
+    /// This line is the answer: a successful result.
+    Result(Value),
+    /// This line is the answer: the server reported an error.
+    Error(Value),
+    /// Not our answer - unparseable, an id-less notification, or a
+    /// different in-flight request's response. Keep reading.
+    Skip,
+}
+
+/// Pure decision logic for `send_request`'s read loop: does `line` answer
+/// `expected_id`, and if so, how? Split out from the async read loop so the
+/// id-validation/notification-skipping logic is unit-testable without
+/// spawning a process.
+fn match_response_line(line: &str, expected_id: u64) -> ResponseMatch {
+    let response: JsonRpcResponse = match serde_json::from_str(line.trim()) {
+        Ok(r) => r,
+        Err(_) => return ResponseMatch::Skip,
+    };
+    if response.id != Some(expected_id) {
+        return ResponseMatch::Skip;
+    }
+    match response.error {
+        Some(err) => ResponseMatch::Error(err),
+        None => ResponseMatch::Result(response.result.unwrap_or(Value::Null)),
+    }
+}
+
 // ── Tool definition returned by tools/list ────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -195,33 +226,19 @@ impl MCPClient {
                     )
                 })??;
 
-            let response: JsonRpcResponse = match serde_json::from_str(response_line.trim()) {
-                Ok(r) => r,
-                Err(e) => {
-                    tracing::warn!(
-                        "Skipping unparseable line from MCP server '{}': {}",
-                        self.server_name,
-                        e
+            match match_response_line(&response_line, id) {
+                ResponseMatch::Result(value) => return Ok(value),
+                ResponseMatch::Error(err) => {
+                    anyhow::bail!("MCP error from '{}': {}", self.server_name, err);
+                }
+                ResponseMatch::Skip => {
+                    tracing::debug!(
+                        "Skipping unrelated/unparseable line from MCP server '{}'",
+                        self.server_name
                     );
                     continue;
                 }
-            };
-
-            if response.id != Some(id) {
-                tracing::debug!(
-                    "Skipping MCP message from '{}' with id {:?} (expected {})",
-                    self.server_name,
-                    response.id,
-                    id
-                );
-                continue;
             }
-
-            if let Some(err) = response.error {
-                anyhow::bail!("MCP error from '{}': {}", self.server_name, err);
-            }
-
-            return Ok(response.result.unwrap_or(Value::Null));
         }
 
         anyhow::bail!(
@@ -351,6 +368,62 @@ impl Tool for McpTool {
             Ok(output) => Ok(ToolResult::success(output)),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
+    }
+}
+
+#[cfg(test)]
+mod response_matching_tests {
+    use super::*;
+
+    /// Regression: `send_request` used to blindly trust "whatever line
+    /// comes back next" as the answer to its own request, with no `id`
+    /// check - a desynced or out-of-order server response could silently
+    /// be handed to the wrong caller.
+    #[test]
+    fn matches_a_response_with_the_expected_id() {
+        let line = r#"{"jsonrpc":"2.0","id":5,"result":{"ok":true}}"#;
+        assert_eq!(
+            match_response_line(line, 5),
+            ResponseMatch::Result(serde_json::json!({"ok": true}))
+        );
+    }
+
+    #[test]
+    fn skips_a_response_for_a_different_request_id() {
+        let line = r#"{"jsonrpc":"2.0","id":6,"result":{}}"#;
+        assert_eq!(match_response_line(line, 5), ResponseMatch::Skip);
+    }
+
+    #[test]
+    fn skips_an_id_less_notification() {
+        let line = r#"{"jsonrpc":"2.0","method":"notifications/progress","params":{}}"#;
+        assert_eq!(match_response_line(line, 5), ResponseMatch::Skip);
+    }
+
+    #[test]
+    fn skips_an_unparseable_line() {
+        assert_eq!(
+            match_response_line("not json at all", 5),
+            ResponseMatch::Skip
+        );
+    }
+
+    #[test]
+    fn surfaces_a_server_error_for_the_matching_id() {
+        let line = r#"{"jsonrpc":"2.0","id":5,"error":{"code":-1,"message":"boom"}}"#;
+        assert_eq!(
+            match_response_line(line, 5),
+            ResponseMatch::Error(serde_json::json!({"code": -1, "message": "boom"}))
+        );
+    }
+
+    #[test]
+    fn missing_result_defaults_to_null() {
+        let line = r#"{"jsonrpc":"2.0","id":5}"#;
+        assert_eq!(
+            match_response_line(line, 5),
+            ResponseMatch::Result(Value::Null)
+        );
     }
 }
 
