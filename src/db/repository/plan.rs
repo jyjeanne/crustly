@@ -8,6 +8,13 @@ use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
+/// A task's execution-tracking columns: `(started_at, output_summary, error_text)`.
+type TaskExecState = (Option<i64>, Option<String>, Option<String>);
+
+/// Raw `(id, started_at, output_summary, error_text)` row read back for
+/// carrying execution state forward across a delete+re-insert `update()`.
+type TaskExecStateRow = (String, Option<i64>, Option<String>, Option<String>);
+
 /// Repository for plan operations
 #[derive(Clone)]
 pub struct PlanRepository {
@@ -147,10 +154,10 @@ impl PlanRepository {
         // below is fully deleted and re-inserted on every update, fetch
         // whatever is already on disk for each task id first so a routine
         // plan edit doesn't wipe out in-progress/crash-recovery state.
-        let existing_exec_state: std::collections::HashMap<
-            Uuid,
-            (Option<i64>, Option<String>, Option<String>),
-        > = sqlx::query_as::<_, (String, Option<i64>, Option<String>, Option<String>)>(
+        let existing_exec_state: std::collections::HashMap<Uuid, TaskExecState> = sqlx::query_as::<
+            _,
+            TaskExecStateRow,
+        >(
             "SELECT id, started_at, output_summary, error_text FROM plan_tasks WHERE plan_id = ?",
         )
         .bind(db_plan.id.to_string())

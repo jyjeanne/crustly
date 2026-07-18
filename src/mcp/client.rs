@@ -249,11 +249,9 @@ impl MCPClient {
                     MAX_LINE_BYTES
                 );
             }
-            let n = self
-                .stdout
-                .read(&mut byte)
-                .await
-                .with_context(|| format!("failed to read from MCP server '{}'", self.server_name))?;
+            let n = self.stdout.read(&mut byte).await.with_context(|| {
+                format!("failed to read from MCP server '{}'", self.server_name)
+            })?;
             if n == 0 {
                 anyhow::bail!("MCP server '{}' closed the connection", self.server_name);
             }
