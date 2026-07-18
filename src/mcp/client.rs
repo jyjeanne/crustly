@@ -425,6 +425,87 @@ mod response_matching_tests {
             ResponseMatch::Result(Value::Null)
         );
     }
+
+    /// Regression: `send_request` used to trust whatever line came back
+    /// next with no `id` check, so a server sending an id-less notification
+    /// ahead of the real answer (or answering out of order) could hand this
+    /// call's result to a different, unrelated call. This exercises the
+    /// real async read loop (`send_request` + `read_response_line`) over a
+    /// genuine pipe, not just the pure `match_response_line` decision.
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn send_request_skips_a_notification_and_matches_the_response_for_its_own_id() {
+        use tokio::io::AsyncWriteExt;
+
+        let mut child = tokio::process::Command::new("cat")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn cat for test fixture");
+        let mut stdin = child.stdin.take().expect("stdin");
+        let stdout = tokio::io::BufReader::new(child.stdout.take().expect("stdout"));
+
+        // Seed the pipe (echoed back verbatim by `cat`) with a stray
+        // id-less notification, followed by the response for the request
+        // `send_request` is about to make - `next_id` starts at 1 below, so
+        // that's the id to match.
+        stdin
+            .write_all(
+                b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{}}\n",
+            )
+            .await
+            .unwrap();
+        stdin
+            .write_all(b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}\n")
+            .await
+            .unwrap();
+        stdin.flush().await.unwrap();
+
+        let mut client = MCPClient {
+            server_name: "test-server".to_string(),
+            stdin,
+            stdout,
+            _child: child,
+            next_id: 1,
+            healthy: true,
+        };
+
+        let result = client.send_request("test/method", None).await.unwrap();
+        assert_eq!(result, serde_json::json!({"ok": true}));
+    }
+
+    /// `send_request` must surface a closed connection as an error rather
+    /// than hanging - `read_response_line`'s `n == 0` (EOF) path.
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn send_request_errors_when_the_server_process_is_gone() {
+        let mut child = tokio::process::Command::new("cat")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn cat for test fixture");
+        let stdin = child.stdin.take().expect("stdin");
+        let stdout = tokio::io::BufReader::new(child.stdout.take().expect("stdout"));
+
+        // Kill `cat` before anything is written, so its stdout closes (EOF)
+        // instead of ever echoing a response back.
+        child.kill().await.expect("kill cat");
+        let _ = child.wait().await;
+
+        let mut client = MCPClient {
+            server_name: "test-server".to_string(),
+            stdin,
+            stdout,
+            _child: child,
+            next_id: 1,
+            healthy: true,
+        };
+
+        let result = client.send_request("test/method", None).await;
+        assert!(result.is_err());
+    }
 }
 
 #[cfg(test)]
