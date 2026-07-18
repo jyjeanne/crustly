@@ -332,7 +332,26 @@ impl Provider for AnthropicProvider {
             "claude-3-sonnet-20240229" => (3.0, 15.0),
             "claude-3-5-sonnet-20240620" => (3.0, 15.0),
             "claude-3-haiku-20240307" => (0.25, 1.25),
-            _ => return 0.0,
+            // `ModelRouter::default_anthropic()` (router.rs) routes real
+            // traffic to dated model IDs newer than the exact matches above
+            // (e.g. `claude-sonnet-4-6`), which fell through to `_ => 0.0`
+            // and silently recorded every session's cost as free. Every new
+            // model release would otherwise need a matching update here, so
+            // fall back to family-tier pricing by substring instead of
+            // requiring an exact, ever-growing list. Tier pricing is
+            // consistently ordered opus > sonnet > haiku across Anthropic's
+            // lineup, so this is an approximation, not exact - logged so a
+            // stale/wrong tier price is discoverable rather than silent.
+            _ if model.contains("opus") => (15.0, 75.0),
+            _ if model.contains("sonnet") => (3.0, 15.0),
+            _ if model.contains("haiku") => (0.25, 1.25),
+            _ => {
+                tracing::warn!(
+                    "Unknown Anthropic model '{}' for cost calculation - recording $0.00",
+                    model
+                );
+                return 0.0;
+            }
         };
 
         let input_cost_total = (input_tokens as f64 / 1_000_000.0) * input_cost;

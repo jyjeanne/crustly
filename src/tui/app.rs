@@ -1240,6 +1240,18 @@ impl App {
 
     /// Send a message to the agent
     async fn send_message(&mut self, content: String) -> Result<()> {
+        // Guard against a second concurrent request against the same session:
+        // without this, submitting again while a response is still streaming
+        // spawns a duplicate `send_message_with_tools_and_mode_streaming` call
+        // that races the first for message ordering, DB writes, and (during
+        // plan execution) task-completion bookkeeping.
+        if self.is_processing
+            && self.processing_session
+                == self.current_session.as_ref().map(|s| s.id)
+        {
+            return Ok(());
+        }
+
         if let Some(session) = &self.current_session {
             self.is_processing = true;
             self.processing_session = Some(session.id);

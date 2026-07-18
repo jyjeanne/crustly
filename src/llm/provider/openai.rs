@@ -737,6 +737,23 @@ impl Provider for OpenAIProvider {
                             for tc_delta in &delta.tool_calls {
                                 let idx = tc_delta.index;
 
+                                // `idx` comes straight off the wire from the
+                                // (possibly third-party/local) endpoint with no
+                                // upper bound. No real model emits more than a
+                                // handful of parallel tool calls, so cap the
+                                // resize to guard against a malformed/hostile
+                                // response (e.g. `"index": 500000000`) forcing
+                                // a huge allocation - fatal here since the
+                                // crate is built with `panic = "abort"`.
+                                const MAX_TOOL_CALL_INDEX: usize = 128;
+                                if idx > MAX_TOOL_CALL_INDEX {
+                                    tracing::warn!(
+                                        "Ignoring tool call delta with out-of-range index {}",
+                                        idx
+                                    );
+                                    continue;
+                                }
+
                                 // Grow the builder vec as needed.
                                 if idx >= tool_call_builders.len() {
                                     tool_call_builders.resize_with(idx + 1, Default::default);
@@ -918,7 +935,13 @@ impl Provider for OpenAIProvider {
             "gpt-4-32k" => (60.0, 120.0),
             "gpt-3.5-turbo" => (0.5, 1.5),
             "gpt-3.5-turbo-16k" => (3.0, 4.0),
-            _ => return 0.0,
+            _ => {
+                tracing::warn!(
+                    "Unknown OpenAI model '{}' for cost calculation - recording $0.00",
+                    model
+                );
+                return 0.0;
+            }
         };
 
         let input_cost_total = (input_tokens as f64 / 1_000_000.0) * input_cost;

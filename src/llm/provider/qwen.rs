@@ -1415,6 +1415,21 @@ impl Provider for QwenProvider {
                         full_content.push_str(content);
                     }
                     for tc in &delta.tool_calls {
+                        // `tc.index` comes straight off the wire with no upper
+                        // bound. No real model emits more than a handful of
+                        // parallel tool calls, so cap the resize to guard
+                        // against a malformed/hostile endpoint response (e.g.
+                        // `"index": 500000000`) forcing a huge allocation -
+                        // fatal here since the crate is built with
+                        // `panic = "abort"`.
+                        const MAX_TOOL_CALL_INDEX: usize = 128;
+                        if tc.index > MAX_TOOL_CALL_INDEX {
+                            tracing::warn!(
+                                "Ignoring tool call delta with out-of-range index {}",
+                                tc.index
+                            );
+                            continue;
+                        }
                         if tc.index >= tool_call_builders.len() {
                             tool_call_builders.resize_with(tc.index + 1, || QwenToolCall {
                                 id: String::new(),
@@ -1574,7 +1589,17 @@ impl Provider for QwenProvider {
             "qwen-max" => (2.4, 9.6),   // Premium tier
             "qwen-plus" => (0.8, 2.0),  // Standard tier
             "qwen-turbo" => (0.3, 0.6), // Economy tier
-            _ => return 0.0,            // Unknown/local models
+            _ => {
+                // Unknown cloud model (e.g. newer SKUs like qwen3-coder-next /
+                // qwen3.6-27b that `supported_models()` lists but this table
+                // hasn't been updated for) - log it so a silently-$0 cost on
+                // a real paid endpoint is discoverable instead of invisible.
+                tracing::warn!(
+                    "Unknown Qwen cloud model '{}' for cost calculation - recording $0.00",
+                    model
+                );
+                return 0.0;
+            }
         };
 
         let input_cost_total = (input_tokens as f64 / 1_000_000.0) * input_cost;

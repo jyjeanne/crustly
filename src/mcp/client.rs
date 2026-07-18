@@ -59,6 +59,10 @@ impl MCPClient {
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
+            // Without this, a server marked unhealthy (or a dropped client/
+            // registry) left the spawned process running as an orphan -
+            // nothing ever called `.kill()` on it.
+            .kill_on_drop(true)
             .spawn()
             .with_context(|| format!("failed to spawn MCP server '{}'", server_name))?;
 
@@ -150,7 +154,7 @@ impl MCPClient {
     // ── private ──────────────────────────────────────────────────────────────
 
     async fn send_request(&mut self, method: &str, params: Option<Value>) -> Result<Value> {
-        use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+        use tokio::io::AsyncWriteExt;
 
         let id = self.next_id;
         self.next_id += 1;
@@ -170,20 +174,95 @@ impl MCPClient {
             .with_context(|| format!("failed to write to MCP server '{}'", self.server_name))?;
         self.stdin.flush().await?;
 
-        let mut response_line = String::new();
-        self.stdout
-            .read_line(&mut response_line)
-            .await
-            .with_context(|| format!("failed to read from MCP server '{}'", self.server_name))?;
+        // A malicious/misbehaving server can send an id-less notification,
+        // answer requests out of order, or never respond at all. The client
+        // is shared behind a single connection with no pipelining, so
+        // blindly trusting "whatever line comes back next" risks handing
+        // this call's result to a *different*, unrelated call - or hanging
+        // it forever. Skip anything that isn't a response to this exact
+        // `id`, and bound both how long we wait per line and how many
+        // stray lines we'll skip before giving up.
+        const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+        const MAX_SKIPPED_LINES: usize = 64;
 
-        let response: JsonRpcResponse = serde_json::from_str(response_line.trim())
-            .with_context(|| format!("invalid JSON-RPC response from '{}'", self.server_name))?;
+        for _ in 0..=MAX_SKIPPED_LINES {
+            let response_line = tokio::time::timeout(READ_TIMEOUT, self.read_response_line())
+                .await
+                .with_context(|| {
+                    format!(
+                        "timed out waiting for a response from MCP server '{}'",
+                        self.server_name
+                    )
+                })??;
 
-        if let Some(err) = response.error {
-            anyhow::bail!("MCP error from '{}': {}", self.server_name, err);
+            let response: JsonRpcResponse = match serde_json::from_str(response_line.trim()) {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::warn!(
+                        "Skipping unparseable line from MCP server '{}': {}",
+                        self.server_name,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            if response.id != Some(id) {
+                tracing::debug!(
+                    "Skipping MCP message from '{}' with id {:?} (expected {})",
+                    self.server_name,
+                    response.id,
+                    id
+                );
+                continue;
+            }
+
+            if let Some(err) = response.error {
+                anyhow::bail!("MCP error from '{}': {}", self.server_name, err);
+            }
+
+            return Ok(response.result.unwrap_or(Value::Null));
         }
 
-        Ok(response.result.unwrap_or(Value::Null))
+        anyhow::bail!(
+            "MCP server '{}' did not send a matching response for request {} after skipping {} unrelated lines",
+            self.server_name,
+            id,
+            MAX_SKIPPED_LINES
+        );
+    }
+
+    /// Read one line from the server's stdout, bounded in size so a server
+    /// that never sends `\n` can't grow the buffer without limit.
+    async fn read_response_line(&mut self) -> Result<String> {
+        use tokio::io::AsyncReadExt;
+
+        const MAX_LINE_BYTES: usize = 10 * 1024 * 1024;
+
+        let mut buf = Vec::new();
+        let mut byte = [0u8; 1];
+        loop {
+            if buf.len() >= MAX_LINE_BYTES {
+                anyhow::bail!(
+                    "response line from MCP server '{}' exceeded {} bytes",
+                    self.server_name,
+                    MAX_LINE_BYTES
+                );
+            }
+            let n = self
+                .stdout
+                .read(&mut byte)
+                .await
+                .with_context(|| format!("failed to read from MCP server '{}'", self.server_name))?;
+            if n == 0 {
+                anyhow::bail!("MCP server '{}' closed the connection", self.server_name);
+            }
+            if byte[0] == b'\n' {
+                break;
+            }
+            buf.push(byte[0]);
+        }
+        Ok(String::from_utf8_lossy(&buf).into_owned())
     }
 }
 

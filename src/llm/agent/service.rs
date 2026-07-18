@@ -1635,11 +1635,21 @@ impl crate::llm::tools::SubAgentLauncher for AgentServiceLauncher {
         description: &str,
         prompt: &str,
     ) -> std::result::Result<(), String> {
+        // Sub-agents run detached in a background task with no UI to prompt,
+        // so there's no `approval_callback` to wire up here - but that must
+        // NOT mean auto-approving every tool call. With the default
+        // `AllowAll` sandbox policy (no `security.allow_bash`/`deny_tools`
+        // configured), that would let a sub-agent run any bash command or
+        // write any file with zero human-in-the-loop check, regardless of
+        // the parent session's approval mode. Leaving `auto_approve_tools`
+        // at its default `false` (and no callback) means tools that don't
+        // require approval (read, glob, grep, etc.) still run freely, while
+        // approval-requiring tools (bash, write, edit) are denied with a
+        // clear error instead of silently executing.
         let mut svc = AgentService::new(self.provider.clone(), self.context.clone())
             .with_tool_registry(self.tool_registry.clone())
-            .with_working_directory(self.working_directory.clone())
-            .with_auto_approve_tools(true)
             .with_max_tool_iterations(20)
+            .with_working_directory(self.working_directory.clone())
             .with_allow_sub_agents(false);
 
         if let Some(sp) = &self.system_prompt {
