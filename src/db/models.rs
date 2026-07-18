@@ -132,8 +132,15 @@ impl PlanTaskStatus {
 
     pub fn parse(s: &str) -> Self {
         match s {
-            "Running" => PlanTaskStatus::Running,
-            "Done" => PlanTaskStatus::Done,
+            // "InProgress"/"Completed" are `crate::plan::TaskStatus`'s
+            // vocabulary for the same `plan_tasks.status` column, written by
+            // `PlanRepository::update`/`format_task_status`. Mapping any
+            // unrecognized string to `Pending` silently treated an
+            // already-completed or in-flight task written via that path as
+            // needing (re)execution - fatal for `interrupted_plan_from_tasks`
+            // crash recovery, which relies on `is_incomplete()`.
+            "Running" | "InProgress" => PlanTaskStatus::Running,
+            "Done" | "Completed" => PlanTaskStatus::Done,
             "Failed" => PlanTaskStatus::Failed,
             "Skipped" => PlanTaskStatus::Skipped,
             _ => PlanTaskStatus::Pending,

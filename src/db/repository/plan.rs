@@ -8,6 +8,13 @@ use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
+/// A task's execution-tracking columns: `(started_at, output_summary, error_text)`.
+type TaskExecState = (Option<i64>, Option<String>, Option<String>);
+
+/// Raw `(id, started_at, output_summary, error_text)` row read back for
+/// carrying execution state forward across a delete+re-insert `update()`.
+type TaskExecStateRow = (String, Option<i64>, Option<String>, Option<String>);
+
 /// Repository for plan operations
 #[derive(Clone)]
 pub struct PlanRepository {
@@ -140,6 +147,31 @@ impl PlanRepository {
 
         let (db_plan, db_tasks) = self.plan_to_db(plan)?;
 
+        // `task_to_db` always sets started_at/output_summary/error_text to
+        // None because the domain `crate::plan::PlanTask` model doesn't
+        // carry them - they're execution-tracking columns only populated by
+        // `PlanTaskRepository::update_task_status`. Since the tasks table
+        // below is fully deleted and re-inserted on every update, fetch
+        // whatever is already on disk for each task id first so a routine
+        // plan edit doesn't wipe out in-progress/crash-recovery state.
+        let existing_exec_state: std::collections::HashMap<Uuid, TaskExecState> = sqlx::query_as::<
+            _,
+            TaskExecStateRow,
+        >(
+            "SELECT id, started_at, output_summary, error_text FROM plan_tasks WHERE plan_id = ?",
+        )
+        .bind(db_plan.id.to_string())
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to load existing task execution state")?
+        .into_iter()
+        .filter_map(|(id, started_at, output_summary, error_text)| {
+            Uuid::parse_str(&id)
+                .ok()
+                .map(|id| (id, (started_at, output_summary, error_text)))
+        })
+        .collect();
+
         // Update plan
         sqlx::query(
             r#"
@@ -173,12 +205,17 @@ impl PlanRepository {
 
         // Insert updated tasks
         for task in db_tasks {
+            let (started_at, output_summary, error_text) = existing_exec_state
+                .get(&task.id)
+                .cloned()
+                .unwrap_or((None, None, None));
             sqlx::query(
                 r#"
                 INSERT INTO plan_tasks (id, plan_id, task_order, title, description,
                                        task_type, dependencies, complexity, acceptance_criteria,
-                                       status, notes, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       status, notes, completed_at, started_at,
+                                       output_summary, error_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
             )
             .bind(task.id.to_string())
@@ -193,6 +230,9 @@ impl PlanRepository {
             .bind(&task.status)
             .bind(&task.notes)
             .bind(task.completed_at.map(|dt| dt.timestamp()))
+            .bind(started_at)
+            .bind(output_summary)
+            .bind(error_text)
             .execute(&mut *tx)
             .await
             .context("Failed to update plan task")?;
@@ -403,8 +443,15 @@ impl PlanRepository {
 
         Ok(match status {
             "Pending" => TaskStatus::Pending,
-            "InProgress" => TaskStatus::InProgress,
-            "Completed" => TaskStatus::Completed,
+            // "Running"/"Done" are `PlanTaskStatus`'s (db/models.rs)
+            // vocabulary for the same `plan_tasks.status` column, written by
+            // `PlanTaskRepository::update_task_status` /
+            // `PlanService::begin_task`/`complete_task`. Accepting them as
+            // aliases here means a task row is loadable regardless of which
+            // of the two status-writing paths touched it last, instead of
+            // this bailing on a value the other vocabulary wrote.
+            "InProgress" | "Running" => TaskStatus::InProgress,
+            "Completed" | "Done" => TaskStatus::Completed,
             "Skipped" => TaskStatus::Skipped,
             "Failed" => TaskStatus::Failed,
             _ => anyhow::bail!("Invalid task status: {}", status),
@@ -592,7 +639,7 @@ impl PlanTaskRepository {
             "SELECT id, plan_id, task_order, title, description, task_type, dependencies, \
                  complexity, acceptance_criteria, status, notes, started_at, completed_at, \
                  output_summary, error_text FROM plan_tasks \
-                 WHERE plan_id = ? AND status NOT IN ('Done', 'Skipped') \
+                 WHERE plan_id = ? AND status NOT IN ('Done', 'Completed', 'Skipped') \
                  ORDER BY task_order",
         )
         .bind(plan_id.to_string())

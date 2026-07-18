@@ -44,6 +44,22 @@ use ollama_rs::{
 /// Default local Ollama host, matching the `OLLAMA_HOST` CLI convention.
 const DEFAULT_OLLAMA_HOST: &str = "http://127.0.0.1:11434";
 
+/// Context window assumed - and, critically, actually requested via `num_ctx`
+/// - when the user hasn't configured `providers.ollama.num_ctx`.
+///
+/// Ollama silently truncates the oldest turns server-side once its own
+/// running context fills up, which is commonly *smaller* than what
+/// `context_window()` used to unconditionally report (8192) for compaction
+/// bookkeeping: `to_ollama_request()` only ever sent `num_ctx` when this
+/// field was configured, so an unconfigured install ran at whatever
+/// Ollama/the model's Modelfile defaults to - not the 8192 Crustly's own
+/// compaction threshold assumed there was room for. That mismatch meant
+/// context could be silently dropped by Ollama before Crustly's own
+/// compaction ever got a chance to summarize it. Defaulting `num_ctx` itself
+/// to this same constant (see `OllamaProvider::new`) guarantees what's
+/// requested and what's assumed can never drift apart.
+const DEFAULT_NUM_CTX: u64 = 8_192;
+
 /// Ollama provider using the native `/api/chat` protocol.
 #[derive(Clone)]
 pub struct OllamaProvider {
@@ -88,7 +104,7 @@ impl OllamaProvider {
             client,
             custom_default_model: None,
             keep_alive: None,
-            num_ctx: None,
+            num_ctx: Some(DEFAULT_NUM_CTX),
             temperature: None,
             top_p: None,
             top_k: None,
@@ -597,11 +613,15 @@ impl Provider for OllamaProvider {
     }
 
     fn context_window(&self, _model: &str) -> Option<u32> {
-        // If the caller configured a custom num_ctx, that's the actual
-        // running context window regardless of model. Otherwise fall back
-        // to a conservative default (most current local models support at
-        // least 8K), matching OpenAIProvider::local()'s behavior.
-        Some(self.num_ctx.map(|c| c as u32).unwrap_or(8_192))
+        // `num_ctx` defaults to `DEFAULT_NUM_CTX` (see `OllamaProvider::new`)
+        // rather than being unset, so this always reflects what's actually
+        // requested via `to_ollama_request` - never a number Ollama itself
+        // wasn't told to allocate.
+        Some(
+            self.num_ctx
+                .map(|c| c as u32)
+                .unwrap_or(DEFAULT_NUM_CTX as u32),
+        )
     }
 
     fn calculate_cost(&self, _model: &str, _input_tokens: u32, _output_tokens: u32) -> f64 {

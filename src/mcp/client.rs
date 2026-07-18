@@ -28,6 +28,37 @@ struct JsonRpcResponse {
     error: Option<Value>,
 }
 
+/// Outcome of checking one raw line read from the server against the
+/// request `send_request` is waiting on.
+#[derive(Debug, PartialEq)]
+enum ResponseMatch {
+    /// This line is the answer: a successful result.
+    Result(Value),
+    /// This line is the answer: the server reported an error.
+    Error(Value),
+    /// Not our answer - unparseable, an id-less notification, or a
+    /// different in-flight request's response. Keep reading.
+    Skip,
+}
+
+/// Pure decision logic for `send_request`'s read loop: does `line` answer
+/// `expected_id`, and if so, how? Split out from the async read loop so the
+/// id-validation/notification-skipping logic is unit-testable without
+/// spawning a process.
+fn match_response_line(line: &str, expected_id: u64) -> ResponseMatch {
+    let response: JsonRpcResponse = match serde_json::from_str(line.trim()) {
+        Ok(r) => r,
+        Err(_) => return ResponseMatch::Skip,
+    };
+    if response.id != Some(expected_id) {
+        return ResponseMatch::Skip;
+    }
+    match response.error {
+        Some(err) => ResponseMatch::Error(err),
+        None => ResponseMatch::Result(response.result.unwrap_or(Value::Null)),
+    }
+}
+
 // ── Tool definition returned by tools/list ────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +90,10 @@ impl MCPClient {
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
+            // Without this, a server marked unhealthy (or a dropped client/
+            // registry) left the spawned process running as an orphan -
+            // nothing ever called `.kill()` on it.
+            .kill_on_drop(true)
             .spawn()
             .with_context(|| format!("failed to spawn MCP server '{}'", server_name))?;
 
@@ -150,7 +185,7 @@ impl MCPClient {
     // ── private ──────────────────────────────────────────────────────────────
 
     async fn send_request(&mut self, method: &str, params: Option<Value>) -> Result<Value> {
-        use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+        use tokio::io::AsyncWriteExt;
 
         let id = self.next_id;
         self.next_id += 1;
@@ -170,20 +205,79 @@ impl MCPClient {
             .with_context(|| format!("failed to write to MCP server '{}'", self.server_name))?;
         self.stdin.flush().await?;
 
-        let mut response_line = String::new();
-        self.stdout
-            .read_line(&mut response_line)
-            .await
-            .with_context(|| format!("failed to read from MCP server '{}'", self.server_name))?;
+        // A malicious/misbehaving server can send an id-less notification,
+        // answer requests out of order, or never respond at all. The client
+        // is shared behind a single connection with no pipelining, so
+        // blindly trusting "whatever line comes back next" risks handing
+        // this call's result to a *different*, unrelated call - or hanging
+        // it forever. Skip anything that isn't a response to this exact
+        // `id`, and bound both how long we wait per line and how many
+        // stray lines we'll skip before giving up.
+        const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+        const MAX_SKIPPED_LINES: usize = 64;
 
-        let response: JsonRpcResponse = serde_json::from_str(response_line.trim())
-            .with_context(|| format!("invalid JSON-RPC response from '{}'", self.server_name))?;
+        for _ in 0..=MAX_SKIPPED_LINES {
+            let response_line = tokio::time::timeout(READ_TIMEOUT, self.read_response_line())
+                .await
+                .with_context(|| {
+                    format!(
+                        "timed out waiting for a response from MCP server '{}'",
+                        self.server_name
+                    )
+                })??;
 
-        if let Some(err) = response.error {
-            anyhow::bail!("MCP error from '{}': {}", self.server_name, err);
+            match match_response_line(&response_line, id) {
+                ResponseMatch::Result(value) => return Ok(value),
+                ResponseMatch::Error(err) => {
+                    anyhow::bail!("MCP error from '{}': {}", self.server_name, err);
+                }
+                ResponseMatch::Skip => {
+                    tracing::debug!(
+                        "Skipping unrelated/unparseable line from MCP server '{}'",
+                        self.server_name
+                    );
+                    continue;
+                }
+            }
         }
 
-        Ok(response.result.unwrap_or(Value::Null))
+        anyhow::bail!(
+            "MCP server '{}' did not send a matching response for request {} after skipping {} unrelated lines",
+            self.server_name,
+            id,
+            MAX_SKIPPED_LINES
+        );
+    }
+
+    /// Read one line from the server's stdout, bounded in size so a server
+    /// that never sends `\n` can't grow the buffer without limit.
+    async fn read_response_line(&mut self) -> Result<String> {
+        use tokio::io::AsyncReadExt;
+
+        const MAX_LINE_BYTES: usize = 10 * 1024 * 1024;
+
+        let mut buf = Vec::new();
+        let mut byte = [0u8; 1];
+        loop {
+            if buf.len() >= MAX_LINE_BYTES {
+                anyhow::bail!(
+                    "response line from MCP server '{}' exceeded {} bytes",
+                    self.server_name,
+                    MAX_LINE_BYTES
+                );
+            }
+            let n = self.stdout.read(&mut byte).await.with_context(|| {
+                format!("failed to read from MCP server '{}'", self.server_name)
+            })?;
+            if n == 0 {
+                anyhow::bail!("MCP server '{}' closed the connection", self.server_name);
+            }
+            if byte[0] == b'\n' {
+                break;
+            }
+            buf.push(byte[0]);
+        }
+        Ok(String::from_utf8_lossy(&buf).into_owned())
     }
 }
 
@@ -274,6 +368,143 @@ impl Tool for McpTool {
             Ok(output) => Ok(ToolResult::success(output)),
             Err(e) => Ok(ToolResult::error(e.to_string())),
         }
+    }
+}
+
+#[cfg(test)]
+mod response_matching_tests {
+    use super::*;
+
+    /// Regression: `send_request` used to blindly trust "whatever line
+    /// comes back next" as the answer to its own request, with no `id`
+    /// check - a desynced or out-of-order server response could silently
+    /// be handed to the wrong caller.
+    #[test]
+    fn matches_a_response_with_the_expected_id() {
+        let line = r#"{"jsonrpc":"2.0","id":5,"result":{"ok":true}}"#;
+        assert_eq!(
+            match_response_line(line, 5),
+            ResponseMatch::Result(serde_json::json!({"ok": true}))
+        );
+    }
+
+    #[test]
+    fn skips_a_response_for_a_different_request_id() {
+        let line = r#"{"jsonrpc":"2.0","id":6,"result":{}}"#;
+        assert_eq!(match_response_line(line, 5), ResponseMatch::Skip);
+    }
+
+    #[test]
+    fn skips_an_id_less_notification() {
+        let line = r#"{"jsonrpc":"2.0","method":"notifications/progress","params":{}}"#;
+        assert_eq!(match_response_line(line, 5), ResponseMatch::Skip);
+    }
+
+    #[test]
+    fn skips_an_unparseable_line() {
+        assert_eq!(
+            match_response_line("not json at all", 5),
+            ResponseMatch::Skip
+        );
+    }
+
+    #[test]
+    fn surfaces_a_server_error_for_the_matching_id() {
+        let line = r#"{"jsonrpc":"2.0","id":5,"error":{"code":-1,"message":"boom"}}"#;
+        assert_eq!(
+            match_response_line(line, 5),
+            ResponseMatch::Error(serde_json::json!({"code": -1, "message": "boom"}))
+        );
+    }
+
+    #[test]
+    fn missing_result_defaults_to_null() {
+        let line = r#"{"jsonrpc":"2.0","id":5}"#;
+        assert_eq!(
+            match_response_line(line, 5),
+            ResponseMatch::Result(Value::Null)
+        );
+    }
+
+    /// Regression: `send_request` used to trust whatever line came back
+    /// next with no `id` check, so a server sending an id-less notification
+    /// ahead of the real answer (or answering out of order) could hand this
+    /// call's result to a different, unrelated call. This exercises the
+    /// real async read loop (`send_request` + `read_response_line`) over a
+    /// genuine pipe, not just the pure `match_response_line` decision.
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn send_request_skips_a_notification_and_matches_the_response_for_its_own_id() {
+        use tokio::io::AsyncWriteExt;
+
+        let mut child = tokio::process::Command::new("cat")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn cat for test fixture");
+        let mut stdin = child.stdin.take().expect("stdin");
+        let stdout = tokio::io::BufReader::new(child.stdout.take().expect("stdout"));
+
+        // Seed the pipe (echoed back verbatim by `cat`) with a stray
+        // id-less notification, followed by the response for the request
+        // `send_request` is about to make - `next_id` starts at 1 below, so
+        // that's the id to match.
+        stdin
+            .write_all(
+                b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{}}\n",
+            )
+            .await
+            .unwrap();
+        stdin
+            .write_all(b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}\n")
+            .await
+            .unwrap();
+        stdin.flush().await.unwrap();
+
+        let mut client = MCPClient {
+            server_name: "test-server".to_string(),
+            stdin,
+            stdout,
+            _child: child,
+            next_id: 1,
+            healthy: true,
+        };
+
+        let result = client.send_request("test/method", None).await.unwrap();
+        assert_eq!(result, serde_json::json!({"ok": true}));
+    }
+
+    /// `send_request` must surface a closed connection as an error rather
+    /// than hanging - `read_response_line`'s `n == 0` (EOF) path.
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn send_request_errors_when_the_server_process_is_gone() {
+        let mut child = tokio::process::Command::new("cat")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn cat for test fixture");
+        let stdin = child.stdin.take().expect("stdin");
+        let stdout = tokio::io::BufReader::new(child.stdout.take().expect("stdout"));
+
+        // Kill `cat` before anything is written, so its stdout closes (EOF)
+        // instead of ever echoing a response back.
+        child.kill().await.expect("kill cat");
+        let _ = child.wait().await;
+
+        let mut client = MCPClient {
+            server_name: "test-server".to_string(),
+            stdin,
+            stdout,
+            _child: child,
+            next_id: 1,
+            healthy: true,
+        };
+
+        let result = client.send_request("test/method", None).await;
+        assert!(result.is_err());
     }
 }
 

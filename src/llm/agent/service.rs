@@ -1635,11 +1635,21 @@ impl crate::llm::tools::SubAgentLauncher for AgentServiceLauncher {
         description: &str,
         prompt: &str,
     ) -> std::result::Result<(), String> {
+        // Sub-agents run detached in a background task with no UI to prompt,
+        // so there's no `approval_callback` to wire up here - but that must
+        // NOT mean auto-approving every tool call. With the default
+        // `AllowAll` sandbox policy (no `security.allow_bash`/`deny_tools`
+        // configured), that would let a sub-agent run any bash command or
+        // write any file with zero human-in-the-loop check, regardless of
+        // the parent session's approval mode. Leaving `auto_approve_tools`
+        // at its default `false` (and no callback) means tools that don't
+        // require approval (read, glob, grep, etc.) still run freely, while
+        // approval-requiring tools (bash, write, edit) are denied with a
+        // clear error instead of silently executing.
         let mut svc = AgentService::new(self.provider.clone(), self.context.clone())
             .with_tool_registry(self.tool_registry.clone())
-            .with_working_directory(self.working_directory.clone())
-            .with_auto_approve_tools(true)
             .with_max_tool_iterations(20)
+            .with_working_directory(self.working_directory.clone())
             .with_allow_sub_agents(false);
 
         if let Some(sp) = &self.system_prompt {
@@ -1819,6 +1829,32 @@ mod tests {
     async fn system_prompt_with_env_is_none_when_no_prompt_is_set() {
         let (agent_service, _session_id) = create_test_service().await;
         assert!(agent_service.system_prompt_with_env().is_none());
+    }
+
+    /// Regression: `AgentServiceLauncher::launch` used to build the
+    /// sub-agent's `AgentService` with `.with_auto_approve_tools(true)`,
+    /// which skipped the human-approval gate entirely for every tool call a
+    /// sub-agent made. It must build with approval left at its safe default
+    /// (`false`, no callback) instead, so approval-requiring tools are
+    /// denied rather than silently auto-approved.
+    #[tokio::test]
+    async fn sub_agent_launcher_does_not_auto_approve_tools() {
+        use crate::llm::tools::SubAgentLauncher;
+
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        let pool = db.pool().clone();
+        let context = ServiceContext::new(pool);
+        let provider = Arc::new(MockProvider);
+        let registry = Arc::new(crate::llm::tools::ToolRegistry::new());
+
+        let launcher =
+            AgentServiceLauncher::new(provider, context, registry, std::env::temp_dir(), None);
+
+        let result = launcher
+            .launch(Uuid::new_v4(), "test sub-agent", "do something")
+            .await;
+        assert!(result.is_ok());
     }
 
     /// Mock provider that simulates tool use
