@@ -493,8 +493,7 @@ impl AgentService {
             .map_err(AgentError::Provider)?;
 
         // Extract text and optional thinking from response
-        let assistant_text = Self::extract_text_from_response(&response);
-        let thinking_text = Self::extract_thinking_from_response(&response);
+        let (assistant_text, thinking_text) = Self::final_text_and_thinking(&response);
 
         // Save assistant response to database
         let assistant_db_msg = message_service
@@ -1363,8 +1362,7 @@ impl AgentService {
         })?;
 
         // Extract text and thinking from final response
-        let assistant_text = Self::extract_text_from_response(&response);
-        let thinking_text = Self::extract_thinking_from_response(&response);
+        let (assistant_text, thinking_text) = Self::final_text_and_thinking(&response);
 
         // Save final assistant response to database
         let assistant_db_msg = message_service
@@ -1501,7 +1499,7 @@ impl AgentService {
         Ok((model_name, request, message_service, session_service))
     }
 
-    /// Extract text content from an LLM response
+    /// Extract text content from an LLM response.
     fn extract_text_from_response(response: &LLMResponse) -> String {
         let mut text = String::new();
 
@@ -1519,6 +1517,33 @@ impl AgentService {
         }
 
         text
+    }
+
+    /// Split a *final* response into (visible answer, separate thinking panel).
+    ///
+    /// Normally that's just `extract_text_from_response` and
+    /// `extract_thinking_from_response`. But some reasoning models served
+    /// through Ollama (ornith, DeepSeek-R1, QwQ) put their *entire* final
+    /// answer in the reasoning channel and emit an empty `content` on the
+    /// closing turn. Left alone, that saved a blank assistant message - the TUI
+    /// showed only a collapsed "[Thinking ▸]" toggle with nothing under it.
+    ///
+    /// When there is no visible text but there IS thinking, promote the
+    /// thinking to the answer and return `None` for the thinking panel, so the
+    /// same text is not rendered twice (once as the body, once in the toggle).
+    /// When a real text block is present, thinking stays where it belongs
+    /// (separate, collapsed) and this promotion never fires.
+    fn final_text_and_thinking(response: &LLMResponse) -> (String, Option<String>) {
+        let text = Self::extract_text_from_response(response);
+        let thinking = Self::extract_thinking_from_response(response);
+
+        if text.trim().is_empty() {
+            if let Some(thinking) = thinking {
+                return (thinking, None);
+            }
+        }
+
+        (text, thinking)
     }
 
     /// Extract thinking content from an LLM response (extended thinking blocks only).
@@ -1738,6 +1763,67 @@ mod tests {
         fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
             0.001 // Mock cost
         }
+    }
+
+    fn response_with(content: Vec<ContentBlock>) -> LLMResponse {
+        LLMResponse {
+            id: "r".to_string(),
+            model: "m".to_string(),
+            content,
+            stop_reason: Some(StopReason::EndTurn),
+            usage: TokenUsage {
+                input_tokens: 1,
+                output_tokens: 1,
+            },
+            cache_metrics: None,
+            perf_metrics: None,
+        }
+    }
+
+    /// Regression: a reasoning model (ornith, DeepSeek-R1, QwQ via Ollama)
+    /// answered entirely inside its thinking channel and returned an empty
+    /// `content` on the final turn. That saved a blank assistant message - the
+    /// TUI showed only a collapsed "[Thinking ▸]" toggle with no answer under
+    /// it. The thinking must be promoted to the visible answer, AND removed
+    /// from the separate thinking panel so the same text is not shown twice.
+    #[test]
+    fn final_text_falls_back_to_thinking_when_there_is_no_visible_text() {
+        let response = response_with(vec![ContentBlock::Thinking {
+            thinking: "The directory contains src/, README.md and main.rs.".to_string(),
+        }]);
+        let (text, thinking) = AgentService::final_text_and_thinking(&response);
+        assert_eq!(text, "The directory contains src/, README.md and main.rs.");
+        assert!(
+            thinking.is_none(),
+            "promoted thinking must not also render in the thinking panel"
+        );
+    }
+
+    /// The promotion must NOT fire when a real text block is present: the
+    /// visible answer is used and thinking stays separate (collapsed).
+    #[test]
+    fn final_text_prefers_visible_text_and_keeps_thinking_separate() {
+        let response = response_with(vec![
+            ContentBlock::Thinking {
+                thinking: "internal reasoning".to_string(),
+            },
+            ContentBlock::Text {
+                text: "Here is the answer.".to_string(),
+            },
+        ]);
+        let (text, thinking) = AgentService::final_text_and_thinking(&response);
+        assert_eq!(text, "Here is the answer.");
+        assert_eq!(thinking.as_deref(), Some("internal reasoning"));
+    }
+
+    /// A genuinely empty response (no text, no thinking) stays empty - the
+    /// fallback has nothing to offer and must not invent content.
+    #[test]
+    fn final_text_of_an_empty_response_is_empty() {
+        let response = response_with(vec![]);
+        let (text, thinking) = AgentService::final_text_and_thinking(&response);
+        assert_eq!(text, "");
+        assert!(thinking.is_none());
     }
 
     async fn create_test_service() -> (AgentService, Uuid) {
