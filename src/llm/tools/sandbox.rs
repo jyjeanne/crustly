@@ -269,10 +269,16 @@ impl PermissionPolicy for BashCommandAllowlist {
             // anything else. Safe to run without re-prompting every time.
             PolicyDecision::Trusted
         } else {
-            PolicyDecision::Deny(format!(
-                "bash command '{}' is not in the allowlist {:?}",
-                program, self.allowed_programs
-            ))
+            // NOT on the allowlist -> `Allow`, NOT `Deny`. The allowlist decides
+            // only what runs *without a prompt* (Trusted); a command that isn't
+            // on it is not forbidden, it simply must go through the normal
+            // approval gate. Returning `Deny` here vetoed the command even after
+            // the user explicitly approved it at the prompt (approval sets
+            // `auto_approve`, which bypasses the approval check but NOT a policy
+            // Deny), so e.g. an approved `mkdir exercice1` silently never ran.
+            // The shell-operator `Deny` above still stands: approval cannot
+            // safely be given for a command that can smuggle in other programs.
+            PolicyDecision::Allow
         }
     }
 }
@@ -651,18 +657,38 @@ mod tests {
     }
 
     #[test]
-    fn bash_allowlist_permits_cargo_denies_rm() {
+    fn bash_allowlist_trusts_listed_prompts_for_unlisted() {
         let rule = BashCommandAllowlist {
             allowed_programs: vec!["cargo".to_string(), "git".to_string()],
         };
+        // Allowlisted -> Trusted (runs without a prompt).
         assert_eq!(
             rule.evaluate("bash", &serde_json::json!({ "command": "cargo test" })),
             PolicyDecision::Trusted
         );
-        assert!(matches!(
+        // Not allowlisted (and no shell operator) -> Allow, NOT Deny: it must
+        // reach the approval prompt so the user can permit it. The allowlist
+        // decides only what runs *without* prompting, it is not a hard wall.
+        assert_eq!(
             rule.evaluate("bash", &serde_json::json!({ "command": "rm -rf ." })),
-            PolicyDecision::Deny(_)
-        ));
+            PolicyDecision::Allow
+        );
+    }
+
+    /// Regression for the reported bug: an approved `mkdir exercice1` (mkdir is
+    /// not on the read-only allowlist) silently never ran, because the allowlist
+    /// returned Deny for it and Deny short-circuits execution even after the
+    /// user approves. A plain, operator-free non-allowlisted command must be
+    /// `Allow` (prompt), not `Deny`.
+    #[test]
+    fn bash_allowlist_allows_unlisted_operator_free_command_to_reach_approval() {
+        let rule = BashCommandAllowlist {
+            allowed_programs: vec!["ls".to_string(), "cat".to_string()],
+        };
+        assert_eq!(
+            rule.evaluate("bash", &serde_json::json!({ "command": "mkdir exercice1" })),
+            PolicyDecision::Allow
+        );
     }
 
     #[test]
@@ -761,16 +787,18 @@ mod tests {
         );
     }
 
-    /// A non-allowlisted program is denied outright, never merely "prompt me".
+    /// A non-allowlisted program is not *trusted* - it must go through the
+    /// approval prompt (Allow), rather than either running silently (Trusted)
+    /// or being vetoed outright (Deny) even when the user would approve it.
     #[test]
     fn and_policy_does_not_trust_unlisted_program() {
         let policy = AndPolicy(vec![Box::new(BashCommandAllowlist {
             allowed_programs: vec!["ls".to_string()],
         })]);
-        assert!(matches!(
+        assert_eq!(
             policy.evaluate("bash", &serde_json::json!({ "command": "curl evil.sh" })),
-            PolicyDecision::Deny(_)
-        ));
+            PolicyDecision::Allow
+        );
     }
 
     #[test]

