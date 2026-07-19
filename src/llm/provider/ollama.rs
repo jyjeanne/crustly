@@ -960,7 +960,22 @@ fn map_ollama_error(err: OllamaError) -> ProviderError {
         },
         OllamaError::Other(msg) => {
             if msg.to_lowercase().contains("not found") {
-                ProviderError::ModelNotFound(msg)
+                // Ollama's body is raw JSON like {"error":"model 'x' not
+                // found"}. Unwrap it and say what to DO about it: this is what
+                // the user sees when the configured default_model (or a
+                // switched-to model) has been deleted from Ollama - e.g.
+                // deleting the active model via Ctrl+D and then relaunching,
+                // where startup falls back to the config default that no
+                // longer exists.
+                let detail = serde_json::from_str::<serde_json::Value>(&msg)
+                    .ok()
+                    .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(String::from))
+                    .unwrap_or(msg);
+                ProviderError::ModelNotFound(format!(
+                    "{detail}. Install it with `ollama pull <model>`, switch to an \
+                     installed model (Ctrl+W in the TUI), or update `default_model` \
+                     under [providers.ollama] in config.toml."
+                ))
             } else {
                 ProviderError::ApiError {
                     status: 0,
@@ -1165,6 +1180,29 @@ mod tests {
             "model \"bogus\" not found, try pulling it first".to_string(),
         ));
         assert!(matches!(err, ProviderError::ModelNotFound(_)));
+    }
+
+    /// Regression: the user deleted the configured default model from Ollama,
+    /// relaunched, and the first message failed with the raw JSON body
+    /// `{"error":"model 'x' not found"}` - no hint of what to do. The message
+    /// must unwrap the JSON and tell the user their options (pull, switch,
+    /// or fix default_model in config).
+    #[test]
+    fn model_not_found_error_is_unwrapped_and_actionable() {
+        let err = map_ollama_error(OllamaError::Other(
+            "{\"error\":\"model 'qwen2.5-coder:7b' not found\"}".to_string(),
+        ));
+        let ProviderError::ModelNotFound(msg) = err else {
+            panic!("expected ModelNotFound, got {err:?}");
+        };
+        assert!(
+            msg.starts_with("model 'qwen2.5-coder:7b' not found"),
+            "the raw JSON wrapper must be stripped, got: {msg}"
+        );
+        assert!(
+            msg.contains("ollama pull") && msg.contains("default_model"),
+            "the message must say what to do about it, got: {msg}"
+        );
     }
 
     #[test]
