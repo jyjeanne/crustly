@@ -129,6 +129,80 @@ Crustly: [creates comprehensive docs]
 
 ## ✨ What's New
 
+### v0.5.1 (unreleased, on `master`) — Local-Model Reliability & Per-Model Tuning
+
+A hardening pass driven by end-to-end testing of the full agentic tool loop
+against local Ollama models (qwen2.5-coder, gemma4, ornith).
+
+#### Per-Model Ollama Settings
+Different models want different tuning, and one global set silently degrades
+every model but the one it was tuned for. Sampling and context can now be set
+per model:
+
+```toml
+[providers.ollama.models."gemma4:12B"]
+num_ctx = 32768        # verbose reasoners need room, or they exhaust the
+temperature = 0.6      # window mid-turn and never reach their tool call
+
+[providers.ollama.models."qwen2.5-coder:7b"]
+temperature = 0.2      # low temperature for tool-use / coding
+```
+
+Each field falls back to the provider-level `[providers.ollama]` value when
+unset. The per-model `num_ctx` is also what context compaction budgets
+against (`context_window` resolves through the same value), so the requested
+and assumed windows can never drift. Applied identically at startup and when
+switching models with `Ctrl+W` — both go through a single construction path.
+
+#### Approval That Means Yes
+The `security.allow_bash` allowlist is now strictly a **no-prompt shortcut**,
+not a wall:
+
+- Allowlisted, operator-free commands run silently (as before).
+- Anything else — including commands with shell operators such as
+  `mkdir x && cd x && cargo init` — **prompts, showing the full command
+  verbatim, and your approval runs exactly that**. Previously these were
+  silently refused *after* you approved them, which broke every local
+  model's natural `cd <dir> && <cmd>` workflow.
+- Operator commands are **never** auto-trusted (the allowlist checks only
+  the first token, so `ls && rm -rf /` always prompts), and Plan/read-only
+  mode still rejects them outright.
+
+#### Reasoning-Only Answers Surfaced, Not Blank
+Reasoning models (ornith, DeepSeek-R1, QwQ — and gemma under context
+pressure) sometimes put their *entire* answer in the thinking channel and
+return no visible text. That used to render as an empty message with a
+collapsed `[Thinking ▸]` toggle. The reasoning is now promoted to the
+visible answer with a clear *"this model returned only its reasoning"*
+notice — display-only, never persisted into the history the model sees.
+
+#### Tool Calls Recovered from Prose
+Some model templates print tool calls as text instead of populating Ollama's
+`tool_calls` field. Recovery now also handles calls wrapped in ```json
+fences *inside* explanatory prose (qwen2.5-coder's retry pattern after a
+rejected command) — strictly: only fenced blocks, only offered tools, only
+explicit arguments. Bare JSON mentioned in prose is still never executed.
+
+#### Reliability & UX Fixes
+- **Fixed the "Message not found" crash** that broke every `crustly run`
+  invocation: sqlx-sqlite does not auto-commit `INSERT ... RETURNING`, so on
+  the file-backed WAL pool the new row was invisible to the next pooled
+  connection. Message creation now commits an explicit transaction.
+- **Fixed the tool-loop detector falsely aborting** consecutive
+  `edit_file`/`write_file`/`read_file` calls to *different* paths (it read
+  the wrong input key, so distinct calls shared one signature).
+- **`Ctrl+W` model switch keeps your config** — it used to rebuild a bare
+  provider, dropping per-model settings, sampling, `num_ctx`, `keep_alive`.
+- **TUI timestamps are shown in local time** (they were rendered in UTC).
+- **`Ctrl+K` (clear session) is refused while a response is generating**,
+  instead of deleting messages out from under the in-flight request.
+- **Model-not-found errors are actionable** — deleting the configured
+  default model from Ollama now yields "install it with `ollama pull`,
+  switch with `Ctrl+W`, or update `default_model` in config.toml" instead
+  of a raw JSON error body.
+- **`--model` CLI flag** — override the configured default model for a
+  single invocation of any command: `crustly --model "gemma4:12B" run "..."`.
+
 ### v0.5.0 — Gemini Provider & Claude Code / Qwen Compatibility
 
 #### Native Google Gemini Provider
@@ -357,7 +431,8 @@ Crustly has a **native** Ollama provider built on [`ollama-rs`](https://github.c
 enabled with `--features ollama` (or `all-llm`). It talks to Ollama's own `/api/chat` protocol instead
 of the OpenAI shim, which unlocks:
 
-- `keep_alive` / `num_ctx` control
+- `keep_alive` / `num_ctx` control, plus **per-model overrides** — give each installed model its
+  own sampling and context window via `[providers.ollama.models."<name>"]` blocks (see What's New)
 - Runtime performance metrics in the TUI header and under each reply: generation throughput
   (tokens/sec), model load time, warm vs. cold start — none of this is available through the
   OpenAI-compatible endpoint

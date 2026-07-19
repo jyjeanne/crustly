@@ -1,6 +1,6 @@
 # Crustly Roadmap
 
-**Current Version:** 0.5.0 — July 2026
+**Current Version:** 0.5.0 (+ unreleased v0.5.1 work on `master`) — July 2026
 **Author:** Jeremy JEANNE
 
 ---
@@ -53,6 +53,16 @@
 - Prior-read enforcement for `edit_file`/`write_file`/`apply_patch`
 - Bug fixes: macOS symlinked-root path boundary check, `pulldown-cmark` 0.13 markdown renderer compatibility
 - Completed `ratatui` 0.28 → 0.30 upgrade, migrating off unmaintained `tui-textarea`
+
+### v0.5.1 (unreleased) — Local-Model Reliability & Per-Model Tuning
+Hardening pass from end-to-end agentic testing against local Ollama models (qwen2.5-coder, gemma4, ornith):
+
+- **Per-model Ollama settings** — `[providers.ollama.models."<name>"]` blocks for sampling (`temperature`/`top_p`/`top_k`), `num_ctx`, and `keep_alive`, with field-by-field fallback to the provider-level values. The per-model `num_ctx` is coupled to `context_window`, so the window compaction budgets against and the window Ollama allocates can never drift. One shared construction path is used at startup and by the `Ctrl+W` model switch
+- **Approval semantics overhaul** — `security.allow_bash` is a no-prompt shortcut, not a wall: non-allowlisted commands and shell-operator chains (`mkdir x && cd x && cargo init`) reach the approval prompt (full command shown verbatim) and the user's approval runs them; operator commands are never auto-trusted, and Plan/read-only mode still rejects them
+- **Reasoning-only answer fallback** — models that answer entirely in the thinking channel no longer produce blank messages: the reasoning is shown with a clear notice (display-only, never fed back into model context)
+- **Fenced-JSON tool-call recovery** — tool calls printed as ```json blocks inside prose (qwen retry pattern) are recovered and executed; strict offered-tool/explicit-arguments matching, bare inline JSON is never executed
+- **`--model` CLI flag** — one-shot default-model override for any command
+- **Fixed:** the "Message not found" crash that broke every `crustly run` (sqlx-sqlite doesn't auto-commit `INSERT ... RETURNING` on a WAL pool — message creation now commits an explicit transaction); the tool-loop detector falsely aborting distinct path-based calls (wrong input key in the signature); `Ctrl+W` rebuilding a bare provider that dropped the entire `[providers.ollama]` config; TUI timestamps rendered in UTC instead of local time; `Ctrl+K` deleting messages out from under an in-flight response; raw-JSON model-not-found errors replaced with actionable guidance
 
 ---
 
