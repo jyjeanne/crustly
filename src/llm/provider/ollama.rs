@@ -171,15 +171,31 @@ impl OllamaProvider {
     /// existing behaviour of defaulting to `DEFAULT_NUM_CTX` when nothing is
     /// configured at either level (set in `new`).
     fn overrides_for(&self, model: &str) -> ModelOverrides {
-        let m = self.per_model.get(model);
-        ModelOverrides {
-            temperature: m.and_then(|o| o.temperature).or(self.temperature),
-            top_p: m.and_then(|o| o.top_p).or(self.top_p),
-            top_k: m.and_then(|o| o.top_k).or(self.top_k),
-            num_ctx: m.and_then(|o| o.num_ctx).or(self.num_ctx),
-            keep_alive: m
-                .and_then(|o| o.keep_alive.clone())
-                .or(self.keep_alive.clone()),
+        // Provider-level defaults, used as-is when there's no per-model entry.
+        let base = || ModelOverrides {
+            temperature: self.temperature,
+            top_p: self.top_p,
+            top_k: self.top_k,
+            num_ctx: self.num_ctx,
+            keep_alive: self.keep_alive.clone(),
+        };
+
+        // Fast path for the common case (no per-model config at all): skip
+        // hashing the model name entirely. This runs on every request (via
+        // to_ollama_request and context_window).
+        if self.per_model.is_empty() {
+            return base();
+        }
+
+        match self.per_model.get(model) {
+            None => base(),
+            Some(m) => ModelOverrides {
+                temperature: m.temperature.or(self.temperature),
+                top_p: m.top_p.or(self.top_p),
+                top_k: m.top_k.or(self.top_k),
+                num_ctx: m.num_ctx.or(self.num_ctx),
+                keep_alive: m.keep_alive.clone().or(self.keep_alive.clone()),
+            },
         }
     }
 
@@ -965,6 +981,20 @@ mod tests {
         assert_eq!(ov.temperature, Some(0.6), "per-model value wins");
         assert_eq!(ov.top_p, Some(0.5), "unset per-model field falls back");
         assert_eq!(ov.top_k, Some(40), "unset per-model field falls back");
+    }
+
+    #[test]
+    fn overrides_for_returns_provider_defaults_when_no_per_model_map() {
+        // The empty-map fast path must yield exactly the provider-level values.
+        let provider = OllamaProvider::default_local()
+            .with_sampling(Some(0.3), Some(0.7), Some(25))
+            .with_num_ctx(12000);
+
+        let ov = provider.overrides_for("any:model");
+        assert_eq!(ov.temperature, Some(0.3));
+        assert_eq!(ov.top_p, Some(0.7));
+        assert_eq!(ov.top_k, Some(25));
+        assert_eq!(ov.num_ctx, Some(12000));
     }
 
     #[test]

@@ -498,6 +498,16 @@ pub struct OllamaModelConfig {
     pub top_p: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<u32>,
+    /// Context window (`num_ctx`) to request for THIS model.
+    ///
+    /// This is both what Crustly asks Ollama to allocate AND what its context
+    /// compaction budgets against (the provider's `context_window` resolves
+    /// through the same per-model value), so the two can never drift. Set it to
+    /// a value the model actually supports: too large and Ollama clamps it to
+    /// the model's trained maximum, leaving compaction budgeting against a
+    /// window the model doesn't really have; too small needlessly truncates
+    /// available context. When unset, the provider-level `num_ctx` (or the
+    /// built-in default) applies.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub num_ctx: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
