@@ -57,14 +57,33 @@ impl MessageRepository {
     /// interleave between the subquery and the insert. `message.sequence` is
     /// overwritten with the value SQLite actually assigned.
     pub async fn create(&self, message: &mut Message) -> Result<()> {
-        let sequence: i32 = sqlx::query_scalar(
+        // Both statements run on ONE explicitly-acquired connection, inside an
+        // explicit transaction, for two reasons:
+        //
+        // 1. Atomic sequence assignment. `sequence` is computed as
+        //    `MAX(sequence)+1` for the session; the INSERT and the read-back
+        //    must not have another writer interleave between them, or two
+        //    concurrent creates could be assigned the same sequence.
+        //
+        // 2. Durable visibility across the pool. This used to be a single
+        //    `INSERT ... RETURNING sequence` run through
+        //    `query_scalar().fetch_one()`. sqlx-sqlite classifies any
+        //    statement that returns rows as a read-query and does NOT
+        //    auto-commit it, so on a file-backed WAL pool the row stayed in the
+        //    connection's pending transaction and was invisible to every other
+        //    pooled connection. The immediate follow-up
+        //    `update_message_usage` (which acquires a *different* connection)
+        //    then failed with "Message not found". Committing an explicit
+        //    transaction here makes the write durable before this returns.
+        let mut tx = self.pool.begin().await.context("Failed to begin tx")?;
+
+        sqlx::query(
             r#"
             INSERT INTO messages (id, session_id, role, content, sequence,
                                  created_at, token_count, cost, provider_name, perf_metrics_json)
             VALUES (?, ?, ?, ?,
                     (SELECT COALESCE(MAX(sequence), 0) + 1 FROM messages WHERE session_id = ?),
                     ?, ?, ?, ?, ?)
-            RETURNING sequence
             "#,
         )
         .bind(message.id.to_string())
@@ -77,9 +96,19 @@ impl MessageRepository {
         .bind(message.cost)
         .bind(&message.provider_name)
         .bind(&message.perf_metrics_json)
-        .fetch_one(&self.pool)
+        .execute(&mut *tx)
         .await
         .context("Failed to create message")?;
+
+        // Read back the sequence SQLite actually assigned, on the same
+        // connection and before commit, so it reflects this INSERT.
+        let sequence: i32 = sqlx::query_scalar("SELECT sequence FROM messages WHERE id = ?")
+            .bind(message.id.to_string())
+            .fetch_one(&mut *tx)
+            .await
+            .context("Failed to read back message sequence")?;
+
+        tx.commit().await.context("Failed to commit message")?;
 
         message.sequence = sequence;
 

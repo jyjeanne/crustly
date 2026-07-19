@@ -215,6 +215,49 @@ mod tests {
         )
     }
 
+    /// Regression: the non-interactive `run` path created an assistant
+    /// message and then immediately called `update_message_usage` on it,
+    /// which failed with "Message not found". This never reproduced in the
+    /// other tests because they use `connect_in_memory` - a single shared
+    /// connection with no WAL. The real app uses a *file-backed* pool with
+    /// `max_connections(5)` and WAL, where the INSERT and the follow-up
+    /// SELECT can land on different pooled connections; a write that isn't
+    /// durably committed before the read is issued is invisible to the other
+    /// connection. This test exercises that exact create-then-read across a
+    /// real file-backed WAL pool so the bug can't come back unnoticed.
+    #[tokio::test]
+    async fn create_then_update_survives_a_file_backed_wal_pool() {
+        use crate::db::Database;
+
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("crustly.db");
+        let db = Database::connect(&db_path).await.unwrap();
+        db.run_migrations().await.unwrap();
+
+        let context = ServiceContext::new(db.pool().clone());
+        let message_service = MessageService::new(context.clone());
+        let session_service = SessionService::new(context);
+
+        let session = session_service
+            .create_session(Some("run".to_string()))
+            .await
+            .unwrap();
+
+        // Do this a handful of times: a connection-visibility race is
+        // timing-dependent, so a single pass could get lucky.
+        for _ in 0..10 {
+            let message = message_service
+                .create_message(session.id, "assistant".to_string(), "hi".to_string())
+                .await
+                .unwrap();
+
+            message_service
+                .update_message_usage(message.id, 42, 0.01)
+                .await
+                .expect("a just-created message must be found by the very next update");
+        }
+    }
+
     #[tokio::test]
     async fn test_create_message() {
         let (message_service, session_service) = create_test_service().await;
