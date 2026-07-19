@@ -252,14 +252,19 @@ impl PermissionPolicy for BashCommandAllowlist {
         }
         let cmd = inputs.get("command").and_then(|v| v.as_str()).unwrap_or("");
 
-        // Only the first token is checked against the allowlist, so an active
-        // shell operator would let an allowed program smuggle in arbitrary
-        // ones (e.g. "git status & rm -rf /", "cargo run `curl …`").
-        if let Some(op) = find_active_shell_operator(cmd) {
-            return PolicyDecision::Deny(format!(
-                "bash command contains shell operator {:?}, which is not allowed under an allowlist policy",
-                op
-            ));
+        // A command with an active shell operator is NEVER Trusted: only the
+        // first token is checked against the allowlist, so `ls && rm -rf /`
+        // would let an allowed program silently smuggle in arbitrary ones.
+        // It is, however, `Allow` - not `Deny`. The approval prompt shows the
+        // user the ENTIRE command verbatim, so nothing is hidden; an explicit
+        // approval of `mkdir x && cd x && cargo init` is informed consent to
+        // exactly that chain. Hard-denying here produced a contradiction: the
+        // user was prompted, said yes, and the command was then silently
+        // refused anyway - which broke every local model's natural
+        // `cd <dir> && <cmd>` workflow (the bash tool starts each call at the
+        // workspace root, so chaining is the only way to run inside a subdir).
+        if find_active_shell_operator(cmd).is_some() {
+            return PolicyDecision::Allow;
         }
 
         let program = cmd.split_whitespace().next().unwrap_or("");
@@ -276,8 +281,6 @@ impl PermissionPolicy for BashCommandAllowlist {
             // the user explicitly approved it at the prompt (approval sets
             // `auto_approve`, which bypasses the approval check but NOT a policy
             // Deny), so e.g. an approved `mkdir exercice1` silently never ran.
-            // The shell-operator `Deny` above still stands: approval cannot
-            // safely be given for a command that can smuggle in other programs.
             PolicyDecision::Allow
         }
     }
@@ -691,8 +694,15 @@ mod tests {
         );
     }
 
+    /// The critical invariant: a command with an active shell operator is
+    /// NEVER Trusted (the allowlist checks only the first token, so
+    /// `git status && rm -rf /` would smuggle past it). It IS allowed to reach
+    /// the approval prompt - the prompt shows the full command verbatim, so an
+    /// explicit approval is informed consent - which is why this asserts
+    /// `Allow`, not `Deny`: hard-denying meant the user was prompted, approved,
+    /// and the command was then silently refused anyway.
     #[test]
-    fn bash_allowlist_denies_shell_operator_chaining() {
+    fn bash_allowlist_never_trusts_shell_operator_chaining() {
         let rule = BashCommandAllowlist {
             allowed_programs: vec!["git".to_string(), "cargo".to_string()],
         };
@@ -709,13 +719,13 @@ mod tests {
             // command substitution stays active inside double quotes
             "git commit -m \"x $(rm -rf /)\"",
             "git commit -m \"x `rm -rf /`\"",
+            // the workflow that motivated Allow-not-Deny
+            "mkdir exercice1 && cd exercice1 && cargo init --name hello_world",
         ] {
-            assert!(
-                matches!(
-                    rule.evaluate("bash", &serde_json::json!({ "command": cmd })),
-                    PolicyDecision::Deny(_)
-                ),
-                "command must be denied: {}",
+            assert_eq!(
+                rule.evaluate("bash", &serde_json::json!({ "command": cmd })),
+                PolicyDecision::Allow,
+                "operator command must prompt (Allow) - never Trusted, never Deny: {}",
                 cmd
             );
         }
