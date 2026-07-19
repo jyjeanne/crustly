@@ -129,7 +129,7 @@ Crustly: [creates comprehensive docs]
 
 ## ✨ What's New
 
-### v0.5.1 (unreleased, on `master`) — Local-Model Reliability & Per-Model Tuning
+### v0.5.2 — Local-Model Reliability & Per-Model Tuning
 
 A hardening pass driven by end-to-end testing of the full agentic tool loop
 against local Ollama models (qwen2.5-coder, gemma4, ornith).
@@ -202,6 +202,9 @@ explicit arguments. Bare JSON mentioned in prose is still never executed.
   of a raw JSON error body.
 - **`--model` CLI flag** — override the configured default model for a
   single invocation of any command: `crustly --model "gemma4:12B" run "..."`.
+- **Chat input no longer renders underlined** — the textarea widget
+  underlines the cursor line by default, which in a chat input is all the
+  text being typed.
 
 ### v0.5.0 — Gemini Provider & Claude Code / Qwen Compatibility
 

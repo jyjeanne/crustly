@@ -5,10 +5,36 @@ For the forward-looking plan, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
-### Unreleased
+### v0.5.2 — Local-Model Reliability & Per-Model Tuning
+
+A hardening pass driven by end-to-end testing of the full agentic tool loop against local Ollama models (qwen2.5-coder, gemma4, ornith).
+
+#### Per-Model Ollama Settings
+Sampling (`temperature`/`top_p`/`top_k`), `num_ctx`, and `keep_alive` can now be set per model via `[providers.ollama.models."<name>"]` blocks, with field-by-field fallback to the provider-level values — tuning one model no longer silently degrades the others. The per-model `num_ctx` is coupled to `context_window`, so the window compaction budgets against and the window Ollama allocates can never drift. One shared construction path is used at startup and by the `Ctrl+W` model switch.
+
+#### Approval That Means Yes
+`security.allow_bash` is now strictly a no-prompt shortcut, not a wall: allowlisted operator-free commands run silently as before, while everything else — including shell-operator chains like `mkdir x && cd x && cargo init` — prompts with the full command shown verbatim, and the user's approval runs exactly that. Operator commands are never auto-trusted (the allowlist checks only the first token, so `ls && rm -rf /` always prompts), and Plan/read-only mode still rejects them outright. Previously, both non-allowlisted and operator commands were silently refused *after* the user approved them.
+
+#### Reasoning-Only Answers Surfaced, Not Blank
+Reasoning models (ornith, DeepSeek-R1, QwQ — and gemma under context pressure) that put their entire answer in the thinking channel no longer produce blank messages: the reasoning is promoted to the visible answer with a clear "this model returned only its reasoning" notice — display-only, never persisted into the history the model sees.
+
+#### Tool Calls Recovered from Prose
+Tool calls printed as ```json fenced blocks *inside* explanatory prose (qwen2.5-coder's retry pattern after a rejected command) are now recovered and executed, on top of the existing whole-message recovery. Recovery stays strict: only fenced blocks, only offered tools, only explicit arguments — bare JSON mentioned in prose is never executed.
+
+#### `--model` CLI Flag
+Override the configured default model for a single invocation of any command: `crustly --model "gemma4:12B" run "..."`.
 
 #### Qwen3-Coder-Next & Qwen3.6-27B Support
 Added `qwen3-coder-next` and `qwen3.6-27b` to the Qwen provider's known model list with their real 256K context window (previously fell back to a conservative 32K default, triggering premature context compaction). The provider also now auto-selects the OpenAI tool parser when `default_model` contains `coder-next`, matching Qwen3-Coder-Next's documented vLLM/SGLang serving recipe (`--tool-call-parser qwen3_coder`), which returns structured `tool_calls` rather than Hermes `<tool_call>` tags. See [QWEN_INTEGRATION.md](docs/guides/QWEN_INTEGRATION.md) for the updated serving instructions.
+
+#### Bug Fixes
+- **"Message not found" crash** that broke every `crustly run` invocation: sqlx-sqlite does not auto-commit `INSERT ... RETURNING`, so on the file-backed WAL pool a just-created message was invisible to the next pooled connection. Message creation now commits an explicit transaction
+- **Tool-loop detector false positive** aborting consecutive `edit_file`/`write_file`/`read_file` calls to *different* paths (the signature read the `file_path` alias instead of the canonical `path` key, so distinct calls collided)
+- **`Ctrl+W` model switch dropped the entire `[providers.ollama]` config** (per-model settings, sampling, `num_ctx`, `keep_alive`), so switched-to models ran unconfigured
+- **TUI timestamps rendered in UTC** instead of the local timezone (chat header, session list, plan, error dialogs)
+- **`Ctrl+K` (clear session) deleted messages out from under an in-flight response**, crashing its trailing DB update; it is now refused with a hint until the response finishes
+- **Model-not-found errors were raw JSON**; they now say what to do (install with `ollama pull`, switch with `Ctrl+W`, or fix `default_model` in config.toml)
+- **Everything typed into the chat input rendered underlined** (ratatui-textarea underlines the cursor line by default; the input now clears that style)
 
 ---
 
