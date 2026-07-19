@@ -191,6 +191,18 @@ pub struct App {
     prompt_analyzer: PromptAnalyzer,
 }
 
+/// Build the chat input textarea with the widget's default cursor-line
+/// styling cleared. `ratatui-textarea` underlines the line the cursor is on
+/// by default; in a chat input that line is (usually all of) the text being
+/// typed, so everything the user wrote rendered underlined. Every place that
+/// constructs the input textarea must go through this, or the underline
+/// comes back on the next `clear_input()`.
+fn plain_textarea() -> TextArea<'static> {
+    let mut textarea = TextArea::default();
+    textarea.set_cursor_line_style(ratatui::style::Style::default());
+    textarea
+}
+
 impl App {
     /// Create a new app instance
     pub fn new(agent_service: Arc<AgentService>, context: ServiceContext) -> Self {
@@ -199,7 +211,7 @@ impl App {
             messages: Vec::new(),
             sessions: Vec::new(),
             mode: AppMode::Splash,
-            textarea: TextArea::default(),
+            textarea: plain_textarea(),
             input_history: Vec::new(),
             history_pos: None,
             history_draft: None,
@@ -293,14 +305,14 @@ impl App {
 
     /// Reset the chat input to empty.
     fn clear_input(&mut self) {
-        self.textarea = TextArea::default();
+        self.textarea = plain_textarea();
     }
 
     /// Replace the chat input's entire contents with `text` (used for the
     /// Plan Mode revision-request pre-fill, which overwrites rather than
     /// appends).
     fn set_input_text(&mut self, text: &str) {
-        self.textarea = TextArea::default();
+        self.textarea = plain_textarea();
         self.textarea.insert_str(text);
     }
 
@@ -3399,6 +3411,36 @@ mod tests {
 
         assert!(!handled);
         assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    /// Regression: ratatui-textarea underlines the cursor line by default, so
+    /// everything typed into the chat input rendered underlined. All three
+    /// paths that (re)build the textarea must clear that style - a fresh app,
+    /// clearing the input after send, and the Plan Mode pre-fill.
+    #[tokio::test]
+    async fn chat_input_text_is_not_underlined() {
+        use ratatui::style::Style;
+
+        let mut app = test_app().await;
+        assert_eq!(
+            app.textarea.cursor_line_style(),
+            Style::default(),
+            "fresh input must not underline the cursor line"
+        );
+
+        app.clear_input();
+        assert_eq!(
+            app.textarea.cursor_line_style(),
+            Style::default(),
+            "clearing the input must not bring the underline back"
+        );
+
+        app.set_input_text("pre-filled revision request");
+        assert_eq!(
+            app.textarea.cursor_line_style(),
+            Style::default(),
+            "pre-filling the input must not bring the underline back"
+        );
     }
 
     #[tokio::test]
