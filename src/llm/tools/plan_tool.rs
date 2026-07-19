@@ -259,7 +259,7 @@ impl Tool for PlanTool {
                 "acceptance_criteria": {
                     "type": "array",
                     "items": { "type": "string" },
-                    "description": "Acceptance criteria for task completion (for add_task)"
+                    "description": "Acceptance criteria for task completion (for add_task). Strongly recommended: 2-3 concrete, checkable conditions (a file exists, a command succeeds, a behavior is observable). They are shown again at start_task and echoed at complete_task as the definition of done"
                 },
                 "task_order": {
                     "type": "integer",
@@ -698,17 +698,32 @@ impl Tool for PlanTool {
                 let task = current_plan.get_task_by_order_mut(task_order).unwrap();
                 task.start_execution();
                 let task_title = task.title.clone();
+                // Surface the acceptance criteria at the moment work begins -
+                // they are the definition of done, and a model that never sees
+                // them again after add_task cannot work toward them.
+                let criteria_section = if task.acceptance_criteria.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        "\n\nAcceptance criteria - the task is done when:\n{}",
+                        task.acceptance_criteria
+                            .iter()
+                            .map(|c| format!("  - {c}"))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
+                };
 
                 current_plan.status = PlanStatus::InProgress;
 
                 format!(
-                    "▶️ Started Task #{}: {}\n\n\
+                    "▶️ Started Task #{}: {}{}\n\n\
                      Now execute the task by:\n\
                      1. Using appropriate tools (read_file, write_file, bash, etc.)\n\
                      2. Recording tool calls with 'record_tool_call'\n\
                      3. Completing with 'complete_task' when done\n\
                      4. Reflecting on results with 'reflect'",
-                    task_order, task_title
+                    task_order, task_title, criteria_section
                 )
             }
 
@@ -732,13 +747,36 @@ impl Tool for PlanTool {
                     task.add_artifact(artifact);
                 }
 
+                // Captured before complete_execution mutates the task: on a
+                // successful completion the criteria are echoed back as the
+                // checklist this completion claims to satisfy - and their
+                // absence is called out, since a completion with no criteria
+                // is unverified beyond the observed-work evidence gate.
+                let acceptance_criteria = task.acceptance_criteria.clone();
+
                 task.complete_execution(output.clone(), success);
 
                 let status_msg = if success {
+                    let criteria_section = if acceptance_criteria.is_empty() {
+                        "\n\n⚠️ This task defined no acceptance_criteria, so this completion \
+                         cannot be checked against a definition of done. For future plans, \
+                         set acceptance_criteria in add_task."
+                            .to_string()
+                    } else {
+                        format!(
+                            "\n\nAcceptance criteria this completion claims to satisfy - \
+                             verify each one:\n{}",
+                            acceptance_criteria
+                                .iter()
+                                .map(|c| format!("  - {c}"))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        )
+                    };
                     format!(
-                        "✅ Task #{} completed successfully!\n\nOutput: {}\n\n\
+                        "✅ Task #{} completed successfully!\n\nOutput: {}{}\n\n\
                          Next: Use 'reflect' to analyze the results, then 'next_task' to continue.",
-                        task_order, output
+                        task_order, output, criteria_section
                     )
                 } else {
                     let can_retry = task.can_retry();
@@ -985,6 +1023,114 @@ mod leniency_tests {
                 "title": "Implement Player Class and Physics"
             }))
             .is_ok());
+    }
+
+    /// Acceptance criteria must round-trip through the execution flow: shown
+    /// at start_task (the definition of done, visible when work begins) and
+    /// echoed at complete_task as the checklist the completion claims to
+    /// satisfy. Previously they were write-only - accepted at add_task and
+    /// never surfaced again, so models had no reason to set or honor them.
+    #[tokio::test]
+    async fn acceptance_criteria_are_surfaced_at_start_and_completion() {
+        let temp_dir = TempDir::new().unwrap();
+        let context = ToolExecutionContext::new(uuid::Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+        let tool = PlanTool;
+
+        tool.execute(
+            serde_json::json!({ "operation": "create", "title": "Game" }),
+            &context,
+        )
+        .await
+        .unwrap();
+        tool.execute(
+            serde_json::json!({
+                "operation": "add_task",
+                "title": "Player physics",
+                "acceptance_criteria": ["player.py exists", "gravity pulls the player down"]
+            }),
+            &context,
+        )
+        .await
+        .unwrap();
+
+        let started = tool
+            .execute(
+                serde_json::json!({ "operation": "start_task", "task_order": 1 }),
+                &context,
+            )
+            .await
+            .unwrap();
+        assert!(
+            started.output.contains("gravity pulls the player down"),
+            "start_task must show the criteria, got: {}",
+            started.output
+        );
+
+        let completed = tool
+            .execute(
+                serde_json::json!({
+                    "operation": "complete_task", "task_order": 1,
+                    "success": true, "output": "done"
+                }),
+                &context,
+            )
+            .await
+            .unwrap();
+        assert!(
+            completed.output.contains("player.py exists"),
+            "complete_task must echo the criteria to verify, got: {}",
+            completed.output
+        );
+        assert!(
+            !completed.output.contains("no acceptance_criteria"),
+            "a task WITH criteria must not get the missing-criteria warning"
+        );
+    }
+
+    /// Completing a task that never defined acceptance criteria must say so -
+    /// the completion is unverified beyond the observed-work evidence gate.
+    #[tokio::test]
+    async fn completing_without_criteria_warns() {
+        let temp_dir = TempDir::new().unwrap();
+        let context = ToolExecutionContext::new(uuid::Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+        let tool = PlanTool;
+
+        tool.execute(
+            serde_json::json!({ "operation": "create", "title": "Game" }),
+            &context,
+        )
+        .await
+        .unwrap();
+        tool.execute(
+            serde_json::json!({ "operation": "add_task", "title": "Polish" }),
+            &context,
+        )
+        .await
+        .unwrap();
+        tool.execute(
+            serde_json::json!({ "operation": "start_task", "task_order": 1 }),
+            &context,
+        )
+        .await
+        .unwrap();
+
+        let completed = tool
+            .execute(
+                serde_json::json!({
+                    "operation": "complete_task", "task_order": 1,
+                    "success": true, "output": "done"
+                }),
+                &context,
+            )
+            .await
+            .unwrap();
+        assert!(
+            completed.output.contains("no acceptance_criteria"),
+            "missing criteria must be called out, got: {}",
+            completed.output
+        );
     }
 
     /// The sparse calls must also execute end-to-end: create a plan and add
