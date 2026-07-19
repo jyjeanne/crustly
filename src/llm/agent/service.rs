@@ -56,6 +56,89 @@ fn has_mutating_capability(caps: &[ToolCapability]) -> bool {
     })
 }
 
+/// Build a loop-detection signature for one tool call: `<name>:<distinguishing
+/// args>`. Two calls with the same signature seen back-to-back are treated as a
+/// stuck loop. The signature MUST include whatever argument distinguishes one
+/// legitimate call from another (path, command, pattern...), or genuinely
+/// different calls collide and the loop detector aborts the second before it
+/// runs.
+///
+/// For path-based tools the canonical input key is `path`, with `file_path` as
+/// an alias (see the read/edit/write tool schemas). Reading only `file_path`
+/// here yielded a bare `read_file:`/`edit_file:`/`write_file:` for every normal
+/// call, so two operations on *different* paths shared a signature and the
+/// second was falsely aborted as a loop.
+fn tool_call_signature(name: &str, input: &Value) -> String {
+    // First string-valued input under any of `keys`, path-normalized.
+    let first_str = |keys: &[&str]| -> Option<String> {
+        keys.iter()
+            .find_map(|k| input.get(*k).and_then(|v| v.as_str()))
+            .map(|s| s.replace('\\', "/"))
+    };
+
+    match name {
+        "plan" => {
+            if let Some(operation) = input.get("operation").and_then(|v| v.as_str()) {
+                if operation == "add_task" {
+                    if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
+                        format!("{name}:{operation}:{title}")
+                    } else {
+                        format!("{name}:{operation}")
+                    }
+                } else {
+                    format!("{name}:{operation}")
+                }
+            } else {
+                name.to_string()
+            }
+        }
+
+        // File system exploration tools - include path to distinguish calls.
+        "ls" => format!("ls:{}", first_str(&["path"]).unwrap_or_default()),
+        "glob" => format!(
+            "glob:{}",
+            input
+                .get("pattern")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+        ),
+        "grep" => {
+            let pattern = input.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
+            let path = input.get("path").and_then(|v| v.as_str()).unwrap_or("");
+            format!("grep:{pattern}:{path}")
+        }
+
+        // Path-based tools: canonical key `path`, alias `file_path`.
+        "read_file" => format!(
+            "read_file:{}",
+            first_str(&["path", "file_path"]).unwrap_or_default()
+        ),
+        "write_file" | "edit_file" => {
+            format!(
+                "{name}:{}",
+                first_str(&["path", "file_path"]).unwrap_or_default()
+            )
+        }
+
+        // Command execution - include (truncated) command.
+        "bash" => {
+            let cmd = first_str(&["command"]).unwrap_or_default();
+            let cmd_short: String = cmd.chars().take(100).collect();
+            format!("bash:{cmd_short}")
+        }
+
+        // Other tools: name plus an input hash, so different calls to the same
+        // tool never share a signature.
+        _ => {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut h = DefaultHasher::new();
+            input.to_string().hash(&mut h);
+            format!("{name}:{:016x}", h.finish())
+        }
+    }
+}
+
 /// Returns true for read-only, idempotent tools that can run concurrently.
 pub fn is_parallelizable(tool_name: &str) -> bool {
     matches!(
@@ -845,97 +928,7 @@ impl AgentService {
             // For example: ls(./src) vs ls(./src/cli) should be different
             let current_call_signature = tool_uses
                 .iter()
-                .map(|(_, name, input)| {
-                    match name.as_str() {
-                        "plan" => {
-                            // Extract operation from plan tool input
-                            if let Some(operation) = input.get("operation").and_then(|v| v.as_str())
-                            {
-                                // For add_task, include task title to distinguish different tasks
-                                if operation == "add_task" {
-                                    if let Some(title) = input.get("title").and_then(|v| v.as_str())
-                                    {
-                                        format!("{}:{}:{}", name, operation, title)
-                                    } else {
-                                        format!("{}:{}", name, operation)
-                                    }
-                                } else {
-                                    format!("{}:{}", name, operation)
-                                }
-                            } else {
-                                name.to_string()
-                            }
-                        }
-
-                        // File system exploration tools - include path to distinguish calls
-                        "ls" => {
-                            if let Some(path) = input.get("path").and_then(|v| v.as_str()) {
-                                // Normalize path separators for consistent comparison
-                                let normalized = path.replace('\\', "/");
-                                format!("ls:{}", normalized)
-                            } else {
-                                "ls:".to_string()
-                            }
-                        }
-
-                        "glob" => {
-                            if let Some(pattern) = input.get("pattern").and_then(|v| v.as_str()) {
-                                format!("glob:{}", pattern)
-                            } else {
-                                "glob:".to_string()
-                            }
-                        }
-
-                        "grep" => {
-                            // Include pattern AND path to distinguish searches
-                            let pattern =
-                                input.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
-                            let path = input.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                            format!("grep:{}:{}", pattern, path)
-                        }
-
-                        "read_file" => {
-                            if let Some(path) = input.get("file_path").and_then(|v| v.as_str()) {
-                                let normalized = path.replace('\\', "/");
-                                format!("read_file:{}", normalized)
-                            } else {
-                                "read_file:".to_string()
-                            }
-                        }
-
-                        // File modification tools - include file path
-                        "write_file" | "edit_file" => {
-                            if let Some(path) = input.get("file_path").and_then(|v| v.as_str()) {
-                                let normalized = path.replace('\\', "/");
-                                format!("{}:{}", name, normalized)
-                            } else {
-                                format!("{}:", name)
-                            }
-                        }
-
-                        // Command execution - include command
-                        "bash" => {
-                            if let Some(cmd) = input.get("command").and_then(|v| v.as_str()) {
-                                // Normalize and truncate for signature
-                                let cmd_normalized = cmd.replace('\\', "/");
-                                let cmd_short: String = cmd_normalized.chars().take(100).collect();
-                                format!("bash:{}", cmd_short)
-                            } else {
-                                "bash:".to_string()
-                            }
-                        }
-
-                        // Other tools: name plus an input hash, so different
-                        // calls to the same tool never share a signature.
-                        _ => {
-                            use std::collections::hash_map::DefaultHasher;
-                            use std::hash::{Hash, Hasher};
-                            let mut h = DefaultHasher::new();
-                            input.to_string().hash(&mut h);
-                            format!("{}:{:016x}", name, h.finish())
-                        }
-                    }
-                })
+                .map(|(_, name, input)| tool_call_signature(name, input))
                 .collect::<Vec<_>>()
                 .join(",");
 
@@ -1800,6 +1793,54 @@ mod tests {
         fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
             0.001 // Mock cost
         }
+    }
+
+    /// Regression: the loop-detection signature for edit_file/write_file/
+    /// read_file read the `file_path` key, but the tools' canonical input key
+    /// is `path` (file_path is only an alias). So a real call using `path`
+    /// produced a bare `edit_file:` signature; two edits to *different* paths
+    /// then collided and the loop detector aborted the second before it ran -
+    /// which is exactly why an approved `edit_file ./exercice1` never executed.
+    #[test]
+    fn signature_uses_path_key_so_different_edits_do_not_collide() {
+        let a = tool_call_signature(
+            "edit_file",
+            &serde_json::json!({ "path": "./exercice1", "operation": "create" }),
+        );
+        let b = tool_call_signature(
+            "edit_file",
+            &serde_json::json!({ "path": "./exercice2", "operation": "create" }),
+        );
+        assert_eq!(a, "edit_file:./exercice1");
+        assert_ne!(a, b, "different paths must yield different signatures");
+    }
+
+    #[test]
+    fn signature_accepts_file_path_alias() {
+        // The alias must still work and agree with the canonical key.
+        let via_alias =
+            tool_call_signature("read_file", &serde_json::json!({ "file_path": "src/x.rs" }));
+        let via_path = tool_call_signature("read_file", &serde_json::json!({ "path": "src/x.rs" }));
+        assert_eq!(via_alias, "read_file:src/x.rs");
+        assert_eq!(via_alias, via_path);
+    }
+
+    #[test]
+    fn signature_distinguishes_same_tool_different_args() {
+        // A quick sweep across the tools with dedicated signature rules.
+        let sig = tool_call_signature;
+        assert_ne!(
+            sig("write_file", &serde_json::json!({ "path": "a" })),
+            sig("write_file", &serde_json::json!({ "path": "b" }))
+        );
+        assert_ne!(
+            sig("bash", &serde_json::json!({ "command": "mkdir a" })),
+            sig("bash", &serde_json::json!({ "command": "mkdir b" }))
+        );
+        assert_ne!(
+            sig("ls", &serde_json::json!({ "path": "src" })),
+            sig("ls", &serde_json::json!({ "path": "tests" }))
+        );
     }
 
     fn response_with(content: Vec<ContentBlock>) -> LLMResponse {
