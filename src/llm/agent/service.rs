@@ -22,6 +22,12 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+/// Prefixed to the answer when a response carried no visible text and its
+/// reasoning was surfaced as a fallback (see `final_text_and_thinking`). Makes
+/// it obvious the body is the model's raw reasoning, not a finished answer.
+const REASONING_ONLY_NOTICE: &str =
+    "_⚠️ This model returned only its reasoning, not a final answer. Showing the reasoning below._";
+
 /// True when the capabilities can change files or system state, meaning
 /// cached read results may be stale after a tool with them runs.
 fn has_mutating_capability(caps: &[ToolCapability]) -> bool {
@@ -1531,6 +1537,9 @@ impl AgentService {
     /// When there is no visible text but there IS thinking, promote the
     /// thinking to the answer and return `None` for the thinking panel, so the
     /// same text is not rendered twice (once as the body, once in the toggle).
+    /// A short heads-up is prefixed so the user can tell this is the model's
+    /// raw reasoning surfaced as a fallback - not a normal answer - which is
+    /// common with reasoning models that never emit a final answer block.
     /// When a real text block is present, thinking stays where it belongs
     /// (separate, collapsed) and this promotion never fires.
     fn final_text_and_thinking(response: &LLMResponse) -> (String, Option<String>) {
@@ -1539,7 +1548,7 @@ impl AgentService {
 
         if text.trim().is_empty() {
             if let Some(thinking) = thinking {
-                return (thinking, None);
+                return (format!("{}\n\n{}", REASONING_ONLY_NOTICE, thinking), None);
             }
         }
 
@@ -1792,7 +1801,14 @@ mod tests {
             thinking: "The directory contains src/, README.md and main.rs.".to_string(),
         }]);
         let (text, thinking) = AgentService::final_text_and_thinking(&response);
-        assert_eq!(text, "The directory contains src/, README.md and main.rs.");
+        assert!(
+            text.contains("The directory contains src/, README.md and main.rs."),
+            "the promoted reasoning must be present in the answer, got: {text}"
+        );
+        assert!(
+            text.starts_with(REASONING_ONLY_NOTICE),
+            "a heads-up must prefix the surfaced reasoning, got: {text}"
+        );
         assert!(
             thinking.is_none(),
             "promoted thinking must not also render in the thinking panel"

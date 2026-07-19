@@ -60,6 +60,45 @@ const DEFAULT_OLLAMA_HOST: &str = "http://127.0.0.1:11434";
 /// requested and what's assumed can never drift apart.
 const DEFAULT_NUM_CTX: u64 = 8_192;
 
+/// Per-model overrides for Ollama sampling/context. Any field left `None`
+/// falls back to the provider-level default. Keyed by exact model name.
+#[derive(Clone, Debug, Default)]
+pub struct ModelOverrides {
+    pub temperature: Option<f32>,
+    pub top_p: Option<f32>,
+    pub top_k: Option<u32>,
+    pub num_ctx: Option<u64>,
+    pub keep_alive: Option<KeepAlive>,
+}
+
+impl ModelOverrides {
+    /// Build from raw config values, parsing the `keep_alive` string with the
+    /// same rules as `with_keep_alive` (an invalid value is logged and dropped,
+    /// so it falls back to the provider-level default rather than erroring).
+    pub fn from_config(
+        temperature: Option<f32>,
+        top_p: Option<f32>,
+        top_k: Option<u32>,
+        num_ctx: Option<u32>,
+        keep_alive: Option<&str>,
+    ) -> Self {
+        let keep_alive = keep_alive.and_then(|s| match parse_keep_alive(s) {
+            Some(ka) => Some(ka),
+            None => {
+                tracing::warn!("Invalid per-model keep_alive value '{}', ignoring", s);
+                None
+            }
+        });
+        Self {
+            temperature,
+            top_p,
+            top_k,
+            num_ctx: num_ctx.map(|c| c as u64),
+            keep_alive,
+        }
+    }
+}
+
 /// Ollama provider using the native `/api/chat` protocol.
 #[derive(Clone)]
 pub struct OllamaProvider {
@@ -75,6 +114,11 @@ pub struct OllamaProvider {
     temperature: Option<f32>,
     top_p: Option<f32>,
     top_k: Option<u32>,
+    /// Per-model overrides, keyed by exact model name. A model present here
+    /// gets its own sampling/context; anything unset per-model falls back to
+    /// the provider-level fields above. Different Ollama models want different
+    /// tuning, so a single global set silently degrades all but one.
+    per_model: std::collections::HashMap<String, ModelOverrides>,
 }
 
 impl OllamaProvider {
@@ -108,6 +152,34 @@ impl OllamaProvider {
             temperature: None,
             top_p: None,
             top_k: None,
+            per_model: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register per-model sampling/context overrides. Replaces any previously
+    /// set map. See [`ModelOverrides`].
+    pub fn with_per_model(
+        mut self,
+        per_model: std::collections::HashMap<String, ModelOverrides>,
+    ) -> Self {
+        self.per_model = per_model;
+        self
+    }
+
+    /// Resolve the effective override for `model` field-by-field: a per-model
+    /// value wins, otherwise the provider-level default. `num_ctx` keeps its
+    /// existing behaviour of defaulting to `DEFAULT_NUM_CTX` when nothing is
+    /// configured at either level (set in `new`).
+    fn overrides_for(&self, model: &str) -> ModelOverrides {
+        let m = self.per_model.get(model);
+        ModelOverrides {
+            temperature: m.and_then(|o| o.temperature).or(self.temperature),
+            top_p: m.and_then(|o| o.top_p).or(self.top_p),
+            top_k: m.and_then(|o| o.top_k).or(self.top_k),
+            num_ctx: m.and_then(|o| o.num_ctx).or(self.num_ctx),
+            keep_alive: m
+                .and_then(|o| o.keep_alive.clone())
+                .or(self.keep_alive.clone()),
         }
     }
 
@@ -213,17 +285,22 @@ impl OllamaProvider {
             }
         }
 
-        // Request values win; the provider's configured defaults fill the gaps.
+        // Resolve sampling/context for THIS model: a per-model override wins,
+        // else the provider-level default. Different Ollama models want
+        // different tuning, so this must be keyed on the model being called.
+        let ov = self.overrides_for(&request.model);
+
+        // Request values win; the resolved per-model defaults fill the gaps.
         // The agent sets neither today, so without these the model would run at
         // Ollama's generic defaults rather than the ones it was tuned for.
         let mut options = ModelOptions::default();
-        if let Some(t) = request.temperature.or(self.temperature) {
+        if let Some(t) = request.temperature.or(ov.temperature) {
             options = options.temperature(t);
         }
-        if let Some(p) = request.top_p.or(self.top_p) {
+        if let Some(p) = request.top_p.or(ov.top_p) {
             options = options.top_p(p);
         }
-        if let Some(k) = self.top_k {
+        if let Some(k) = ov.top_k {
             options = options.top_k(k);
         }
         if let Some(seed) = request.seed.and_then(|s| i32::try_from(s).ok()) {
@@ -235,7 +312,7 @@ impl OllamaProvider {
         if let Some(max_tokens) = request.max_tokens.and_then(|m| i32::try_from(m).ok()) {
             options = options.num_predict(max_tokens);
         }
-        if let Some(ctx) = self.num_ctx {
+        if let Some(ctx) = ov.num_ctx {
             options = options.num_ctx(ctx);
         }
         // NOTE: Ollama's ModelOptions has no frequency_penalty/presence_penalty
@@ -266,7 +343,7 @@ impl OllamaProvider {
         if let Some(think) = think {
             ollama_request = ollama_request.think(think);
         }
-        if let Some(ka) = self.keep_alive.clone() {
+        if let Some(ka) = ov.keep_alive.clone() {
             ollama_request = ollama_request.keep_alive(ka);
         }
 
@@ -839,6 +916,49 @@ mod tests {
         let provider =
             OllamaProvider::default_local().with_default_model("qwen2.5-coder:7b".to_string());
         assert_eq!(provider.default_model(), "qwen2.5-coder:7b");
+    }
+
+    #[test]
+    fn per_model_override_wins_over_provider_default_for_that_model() {
+        let mut per_model = std::collections::HashMap::new();
+        per_model.insert(
+            "ornith:9b".to_string(),
+            ModelOverrides::from_config(Some(0.6), Some(0.95), Some(20), None, None),
+        );
+        let provider = OllamaProvider::default_local()
+            .with_sampling(Some(0.2), Some(0.5), Some(40)) // provider-level fallback
+            .with_per_model(per_model);
+
+        // ornith gets its own tuning...
+        let ornith = provider.overrides_for("ornith:9b");
+        assert_eq!(ornith.temperature, Some(0.6));
+        assert_eq!(ornith.top_p, Some(0.95));
+        assert_eq!(ornith.top_k, Some(20));
+
+        // ...while every other model still gets the provider-level defaults,
+        // so tuning ornith can no longer degrade qwen.
+        let qwen = provider.overrides_for("qwen2.5-coder:7b");
+        assert_eq!(qwen.temperature, Some(0.2));
+        assert_eq!(qwen.top_p, Some(0.5));
+        assert_eq!(qwen.top_k, Some(40));
+    }
+
+    #[test]
+    fn per_model_override_falls_back_field_by_field() {
+        let mut per_model = std::collections::HashMap::new();
+        // Only temperature is set per-model; the rest must fall back.
+        per_model.insert(
+            "ornith:9b".to_string(),
+            ModelOverrides::from_config(Some(0.6), None, None, None, None),
+        );
+        let provider = OllamaProvider::default_local()
+            .with_sampling(Some(0.2), Some(0.5), Some(40))
+            .with_per_model(per_model);
+
+        let ov = provider.overrides_for("ornith:9b");
+        assert_eq!(ov.temperature, Some(0.6), "per-model value wins");
+        assert_eq!(ov.top_p, Some(0.5), "unset per-model field falls back");
+        assert_eq!(ov.top_k, Some(40), "unset per-model field falls back");
     }
 
     #[test]

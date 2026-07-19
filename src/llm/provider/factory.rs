@@ -267,6 +267,31 @@ fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
         ollama_config.top_k,
     );
 
+    // Per-model overrides: each `[providers.ollama.models."<name>"]` entry
+    // becomes a ModelOverrides that wins field-by-field over the defaults above
+    // for that model only. This is what lets ornith and qwen coexist with
+    // different tuning instead of one global set degrading the other.
+    if !ollama_config.models.is_empty() {
+        use super::ollama::ModelOverrides;
+        let per_model = ollama_config
+            .models
+            .iter()
+            .map(|(name, m)| {
+                (
+                    name.clone(),
+                    ModelOverrides::from_config(
+                        m.temperature,
+                        m.top_p,
+                        m.top_k,
+                        m.num_ctx,
+                        m.keep_alive.as_deref(),
+                    ),
+                )
+            })
+            .collect();
+        provider = provider.with_per_model(per_model);
+    }
+
     Ok(Some(Arc::new(provider)))
 }
 

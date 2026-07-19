@@ -467,12 +467,41 @@ pub struct OllamaProviderConfig {
     /// Sampling defaults. Ollama otherwise applies its own generic ones
     /// (temperature 0.8, top_p 0.9, top_k 40), which are rarely what a specific
     /// model was tuned for - e.g. Ornith-1.0 documents 0.6 / 0.95 / 20.
+    ///
+    /// These apply to EVERY Ollama model unless overridden per-model in
+    /// `models` below. They are the fallback; a matching `[models."<name>"]`
+    /// entry wins field-by-field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<u32>,
+
+    /// Per-model overrides, keyed by exact model name (e.g. "ornith:9b").
+    ///
+    /// Different Ollama models want different sampling/context - tuning one
+    /// globally silently degrades the others. Any field set here overrides the
+    /// provider-level fallback above for that model only; unset fields fall
+    /// back. Configured as `[providers.ollama.models."ornith:9b"]` tables.
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub models: std::collections::HashMap<String, OllamaModelConfig>,
+}
+
+/// Per-model Ollama overrides. Every field is optional; an unset field falls
+/// back to the provider-level `OllamaProviderConfig` value.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct OllamaModelConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_k: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub num_ctx: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keep_alive: Option<String>,
 }
 
 impl Default for OllamaProviderConfig {
@@ -486,6 +515,7 @@ impl Default for OllamaProviderConfig {
             temperature: None,
             top_p: None,
             top_k: None,
+            models: std::collections::HashMap::new(),
         }
     }
 }
