@@ -17,9 +17,18 @@ pub struct PlanTool;
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "operation", rename_all = "snake_case")]
 enum PlanOperation {
-    /// Create a new plan
+    /// Create a new plan.
+    ///
+    /// Only `title` is required. `description` (and the rest) default to
+    /// empty: small local models routinely omit them, and a hard serde
+    /// failure over a missing description sent one model into a
+    /// retry-until-the-loop-breaker-killed-it spiral (three
+    /// `plan(create)` attempts, each "missing field `description`",
+    /// before it finally got one through). A thin plan the user can read
+    /// beats no plan.
     Create {
         title: String,
+        #[serde(default)]
         description: String,
         #[serde(default)]
         context: String,
@@ -30,10 +39,19 @@ enum PlanOperation {
         #[serde(default)]
         technical_stack: Vec<String>,
     },
-    /// Add a task to the current plan
+    /// Add a task to the current plan.
+    ///
+    /// Only `title` is required, for the same reason as `Create`:
+    /// requiring `description` AND `task_type` meant a model that omitted
+    /// both needed multiple corrected retries, and retries share a loop
+    /// signature (same title) - the loop breaker killed the plan after
+    /// task 1 of 5. `task_type` defaults to "other"; `execute` already
+    /// maps any unknown string to `TaskType::Other`.
     AddTask {
         title: String,
+        #[serde(default)]
         description: String,
+        #[serde(default = "default_task_type")]
         task_type: String,
         #[serde(default)]
         dependencies: Vec<usize>, // Task order numbers
@@ -98,6 +116,10 @@ enum PlanOperation {
 
 fn default_complexity() -> u8 {
     3
+}
+
+fn default_task_type() -> String {
+    "other".to_string()
 }
 
 /// Validate plan file path for security
@@ -197,7 +219,7 @@ impl Tool for PlanTool {
                 },
                 "description": {
                     "type": "string",
-                    "description": "Plan or task description (for create/add_task/update_plan)"
+                    "description": "Plan or task description (for create/add_task/update_plan). Optional but strongly encouraged - defaults to empty"
                 },
                 "context": {
                     "type": "string",
@@ -219,8 +241,8 @@ impl Tool for PlanTool {
                 },
                 "task_type": {
                     "type": "string",
-                    "enum": ["research", "edit", "create", "delete", "test", "refactor", "documentation", "configuration", "build"],
-                    "description": "Type of task (for add_task)"
+                    "enum": ["research", "edit", "create", "delete", "test", "refactor", "documentation", "configuration", "build", "other"],
+                    "description": "Type of task (for add_task). Optional - defaults to \"other\""
                 },
                 "dependencies": {
                     "type": "array",
@@ -345,9 +367,13 @@ impl Tool for PlanTool {
                 test_strategy,
                 technical_stack,
             } => {
-                // Validate inputs
+                // Validate inputs. Description is optional (see the
+                // PlanOperation::Create doc comment) - only length-check it
+                // when provided, same as context.
                 validate_string(&title, MAX_TITLE_LENGTH, "Plan title")?;
-                validate_string(&description, MAX_DESCRIPTION_LENGTH, "Plan description")?;
+                if !description.is_empty() {
+                    validate_string(&description, MAX_DESCRIPTION_LENGTH, "Plan description")?;
+                }
                 if !ctx.is_empty() {
                     validate_string(&ctx, MAX_CONTEXT_LENGTH, "Plan context")?;
                 }
@@ -399,9 +425,13 @@ impl Tool for PlanTool {
                 complexity,
                 acceptance_criteria,
             } => {
-                // Validate inputs
+                // Validate inputs. Description is optional (see the
+                // PlanOperation::AddTask doc comment) - only length-check it
+                // when provided.
                 validate_string(&title, MAX_TITLE_LENGTH, "Task title")?;
-                validate_string(&description, MAX_DESCRIPTION_LENGTH, "Task description")?;
+                if !description.is_empty() {
+                    validate_string(&description, MAX_DESCRIPTION_LENGTH, "Task description")?;
+                }
 
                 let current_plan = plan.as_mut().ok_or_else(|| {
                     ToolError::InvalidInput(
@@ -929,3 +959,64 @@ impl Tool for PlanTool {
 #[cfg(test)]
 #[path = "plan_tool_security_tests.rs"]
 mod plan_tool_security_tests;
+
+#[cfg(test)]
+mod leniency_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    /// Regression: `create` required `description` and `add_task` required
+    /// `description` + `task_type`. A local model (gemma4) omitted them,
+    /// got "missing field" serde errors, and its corrected retries shared a
+    /// loop signature (same title) - the loop breaker killed the plan after
+    /// one task. Title-only calls must now pass validation.
+    #[test]
+    fn title_only_create_and_add_task_are_valid() {
+        let tool = PlanTool;
+        assert!(tool
+            .validate_input(&serde_json::json!({
+                "operation": "create",
+                "title": "Implement platformer game"
+            }))
+            .is_ok());
+        assert!(tool
+            .validate_input(&serde_json::json!({
+                "operation": "add_task",
+                "title": "Implement Player Class and Physics"
+            }))
+            .is_ok());
+    }
+
+    /// The sparse calls must also execute end-to-end: create a plan and add
+    /// a task with nothing but titles, defaults filling in the rest.
+    #[tokio::test]
+    async fn sparse_plan_calls_execute_end_to_end() {
+        let temp_dir = TempDir::new().unwrap();
+        let context = ToolExecutionContext::new(uuid::Uuid::new_v4())
+            .with_working_directory(temp_dir.path().to_path_buf());
+        let tool = PlanTool;
+
+        let created = tool
+            .execute(
+                serde_json::json!({ "operation": "create", "title": "Platformer" }),
+                &context,
+            )
+            .await
+            .unwrap();
+        assert!(created.success, "title-only create must succeed");
+
+        let added = tool
+            .execute(
+                serde_json::json!({ "operation": "add_task", "title": "Player physics" }),
+                &context,
+            )
+            .await
+            .unwrap();
+        assert!(added.success, "title-only add_task must succeed");
+        assert!(
+            added.output.contains("Player physics"),
+            "the task must actually be added, got: {}",
+            added.output
+        );
+    }
+}

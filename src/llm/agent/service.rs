@@ -954,9 +954,19 @@ impl AgentService {
                 .content
                 .iter()
                 .any(|b| matches!(b, ContentBlock::Text { text } if !text.trim().is_empty()));
+            // Building a plan is an intentionally silent chain: create +
+            // one add_task per step + finalize is 7+ consecutive tool calls
+            // with nothing to say in between - the drift guard used to fire
+            // mid-plan and force a text response, cutting the plan off after
+            // its first tasks. Plan-tool turns are therefore neutral: they
+            // neither count toward drift nor reset it. A model genuinely
+            // stuck repeating one plan call is still caught by the
+            // identical-call loop breaker below.
+            let all_plan_calls =
+                !tool_uses.is_empty() && tool_uses.iter().all(|(_, name, _)| name == "plan");
             if produced_text {
                 silent_tool_calls = 0;
-            } else {
+            } else if !all_plan_calls {
                 silent_tool_calls += 1;
             }
             let drifting = silent_tool_calls >= MAX_SILENT_TOOL_CALLS;
