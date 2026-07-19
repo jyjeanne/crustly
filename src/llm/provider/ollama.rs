@@ -689,13 +689,19 @@ impl Provider for OllamaProvider {
         true
     }
 
-    fn context_window(&self, _model: &str) -> Option<u32> {
-        // `num_ctx` defaults to `DEFAULT_NUM_CTX` (see `OllamaProvider::new`)
-        // rather than being unset, so this always reflects what's actually
-        // requested via `to_ollama_request` - never a number Ollama itself
-        // wasn't told to allocate.
+    fn context_window(&self, model: &str) -> Option<u32> {
+        // Must reflect the `num_ctx` ACTUALLY requested for this model in
+        // `to_ollama_request` - both go through `overrides_for(model)` so a
+        // per-model `num_ctx` can never diverge from what compaction assumes.
+        // If the two drifted, compaction would size its token budget against a
+        // different window than Ollama was told to allocate, and Ollama would
+        // silently truncate the oldest turns before Crustly's own compaction
+        // ever fired. `num_ctx` defaults to `DEFAULT_NUM_CTX` (see
+        // `OllamaProvider::new`) rather than being unset, so this is never a
+        // number Ollama itself wasn't told to allocate.
         Some(
-            self.num_ctx
+            self.overrides_for(model)
+                .num_ctx
                 .map(|c| c as u32)
                 .unwrap_or(DEFAULT_NUM_CTX as u32),
         )
@@ -959,6 +965,33 @@ mod tests {
         assert_eq!(ov.temperature, Some(0.6), "per-model value wins");
         assert_eq!(ov.top_p, Some(0.5), "unset per-model field falls back");
         assert_eq!(ov.top_k, Some(40), "unset per-model field falls back");
+    }
+
+    #[test]
+    fn context_window_reflects_the_per_model_num_ctx_that_is_actually_requested() {
+        // A model with its own num_ctx must report THAT window from
+        // context_window, not the provider-level one - otherwise compaction
+        // sizes its budget against a different window than Ollama was told to
+        // allocate, and Ollama silently drops context first.
+        let mut per_model = std::collections::HashMap::new();
+        per_model.insert(
+            "small-ctx:model".to_string(),
+            ModelOverrides::from_config(None, None, None, Some(4096), None),
+        );
+        let provider = OllamaProvider::default_local()
+            .with_num_ctx(16384) // provider-level default
+            .with_per_model(per_model);
+
+        assert_eq!(
+            provider.context_window("small-ctx:model"),
+            Some(4096),
+            "per-model num_ctx must be reported"
+        );
+        assert_eq!(
+            provider.context_window("other:model"),
+            Some(16384),
+            "a model without an override still reports the provider default"
+        );
     }
 
     #[test]

@@ -28,6 +28,21 @@ use uuid::Uuid;
 const REASONING_ONLY_NOTICE: &str =
     "_⚠️ This model returned only its reasoning, not a final answer. Showing the reasoning below._";
 
+/// Outcome of resolving a final response's text (see `final_text_and_thinking`).
+///
+/// `stored` and `display` differ only in the reasoning-only fallback: `display`
+/// carries the `REASONING_ONLY_NOTICE` banner for the UI, while `stored` holds
+/// the raw text that is persisted and replayed into model context - the banner
+/// must never leak into the conversation history the model sees.
+struct FinalText {
+    /// What to persist and feed back to the model as prior assistant text.
+    stored: String,
+    /// What to show the user for this turn (may carry a UI-only notice).
+    display: String,
+    /// Separate collapsed thinking panel, if any.
+    thinking: Option<String>,
+}
+
 /// True when the capabilities can change files or system state, meaning
 /// cached read results may be stale after a tool with them runs.
 fn has_mutating_capability(caps: &[ToolCapability]) -> bool {
@@ -498,12 +513,14 @@ impl AgentService {
             .await
             .map_err(AgentError::Provider)?;
 
-        // Extract text and optional thinking from response
-        let (assistant_text, thinking_text) = Self::final_text_and_thinking(&response);
+        // Resolve text: `stored` is persisted/replayed to the model, `display`
+        // is shown to the user (they differ only for the reasoning-only notice).
+        let final_text = Self::final_text_and_thinking(&response);
+        let thinking_text = final_text.thinking;
 
-        // Save assistant response to database
+        // Save assistant response to database (raw text, no UI notice).
         let assistant_db_msg = message_service
-            .create_message(session_id, "assistant".to_string(), assistant_text.clone())
+            .create_message(session_id, "assistant".to_string(), final_text.stored)
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
@@ -540,7 +557,7 @@ impl AgentService {
 
         Ok(AgentResponse {
             message_id: assistant_db_msg.id,
-            content: assistant_text,
+            content: final_text.display,
             thinking_text,
             stop_reason: response.stop_reason,
             usage: response.usage,
@@ -1367,12 +1384,14 @@ impl AgentService {
             AgentError::Internal("Tool loop completed without final response".to_string())
         })?;
 
-        // Extract text and thinking from final response
-        let (assistant_text, thinking_text) = Self::final_text_and_thinking(&response);
+        // Resolve text: `stored` is persisted/replayed to the model, `display`
+        // is shown to the user (they differ only for the reasoning-only notice).
+        let final_text = Self::final_text_and_thinking(&response);
+        let thinking_text = final_text.thinking;
 
-        // Save final assistant response to database
+        // Save final assistant response to database (raw text, no UI notice).
         let assistant_db_msg = message_service
-            .create_message(session_id, "assistant".to_string(), assistant_text.clone())
+            .create_message(session_id, "assistant".to_string(), final_text.stored)
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
@@ -1406,7 +1425,7 @@ impl AgentService {
 
         Ok(AgentResponse {
             message_id: assistant_db_msg.id,
-            content: assistant_text,
+            content: final_text.display,
             thinking_text,
             stop_reason: response.stop_reason,
             usage: crate::llm::provider::TokenUsage {
@@ -1525,34 +1544,43 @@ impl AgentService {
         text
     }
 
-    /// Split a *final* response into (visible answer, separate thinking panel).
+    /// Resolve a *final* response into what to store vs. what to display.
     ///
-    /// Normally that's just `extract_text_from_response` and
-    /// `extract_thinking_from_response`. But some reasoning models served
-    /// through Ollama (ornith, DeepSeek-R1, QwQ) put their *entire* final
-    /// answer in the reasoning channel and emit an empty `content` on the
-    /// closing turn. Left alone, that saved a blank assistant message - the TUI
-    /// showed only a collapsed "[Thinking ▸]" toggle with nothing under it.
+    /// Normally `stored` and `display` are identical (the visible text), with
+    /// `thinking` kept separate for the collapsed panel. But some reasoning
+    /// models served through Ollama (ornith, DeepSeek-R1, QwQ) put their
+    /// *entire* final answer in the reasoning channel and emit an empty
+    /// `content` on the closing turn. Left alone, that saved a blank assistant
+    /// message - the TUI showed only a collapsed "[Thinking ▸]" toggle with
+    /// nothing under it.
     ///
     /// When there is no visible text but there IS thinking, promote the
-    /// thinking to the answer and return `None` for the thinking panel, so the
-    /// same text is not rendered twice (once as the body, once in the toggle).
-    /// A short heads-up is prefixed so the user can tell this is the model's
-    /// raw reasoning surfaced as a fallback - not a normal answer - which is
-    /// common with reasoning models that never emit a final answer block.
-    /// When a real text block is present, thinking stays where it belongs
-    /// (separate, collapsed) and this promotion never fires.
-    fn final_text_and_thinking(response: &LLMResponse) -> (String, Option<String>) {
+    /// thinking to the answer (and drop the separate thinking panel, so the
+    /// same text is not rendered twice). Crucially, only `display` gets the
+    /// `REASONING_ONLY_NOTICE` heads-up; `stored` holds the RAW reasoning. The
+    /// stored value is what gets persisted and later replayed into the model's
+    /// context as prior assistant text - putting a UI banner there would make
+    /// the model think it authored the notice. When a real text block is
+    /// present, this promotion never fires and stored == display.
+    fn final_text_and_thinking(response: &LLMResponse) -> FinalText {
         let text = Self::extract_text_from_response(response);
         let thinking = Self::extract_thinking_from_response(response);
 
         if text.trim().is_empty() {
             if let Some(thinking) = thinking {
-                return (format!("{}\n\n{}", REASONING_ONLY_NOTICE, thinking), None);
+                return FinalText {
+                    display: format!("{}\n\n{}", REASONING_ONLY_NOTICE, thinking),
+                    stored: thinking,
+                    thinking: None,
+                };
             }
         }
 
-        (text, thinking)
+        FinalText {
+            display: text.clone(),
+            stored: text,
+            thinking,
+        }
     }
 
     /// Extract thinking content from an LLM response (extended thinking blocks only).
@@ -1795,22 +1823,40 @@ mod tests {
     /// TUI showed only a collapsed "[Thinking ▸]" toggle with no answer under
     /// it. The thinking must be promoted to the visible answer, AND removed
     /// from the separate thinking panel so the same text is not shown twice.
+    ///
+    /// The `display` value carries the reasoning-only notice for the user, but
+    /// `stored` (persisted and replayed into model context) must be the RAW
+    /// reasoning with NO notice - otherwise the model sees the UI banner as its
+    /// own prior words on the next turn.
     #[test]
     fn final_text_falls_back_to_thinking_when_there_is_no_visible_text() {
+        let reasoning = "The directory contains src/, README.md and main.rs.";
         let response = response_with(vec![ContentBlock::Thinking {
-            thinking: "The directory contains src/, README.md and main.rs.".to_string(),
+            thinking: reasoning.to_string(),
         }]);
-        let (text, thinking) = AgentService::final_text_and_thinking(&response);
+        let ft = AgentService::final_text_and_thinking(&response);
+
         assert!(
-            text.contains("The directory contains src/, README.md and main.rs."),
-            "the promoted reasoning must be present in the answer, got: {text}"
+            ft.display.starts_with(REASONING_ONLY_NOTICE),
+            "the display value must carry the heads-up, got: {}",
+            ft.display
         );
         assert!(
-            text.starts_with(REASONING_ONLY_NOTICE),
-            "a heads-up must prefix the surfaced reasoning, got: {text}"
+            ft.display.contains(reasoning),
+            "the promoted reasoning must be present in the display value"
+        );
+
+        assert_eq!(
+            ft.stored, reasoning,
+            "the STORED value must be the raw reasoning with no UI notice, \
+             so the banner never leaks into model-facing history"
         );
         assert!(
-            thinking.is_none(),
+            !ft.stored.contains(REASONING_ONLY_NOTICE),
+            "the notice must not be persisted"
+        );
+        assert!(
+            ft.thinking.is_none(),
             "promoted thinking must not also render in the thinking panel"
         );
     }
@@ -1827,9 +1873,13 @@ mod tests {
                 text: "Here is the answer.".to_string(),
             },
         ]);
-        let (text, thinking) = AgentService::final_text_and_thinking(&response);
-        assert_eq!(text, "Here is the answer.");
-        assert_eq!(thinking.as_deref(), Some("internal reasoning"));
+        let ft = AgentService::final_text_and_thinking(&response);
+        assert_eq!(ft.display, "Here is the answer.");
+        assert_eq!(
+            ft.stored, "Here is the answer.",
+            "with a real text block, stored == display"
+        );
+        assert_eq!(ft.thinking.as_deref(), Some("internal reasoning"));
     }
 
     /// A genuinely empty response (no text, no thinking) stays empty - the
@@ -1837,9 +1887,10 @@ mod tests {
     #[test]
     fn final_text_of_an_empty_response_is_empty() {
         let response = response_with(vec![]);
-        let (text, thinking) = AgentService::final_text_and_thinking(&response);
-        assert_eq!(text, "");
-        assert!(thinking.is_none());
+        let ft = AgentService::final_text_and_thinking(&response);
+        assert_eq!(ft.display, "");
+        assert_eq!(ft.stored, "");
+        assert!(ft.thinking.is_none());
     }
 
     async fn create_test_service() -> (AgentService, Uuid) {
