@@ -158,6 +158,10 @@ pub struct App {
     pub model_download_deleting: Option<String>,
     model_download_delete_task: Option<tokio::task::JoinHandle<()>>,
     ollama_host: String,
+    /// The `[providers.ollama]` config section, applied when the Ctrl+W
+    /// switch rebuilds the provider - without it a switched-to model runs
+    /// unconfigured (no per-model num_ctx/sampling, no keep_alive).
+    ollama_config: Option<crate::config::OllamaProviderConfig>,
 
     // Provider Switch dialog state (Ctrl+W, native Ollama provider)
     pub provider_switch_models: Vec<String>,
@@ -233,6 +237,7 @@ impl App {
             model_download_deleting: None,
             model_download_delete_task: None,
             ollama_host: "http://localhost:11434".to_string(),
+            ollama_config: None,
             provider_switch_models: Vec::new(),
             provider_switch_selected: 0,
             provider_switch_loading: false,
@@ -451,6 +456,13 @@ impl App {
     /// Defaults to `http://localhost:11434` if never called.
     pub fn set_ollama_host(&mut self, host: String) {
         self.ollama_host = host;
+    }
+
+    /// Record the `[providers.ollama]` config so the Ctrl+W provider switch
+    /// rebuilds providers with the same settings (per-model num_ctx/sampling,
+    /// keep_alive) as the one built at startup.
+    pub fn set_ollama_config(&mut self, config: crate::config::OllamaProviderConfig) {
+        self.ollama_config = Some(config);
     }
 
     /// Record whether the terminal supports the Kitty keyboard enhancement
@@ -2421,7 +2433,11 @@ impl App {
     /// `agent_service` at that moment, in which case `Arc::get_mut` simply
     /// returns `None` rather than allowing an unsafe in-place mutation.
     async fn switch_provider_to_ollama_model(&mut self, model: String) -> Result<()> {
-        match super::ollama_download::build_ollama_provider(&self.ollama_host, &model) {
+        match super::ollama_download::build_ollama_provider(
+            &self.ollama_host,
+            &model,
+            self.ollama_config.as_ref(),
+        ) {
             Ok(provider) => match Arc::get_mut(&mut self.agent_service) {
                 Some(service) => {
                     service.set_provider(provider);

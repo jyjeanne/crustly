@@ -239,8 +239,6 @@ fn try_create_gemini(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
 /// Try to create the native Ollama provider if `providers.ollama` is configured.
 #[cfg(feature = "ollama")]
 fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
-    use super::ollama::OllamaProvider;
-
     let ollama_config = match &config.providers.ollama {
         Some(cfg) if cfg.enabled => cfg,
         _ => return Ok(None),
@@ -248,32 +246,57 @@ fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
 
     tracing::info!("Using native Ollama at: {}", ollama_config.host);
     println!("🦙 Using native Ollama at: {}\n", ollama_config.host);
-
-    let mut provider = OllamaProvider::new(ollama_config.host.clone());
     if let Some(model) = &ollama_config.default_model {
         tracing::info!("Using custom default model: {}", model);
         println!("📦 Model: {}\n", model);
-        provider = provider.with_default_model(model.clone());
     }
-    if let Some(keep_alive) = &ollama_config.keep_alive {
+
+    Ok(Some(Arc::new(ollama_provider_from_config(
+        ollama_config,
+        None,
+    ))))
+}
+
+/// Build a fully-configured `OllamaProvider` from `[providers.ollama]`:
+/// host, default model, keep_alive, num_ctx, sampling, and the per-model
+/// overrides map. `model_override` replaces the config's `default_model`
+/// (used when the user picks a model at runtime).
+///
+/// This is THE construction path for Ollama providers. The TUI's Ctrl+W
+/// model switch used to build a bare `OllamaProvider::new(host)` instead,
+/// silently dropping every configured setting - most damagingly the
+/// per-model `num_ctx`, so a switched-to model ran at the 8192-token
+/// default and reasoning models exhausted their window mid-turn. Any new
+/// call site must go through here so the two paths can't drift again.
+#[cfg(feature = "ollama")]
+pub fn ollama_provider_from_config(
+    cfg: &crate::config::OllamaProviderConfig,
+    model_override: Option<&str>,
+) -> super::ollama::OllamaProvider {
+    use super::ollama::{ModelOverrides, OllamaProvider};
+
+    let mut provider = OllamaProvider::new(cfg.host.clone());
+
+    let model = model_override
+        .map(str::to_string)
+        .or_else(|| cfg.default_model.clone());
+    if let Some(model) = model {
+        provider = provider.with_default_model(model);
+    }
+    if let Some(keep_alive) = &cfg.keep_alive {
         provider = provider.with_keep_alive(keep_alive);
     }
-    if let Some(num_ctx) = ollama_config.num_ctx {
+    if let Some(num_ctx) = cfg.num_ctx {
         provider = provider.with_num_ctx(num_ctx);
     }
-    provider = provider.with_sampling(
-        ollama_config.temperature,
-        ollama_config.top_p,
-        ollama_config.top_k,
-    );
+    provider = provider.with_sampling(cfg.temperature, cfg.top_p, cfg.top_k);
 
     // Per-model overrides: each `[providers.ollama.models."<name>"]` entry
     // becomes a ModelOverrides that wins field-by-field over the defaults above
     // for that model only. This is what lets ornith and qwen coexist with
     // different tuning instead of one global set degrading the other.
-    if !ollama_config.models.is_empty() {
-        use super::ollama::ModelOverrides;
-        let per_model = ollama_config
+    if !cfg.models.is_empty() {
+        let per_model = cfg
             .models
             .iter()
             .map(|(name, m)| {
@@ -292,7 +315,7 @@ fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
         provider = provider.with_per_model(per_model);
     }
 
-    Ok(Some(Arc::new(provider)))
+    provider
 }
 
 /// Without the `ollama` feature compiled in, a configured `providers.ollama`

@@ -91,21 +91,42 @@ pub async fn fetch_installed_models(_host: String) -> Vec<String> {
 /// Build a native Ollama provider for `model`, for the Provider Switch
 /// dialog (Ctrl+W). Returns a clear error instead of silently doing
 /// nothing when this build wasn't compiled with `--features ollama`.
+///
+/// `config` is the user's `[providers.ollama]` section. It MUST be applied
+/// here: this used to build a bare `OllamaProvider::new(host)`, silently
+/// dropping keep_alive/num_ctx/sampling and the whole per-model overrides
+/// map - so every model reached via Ctrl+W ran unconfigured (most visibly,
+/// a per-model `num_ctx` fell back to the 8192 default and reasoning models
+/// exhausted their window mid-turn without ever emitting a tool call).
+/// `None` (no `[providers.ollama]` in config) falls back to a bare provider
+/// on `host`.
 #[cfg(feature = "ollama")]
 pub fn build_ollama_provider(
     host: &str,
     model: &str,
+    config: Option<&crate::config::OllamaProviderConfig>,
 ) -> Result<std::sync::Arc<dyn crate::llm::provider::Provider>, String> {
-    Ok(std::sync::Arc::new(
-        crate::llm::provider::OllamaProvider::new(host.to_string())
+    let provider = match config {
+        Some(cfg) => {
+            // Same construction path as startup (see
+            // `ollama_provider_from_config`), with the picked model overriding
+            // the config's default_model. Keep the App's host authoritative in
+            // case it was overridden at runtime.
+            let mut cfg = cfg.clone();
+            cfg.host = host.to_string();
+            crate::llm::provider::ollama_provider_from_config(&cfg, Some(model))
+        }
+        None => crate::llm::provider::OllamaProvider::new(host.to_string())
             .with_default_model(model.to_string()),
-    ))
+    };
+    Ok(std::sync::Arc::new(provider))
 }
 
 #[cfg(not(feature = "ollama"))]
 pub fn build_ollama_provider(
     _host: &str,
     _model: &str,
+    _config: Option<&crate::config::OllamaProviderConfig>,
 ) -> Result<std::sync::Arc<dyn crate::llm::provider::Provider>, String> {
     Err(
         "This build of crustly was compiled without the 'ollama' feature. \
@@ -209,6 +230,37 @@ pub async fn spawn_delete(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Regression: the Ctrl+W switch built a bare `OllamaProvider::new(host)`,
+    /// dropping the entire `[providers.ollama]` config. Most damagingly, a
+    /// per-model `num_ctx` (e.g. gemma4's 32768) fell back to the 8192 default
+    /// after a switch, so the model exhausted its window mid-reasoning and
+    /// never emitted a tool call. The switch path must apply the config: the
+    /// provider's `context_window` for the switched-to model is the observable.
+    #[cfg(feature = "ollama")]
+    #[test]
+    fn switch_built_provider_applies_per_model_num_ctx_from_config() {
+        let mut cfg = crate::config::OllamaProviderConfig::default();
+        cfg.models.insert(
+            "gemma4:12B".to_string(),
+            crate::config::OllamaModelConfig {
+                num_ctx: Some(32768),
+                ..Default::default()
+            },
+        );
+
+        let provider =
+            build_ollama_provider("http://localhost:11434", "gemma4:12B", Some(&cfg)).unwrap();
+        assert_eq!(
+            provider.context_window("gemma4:12B"),
+            Some(32768),
+            "the switched-to model must get its configured per-model num_ctx"
+        );
+
+        // Without config the old bare fallback still applies (default window).
+        let bare = build_ollama_provider("http://localhost:11434", "gemma4:12B", None).unwrap();
+        assert_eq!(bare.context_window("gemma4:12B"), Some(8192));
+    }
 
     #[test]
     fn filter_suggestions_empty_query_returns_all_deduped() {

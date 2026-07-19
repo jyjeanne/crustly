@@ -793,6 +793,12 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tracing::debug!("Creating TUI app");
     let mut app = tui::App::new(agent_service, service_context.clone());
     app.set_ollama_host(ollama_host(config));
+    // Hand the [providers.ollama] section to the TUI so the Ctrl+W model
+    // switch rebuilds providers with the SAME settings as startup (per-model
+    // num_ctx/sampling, keep_alive) instead of a bare unconfigured provider.
+    if let Some(ollama_cfg) = &config.providers.ollama {
+        app.set_ollama_config(ollama_cfg.clone());
+    }
     app.set_mcp_status(mcp_status);
 
     // Get event sender from app

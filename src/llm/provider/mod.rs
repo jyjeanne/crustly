@@ -30,6 +30,8 @@ pub mod qwen;
 pub use anthropic::AnthropicProvider;
 pub use azure::AzureOpenAIProvider;
 pub use factory::create_provider;
+#[cfg(feature = "ollama")]
+pub use factory::ollama_provider_from_config;
 pub use gemini::GeminiProvider;
 #[cfg(feature = "ollama")]
 pub use ollama::OllamaProvider;
