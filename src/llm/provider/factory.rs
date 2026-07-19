@@ -290,6 +290,9 @@ pub fn ollama_provider_from_config(
         provider = provider.with_num_ctx(num_ctx);
     }
     provider = provider.with_sampling(cfg.temperature, cfg.top_p, cfg.top_k);
+    if let Some(think) = &cfg.think {
+        provider = provider.with_think(think.as_str());
+    }
 
     // Per-model overrides: each `[providers.ollama.models."<name>"]` entry
     // becomes a ModelOverrides that wins field-by-field over the defaults above
@@ -308,6 +311,7 @@ pub fn ollama_provider_from_config(
                         m.top_k,
                         m.num_ctx,
                         m.keep_alive.as_deref(),
+                        m.think.as_ref().map(|t| t.as_str()),
                     ),
                 )
             })

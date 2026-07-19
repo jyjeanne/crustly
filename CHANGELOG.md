@@ -24,6 +24,12 @@ Tool calls printed as ```json fenced blocks *inside* explanatory prose (qwen2.5-
 #### `--model` CLI Flag
 Override the configured default model for a single invocation of any command: `crustly --model "gemma4:12B" run "..."`.
 
+#### Per-Model `think` Control
+Ollama's native `think` parameter is now configurable per model (and provider-wide): `think = false` disables a reasoning model's thinking channel entirely, `"low"`/`"medium"`/`"high"` set an effort level. This exists because gemma4 was observed spending two minutes and ~10k tokens "thinking" mid-task and ending its turn without ever emitting the tool call it was reasoning about — with `think = false` it answers decisively in visible content (an observed 11-token tool call instead of a multi-minute spiral). An explicit extended-thinking request still wins over the configured default.
+
+#### Resilient Plan Creation
+Plan Mode now survives sparse tool calls from small local models: `plan create` and `add_task` require only a `title` (`description` defaults to empty, `task_type` to `"other"`), where the previous hard requirements sent models into "missing field" retry spirals that the loop breaker then killed — leaving one-task plans. Plan-building turns are also exempt from the silent-tool-call drift guard, since building a plan is legitimately `create` + one `add_task` per step + `finalize` with nothing to say in between.
+
 #### Qwen3-Coder-Next & Qwen3.6-27B Support
 Added `qwen3-coder-next` and `qwen3.6-27b` to the Qwen provider's known model list with their real 256K context window (previously fell back to a conservative 32K default, triggering premature context compaction). The provider also now auto-selects the OpenAI tool parser when `default_model` contains `coder-next`, matching Qwen3-Coder-Next's documented vLLM/SGLang serving recipe (`--tool-call-parser qwen3_coder`), which returns structured `tool_calls` rather than Hermes `<tool_call>` tags. See [QWEN_INTEGRATION.md](docs/guides/QWEN_INTEGRATION.md) for the updated serving instructions.
 

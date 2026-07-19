@@ -69,18 +69,25 @@ pub struct ModelOverrides {
     pub top_k: Option<u32>,
     pub num_ctx: Option<u64>,
     pub keep_alive: Option<KeepAlive>,
+    /// Ollama's native `think` parameter for this model: `False` disables the
+    /// reasoning channel, `True` enables it, levels set effort. Exists so a
+    /// reasoning model that spirals in its thinking channel (gemma4) can be
+    /// told to answer in visible content instead.
+    pub think: Option<ThinkType>,
 }
 
 impl ModelOverrides {
     /// Build from raw config values, parsing the `keep_alive` string with the
-    /// same rules as `with_keep_alive` (an invalid value is logged and dropped,
-    /// so it falls back to the provider-level default rather than erroring).
+    /// same rules as `with_keep_alive` and the `think` string with
+    /// `parse_think` (an invalid value is logged and dropped, so it falls back
+    /// to the provider-level default rather than erroring).
     pub fn from_config(
         temperature: Option<f32>,
         top_p: Option<f32>,
         top_k: Option<u32>,
         num_ctx: Option<u32>,
         keep_alive: Option<&str>,
+        think: Option<&str>,
     ) -> Self {
         let keep_alive = keep_alive.and_then(|s| match parse_keep_alive(s) {
             Some(ka) => Some(ka),
@@ -95,6 +102,26 @@ impl ModelOverrides {
             top_k,
             num_ctx: num_ctx.map(|c| c as u64),
             keep_alive,
+            think: think.and_then(parse_think),
+        }
+    }
+}
+
+/// Parse a config `think` value ("true"/"false"/"low"/"medium"/"high") into
+/// Ollama's `ThinkType`. Invalid values are logged and dropped.
+fn parse_think(s: &str) -> Option<ThinkType> {
+    match s {
+        "true" => Some(ThinkType::True),
+        "false" => Some(ThinkType::False),
+        "low" => Some(ThinkType::Low),
+        "medium" => Some(ThinkType::Medium),
+        "high" => Some(ThinkType::High),
+        other => {
+            tracing::warn!(
+                "Invalid think value '{}' (expected true/false/low/medium/high), ignoring",
+                other
+            );
+            None
         }
     }
 }
@@ -114,6 +141,9 @@ pub struct OllamaProvider {
     temperature: Option<f32>,
     top_p: Option<f32>,
     top_k: Option<u32>,
+    /// Default `think` control sent when the request doesn't ask for
+    /// extended thinking explicitly (see `ModelOverrides::think`).
+    think: Option<ThinkType>,
     /// Per-model overrides, keyed by exact model name. A model present here
     /// gets its own sampling/context; anything unset per-model falls back to
     /// the provider-level fields above. Different Ollama models want different
@@ -152,6 +182,7 @@ impl OllamaProvider {
             temperature: None,
             top_p: None,
             top_k: None,
+            think: None,
             per_model: std::collections::HashMap::new(),
         }
     }
@@ -163,6 +194,14 @@ impl OllamaProvider {
         per_model: std::collections::HashMap<String, ModelOverrides>,
     ) -> Self {
         self.per_model = per_model;
+        self
+    }
+
+    /// Set the default `think` control ("true"/"false"/"low"/"medium"/"high")
+    /// sent when a request doesn't ask for extended thinking explicitly.
+    /// Invalid values are logged and ignored.
+    pub fn with_think(mut self, think: &str) -> Self {
+        self.think = parse_think(think);
         self
     }
 
@@ -178,6 +217,7 @@ impl OllamaProvider {
             top_k: self.top_k,
             num_ctx: self.num_ctx,
             keep_alive: self.keep_alive.clone(),
+            think: self.think.clone(),
         };
 
         // Fast path for the common case (no per-model config at all): skip
@@ -195,6 +235,7 @@ impl OllamaProvider {
                 top_k: m.top_k.or(self.top_k),
                 num_ctx: m.num_ctx.or(self.num_ctx),
                 keep_alive: m.keep_alive.clone().or(self.keep_alive.clone()),
+                think: m.think.clone().or(self.think.clone()),
             },
         }
     }
@@ -343,11 +384,18 @@ impl OllamaProvider {
 
         let format = request.response_format.as_ref().and_then(to_ollama_format);
 
-        let think = request.thinking.as_ref().map(|t| match t.budget_tokens {
-            0..=2_000 => ThinkType::Low,
-            2_001..=8_000 => ThinkType::Medium,
-            _ => ThinkType::High,
-        });
+        // An explicit extended-thinking request wins; otherwise apply the
+        // configured per-model/provider `think` control (e.g. `think = false`
+        // to stop a reasoning model from spiralling in its thinking channel).
+        let think = request
+            .thinking
+            .as_ref()
+            .map(|t| match t.budget_tokens {
+                0..=2_000 => ThinkType::Low,
+                2_001..=8_000 => ThinkType::Medium,
+                _ => ThinkType::High,
+            })
+            .or_else(|| ov.think.clone());
 
         let mut ollama_request = ChatMessageRequest::new(request.model, messages).options(options);
         if !tools.is_empty() {
@@ -1010,7 +1058,7 @@ mod tests {
         let mut per_model = std::collections::HashMap::new();
         per_model.insert(
             "ornith:9b".to_string(),
-            ModelOverrides::from_config(Some(0.6), Some(0.95), Some(20), None, None),
+            ModelOverrides::from_config(Some(0.6), Some(0.95), Some(20), None, None, None),
         );
         let provider = OllamaProvider::default_local()
             .with_sampling(Some(0.2), Some(0.5), Some(40)) // provider-level fallback
@@ -1036,7 +1084,7 @@ mod tests {
         // Only temperature is set per-model; the rest must fall back.
         per_model.insert(
             "ornith:9b".to_string(),
-            ModelOverrides::from_config(Some(0.6), None, None, None, None),
+            ModelOverrides::from_config(Some(0.6), None, None, None, None, None),
         );
         let provider = OllamaProvider::default_local()
             .with_sampling(Some(0.2), Some(0.5), Some(40))
@@ -1071,7 +1119,7 @@ mod tests {
         let mut per_model = std::collections::HashMap::new();
         per_model.insert(
             "small-ctx:model".to_string(),
-            ModelOverrides::from_config(None, None, None, Some(4096), None),
+            ModelOverrides::from_config(None, None, None, Some(4096), None, None),
         );
         let provider = OllamaProvider::default_local()
             .with_num_ctx(16384) // provider-level default
@@ -1678,6 +1726,50 @@ mod tests {
         let ollama_request = provider.to_ollama_request(request);
         assert!(matches!(ollama_request.think, Some(ThinkType::Medium)));
         assert!(matches!(ollama_request.format, Some(FormatType::Json)));
+    }
+
+    /// Regression: gemma4 spent two minutes and ~10k tokens spiralling in its
+    /// thinking channel mid-plan-building, ending the turn with no tool call.
+    /// A per-model `think = false` must reach the wire as Ollama's native
+    /// `think` parameter so the model answers in visible content instead.
+    #[test]
+    fn per_model_think_false_is_sent_when_request_has_no_thinking() {
+        let mut per_model = std::collections::HashMap::new();
+        per_model.insert(
+            "gemma4:12B".to_string(),
+            ModelOverrides::from_config(None, None, None, None, None, Some("false")),
+        );
+        let provider = OllamaProvider::default_local().with_per_model(per_model);
+
+        let request = LLMRequest::new("gemma4:12B", vec![Message::user("hi")]);
+        let ollama_request = provider.to_ollama_request(request);
+        assert!(
+            matches!(ollama_request.think, Some(ThinkType::False)),
+            "configured think=false must be sent, got {:?}",
+            ollama_request.think
+        );
+
+        // A model without a think override sends no think parameter at all.
+        let provider = OllamaProvider::default_local();
+        let request = LLMRequest::new("llama3.2", vec![Message::user("hi")]);
+        assert!(provider.to_ollama_request(request).think.is_none());
+    }
+
+    /// An explicit extended-thinking request must beat the configured default.
+    #[test]
+    fn request_thinking_wins_over_configured_think() {
+        let provider = OllamaProvider::default_local().with_think("false");
+        let request = LLMRequest::new("llama3.2", vec![Message::user("hi")]).with_thinking(4_000);
+        let ollama_request = provider.to_ollama_request(request);
+        assert!(matches!(ollama_request.think, Some(ThinkType::Medium)));
+    }
+
+    /// Invalid think strings are dropped (logged), not sent.
+    #[test]
+    fn invalid_think_value_is_ignored() {
+        let provider = OllamaProvider::default_local().with_think("sometimes");
+        let request = LLMRequest::new("llama3.2", vec![Message::user("hi")]);
+        assert!(provider.to_ollama_request(request).think.is_none());
     }
 
     #[test]

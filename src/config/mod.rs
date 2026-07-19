@@ -486,6 +486,11 @@ pub struct OllamaProviderConfig {
     /// back. Configured as `[providers.ollama.models."ornith:9b"]` tables.
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub models: std::collections::HashMap<String, OllamaModelConfig>,
+
+    /// Provider-level default for Ollama's `think` parameter; a matching
+    /// per-model `think` (below) wins. See `OllamaModelConfig::think`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub think: Option<ThinkSetting>,
 }
 
 /// Per-model Ollama overrides. Every field is optional; an unset field falls
@@ -512,6 +517,41 @@ pub struct OllamaModelConfig {
     pub num_ctx: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keep_alive: Option<String>,
+    /// Thinking/reasoning control for THIS model, sent as Ollama's native
+    /// `think` parameter: `think = false` disables the reasoning channel
+    /// entirely, `true` enables it, and `"low"`/`"medium"`/`"high"` set an
+    /// effort level (model-dependent).
+    ///
+    /// This exists because some reasoning models (gemma4 was the observed
+    /// case) spiral: they burn minutes and thousands of tokens in the
+    /// thinking channel and end the turn without ever emitting the tool
+    /// call or answer they were reasoning about. `think = false` makes such
+    /// a model put its output in the visible content instead. Unset means
+    /// no `think` parameter is sent and the model uses its own default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub think: Option<ThinkSetting>,
+}
+
+/// Thinking control value: a bool (`think = false`) or an effort level
+/// string (`think = "low"`). Mirrors what Ollama's `think` parameter
+/// accepts on the wire.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ThinkSetting {
+    Enabled(bool),
+    Level(String),
+}
+
+impl ThinkSetting {
+    /// Canonical string form, consumed by the Ollama provider's parser
+    /// ("true"/"false"/"low"/"medium"/"high").
+    pub fn as_str(&self) -> &str {
+        match self {
+            ThinkSetting::Enabled(true) => "true",
+            ThinkSetting::Enabled(false) => "false",
+            ThinkSetting::Level(s) => s.as_str(),
+        }
+    }
 }
 
 impl Default for OllamaProviderConfig {
@@ -526,6 +566,7 @@ impl Default for OllamaProviderConfig {
             top_p: None,
             top_k: None,
             models: std::collections::HashMap::new(),
+            think: None,
         }
     }
 }
