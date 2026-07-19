@@ -101,7 +101,7 @@ These touch `LLMRequest`/`AgentContext`, both flagged as top-10 "god nodes" in
 ### 2.1 Stop deep-cloning the full message history on every tool-loop iteration
 
 `send_message_with_tools_inner` rebuilds `LLMRequest::new(model_name.clone(), context.messages.clone())`
-on **every iteration** of the tool loop (`src/llm/agent/service.rs:743, 1049, 1493`), not once per
+on **every iteration** of the tool loop (`src/llm/agent/service.rs:743, 1048, 1493`), not once per
 user turn — up to `max_tool_iterations` (default 10) full-history clones per turn, including full
 text of every prior tool result (e.g. whole file contents from earlier `read_file` calls).
 
@@ -182,7 +182,23 @@ regression.
 `cargo run -- run "..."` script against a small (7B, CPU-feasible) and a larger (30B+, GPU) Ollama
 model, capturing `PerfMetrics` (`ollama.rs:781-792`, already surfaces cold/warm start, eval duration)
 before and after each phase, since that field already exists and is Ollama-specific — no new
-instrumentation needed to start collecting a baseline.
+instrumentation needed to start collecting a baseline, **and it is confirmed wired through the
+streaming path today** (`service.rs:290-294` carries `perf_metrics` out of `drain_stream_to_response`,
+covered by the `drain_stream_to_response_carries_perf_metrics_through` test), superseding an earlier
+note in `ollama-rs-integration-plan.md` (repo root) that streaming metrics were computed but discarded
+— that gap has since been closed.
+
+**Caveat found during review:** capture the baseline from a *live* run, not from a reloaded session.
+`DisplayMessage::from(Message)` (`src/tui/app.rs:43-64`) deserializes `perf_metrics` from the DB
+(`perf_metrics_json`, line 45-48) but always sets `tokens_per_second: None` on reload (line 61) —
+throughput is only ever computed once, at the moment a response finishes streaming
+(`app.rs:1430-1433`, from the in-memory `response.usage.output_tokens`). It can't be recomputed
+after reload because `messages.token_count` persists input+output combined, not output alone. If a
+before/after benchmark script re-opens old sessions to compare `tokens_per_second`, it will silently
+see `None` for all of them — either log `PerfMetrics` to a file at capture time (recommended, no
+schema change), or split `token_count` into `input_tokens`/`output_tokens` columns if historical
+throughput queries are wanted later. Not fixing this is fine for Phase 3 as scoped; it's listed here
+so whoever writes the benchmark script doesn't lose an afternoon to it.
 
 ---
 
