@@ -180,7 +180,12 @@ impl ErrorInfo {
             ),
             String::new(),
             format!("Title: {}", self.title),
-            format!("Time: {}", self.timestamp.format("%Y-%m-%d %H:%M:%S")),
+            format!(
+                "Time: {}",
+                self.timestamp
+                    .with_timezone(&chrono::Local)
+                    .format("%Y-%m-%d %H:%M:%S")
+            ),
             String::new(),
             "Message:".to_string(),
             self.message.clone(),

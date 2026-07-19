@@ -1817,13 +1817,18 @@ impl App {
                 markdown.push_str("---\n\n");
             }
 
+            // UTC in the domain model -> local for display.
             markdown.push_str(&format!(
                 "\n*Plan created: {}*\n",
-                plan.created_at.format("%Y-%m-%d %H:%M:%S")
+                plan.created_at
+                    .with_timezone(&chrono::Local)
+                    .format("%Y-%m-%d %H:%M:%S")
             ));
             markdown.push_str(&format!(
                 "*Last updated: {}*\n",
-                plan.updated_at.format("%Y-%m-%d %H:%M:%S")
+                plan.updated_at
+                    .with_timezone(&chrono::Local)
+                    .format("%Y-%m-%d %H:%M:%S")
             ));
 
             // Write markdown file to working directory

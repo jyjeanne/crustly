@@ -317,7 +317,12 @@ fn render_thinking_block(msg: &super::app::DisplayMessage) -> Vec<Line<'static>>
 /// Render one full message: role/timestamp header, thinking block, body, perf
 /// footer, and the trailing separator.
 fn render_message_lines(msg: &super::app::DisplayMessage, model_name: &str) -> Vec<Line<'static>> {
-    let timestamp = msg.timestamp.format("%H:%M:%S");
+    // Timestamps are stored in UTC; show them in the user's local timezone so
+    // the clock in the transcript matches the wall clock on their machine.
+    let timestamp = msg
+        .timestamp
+        .with_timezone(&chrono::Local)
+        .format("%H:%M:%S");
     let (role_text, role_style, prefix) = if msg.role == "user" {
         (
             "You".to_string(),
@@ -539,7 +544,11 @@ fn render_sessions(f: &mut Frame, app: &App, area: Rect) {
         let suffix = if is_current { " [current]" } else { "" };
 
         let name = session.title.as_deref().unwrap_or("Untitled");
-        let created = session.created_at.format("%Y-%m-%d %H:%M");
+        // UTC in the DB -> local for display (see render_message_lines).
+        let created = session
+            .created_at
+            .with_timezone(&chrono::Local)
+            .format("%Y-%m-%d %H:%M");
 
         let style = if is_selected {
             Style::default()
@@ -2087,6 +2096,61 @@ mod tests {
             out.push('\n');
         }
         out
+    }
+
+    /// Flatten a rendered line's spans into plain text.
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    /// Regression: message timestamps are stored in UTC but were formatted
+    /// with `%H:%M:%S` directly, so the transcript showed UTC clock time - two
+    /// hours off from the user's wall clock in a UTC+2 zone. The header must
+    /// render the timestamp in the local timezone.
+    #[test]
+    fn message_header_timestamp_is_shown_in_local_time() {
+        // A fixed UTC instant. What the header must show is this instant
+        // converted to whatever local zone the test host is in - computed the
+        // same way, so the assertion holds in every timezone (including UTC,
+        // where local == UTC and the test still passes).
+        let utc = chrono::DateTime::parse_from_rfc3339("2026-07-19T13:07:04Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let expected_local = utc
+            .with_timezone(&chrono::Local)
+            .format("%H:%M:%S")
+            .to_string();
+
+        let msg = DisplayMessage {
+            id: uuid::Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: "hi".to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: utc,
+            token_count: None,
+            cost: None,
+            provider_name: Some("ollama".to_string()),
+            perf_metrics: None,
+            tokens_per_second: None,
+        };
+
+        let header = line_text(&render_message_lines(&msg, "ollama:model")[0]);
+        assert!(
+            header.contains(&expected_local),
+            "header should show local time {expected_local}, got: {header}"
+        );
+
+        // If the host is NOT in UTC, the raw UTC clock string must be absent -
+        // proving the conversion actually happened rather than coincidentally
+        // matching. In UTC hosts local == UTC, so this check is skipped.
+        let utc_str = utc.format("%H:%M:%S").to_string();
+        if utc_str != expected_local {
+            assert!(
+                !header.contains(&utc_str),
+                "header must not show the raw UTC time {utc_str} when local differs, got: {header}"
+            );
+        }
     }
 
     #[tokio::test]
