@@ -139,6 +139,90 @@ fn tool_call_signature(name: &str, input: &Value) -> String {
     }
 }
 
+/// Gate for `plan complete_task` calls: marking a task `success=true` must be
+/// backed by evidence that work actually happened. gemma4 was observed
+/// rubber-stamping half a plan - real code for tasks 1-2, then bare
+/// `complete_task` calls for tasks 3-4 with zero tool activity in between,
+/// leaving a "Completed" plan whose work was never done.
+///
+/// Returns `Some(rejection message)` when the call must be refused, `None`
+/// when it may proceed. A completion is allowed when any of these hold:
+/// - any mutating tool (file write, shell, ...) succeeded since the previous
+///   task completion in this agent loop (`mutating_evidence > 0`);
+/// - the call lists `artifacts` and every listed path exists on disk
+///   (verifiable work done earlier or outside this loop);
+/// - the task's type is `Research`, which legitimately changes nothing;
+/// - the completion is `success=false` (or `skip_task`) - honest failure is
+///   always allowed, only unearned success is not.
+fn plan_completion_rejection(
+    input: &Value,
+    mutating_evidence: usize,
+    working_directory: &std::path::Path,
+    session_id: Uuid,
+) -> Option<String> {
+    if input.get("operation").and_then(|v| v.as_str()) != Some("complete_task") {
+        return None;
+    }
+    if input.get("success").and_then(|v| v.as_bool()) != Some(true) {
+        return None;
+    }
+    if mutating_evidence > 0 {
+        return None;
+    }
+
+    // Claimed artifacts count as evidence - but only if they verifiably exist.
+    if let Some(artifacts) = input.get("artifacts").and_then(|v| v.as_array()) {
+        if !artifacts.is_empty() {
+            let missing: Vec<&str> = artifacts
+                .iter()
+                .filter_map(|a| a.as_str())
+                .filter(|p| {
+                    let path = std::path::Path::new(p);
+                    let abs = if path.is_absolute() {
+                        path.to_path_buf()
+                    } else {
+                        working_directory.join(path)
+                    };
+                    !abs.exists()
+                })
+                .collect();
+            if missing.is_empty() {
+                return None;
+            }
+            return Some(format!(
+                "Refusing to mark this task complete: the claimed artifacts do not exist \
+                 on disk: {}. Create them first, correct the paths, or complete with \
+                 success=false and explain what went wrong.",
+                missing.join(", ")
+            ));
+        }
+    }
+
+    // Research tasks legitimately complete without modifying anything.
+    if let Some(order) = input.get("task_order").and_then(|v| v.as_u64()) {
+        let plan_file = working_directory.join(format!(".crustly_plan_{}.json", session_id));
+        if let Ok(content) = std::fs::read_to_string(&plan_file) {
+            if let Ok(plan) = serde_json::from_str::<crate::plan::PlanDocument>(&content) {
+                if let Some(task) = plan.tasks.iter().find(|t| t.order == order as usize) {
+                    if matches!(task.task_type, crate::plan::TaskType::Research) {
+                        return None;
+                    }
+                }
+            }
+        }
+    }
+
+    Some(
+        "Refusing to mark this task complete: no file or shell changes have been observed \
+         since the previous task completed, so there is no evidence the task's work was \
+         actually done. Either: (1) perform the task's work first, (2) list the files the \
+         task produced in `artifacts` so they can be verified on disk, (3) complete with \
+         success=false and explain what went wrong, or (4) use skip_task if the task is \
+         not applicable."
+            .to_string(),
+    )
+}
+
 /// Returns true for read-only, idempotent tools that can run concurrently.
 pub fn is_parallelizable(tool_name: &str) -> bool {
     matches!(
@@ -839,6 +923,11 @@ impl AgentService {
                                                              // Consecutive tool-calling turns in which the model said nothing to the
                                                              // user. Reset by any turn that produces text. See MAX_SILENT_TOOL_CALLS.
         let mut silent_tool_calls: usize = 0;
+        // Successful mutating tool calls since the previous plan task
+        // completion. Backs `plan_completion_rejection`: marking a plan task
+        // success=true requires evidence of work; each accepted completion
+        // resets the counter so the NEXT task needs fresh evidence.
+        let mut mutating_evidence: usize = 0;
 
         while iteration < self.max_tool_iterations {
             iteration += 1;
@@ -1160,6 +1249,29 @@ impl AgentService {
                     self.max_tool_iterations
                 );
 
+                // A plan task may only be marked success=true with evidence
+                // that its work happened (see plan_completion_rejection).
+                if tool_name == "plan" {
+                    if let Some(reason) = plan_completion_rejection(
+                        &tool_input,
+                        mutating_evidence,
+                        &tool_context.working_directory,
+                        tool_context.session_id,
+                    ) {
+                        tracing::warn!(
+                            "⚠️ Blocked a plan complete_task without evidence of work \
+                             (mutating calls since last completion: {})",
+                            mutating_evidence
+                        );
+                        tool_results.push(ContentBlock::ToolResult {
+                            tool_use_id: tool_id,
+                            content: reason,
+                            is_error: Some(true),
+                        });
+                        continue;
+                    }
+                }
+
                 // Check if approval is needed. `requires_approval` is a static
                 // property of the tool (bash always returns true), so it alone
                 // would re-prompt for every `ls`. Defer to the permission policy
@@ -1235,16 +1347,20 @@ impl AgentService {
                                 };
 
                                 // Execute the tool with approved context
-                                mutating_tool_ran |= self
+                                let is_mutating = self
                                     .tool_registry
                                     .get(&tool_name)
                                     .is_some_and(|t| has_mutating_capability(&t.capabilities()));
+                                mutating_tool_ran |= is_mutating;
                                 match self
                                     .tool_registry
                                     .execute(&tool_name, tool_input, &approved_tool_context)
                                     .await
                                 {
                                     Ok(result) => {
+                                        if result.success && is_mutating {
+                                            mutating_evidence += 1;
+                                        }
                                         tool_results.push(ContentBlock::ToolResult {
                                             tool_use_id: tool_id,
                                             content: if result.success {
@@ -1294,16 +1410,30 @@ impl AgentService {
                 }
 
                 // Execute the tool
-                mutating_tool_ran |= self
+                let is_mutating = self
                     .tool_registry
                     .get(&tool_name)
                     .is_some_and(|t| has_mutating_capability(&t.capabilities()));
+                mutating_tool_ran |= is_mutating;
+                let completes_plan_task = tool_name == "plan"
+                    && tool_input.get("operation").and_then(|v| v.as_str())
+                        == Some("complete_task");
                 match self
                     .tool_registry
                     .execute(&tool_name, tool_input, &tool_context)
                     .await
                 {
                     Ok(result) => {
+                        if result.success {
+                            if is_mutating {
+                                mutating_evidence += 1;
+                            }
+                            // Checkpoint: an accepted completion consumes the
+                            // evidence, so the NEXT task needs its own.
+                            if completes_plan_task {
+                                mutating_evidence = 0;
+                            }
+                        }
                         tool_results.push(ContentBlock::ToolResult {
                             tool_use_id: tool_id,
                             content: if result.success {
@@ -1850,6 +1980,78 @@ mod tests {
         assert_ne!(
             sig("ls", &serde_json::json!({ "path": "src" })),
             sig("ls", &serde_json::json!({ "path": "tests" }))
+        );
+    }
+
+    /// Regression: gemma4 rubber-stamped plan tasks 3-4 - bare
+    /// `complete_task(success=true)` calls with zero tool activity in
+    /// between - leaving a "Completed" plan whose work was never done.
+    /// Unearned success must be refused; every honest path must pass.
+    #[test]
+    fn plan_completion_gate_decision_matrix() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        let session = Uuid::new_v4();
+        let complete_ok = serde_json::json!({
+            "operation": "complete_task", "task_order": 2, "success": true, "output": "done"
+        });
+
+        // The observed failure: success=true, no evidence, no artifacts.
+        let rejection = plan_completion_rejection(&complete_ok, 0, dir, session);
+        assert!(rejection.is_some(), "unearned success=true must be refused");
+        assert!(
+            rejection.unwrap().contains("skip_task"),
+            "the refusal must teach the honest ways out"
+        );
+
+        // Evidence of work since the last completion -> allowed.
+        assert!(plan_completion_rejection(&complete_ok, 1, dir, session).is_none());
+
+        // Honest failure and unrelated plan operations are never gated.
+        let failed = serde_json::json!({
+            "operation": "complete_task", "task_order": 2, "success": false, "output": "broke"
+        });
+        assert!(plan_completion_rejection(&failed, 0, dir, session).is_none());
+        let add = serde_json::json!({ "operation": "add_task", "title": "T" });
+        assert!(plan_completion_rejection(&add, 0, dir, session).is_none());
+
+        // Artifacts that exist on disk are verifiable evidence...
+        std::fs::write(dir.join("made.py"), "x").unwrap();
+        let with_real_artifact = serde_json::json!({
+            "operation": "complete_task", "task_order": 2, "success": true,
+            "output": "done", "artifacts": ["made.py"]
+        });
+        assert!(plan_completion_rejection(&with_real_artifact, 0, dir, session).is_none());
+
+        // ...but claimed artifacts that DON'T exist are a firm refusal.
+        let with_fake_artifact = serde_json::json!({
+            "operation": "complete_task", "task_order": 2, "success": true,
+            "output": "done", "artifacts": ["made.py", "ghost.py"]
+        });
+        let rejection = plan_completion_rejection(&with_fake_artifact, 0, dir, session);
+        assert!(
+            rejection.as_deref().is_some_and(|m| m.contains("ghost.py")),
+            "missing artifacts must be named, got: {rejection:?}"
+        );
+
+        // A Research task legitimately changes nothing - exempt via the plan
+        // file's task type.
+        let mut plan =
+            crate::plan::PlanDocument::new(session, "Investigate".to_string(), String::new());
+        plan.tasks.push(crate::plan::PlanTask::new(
+            2,
+            "Read the codebase".to_string(),
+            String::new(),
+            crate::plan::TaskType::Research,
+        ));
+        std::fs::write(
+            dir.join(format!(".crustly_plan_{session}.json")),
+            serde_json::to_string(&plan).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            plan_completion_rejection(&complete_ok, 0, dir, session).is_none(),
+            "a Research task must complete without mutating evidence"
         );
     }
 

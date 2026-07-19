@@ -30,6 +30,9 @@ Ollama's native `think` parameter is now configurable per model (and provider-wi
 #### Resilient Plan Creation
 Plan Mode now survives sparse tool calls from small local models: `plan create` and `add_task` require only a `title` (`description` defaults to empty, `task_type` to `"other"`), where the previous hard requirements sent models into "missing field" retry spirals that the loop breaker then killed — leaving one-task plans. Plan-building turns are also exempt from the silent-tool-call drift guard, since building a plan is legitimately `create` + one `add_task` per step + `finalize` with nothing to say in between.
 
+#### Earned Task Completion
+Marking a plan task `success=true` now requires evidence the work happened — gemma4 was observed rubber-stamping the second half of a plan (bare `complete_task` calls with zero tool activity, leaving a "Completed" plan whose work was never done). A completion is accepted when a mutating tool (file write, shell, …) succeeded since the previous task completed, when the listed `artifacts` verifiably exist on disk, or when the task is `research`-type (which legitimately changes nothing). Honest outcomes are never gated: `success=false` and `skip_task` always go through, and a refusal tells the model exactly which paths are open.
+
 #### Qwen3-Coder-Next & Qwen3.6-27B Support
 Added `qwen3-coder-next` and `qwen3.6-27b` to the Qwen provider's known model list with their real 256K context window (previously fell back to a conservative 32K default, triggering premature context compaction). The provider also now auto-selects the OpenAI tool parser when `default_model` contains `coder-next`, matching Qwen3-Coder-Next's documented vLLM/SGLang serving recipe (`--tool-call-parser qwen3_coder`), which returns structured `tool_calls` rather than Hermes `<tool_call>` tags. See [QWEN_INTEGRATION.md](docs/guides/QWEN_INTEGRATION.md) for the updated serving instructions.
 
