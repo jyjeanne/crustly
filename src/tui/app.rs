@@ -1222,6 +1222,22 @@ impl App {
 
     /// Clear all messages from the current session
     async fn clear_session(&mut self) -> Result<()> {
+        // Refuse to clear while a response is still generating for THIS session.
+        // The agent call runs as a detached background task that, on completion,
+        // creates an assistant message and then updates it (usage/metrics). If we
+        // delete every message for the session out from under that task, its
+        // trailing `update_message_usage` finds nothing and fails with
+        // "Message not found" - and a message created *after* the delete would
+        // reappear as an orphan in the just-cleared session. Mirror the
+        // concurrency guard `send_message` already uses for a second submission.
+        if self.is_processing
+            && self.processing_session == self.current_session.as_ref().map(|s| s.id)
+        {
+            self.error_message =
+                Some("⏳ Wait for the response to finish before clearing.".to_string());
+            return Ok(());
+        }
+
         if let Some(session) = &self.current_session {
             // Delete all messages from the database
             self.message_service
@@ -3856,6 +3872,86 @@ mod tests {
         assert!(
             app.streaming_response.is_none(),
             "switching away must not leave a different session's partial reply visible"
+        );
+    }
+
+    /// Regression: pressing Ctrl+K (clear session) while a response is still
+    /// generating used to delete every message for the session out from under
+    /// the detached agent task, whose trailing `update_message_usage` then
+    /// failed with "Message not found". `clear_session` must instead refuse
+    /// and leave the transcript untouched while a request is in flight for the
+    /// current session.
+    #[tokio::test]
+    async fn clear_session_is_refused_while_the_current_session_is_processing() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let session_id = app.current_session.as_ref().unwrap().id;
+
+        // Persist a message so we can prove nothing was deleted.
+        app.message_service
+            .create_message(session_id, "assistant".to_string(), "in flight".to_string())
+            .await
+            .unwrap();
+
+        // A request is in flight for THIS session.
+        app.is_processing = true;
+        app.processing_session = Some(session_id);
+
+        app.clear_session().await.unwrap();
+
+        let remaining = app
+            .message_service
+            .list_messages_for_session(session_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            remaining.len(),
+            1,
+            "clear_session must not delete messages while the session is processing"
+        );
+        assert!(
+            app.error_message
+                .as_ref()
+                .is_some_and(|m| m.contains("Wait for the response")),
+            "the user should see a hint explaining why Ctrl+K did nothing"
+        );
+    }
+
+    /// The guard is scoped to the *current* session: a request in flight for a
+    /// different session must not block clearing the one on screen.
+    #[tokio::test]
+    async fn clear_session_proceeds_when_only_another_session_is_processing() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+        let other_session_id = app.current_session.as_ref().unwrap().id;
+
+        app.create_new_session().await.unwrap();
+        let current_session_id = app.current_session.as_ref().unwrap().id;
+        assert_ne!(other_session_id, current_session_id);
+
+        app.message_service
+            .create_message(
+                current_session_id,
+                "assistant".to_string(),
+                "on screen".to_string(),
+            )
+            .await
+            .unwrap();
+
+        // Something is processing, but for the OTHER session.
+        app.is_processing = true;
+        app.processing_session = Some(other_session_id);
+
+        app.clear_session().await.unwrap();
+
+        let remaining = app
+            .message_service
+            .list_messages_for_session(current_session_id)
+            .await
+            .unwrap();
+        assert!(
+            remaining.is_empty(),
+            "clear_session must proceed when the in-flight request belongs to a different session"
         );
     }
 
