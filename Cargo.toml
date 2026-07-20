@@ -30,7 +30,7 @@ crossterm = { version = "0.29", features = ["event-stream"] }
 ratatui-textarea = "0.9"
 tui-tree-widget = "0.24"
 ratatui-image = { version = "11.0", default-features = false, features = ["image-defaults", "crossterm"] }
-viuer = "0.7"
+viuer = "0.11"
 arboard = "3.4"
 
 # Database
