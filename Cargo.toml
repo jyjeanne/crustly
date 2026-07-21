@@ -117,7 +117,7 @@ mime = "0.3"
 base64 = "0.21"
 
 # Document Parsing
-pdf-extract = "0.7"
+pdf-extract = "0.12"
 zip = "8.6"
 quick-xml = "0.41"
 
