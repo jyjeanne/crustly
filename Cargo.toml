@@ -68,7 +68,7 @@ crabrace = "0.1.0"
 
 # Error Handling
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 color-eyre = "0.6"
 
 # Logging & Tracing
