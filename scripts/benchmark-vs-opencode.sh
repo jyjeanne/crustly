@@ -171,7 +171,7 @@ measure_rss_gnu_time() {
 measure_rss_proc_poll() {
   local bin="$1" arg="$2"
   [ "$OS_NAME" = "Linux" ] || { echo ""; return; }
-  "$bin" "$arg" &
+  "$bin" "$arg" >/dev/null 2>&1 &
   local pid=$!
   local peak=0
   while kill -0 "$pid" 2>/dev/null; do
@@ -209,7 +209,13 @@ file_size_bytes() {
 }
 
 human_kib() {
-  awk -v b="$1" 'BEGIN { if (b == "" ) { print "n/a" } else { printf "%.1f MiB", b/1024 } }'
+  # Input already in KiB (as reported by GNU time -v / /proc VmRSS).
+  awk -v k="$1" 'BEGIN { if (k == "" ) { print "n/a" } else { printf "%.1f MiB", k/1024 } }'
+}
+
+human_bytes() {
+  # Input in bytes (as reported by stat).
+  awk -v b="$1" 'BEGIN { if (b == "" ) { print "n/a" } else { printf "%.1f MiB", b/1048576 } }'
 }
 
 # ── Run measurements ─────────────────────────────────────────────────────
@@ -285,9 +291,9 @@ extract_field() { echo "$1" | grep -o "$2=[0-9.]*" | cut -d= -f2; }
   echo
   echo "| Tool | Path | Size |"
   echo "|---|---|---|"
-  echo "| crustly | \`$CRUSTLY_BIN\` | $(human_kib "$CRUSTLY_SIZE_BYTES") ($CRUSTLY_SIZE_BYTES bytes) |"
+  echo "| crustly | \`$CRUSTLY_BIN\` | $(human_bytes "$CRUSTLY_SIZE_BYTES") ($CRUSTLY_SIZE_BYTES bytes) |"
   if [ "$OPENCODE_AVAILABLE" -eq 1 ]; then
-    echo "| opencode | \`$OPENCODE_BIN\` | $(human_kib "$OPENCODE_SIZE_BYTES") ($OPENCODE_SIZE_BYTES bytes) |"
+    echo "| opencode | \`$OPENCODE_BIN\` | $(human_bytes "$OPENCODE_SIZE_BYTES") ($OPENCODE_SIZE_BYTES bytes) |"
   else
     echo "| opencode | — | not measured |"
   fi
