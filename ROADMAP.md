@@ -3,6 +3,8 @@
 **Current Version:** 0.5.2 — July 2026
 **Author:** Jeremy JEANNE
 
+**Related strategy docs:** [`differentiation-strategy-vs-opencode.md`](./differentiation-strategy-vs-opencode.md) (competitive positioning — depth over breadth), [`docs/guides/SECURITY_MODEL.md`](./docs/guides/SECURITY_MODEL.md) (permission engine, compared to OpenCode's), [`llm-file-gguf-support.md`](./llm-file-gguf-support.md) (direct GGUF loading evaluation, conditional Go/No-Go)
+
 ---
 
 ## Completed Milestones
@@ -71,6 +73,32 @@ Hardening pass from end-to-end agentic testing against local Ollama models (qwen
 ### v0.6 — Stability & Developer Experience
 **Target:** Q4 2026
 
+**Competitive positioning (from `differentiation-strategy-vs-opencode.md`)** — the study
+concluded Crustly should compete on depth (resource efficiency, permission-model rigor,
+auditability) rather than chasing OpenCode's breadth (75+ providers, plugin ecosystem,
+multi-frontend client/server). The two cheapest, highest-confidence items from its roadmap
+are done; the rest are tracked here as they get picked up:
+
+- [x] **Security model documentation** — `docs/guides/SECURITY_MODEL.md` documents the
+  `PermissionPolicy` engine (`Allow`/`Trusted`/`Deny`, composable `AndPolicy`/`OrPolicy`, path
+  boundary enforcement with symlink/Windows-verbatim-prefix handling, bash allowlist hardened
+  against shell-operator-chaining bypass), every claim tied to file/line and verified against
+  the test suite (`cargo test --lib llm::tools::sandbox`, 22/22 passing). Compares directly to
+  OpenCode's documented "no sandbox, no rule engine, no hooks" permission model
+- [x] **Resource-footprint benchmark tooling** — `scripts/benchmark-vs-opencode.sh` measures
+  cold-start time, peak RSS, and binary size reproducibly against OpenCode on the same machine
+  (`benchmarks/README.md` for methodology and ground rules: real numbers only, publish
+  unfavorable results too)
+- [ ] **Publish first real crustly-vs-opencode benchmark report** — run the script above on a
+  machine with both tools installed and commit the resulting report under `benchmarks/results/`
+  (not yet done from this environment — OpenCode isn't installed here, so no comparative numbers
+  have been fabricated)
+- [ ] **Plan Mode audit export** — `crustly plan export --session <id>`, turning the existing
+  persisted `PlanDocument`/`plan_tasks` model (ADR 0004) into a reviewable audit report; see
+  `differentiation-strategy-vs-opencode.md` §3.4
+- [ ] **"Zero-daemon" positioning in user-facing docs** — README/onboarding language stating
+  plainly that Crustly never starts a background server or opens a local port, unlike
+  OpenCode's Hono HTTP/SSE server (see `differentiation-strategy-vs-opencode.md` §3.2)
 - [ ] **Integration test suite** — full chat/tool/approval flows with a mock provider (no live API calls required)
 - [ ] **CI/CD pipeline** — GitHub Actions: `cargo test`, `cargo clippy`, `cargo fmt --check`, `cargo audit` on every PR
 - [ ] **Interactive settings TUI** — configure provider, API keys (masked), model, tool toggles, approval timeout from inside the TUI
@@ -123,6 +151,7 @@ Hardening pass from end-to-end agentic testing against local Ollama models (qwen
 | Item | Notes |
 |------|-------|
 | RAG / vector store | Semantic search over the codebase; integrate with the existing codebase index. Raw embedding generation is already available via the native Ollama provider (`crustly ollama embed`) — no retrieval layer wired up yet |
+| Direct GGUF model loading (no Ollama) | Evaluated in [`llm-file-gguf-support.md`](./llm-file-gguf-support.md) via the `llama-cpp-2` crate — technically sound (native crate, MIT/Apache-2.0, GGUF-native) but a multi-week embedded-inference-engine effort. **Conditional Go/No-Go**: currently No-Go pending confirmation of either an air-gapped/IT-restricted deployment requirement or a measured local-model tool-calling failure rate; reopen the moment either appears. Would complete Crustly's "zero-daemon" story end-to-end (see `differentiation-strategy-vs-opencode.md` §3.2) |
 | Multi-pane TUI | Chat + file preview split; tabs for multiple conversations |
 | Web interface | Optional `crustly serve` command exposing a browser UI |
 | Multi-user / team | Shared sessions, role-based approval, audit log export |
@@ -139,3 +168,7 @@ Hardening pass from end-to-end agentic testing against local Ollama models (qwen
 3. **Explicit approval** — dangerous operations always pause for user confirmation; no silent side effects.
 4. **Measurable before optimised** — add benchmarks before claiming performance improvements.
 5. **Security before features** — path traversal, injection, and API key hygiene are non-negotiable pre-conditions for 1.0.
+6. **Depth over breadth** — compete on resource efficiency, permission-model rigor, and
+   auditability rather than chasing provider count, plugin ecosystems, or multi-frontend
+   surface area; see `differentiation-strategy-vs-opencode.md` for the reasoning and the
+   explicit list of what this project deliberately does not chase.
