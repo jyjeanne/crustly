@@ -51,7 +51,7 @@ shellexpand = "3.1"
 
 # HTTP & LLM Clients
 reqwest = { version = "0.12", features = ["json", "native-tls", "stream"], default-features = false }
-async-openai = { version = "0.20", optional = true }
+async-openai = { version = "0.41", optional = true }
 aws-sdk-bedrockruntime = { version = "1.15", optional = true }
 # Native Ollama provider. Pulls its own reqwest 0.12 client internally (ollama-rs
 # is built against reqwest 0.12, incompatible with the reqwest 0.11 client used
