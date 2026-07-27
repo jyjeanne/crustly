@@ -99,7 +99,7 @@ tower-lsp = "0.20"
 lsp-types = "0.97"
 
 # Tokenization (BPE-based, accurate to <2% for cl100k_base vocab)
-tiktoken-rs = "0.5"
+tiktoken-rs = "0.12"
 
 # Concurrent Data Structures
 dashmap = "6.2"
