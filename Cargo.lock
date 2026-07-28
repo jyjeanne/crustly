@@ -1793,7 +1793,7 @@ dependencies = [
  "async-openai",
  "async-trait",
  "aws-sdk-bedrockruntime",
- "base64 0.21.7",
+ "base64 0.22.1",
  "bytes",
  "chrono",
  "clap",
