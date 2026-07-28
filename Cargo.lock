@@ -1793,7 +1793,7 @@ dependencies = [
  "async-openai",
  "async-trait",
  "aws-sdk-bedrockruntime",
- "base64 0.21.7",
+ "base64 0.22.1",
  "bytes",
  "chrono",
  "clap",
@@ -3509,7 +3509,7 @@ dependencies = [
  "jni-sys",
  "log",
  "simd_cesu8",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "walkdir",
  "windows-link",
 ]
@@ -4904,7 +4904,7 @@ dependencies = [
  "spin 0.10.1",
  "symbolic-demangle",
  "tempfile",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]

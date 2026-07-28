@@ -114,7 +114,7 @@ keyring = "4.1"
 # Misc
 bytes = "1.5"
 mime = "0.3"
-base64 = "0.21"
+base64 = "0.22"
 
 # Document Parsing
 pdf-extract = "0.12"
