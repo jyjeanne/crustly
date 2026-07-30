@@ -1,0 +1,180 @@
+---
+type: Rust Method
+title: len
+resource: src/config/secrets.rs#L149-L151
+generated:
+  by: okf-rs/0.2.0
+relationships:
+  called_by:
+  - functions/benches/parallel_tool_dispatch/read_sequential
+  - functions/src/cli/cmd_logs
+  - functions/src/db/models/interrupted_plan_from_tasks
+  - functions/src/db/repository/memory/EpisodicMemoryRepository/list_recent
+  - functions/src/llm/agent/compaction/compact
+  - functions/src/llm/agent/compaction/compaction_atomicity_db_failure_leaves_context_unchanged
+  - functions/src/llm/agent/context/token_count
+  - functions/src/llm/agent/context/test_trim_to_fit
+  - functions/src/llm/agent/service/route_text_delta
+  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+  - functions/src/llm/pdf_context/augment_message_with_pdf
+  - functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete
+  - functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream
+  - functions/src/llm/provider/ollama/parse_keep_alive
+  - functions/src/llm/provider/openai/OpenAIProvider/provider/complete
+  - functions/src/llm/provider/openai/OpenAIProvider/provider/stream
+  - functions/src/llm/provider/qwen/QwenProvider/find_json_objects
+  - functions/src/llm/provider/qwen/QwenProvider/expand_span_over_adjacent_fences
+  - functions/src/llm/provider/qwen/QwenProvider/parse_native_qwen_tool_calls
+  - functions/src/llm/provider/qwen/QwenProvider/clean_incomplete_markers
+  - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+  - functions/src/llm/provider/qwen/QwenProvider/provider/complete
+  - functions/src/llm/provider/qwen/QwenProvider/provider/stream
+  - functions/src/llm/provider/types/extract_think_tags
+  - functions/src/llm/tools/apply_patch/parse_patch
+  - functions/src/llm/tools/apply_patch/find_subsequence
+  - functions/src/llm/tools/apply_patch/apply_hunks
+  - functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/execute
+  - functions/src/llm/tools/bash/is_read_only_command
+  - functions/src/llm/tools/context/ContextTool/tool/execute
+  - functions/src/llm/tools/doc_parser/DocParserTool/tool/execute
+  - functions/src/llm/tools/doc_parser/DocParserTool/parse_pdf
+  - functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags
+  - functions/src/llm/tools/edit/EditTool/tool/execute
+  - functions/src/llm/tools/file_read_cache/FileFingerprint/of
+  - functions/src/llm/tools/glob/GlobTool/tool/execute
+  - functions/src/llm/tools/grep/GrepTool/tool/execute
+  - functions/src/llm/tools/grep/GrepTool/search_file
+  - functions/src/llm/tools/http/HttpClientTool/tool/execute
+  - functions/src/llm/tools/ls/LsTool/list_directory
+  - functions/src/llm/tools/notebook/NotebookEditTool/tool/execute
+  - functions/src/llm/tools/plan_tool/validate_plan_file_path
+  - functions/src/llm/tools/plan_tool/validate_string
+  - functions/src/llm/tools/plan_tool/PlanTool/tool/execute
+  - functions/src/llm/tools/read/ReadTool/tool/execute
+  - functions/src/llm/tools/registry/ToolRegistry/count
+  - functions/src/llm/tools/ssrf_guard/checked_redirect_policy
+  - functions/src/llm/tools/todo_write/TodoWriteTool/tool/execute
+  - functions/src/llm/tools/web_fetch/WebFetchTool/tool/execute
+  - functions/src/llm/tools/web_search/WebSearchTool/tool/execute
+  - functions/src/llm/tools/write/WriteTool/tool/execute
+  - functions/src/mcp/client/MCPClient/read_response_line
+  - functions/src/plan/PlanDocument/tasks_in_order
+  - functions/src/plan/PlanDocument/progress_percentage
+  - functions/src/plan/PlanDocument/execution_summary
+  - functions/src/plan/PlanDocument/get_validation_warnings
+  - functions/src/plan/PlanModeState/approve
+  - functions/src/services/plan/PlanService/validate_plan
+  - functions/src/services/plan/PlanService/get_statistics
+  - functions/src/tui/app/App/cursor_on_last_line
+  - functions/src/tui/app/App/history_prev
+  - functions/src/tui/app/App/history_next
+  - functions/src/tui/app/App/handle_sessions_key
+  - functions/src/tui/app/App/handle_skills_key
+  - functions/src/tui/app/App/handle_mcp_key
+  - functions/src/tui/app/App/handle_plan_key
+  - functions/src/tui/app/App/check_and_load_plan
+  - functions/src/tui/app/App/execute_next_plan_task
+  - functions/src/tui/app/App/handle_file_picker_key
+  - functions/src/tui/app/App/handle_model_download_key
+  - functions/src/tui/app/App/handle_provider_switch_key
+  - functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions
+  - functions/src/tui/app/send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight
+  - functions/src/tui/app/send_message_still_works_for_a_different_session_than_the_one_processing
+  - functions/src/tui/render/render_header
+  - functions/src/tui/render/render_processing_indicator
+  - functions/src/tui/render/render_chat
+  - functions/src/tui/render/render_approval_input_summary
+  - functions/src/tui/render/render_file_picker
+  - functions/src/utils/truncate_at_char_boundary
+  - functions/tests/compaction_test/compaction_fails_gracefully_with_insufficient_turns
+  - functions/tests/integration_test/MockProvider/provider/complete
+---
+
+# Signature
+
+`pub fn len(&self) -> usize`
+
+# Called by
+
+- [read_sequential](../../../../../functions/benches/parallel_tool_dispatch/read_sequential.md)
+- [cmd_logs](../../../../../functions/src/cli/cmd_logs.md)
+- [interrupted_plan_from_tasks](../../../../../functions/src/db/models/interrupted_plan_from_tasks.md)
+- [list_recent](../../../../../functions/src/db/repository/memory/EpisodicMemoryRepository/list_recent.md)
+- [compact](../../../../../functions/src/llm/agent/compaction/compact.md)
+- [compaction_atomicity_db_failure_leaves_context_unchanged](../../../../../functions/src/llm/agent/compaction/compaction_atomicity_db_failure_leaves_context_unchanged.md)
+- [token_count](../../../../../functions/src/llm/agent/context/token_count.md)
+- [test_trim_to_fit](../../../../../functions/src/llm/agent/context/test_trim_to_fit.md)
+- [route_text_delta](../../../../../functions/src/llm/agent/service/route_text_delta.md)
+- [send_message_with_tools_inner](../../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.md)
+- [augment_message_with_pdf](../../../../../functions/src/llm/pdf_context/augment_message_with_pdf.md)
+- [complete](../../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete.md)
+- [stream](../../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream.md)
+- [parse_keep_alive](../../../../../functions/src/llm/provider/ollama/parse_keep_alive.md)
+- [complete](../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/complete.md)
+- [stream](../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/stream.md)
+- [find_json_objects](../../../../../functions/src/llm/provider/qwen/QwenProvider/find_json_objects.md)
+- [expand_span_over_adjacent_fences](../../../../../functions/src/llm/provider/qwen/QwenProvider/expand_span_over_adjacent_fences.md)
+- [parse_native_qwen_tool_calls](../../../../../functions/src/llm/provider/qwen/QwenProvider/parse_native_qwen_tool_calls.md)
+- [clean_incomplete_markers](../../../../../functions/src/llm/provider/qwen/QwenProvider/clean_incomplete_markers.md)
+- [from_qwen_response](../../../../../functions/src/llm/provider/qwen/QwenProvider/from_qwen_response.md)
+- [complete](../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/complete.md)
+- [stream](../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/stream.md)
+- [extract_think_tags](../../../../../functions/src/llm/provider/types/extract_think_tags.md)
+- [parse_patch](../../../../../functions/src/llm/tools/apply_patch/parse_patch.md)
+- [find_subsequence](../../../../../functions/src/llm/tools/apply_patch/find_subsequence.md)
+- [apply_hunks](../../../../../functions/src/llm/tools/apply_patch/apply_hunks.md)
+- [execute](../../../../../functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/execute.md)
+- [is_read_only_command](../../../../../functions/src/llm/tools/bash/is_read_only_command.md)
+- [execute](../../../../../functions/src/llm/tools/context/ContextTool/tool/execute.md)
+- [execute](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/tool/execute.md)
+- [parse_pdf](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/parse_pdf.md)
+- [strip_html_tags](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags.md)
+- [execute](../../../../../functions/src/llm/tools/edit/EditTool/tool/execute.md)
+- [of](../../../../../functions/src/llm/tools/file_read_cache/FileFingerprint/of.md)
+- [execute](../../../../../functions/src/llm/tools/glob/GlobTool/tool/execute.md)
+- [execute](../../../../../functions/src/llm/tools/grep/GrepTool/tool/execute.md)
+- [search_file](../../../../../functions/src/llm/tools/grep/GrepTool/search_file.md)
+- [execute](../../../../../functions/src/llm/tools/http/HttpClientTool/tool/execute.md)
+- [list_directory](../../../../../functions/src/llm/tools/ls/LsTool/list_directory.md)
+- [execute](../../../../../functions/src/llm/tools/notebook/NotebookEditTool/tool/execute.md)
+- [validate_plan_file_path](../../../../../functions/src/llm/tools/plan_tool/validate_plan_file_path.md)
+- [validate_string](../../../../../functions/src/llm/tools/plan_tool/validate_string.md)
+- [execute](../../../../../functions/src/llm/tools/plan_tool/PlanTool/tool/execute.md)
+- [execute](../../../../../functions/src/llm/tools/read/ReadTool/tool/execute.md)
+- [count](../../../../../functions/src/llm/tools/registry/ToolRegistry/count.md)
+- [checked_redirect_policy](../../../../../functions/src/llm/tools/ssrf_guard/checked_redirect_policy.md)
+- [execute](../../../../../functions/src/llm/tools/todo_write/TodoWriteTool/tool/execute.md)
+- [execute](../../../../../functions/src/llm/tools/web_fetch/WebFetchTool/tool/execute.md)
+- [execute](../../../../../functions/src/llm/tools/web_search/WebSearchTool/tool/execute.md)
+- [execute](../../../../../functions/src/llm/tools/write/WriteTool/tool/execute.md)
+- [read_response_line](../../../../../functions/src/mcp/client/MCPClient/read_response_line.md)
+- [tasks_in_order](../../../../../functions/src/plan/PlanDocument/tasks_in_order.md)
+- [progress_percentage](../../../../../functions/src/plan/PlanDocument/progress_percentage.md)
+- [execution_summary](../../../../../functions/src/plan/PlanDocument/execution_summary.md)
+- [get_validation_warnings](../../../../../functions/src/plan/PlanDocument/get_validation_warnings.md)
+- [approve](../../../../../functions/src/plan/PlanModeState/approve.md)
+- [validate_plan](../../../../../functions/src/services/plan/PlanService/validate_plan.md)
+- [get_statistics](../../../../../functions/src/services/plan/PlanService/get_statistics.md)
+- [cursor_on_last_line](../../../../../functions/src/tui/app/App/cursor_on_last_line.md)
+- [history_prev](../../../../../functions/src/tui/app/App/history_prev.md)
+- [history_next](../../../../../functions/src/tui/app/App/history_next.md)
+- [handle_sessions_key](../../../../../functions/src/tui/app/App/handle_sessions_key.md)
+- [handle_skills_key](../../../../../functions/src/tui/app/App/handle_skills_key.md)
+- [handle_mcp_key](../../../../../functions/src/tui/app/App/handle_mcp_key.md)
+- [handle_plan_key](../../../../../functions/src/tui/app/App/handle_plan_key.md)
+- [check_and_load_plan](../../../../../functions/src/tui/app/App/check_and_load_plan.md)
+- [execute_next_plan_task](../../../../../functions/src/tui/app/App/execute_next_plan_task.md)
+- [handle_file_picker_key](../../../../../functions/src/tui/app/App/handle_file_picker_key.md)
+- [handle_model_download_key](../../../../../functions/src/tui/app/App/handle_model_download_key.md)
+- [handle_provider_switch_key](../../../../../functions/src/tui/app/App/handle_provider_switch_key.md)
+- [stale_session_response_complete_is_dropped_after_switching_sessions](../../../../../functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions.md)
+- [send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight](../../../../../functions/src/tui/app/send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight.md)
+- [send_message_still_works_for_a_different_session_than_the_one_processing](../../../../../functions/src/tui/app/send_message_still_works_for_a_different_session_than_the_one_processing.md)
+- [render_header](../../../../../functions/src/tui/render/render_header.md)
+- [render_processing_indicator](../../../../../functions/src/tui/render/render_processing_indicator.md)
+- [render_chat](../../../../../functions/src/tui/render/render_chat.md)
+- [render_approval_input_summary](../../../../../functions/src/tui/render/render_approval_input_summary.md)
+- [render_file_picker](../../../../../functions/src/tui/render/render_file_picker.md)
+- [truncate_at_char_boundary](../../../../../functions/src/utils/truncate_at_char_boundary.md)
+- [compaction_fails_gracefully_with_insufficient_turns](../../../../../functions/tests/compaction_test/compaction_fails_gracefully_with_insufficient_turns.md)
+- [complete](../../../../../functions/tests/integration_test/MockProvider/provider/complete.md)

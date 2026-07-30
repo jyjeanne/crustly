@@ -1,0 +1,18 @@
+---
+type: Rust Method
+title: project_config_path
+resource: src/config/mod.rs#L725-L736
+generated:
+  by: okf-rs/0.2.0
+relationships:
+  called_by:
+  - functions/src/config/Config/load
+---
+
+# Signature
+
+`pub fn project_config_path() -> Option<PathBuf>`
+
+# Called by
+
+- [load](../../../../functions/src/config/Config/load.md)

@@ -120,3 +120,7 @@ docs/graph/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 
 # Universal Ctags symbol index (scripts/generate-ctags.sh) - regenerable, not diffable
 /tags
+
+# okf-rs OKF bundle: keep knowledge/ and okf.toml under version control, but
+# not the regenerable incremental-index cache (`okf-rs generate`/`watch`).
+.okf-cache.json

@@ -1,0 +1,12 @@
+---
+type: Rust Function
+title: test_cli_parse_config_path
+resource: tests/cli_test.rs#L202-L205
+visibility: private
+generated:
+  by: okf-rs/0.2.0
+---
+
+# Signature
+
+`fn test_cli_parse_config_path()`
