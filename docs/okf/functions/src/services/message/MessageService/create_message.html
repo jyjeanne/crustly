@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>create_message — Rust Method</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>create_message</h1>
+<p class="type">Rust Method</p>
+<pre><code>pub async fn create_message( &amp;self, session_id: Uuid, role: String, content: String, ) -&gt; Result&lt;Message&gt;</code></pre>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/llm/agent/service/AgentService/send_message.html">send_message</a></li>
+<li><a href="../../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.html">send_message_with_tools_inner</a></li>
+<li><a href="../../../../../functions/src/llm/agent/service/AgentService/prepare_message_context.html">prepare_message_context</a></li>
+<li><a href="../../../../../functions/src/services/message/create_then_update_survives_a_file_backed_wal_pool.html">create_then_update_survives_a_file_backed_wal_pool</a></li>
+<li><a href="../../../../../functions/src/services/message/test_create_message.html">test_create_message</a></li>
+<li><a href="../../../../../functions/src/services/message/test_get_message.html">test_get_message</a></li>
+<li><a href="../../../../../functions/src/services/message/test_list_messages_for_session.html">test_list_messages_for_session</a></li>
+<li><a href="../../../../../functions/src/services/message/test_update_message_usage.html">test_update_message_usage</a></li>
+<li><a href="../../../../../functions/src/services/message/test_update_message_metrics_with_perf_data.html">test_update_message_metrics_with_perf_data</a></li>
+<li><a href="../../../../../functions/src/services/message/test_update_message_metrics_without_perf_data.html">test_update_message_metrics_without_perf_data</a></li>
+<li><a href="../../../../../functions/src/services/message/test_delete_message.html">test_delete_message</a></li>
+<li><a href="../../../../../functions/src/services/message/test_delete_messages_for_session.html">test_delete_messages_for_session</a></li>
+<li><a href="../../../../../functions/src/services/message/test_count_messages_in_session.html">test_count_messages_in_session</a></li>
+<li><a href="../../../../../functions/src/services/message/test_get_last_message.html">test_get_last_message</a></li>
+<li><a href="../../../../../functions/src/services/message/test_get_messages_by_role.html">test_get_messages_by_role</a></li>
+<li><a href="../../../../../functions/src/services/message/test_calculate_totals.html">test_calculate_totals</a></li>
+<li><a href="../../../../../functions/src/tui/app/clear_session_is_refused_while_the_current_session_is_processing.html">clear_session_is_refused_while_the_current_session_is_processing</a></li>
+<li><a href="../../../../../functions/src/tui/app/clear_session_proceeds_when_only_another_session_is_processing.html">clear_session_proceeds_when_only_another_session_is_processing</a></li>
+</ul>
+<p class="resource">Source: src/services/message.rs#L24-L60</p>
+</body>
+</html>

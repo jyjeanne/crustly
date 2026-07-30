@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>to_gemini_request — Rust Method</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../../index.html">Home</a> / <a href="../../../../../../functions/@index.html">functions</a></nav>
+<h1>to_gemini_request</h1>
+<p class="type">Rust Method</p>
+<p><span class="visibility">private</span></p>
+<pre><code>fn to_gemini_request(&amp;self, request: &amp;LLMRequest) -&gt; GeminiRequest</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/gemini_role.html">gemini_role</a></li>
+<li><a href="../../../../../../functions/src/config/secrets/SecretString/is_empty.html">is_empty</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/GeminiPart/text.html">text</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/complete.html">complete</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/test_to_gemini_request_maps_system_and_tools.html">test_to_gemini_request_maps_system_and_tools</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/test_to_gemini_request_tool_result_uses_function_name.html">test_to_gemini_request_tool_result_uses_function_name</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/test_thinking_config_forwarded.html">test_thinking_config_forwarded</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/test_json_mode_sets_response_mime_type.html">test_json_mode_sets_response_mime_type</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/test_full_json_schema_sets_response_schema.html">test_full_json_schema_sets_response_schema</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/test_inline_image_becomes_inline_data_part.html">test_inline_image_becomes_inline_data_part</a></li>
+<li><a href="../../../../../../functions/src/llm/provider/gemini/test_image_url_source_is_skipped_without_panicking.html">test_image_url_source_is_skipped_without_panicking</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/gemini.rs#L113-L261</p>
+</body>
+</html>

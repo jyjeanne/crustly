@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bash — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>bash</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/tools/bash/BashInput.html">BashInput</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/bash/BashTool.html">BashTool</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/tools/bash/BashTool/tool/capabilities.html">capabilities</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/bash/BashTool/tool/description.html">description</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/bash/BashTool/tool/execute.html">execute</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/bash/BashTool/tool/input_schema.html">input_schema</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/bash/BashTool/tool/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/bash/BashTool/tool/requires_approval.html">requires_approval</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/bash/BashTool/tool/validate_input.html">validate_input</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/bash/bash_runs_posix_in_the_requested_working_directory.html">bash_runs_posix_in_the_requested_working_directory</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/is_read_only_command.html">is_read_only_command</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/read_only_mode_allows_simple_safe_commands.html">read_only_mode_allows_simple_safe_commands</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/read_only_mode_rejects_chained_destructive_commands.html">read_only_mode_rejects_chained_destructive_commands</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/read_only_mode_rejects_git_config.html">read_only_mode_rejects_git_config</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/read_only_mode_rejects_mutating_find_flags.html">read_only_mode_rejects_mutating_find_flags</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/read_only_mode_rejects_network_fetch_tools.html">read_only_mode_rejects_network_fetch_tools</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/resolve_shell.html">resolve_shell</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_bash_accepts_directory_alias.html">test_bash_accepts_directory_alias</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_bash_invalid_command.html">test_bash_invalid_command</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_bash_is_background_notes_synchronous_fallback.html">test_bash_is_background_notes_synchronous_fallback</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_bash_simple_command.html">test_bash_simple_command</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_bash_timeout.html">test_bash_timeout</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_bash_timeout_field_overrides_context_default.html">test_bash_timeout_field_overrides_context_default</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_bash_tool_schema.html">test_bash_tool_schema</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_bash_with_exit_code.html">test_bash_with_exit_code</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/test_validate_empty_command.html">test_validate_empty_command</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/bash/windows_resolves_a_posix_shell_not_cmd.html">windows_resolves_a_posix_shell_not_cmd</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-result-toolerror</code></li>
+<li><code>external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/serde-json-value</code></li>
+<li><code>external/tokio-process-command</code></li>
+<li><code>external/tokio-time-timeout-duration</code></li>
+<li><code>external/std-sync-oncelock</code></li>
+<li><code>external/super</code></li>
+<li><code>external/uuid-uuid</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/tools/bash.rs#L1-L735</p>
+</body>
+</html>

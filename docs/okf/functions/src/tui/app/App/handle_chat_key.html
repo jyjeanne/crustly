@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>handle_chat_key — Rust Method</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>handle_chat_key</h1>
+<p class="type">Rust Method</p>
+<p><span class="visibility">private</span></p>
+<pre><code>async fn handle_chat_key(&amp;mut self, event: crossterm::event::KeyEvent) -&gt; Result&lt;()&gt;</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../../functions/src/tui/events/is_submit.html">is_submit</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/input_is_blank.html">input_is_blank</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/input_text.html">input_text</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/clear_input.html">clear_input</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/push_input_history.html">push_input_history</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/try_handle_slash_command.html">try_handle_slash_command</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_newline.html">is_newline</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_cancel.html">is_cancel</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_page_up.html">is_page_up</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_page_down.html">is_page_down</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_copy_response.html">is_copy_response</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/copy_last_response_to_clipboard.html">copy_last_response_to_clipboard</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_paste_clipboard.html">is_paste_clipboard</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/paste_from_clipboard.html">paste_from_clipboard</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/open_file_picker.html">open_file_picker</a></li>
+<li><a href="../../../../../functions/src/config/secrets/SecretString/is_empty.html">is_empty</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/cursor_on_first_line.html">cursor_on_first_line</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/history_prev.html">history_prev</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/cursor_on_last_line.html">cursor_on_last_line</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/history_next.html">history_next</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/tui/app/App/handle_key_event.html">handle_key_event</a></li>
+<li><a href="../../../../../functions/src/tui/app/up_recalls_previous_messages_without_sending_them.html">up_recalls_previous_messages_without_sending_them</a></li>
+<li><a href="../../../../../functions/src/tui/app/recalled_message_can_be_edited_before_resending.html">recalled_message_can_be_edited_before_resending</a></li>
+<li><a href="../../../../../functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft.html">up_moves_the_cursor_inside_a_multiline_draft</a></li>
+<li><a href="../../../../../functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history.html">up_is_plain_cursor_movement_when_there_is_no_history</a></li>
+<li><a href="../../../../../functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once.html">consecutive_duplicate_submissions_are_stored_once</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting.html">chat_shift_enter_inserts_newline_instead_of_submitting</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_alt_enter_inserts_newline_as_non_kitty_fallback.html">chat_alt_enter_inserts_newline_as_non_kitty_fallback</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_left_arrow_moves_cursor_for_mid_buffer_insert.html">chat_left_arrow_moves_cursor_for_mid_buffer_insert</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_backspace_deletes_at_cursor_not_always_the_last_char.html">chat_backspace_deletes_at_cursor_not_always_the_last_char</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_home_and_end_move_cursor_to_line_boundaries.html">chat_home_and_end_move_cursor_to_line_boundaries</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_ctrl_left_right_jump_by_word.html">chat_ctrl_left_right_jump_by_word</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_ctrl_backspace_deletes_whole_word.html">chat_ctrl_backspace_deletes_whole_word</a></li>
+<li><a href="../../../../../functions/src/tui/app/altgr_backslash_reaches_the_input.html">altgr_backslash_reaches_the_input</a></li>
+<li><a href="../../../../../functions/src/tui/app/altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut.html">altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut</a></li>
+<li><a href="../../../../../functions/src/tui/app/plain_at_sign_still_opens_the_file_picker.html">plain_at_sign_still_opens_the_file_picker</a></li>
+<li><a href="../../../../../functions/src/tui/app/typed_backslashes_reach_the_input.html">typed_backslashes_reach_the_input</a></li>
+<li><a href="../../../../../functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end.html">paste_inserts_at_cursor_not_always_appended_at_the_end</a></li>
+<li><a href="../../../../../functions/src/tui/app/ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard.html">ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard</a></li>
+<li><a href="../../../../../functions/src/tui/app/ctrl_y_copies_last_code_block_when_present.html">ctrl_y_copies_last_code_block_when_present</a></li>
+<li><a href="../../../../../functions/src/tui/app/ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking.html">ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking</a></li>
+<li><a href="../../../../../functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end.html">typing_and_submitting_slash_skills_opens_the_dialog_end_to_end</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer.html">chat_plain_enter_submits_and_clears_buffer</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_plain_enter_on_empty_buffer_does_nothing.html">chat_plain_enter_on_empty_buffer_does_nothing</a></li>
+<li><a href="../../../../../functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias.html">chat_ctrl_enter_still_submits_as_legacy_alias</a></li>
+</ul>
+<p class="resource">Source: src/tui/app.rs#L861-L969</p>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>qwen — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>qwen</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenChoice.html">QwenChoice</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenError.html">QwenError</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenErrorResponse.html">QwenErrorResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenFunction.html">QwenFunction</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenFunctionCall.html">QwenFunctionCall</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenFunctionCallDelta.html">QwenFunctionCallDelta</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenMessage.html">QwenMessage</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenMessageDelta.html">QwenMessageDelta</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenProvider.html">QwenProvider</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenRequest.html">QwenRequest</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenResponse.html">QwenResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenStreamChoice.html">QwenStreamChoice</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenStreamChunk.html">QwenStreamChunk</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenTool.html">QwenTool</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenToolCall.html">QwenToolCall</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenToolCallDelta.html">QwenToolCallDelta</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/QwenUsage.html">QwenUsage</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/SamplingOverrides.html">SamplingOverrides</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/ThinkingConfig.html">ThinkingConfig</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/qwen/ToolCallParser.html">ToolCallParser</a> — Rust Enum</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/build_client.html">build_client</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/clean_incomplete_markers.html">clean_incomplete_markers</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/dashscope_cn.html">dashscope_cn</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/dashscope_intl.html">dashscope_intl</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/default_sampling.html">default_sampling</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/expand_span_over_adjacent_fences.html">expand_span_over_adjacent_fences</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/extract_thinking.html">extract_thinking</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/find_json_objects.html">find_json_objects</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/format_hermes_tools.html">format_hermes_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/format_native_qwen_result.html">format_native_qwen_result</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/format_native_qwen_tools.html">format_native_qwen_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/from_qwen_response.html">from_qwen_response</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/generate_call_id.html">generate_call_id</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/handle_error.html">handle_error</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/headers.html">headers</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/is_local.html">is_local</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/local.html">local</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/local_only.html">local_only</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls.html">parse_fallback_tool_calls</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/parse_hermes_tool_calls.html">parse_hermes_tool_calls</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/parse_native_qwen_tool_calls.html">parse_native_qwen_tool_calls</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/supports_streaming.html">supports_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/supports_tools.html">supports_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/supports_vision.html">supports_vision</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/provider/validate_model.html">validate_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/push_fallback_or_text.html">push_fallback_or_text</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/to_qwen_request.html">to_qwen_request</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/tool_parser.html">tool_parser</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/with_base_url.html">with_base_url</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/with_default_model.html">with_default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/with_sampling.html">with_sampling</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/with_thinking.html">with_thinking</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/with_thinking_budget.html">with_thinking_budget</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/QwenProvider/with_tool_parser.html">with_tool_parser</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/find_after.html">find_after</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/find_after_ignores_a_match_before_start.html">find_after_ignores_a_match_before_start</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/find_after_returns_an_absolute_offset_not_a_relative_one.html">find_after_returns_an_absolute_offset_not_a_relative_one</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/find_after_returns_none_when_nothing_matches_after_start.html">find_after_returns_none_when_nothing_matches_after_start</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/llm_response_to_stream_events.html">llm_response_to_stream_events</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/mock_sse_server.html">mock_sse_server</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/stream_assembles_openai_style_tool_call_across_sse_chunks.html">stream_assembles_openai_style_tool_call_across_sse_chunks</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/stream_events_from_buffered_content.html">stream_events_from_buffered_content</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/stream_skips_malformed_sse_chunk_and_continues.html">stream_skips_malformed_sse_chunk_and_continues</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/streaming_assembles_hermes_tool_call_from_buffered_text.html">streaming_assembles_hermes_tool_call_from_buffered_text</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/streaming_plain_text_roundtrips_without_tool_calls.html">streaming_plain_text_roundtrips_without_tool_calls</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_calculate_cost_cloud.html">test_calculate_cost_cloud</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_calculate_cost_local.html">test_calculate_cost_local</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_calculate_cost_unknown_cloud_model_returns_zero.html">test_calculate_cost_unknown_cloud_model_returns_zero</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_clean_incomplete_markers.html">test_clean_incomplete_markers</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_context_window.html">test_context_window</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_custom_default_model.html">test_custom_default_model</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_fallback_does_not_corrupt_unrelated_fenced_code_block.html">test_fallback_does_not_corrupt_unrelated_fenced_code_block</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_fallback_ignores_unrelated_json.html">test_fallback_ignores_unrelated_json</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_fallback_parses_bare_json_tool_call.html">test_fallback_parses_bare_json_tool_call</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_fallback_parses_fenced_json_tool_call.html">test_fallback_parses_fenced_json_tool_call</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_fallback_rejects_unregistered_tool_name.html">test_fallback_rejects_unregistered_tool_name</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_find_json_objects_recovers_nested_object_after_failed_outer_parse.html">test_find_json_objects_recovers_nested_object_after_failed_outer_parse</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_from_qwen_response_detects_bare_json_call_mixed_with_hermes_call.html">test_from_qwen_response_detects_bare_json_call_mixed_with_hermes_call</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_from_qwen_response_drops_truncated_trailing_hermes_tag_from_display.html">test_from_qwen_response_drops_truncated_trailing_hermes_tag_from_display</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_from_qwen_response_openai_parser_still_detects_fallback_json.html">test_from_qwen_response_openai_parser_still_detects_fallback_json</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_from_qwen_response_stray_closing_tag_before_real_call_does_not_loop_forever.html">test_from_qwen_response_stray_closing_tag_before_real_call_does_not_loop_forever</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_from_qwen_response_uses_fallback_when_no_hermes_tags.html">test_from_qwen_response_uses_fallback_when_no_hermes_tags</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_hermes_json_missing_required_fields_is_skipped.html">test_hermes_json_missing_required_fields_is_skipped</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_hermes_malformed_json_is_skipped_without_panicking.html">test_hermes_malformed_json_is_skipped_without_panicking</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_hermes_tool_call_parsing.html">test_hermes_tool_call_parsing</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_hermes_tools_format.html">test_hermes_tools_format</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_local_provider_creation.html">test_local_provider_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_multiple_hermes_tool_calls.html">test_multiple_hermes_tool_calls</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_multiple_native_qwen_tool_calls.html">test_multiple_native_qwen_tool_calls</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_native_qwen_parser_configuration.html">test_native_qwen_parser_configuration</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_native_qwen_result_format.html">test_native_qwen_result_format</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_native_qwen_tool_call_parsing.html">test_native_qwen_tool_call_parsing</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_native_qwen_tools_format.html">test_native_qwen_tools_format</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_qwen_provider_creation.html">test_qwen_provider_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_sampling_config_override_wins_over_defaults.html">test_sampling_config_override_wins_over_defaults</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_sampling_defaults_dashscope_omits_vendor_extensions.html">test_sampling_defaults_dashscope_omits_vendor_extensions</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_sampling_defaults_qwen25_coder_local.html">test_sampling_defaults_qwen25_coder_local</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_sampling_defaults_qwen3_non_thinking.html">test_sampling_defaults_qwen3_non_thinking</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_sampling_defaults_qwen3_thinking.html">test_sampling_defaults_qwen3_thinking</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_sampling_defaults_unrecognized_model_name_is_conservative.html">test_sampling_defaults_unrecognized_model_name_is_conservative</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_sampling_explicit_request_top_p_wins.html">test_sampling_explicit_request_top_p_wins</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_stop_words_defined.html">test_stop_words_defined</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_supported_models.html">test_supported_models</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_thinking_extraction.html">test_thinking_extraction</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_thinking_extraction_out_of_order_tags_does_not_panic.html">test_thinking_extraction_out_of_order_tags_does_not_panic</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_thinking_mode_configuration.html">test_thinking_mode_configuration</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_tool_call_index_in_bounds.html">test_tool_call_index_in_bounds</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/test_tool_parser_configuration.html">test_tool_parser_configuration</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/qwen/tool_call_index_in_bounds.html">tool_call_index_in_bounds</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-providererror-result</code></li>
+<li><code>external/super-r-trait-provider-providerstream</code></li>
+<li><code>external/super-types</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/futures-stream-streamext</code></li>
+<li><code>external/reqwest-client</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/std-time-duration</code></li>
+<li><code>external/super-retry-retry-with-backoff-retryconfig</code></li>
+<li><code>external/super</code></li>
+<li><code>external/tokio-io-asyncreadext-asyncwriteext</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/qwen.rs#L1-L2831</p>
+</body>
+</html>

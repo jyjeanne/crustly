@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>validate_plan_file_path — Rust Function</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>validate_plan_file_path</h1>
+<p class="type">Rust Function</p>
+<p><span class="visibility">private</span></p>
+<pre><code>fn validate_plan_file_path(path: &amp;Path, working_dir: &amp;Path) -&gt; Result&lt;()&gt;</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../../functions/src/config/secrets/SecretString/len.html">len</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool/PlanTool/tool/execute.html">execute</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_validate_path_within_working_directory.html">test_validate_path_within_working_directory</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_validate_path_outside_working_directory.html">test_validate_path_outside_working_directory</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_validate_path_traversal_attack.html">test_validate_path_traversal_attack</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_validate_filename_pattern.html">test_validate_filename_pattern</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_validate_filename_requires_uuid.html">test_validate_filename_requires_uuid</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_validate_symlink_rejection.html">test_validate_symlink_rejection</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_filename_with_special_characters.html">test_filename_with_special_characters</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_filename_with_null_byte.html">test_filename_with_null_byte</a></li>
+<li><a href="../../../../../functions/src/llm/tools/plan_tool_security_tests/test_validate_plan_file_path_canonical.html">test_validate_plan_file_path_canonical</a></li>
+</ul>
+<p class="resource">Source: src/llm/tools/plan_tool.rs#L127-L164</p>
+</body>
+</html>

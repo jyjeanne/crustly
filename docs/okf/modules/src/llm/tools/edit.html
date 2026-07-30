@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>edit — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>edit</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/tools/edit/EditInput.html">EditInput</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/edit/EditOperation.html">EditOperation</a> — Rust Enum</li>
+<li><a href="../../../../classes/src/llm/tools/edit/EditTool.html">EditTool</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/tools/edit/EditTool/tool/capabilities.html">capabilities</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/edit/EditTool/tool/description.html">description</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/edit/EditTool/tool/execute.html">execute</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/edit/EditTool/tool/input_schema.html">input_schema</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/edit/EditTool/tool/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/edit/EditTool/tool/requires_approval.html">requires_approval</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/edit/EditTool/tool/validate_input.html">validate_input</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/edit/context.html">context</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/default_true.html">default_true</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/normalize_input.html">normalize_input</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/seeded_context.html">seeded_context</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_consecutive_edits_do_not_require_a_re_read_between_them.html">test_consecutive_edits_do_not_require_a_re_read_between_them</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_edit_rejects_a_file_changed_since_it_was_read.html">test_edit_rejects_a_file_changed_since_it_was_read</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_edit_rejects_a_file_never_read_this_session.html">test_edit_rejects_a_file_never_read_this_session</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_line_operation_without_operation_field_is_rejected.html">test_line_operation_without_operation_field_is_rejected</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_qwen_code_and_claude_code_style_payload_works_with_no_operation_field.html">test_qwen_code_and_claude_code_style_payload_works_with_no_operation_field</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_read_file_then_edit_file_succeeds.html">test_read_file_then_edit_file_succeeds</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_replace_all_true_replaces_every_occurrence.html">test_replace_all_true_replaces_every_occurrence</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_replace_lines_still_works.html">test_replace_lines_still_works</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_replace_missing_text_errors.html">test_replace_missing_text_errors</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_replace_rejects_non_unique_match_by_default.html">test_replace_rejects_non_unique_match_by_default</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_replace_with_explicit_operation_still_works.html">test_replace_with_explicit_operation_still_works</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/edit/test_validate_input_accepts_file_path_alias.html">test_validate_input_accepts_file_path_alias</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-validate-file-path-result-toolerror</code></li>
+<li><code>external/super-file-read-cache-filefingerprint-readgate</code></li>
+<li><code>external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/serde-json-value</code></li>
+<li><code>external/tokio-fs</code></li>
+<li><code>external/super</code></li>
+<li><code>external/tempfile-tempdir</code></li>
+<li><code>external/uuid-uuid</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/tools/edit.rs#L1-L752</p>
+</body>
+</html>

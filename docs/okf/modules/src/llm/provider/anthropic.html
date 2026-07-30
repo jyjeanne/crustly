@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anthropic — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>anthropic</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/provider/anthropic/AnthropicError.html">AnthropicError</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/anthropic/AnthropicErrorDetail.html">AnthropicErrorDetail</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/anthropic/AnthropicProvider.html">AnthropicProvider</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/anthropic/AnthropicRequest.html">AnthropicRequest</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/anthropic/AnthropicResponse.html">AnthropicResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/anthropic/AnthropicTokenUsage.html">AnthropicTokenUsage</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/from_anthropic_response.html">from_anthropic_response</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/handle_error.html">handle_error</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/headers.html">headers</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/supports_streaming.html">supports_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/supports_tools.html">supports_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/supports_vision.html">supports_vision</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/to_anthropic_request.html">to_anthropic_request</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/AnthropicProvider/with_client.html">with_client</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/parse_anthropic_sse_stream.html">parse_anthropic_sse_stream</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/sse_stream_reassembles_an_event_split_across_chunks.html">sse_stream_reassembles_an_event_split_across_chunks</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/sse_stream_yields_every_event_in_a_single_chunk.html">sse_stream_yields_every_event_in_a_single_chunk</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/test_anthropic_provider_creation.html">test_anthropic_provider_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/test_capabilities.html">test_capabilities</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/test_context_window.html">test_context_window</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/test_cost_calculation.html">test_cost_calculation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/test_cost_calculation_falls_back_to_family_tier_for_unlisted_model_ids.html">test_cost_calculation_falls_back_to_family_tier_for_unlisted_model_ids</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/test_cost_calculation_unknown_model_family_returns_zero.html">test_cost_calculation_unknown_model_family_returns_zero</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/anthropic/test_supported_models.html">test_supported_models</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-providererror-result</code></li>
+<li><code>external/super-r-trait-provider-providerstream</code></li>
+<li><code>external/super-types</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/futures-stream-streamext</code></li>
+<li><code>external/reqwest-client</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/std-time-duration</code></li>
+<li><code>external/super-retry-retry-with-backoff-retryconfig</code></li>
+<li><code>external/super</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/anthropic.rs#L1-L620</p>
+</body>
+</html>

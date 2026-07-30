@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>factory — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>factory</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/provider/factory/FailoverProvider.html">FailoverProvider</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/factory/RateLimitedProvider.html">RateLimitedProvider</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/factory/SucceedingProvider.html">SucceedingProvider</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/is_failover_error.html">is_failover_error</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/FailoverProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/RateLimitedProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/RateLimitedProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/RateLimitedProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/RateLimitedProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/RateLimitedProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/RateLimitedProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/RateLimitedProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/factory/configure_openai.html">configure_openai</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/configure_qwen.html">configure_qwen</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/configure_qwen_auto_selects_openai_parser_for_coder_next.html">configure_qwen_auto_selects_openai_parser_for_coder_next</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/configure_qwen_explicit_tool_parser_overrides_coder_next_auto_selection.html">configure_qwen_explicit_tool_parser_overrides_coder_next_auto_selection</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/configure_qwen_keeps_hermes_default_for_other_models.html">configure_qwen_keeps_hermes_default_for_other_models</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/create_anthropic.html">create_anthropic</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/create_provider.html">create_provider</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/disabled_anthropic_fallback_fails_with_a_clear_message.html">disabled_anthropic_fallback_fails_with_a_clear_message</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/disabled_gemini_is_skipped_in_favour_of_the_next_provider.html">disabled_gemini_is_skipped_in_favour_of_the_next_provider</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/disabled_openai_is_skipped_in_favour_of_the_next_provider.html">disabled_openai_is_skipped_in_favour_of_the_next_provider</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/disabled_qwen_is_skipped_in_favour_of_the_next_provider.html">disabled_qwen_is_skipped_in_favour_of_the_next_provider</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/gemini_without_api_key_falls_through_to_anthropic.html">gemini_without_api_key_falls_through_to_anthropic</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/ollama_provider_from_config.html">ollama_provider_from_config</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_create_provider_no_credentials.html">test_create_provider_no_credentials</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_create_provider_with_anthropic.html">test_create_provider_with_anthropic</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_create_provider_with_azure.html">test_create_provider_with_azure</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_create_provider_with_gemini.html">test_create_provider_with_gemini</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_create_provider_with_gemini_custom_base_url_and_model.html">test_create_provider_with_gemini_custom_base_url_and_model</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_create_provider_with_openai.html">test_create_provider_with_openai</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_create_provider_with_qwen.html">test_create_provider_with_qwen</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_disabled_azure_falls_through_to_anthropic.html">test_disabled_azure_falls_through_to_anthropic</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_failover_all_fail_returns_last_error.html">test_failover_all_fail_returns_last_error</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/test_failover_on_rate_limit_tries_next_provider.html">test_failover_on_rate_limit_tries_next_provider</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/try_create_azure.html">try_create_azure</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/try_create_gemini.html">try_create_gemini</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/try_create_ollama.html">try_create_ollama</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/try_create_ollama-2.html">try_create_ollama</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/try_create_openai.html">try_create_openai</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/factory/try_create_qwen.html">try_create_qwen</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-anthropic-anthropicprovider-azure-azureopenaiprovider-error-providererror-gemini-geminiprovider-openai-openaiprovider-qwen-qwenprovider-toolcallparser-provider</code></li>
+<li><code>external/crate-config-config-providerconfig-qwenproviderconfig</code></li>
+<li><code>external/anyhow-context-result</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/std-sync-arc</code></li>
+<li><code>external/super-ollama-modeloverrides-ollamaprovider</code></li>
+<li><code>external/super-super-error-providererror-result-as-providerresult-r-trait-providerstream-types-contentblock-llmrequest-llmresponse-stopreason-tokenusage</code></li>
+<li><code>external/super</code></li>
+<li><code>external/crate-config-config-providerconfig-providerconfigs-qwenproviderconfig</code></li>
+<li><code>external/std-sync-atomic-atomicusize-ordering</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/factory.rs#L1-L1061</p>
+</body>
+</html>

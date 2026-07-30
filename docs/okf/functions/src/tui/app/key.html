@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>key — Rust Function</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../functions/@index.html">functions</a></nav>
+<h1>key</h1>
+<p class="type">Rust Function</p>
+<p><span class="visibility">private</span></p>
+<pre><code>fn key(code: KeyCode) -&gt; crossterm::event::KeyEvent</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../functions/src/logging/LoggerGuard/empty.html">empty</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../functions/src/tui/app/model_download_typing_filters_suggestions.html">model_download_typing_filters_suggestions</a></li>
+<li><a href="../../../../functions/src/tui/app/model_download_backspace_removes_last_char.html">model_download_backspace_removes_last_char</a></li>
+<li><a href="../../../../functions/src/tui/app/model_download_tab_adopts_highlighted_suggestion.html">model_download_tab_adopts_highlighted_suggestion</a></li>
+<li><a href="../../../../functions/src/tui/app/model_download_esc_closes_dialog_without_running_pull.html">model_download_esc_closes_dialog_without_running_pull</a></li>
+<li><a href="../../../../functions/src/tui/app/model_download_enter_starts_pull_then_esc_aborts_it.html">model_download_enter_starts_pull_then_esc_aborts_it</a></li>
+<li><a href="../../../../functions/src/tui/app/delete_key_ignored_for_uninstalled_suggestion.html">delete_key_ignored_for_uninstalled_suggestion</a></li>
+<li><a href="../../../../functions/src/tui/app/delete_key_on_installed_model_asks_for_confirmation.html">delete_key_on_installed_model_asks_for_confirmation</a></li>
+<li><a href="../../../../functions/src/tui/app/confirm_delete_n_cancels_back_to_list.html">confirm_delete_n_cancels_back_to_list</a></li>
+<li><a href="../../../../functions/src/tui/app/confirm_delete_esc_cancels_back_to_list_without_closing_dialog.html">confirm_delete_esc_cancels_back_to_list_without_closing_dialog</a></li>
+<li><a href="../../../../functions/src/tui/app/confirm_delete_y_starts_delete.html">confirm_delete_y_starts_delete</a></li>
+<li><a href="../../../../functions/src/tui/app/up_recalls_previous_messages_without_sending_them.html">up_recalls_previous_messages_without_sending_them</a></li>
+<li><a href="../../../../functions/src/tui/app/recalled_message_can_be_edited_before_resending.html">recalled_message_can_be_edited_before_resending</a></li>
+<li><a href="../../../../functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft.html">up_moves_the_cursor_inside_a_multiline_draft</a></li>
+<li><a href="../../../../functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history.html">up_is_plain_cursor_movement_when_there_is_no_history</a></li>
+<li><a href="../../../../functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once.html">consecutive_duplicate_submissions_are_stored_once</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting.html">chat_shift_enter_inserts_newline_instead_of_submitting</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_alt_enter_inserts_newline_as_non_kitty_fallback.html">chat_alt_enter_inserts_newline_as_non_kitty_fallback</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_left_arrow_moves_cursor_for_mid_buffer_insert.html">chat_left_arrow_moves_cursor_for_mid_buffer_insert</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_backspace_deletes_at_cursor_not_always_the_last_char.html">chat_backspace_deletes_at_cursor_not_always_the_last_char</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_home_and_end_move_cursor_to_line_boundaries.html">chat_home_and_end_move_cursor_to_line_boundaries</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_ctrl_left_right_jump_by_word.html">chat_ctrl_left_right_jump_by_word</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_ctrl_backspace_deletes_whole_word.html">chat_ctrl_backspace_deletes_whole_word</a></li>
+<li><a href="../../../../functions/src/tui/app/altgr_backslash_reaches_the_input.html">altgr_backslash_reaches_the_input</a></li>
+<li><a href="../../../../functions/src/tui/app/plain_at_sign_still_opens_the_file_picker.html">plain_at_sign_still_opens_the_file_picker</a></li>
+<li><a href="../../../../functions/src/tui/app/typed_backslashes_reach_the_input.html">typed_backslashes_reach_the_input</a></li>
+<li><a href="../../../../functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end.html">paste_inserts_at_cursor_not_always_appended_at_the_end</a></li>
+<li><a href="../../../../functions/src/tui/app/shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps.html">shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps</a></li>
+<li><a href="../../../../functions/src/tui/app/shift_tab_works_from_any_mode_not_just_chat.html">shift_tab_works_from_any_mode_not_just_chat</a></li>
+<li><a href="../../../../functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone.html">setting_auto_mode_state_shares_the_same_cell_as_a_clone</a></li>
+<li><a href="../../../../functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end.html">typing_and_submitting_slash_skills_opens_the_dialog_end_to_end</a></li>
+<li><a href="../../../../functions/src/tui/app/skills_view_up_down_navigation_clamps_at_bounds.html">skills_view_up_down_navigation_clamps_at_bounds</a></li>
+<li><a href="../../../../functions/src/tui/app/skills_view_esc_returns_to_chat.html">skills_view_esc_returns_to_chat</a></li>
+<li><a href="../../../../functions/src/tui/app/mcp_view_up_down_navigation_clamps_at_bounds.html">mcp_view_up_down_navigation_clamps_at_bounds</a></li>
+<li><a href="../../../../functions/src/tui/app/mcp_view_esc_returns_to_chat.html">mcp_view_esc_returns_to_chat</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer.html">chat_plain_enter_submits_and_clears_buffer</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_plain_enter_on_empty_buffer_does_nothing.html">chat_plain_enter_on_empty_buffer_does_nothing</a></li>
+<li><a href="../../../../functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it.html">ctrl_o_opens_model_info_panel_and_esc_closes_it</a></li>
+<li><a href="../../../../functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias.html">chat_ctrl_enter_still_submits_as_legacy_alias</a></li>
+<li><a href="../../../../functions/src/tui/app/provider_switch_up_down_navigation_clamps_at_bounds.html">provider_switch_up_down_navigation_clamps_at_bounds</a></li>
+<li><a href="../../../../functions/src/tui/app/provider_switch_esc_returns_to_chat.html">provider_switch_esc_returns_to_chat</a></li>
+</ul>
+<p class="resource">Source: src/tui/app.rs#L2567-L2569</p>
+</body>
+</html>

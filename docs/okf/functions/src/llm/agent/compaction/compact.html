@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>compact — Rust Function</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>compact</h1>
+<p class="type">Rust Function</p>
+<pre><code>pub async fn compact(ctx: &amp;mut AgentContext, pool: &amp;sqlx::SqlitePool) -&gt; Result&lt;CompactionRecord&gt;</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../../functions/src/config/secrets/SecretString/len.html">len</a></li>
+<li><a href="../../../../../functions/src/llm/agent/compaction/message_has_tool_result.html">message_has_tool_result</a></li>
+<li><a href="../../../../../functions/src/llm/agent/compaction/summarise_turns.html">summarise_turns</a></li>
+<li><a href="../../../../../functions/src/llm/agent/context/token_count.html">token_count</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/llm/agent/compaction/compaction_atomicity_db_failure_leaves_context_unchanged.html">compaction_atomicity_db_failure_leaves_context_unchanged</a></li>
+<li><a href="../../../../../functions/src/llm/agent/compaction/compaction_integration_preserves_last_10_turns.html">compaction_integration_preserves_last_10_turns</a></li>
+<li><a href="../../../../../functions/src/llm/agent/compaction/compaction_never_splits_a_tool_use_result_pair.html">compaction_never_splits_a_tool_use_result_pair</a></li>
+<li><a href="../../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.html">send_message_with_tools_inner</a></li>
+<li><a href="../../../../../functions/src/logging/init_minimal_logging.html">init_minimal_logging</a></li>
+<li><a href="../../../../../functions/tests/compaction_test/compaction_preserves_last_10_turns.html">compaction_preserves_last_10_turns</a></li>
+<li><a href="../../../../../functions/tests/compaction_test/compaction_fails_gracefully_with_insufficient_turns.html">compaction_fails_gracefully_with_insufficient_turns</a></li>
+<li><a href="../../../../../functions/tests/compaction_test/compaction_writes_one_record_to_db.html">compaction_writes_one_record_to_db</a></li>
+</ul>
+<p class="resource">Source: src/llm/agent/compaction.rs#L27-L124</p>
+</body>
+</html>

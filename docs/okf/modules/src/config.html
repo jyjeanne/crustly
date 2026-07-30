@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>config — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../index.html">Home</a> / <a href="../../modules/@index.html">modules</a></nav>
+<h1>config</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../classes/src/config/Config.html">Config</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/DatabaseConfig.html">DatabaseConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/DebugConfig.html">DebugConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/LoggingConfig.html">LoggingConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/McpConfig.html">McpConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/McpServerConfig.html">McpServerConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/MemoryConfig.html">MemoryConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/OllamaModelConfig.html">OllamaModelConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/OllamaProviderConfig.html">OllamaProviderConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/PlanExecMode.html">PlanExecMode</a> — Rust Enum</li>
+<li><a href="../../classes/src/config/PlanModeConfig.html">PlanModeConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/ProviderConfig.html">ProviderConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/ProviderConfigs.html">ProviderConfigs</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/QwenProviderConfig.html">QwenProviderConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/SecurityConfig.html">SecurityConfig</a> — Rust Struct</li>
+<li><a href="../../classes/src/config/ThinkSetting.html">ThinkSetting</a> — Rust Enum</li>
+<li><a href="../../classes/src/config/ToolCacheConfig.html">ToolCacheConfig</a> — Rust Struct</li>
+<li><a href="../../functions/src/config/Config/apply_env_overrides.html">apply_env_overrides</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/default/default.html">default</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/load.html">load</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/load_from_path.html">load_from_path</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/load_provider_api_keys.html">load_provider_api_keys</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/local_config_path.html">local_config_path</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/merge.html">merge</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/merge_from_file.html">merge_from_file</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/project_config_path.html">project_config_path</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/save.html">save</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/system_config_path.html">system_config_path</a> — Rust Method</li>
+<li><a href="../../functions/src/config/Config/validate.html">validate</a> — Rust Method</li>
+<li><a href="../../functions/src/config/DatabaseConfig/default/default.html">default</a> — Rust Method</li>
+<li><a href="../../functions/src/config/LoggingConfig/default/default.html">default</a> — Rust Method</li>
+<li><a href="../../functions/src/config/MemoryConfig/default/default.html">default</a> — Rust Method</li>
+<li><a href="../../functions/src/config/OllamaProviderConfig/default/default.html">default</a> — Rust Method</li>
+<li><a href="../../functions/src/config/ProviderConfigs/override_default_model.html">override_default_model</a> — Rust Method</li>
+<li><a href="../../functions/src/config/QwenProviderConfig/default/default.html">default</a> — Rust Method</li>
+<li><a href="../../functions/src/config/SecurityConfig/to_policy.html">to_policy</a> — Rust Method</li>
+<li><a href="../../functions/src/config/ThinkSetting/as_str.html">as_str</a> — Rust Method</li>
+<li><a href="../../functions/src/config/ToolCacheConfig/default/default.html">default</a> — Rust Method</li>
+<li><a href="../../functions/src/config/ToolCacheConfig/ttl_secs_for.html">ttl_secs_for</a> — Rust Method</li>
+<li><a href="../../functions/src/config/allow_bash_trusts_only_the_listed_read_only_programs.html">allow_bash_trusts_only_the_listed_read_only_programs</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_compaction_threshold.html">default_compaction_threshold</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_db_path.html">default_db_path</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_enabled.html">default_enabled</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_episodic_budget.html">default_episodic_budget</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_glob_ttl.html">default_glob_ttl</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_grep_ttl.html">default_grep_ttl</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_log_level.html">default_log_level</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_max_iterations.html">default_max_iterations</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_ollama_host.html">default_ollama_host</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_read_file_ttl.html">default_read_file_ttl</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_risk_threshold.html">default_risk_threshold</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_true.html">default_true</a> — Rust Function</li>
+<li><a href="../../functions/src/config/default_web_search_ttl.html">default_web_search_ttl</a> — Rust Function</li>
+<li><a href="../../functions/src/config/empty_security_config_trusts_nothing.html">empty_security_config_trusts_nothing</a> — Rust Function</li>
+<li><a href="../../functions/src/config/model_override_reports_when_no_provider_can_take_it.html">model_override_reports_when_no_provider_can_take_it</a> — Rust Function</li>
+<li><a href="../../functions/src/config/model_override_respects_provider_precedence.html">model_override_respects_provider_precedence</a> — Rust Function</li>
+<li><a href="../../functions/src/config/model_override_skips_disabled_providers.html">model_override_skips_disabled_providers</a> — Rust Function</li>
+<li><a href="../../functions/src/config/model_override_skips_gemini_without_api_key.html">model_override_skips_gemini_without_api_key</a> — Rust Function</li>
+<li><a href="../../functions/src/config/model_override_targets_gemini_when_it_is_the_selected_provider.html">model_override_targets_gemini_when_it_is_the_selected_provider</a> — Rust Function</li>
+<li><a href="../../functions/src/config/model_override_targets_the_selected_provider.html">model_override_targets_the_selected_provider</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_config_env_overrides.html">test_config_env_overrides</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_config_from_toml.html">test_config_from_toml</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_config_save_and_load.html">test_config_save_and_load</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_config_validation.html">test_config_validation</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_config_validation_empty_crabrace_url.html">test_config_validation_empty_crabrace_url</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_config_validation_invalid_log_level.html">test_config_validation_invalid_log_level</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_database_config_default.html">test_database_config_default</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_debug_config_default.html">test_debug_config_default</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_default_config.html">test_default_config</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_local_config_path.html">test_local_config_path</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_logging_config_default.html">test_logging_config_default</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_ollama_config_from_env.html">test_ollama_config_from_env</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_ollama_provider_config_default.html">test_ollama_provider_config_default</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_provider_config_api_keys_from_env.html">test_provider_config_api_keys_from_env</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_provider_configs_default.html">test_provider_configs_default</a> — Rust Function</li>
+<li><a href="../../functions/src/config/test_system_config_path.html">test_system_config_path</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/pub-use-crabrace-crabraceconfig-crabraceintegration</code></li>
+<li><code>external/pub-use-secrets-providersecrets-secretstring</code></li>
+<li><code>external/pub-use-update-providerupdater-updateresult</code></li>
+<li><code>external/anyhow-context-result</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/std-fs</code></li>
+<li><code>external/std-path-path-pathbuf</code></li>
+<li><code>external/crate-llm-tools-sandbox-allowall-andpolicy-bashcommandallowlist-denypathprefixrule-denytoolrule</code></li>
+<li><code>external/super</code></li>
+<li><code>external/tempfile-namedtempfile</code></li>
+<li><code>external/crate-llm-tools-sandbox-policydecision</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/config/mod.rs#L1-L1476</p>
+</body>
+</html>

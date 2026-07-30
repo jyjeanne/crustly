@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>plan — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../index.html">Home</a> / <a href="../../modules/@index.html">modules</a></nav>
+<h1>plan</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../classes/src/plan/AutoRunMode.html">AutoRunMode</a> — Rust Enum</li>
+<li><a href="../../classes/src/plan/ExecutionSummary.html">ExecutionSummary</a> — Rust Struct</li>
+<li><a href="../../classes/src/plan/InterruptedPlan.html">InterruptedPlan</a> — Rust Struct</li>
+<li><a href="../../classes/src/plan/PauseReason.html">PauseReason</a> — Rust Enum</li>
+<li><a href="../../classes/src/plan/PlanDocument.html">PlanDocument</a> — Rust Struct</li>
+<li><a href="../../classes/src/plan/PlanModeState.html">PlanModeState</a> — Rust Enum</li>
+<li><a href="../../classes/src/plan/PlanStatus.html">PlanStatus</a> — Rust Enum</li>
+<li><a href="../../classes/src/plan/PlanTask.html">PlanTask</a> — Rust Struct</li>
+<li><a href="../../classes/src/plan/TaskExecution.html">TaskExecution</a> — Rust Struct</li>
+<li><a href="../../classes/src/plan/TaskStatus.html">TaskStatus</a> — Rust Enum</li>
+<li><a href="../../classes/src/plan/TaskType.html">TaskType</a> — Rust Enum</li>
+<li><a href="../../classes/src/plan/ToolCall.html">ToolCall</a> — Rust Struct</li>
+<li><a href="../../functions/src/plan/PlanDocument/add_task.html">add_task</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/approve.html">approve</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/count_by_status.html">count_by_status</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/dependencies_satisfied.html">dependencies_satisfied</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/execution_summary.html">execution_summary</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/get_task.html">get_task</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/get_task_by_order.html">get_task_by_order</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/get_task_by_order_mut.html">get_task_by_order_mut</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/get_task_mut.html">get_task_mut</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/get_validation_warnings.html">get_validation_warnings</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/is_complete.html">is_complete</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/new.html">new</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/next_executable_task.html">next_executable_task</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/next_executable_task_mut.html">next_executable_task_mut</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/progress_percentage.html">progress_percentage</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/ready_tasks.html">ready_tasks</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/reject.html">reject</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/retriable_tasks.html">retriable_tasks</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/start_execution.html">start_execution</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/tasks_in_order.html">tasks_in_order</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanDocument/validate_dependencies.html">validate_dependencies</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanModeState/advance.html">advance</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanModeState/approve.html">approve</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanModeState/is_high_risk_tool.html">is_high_risk_tool</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanModeState/tool_needs_approval.html">tool_needs_approval</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanStatus/std-fmt-display/fmt.html">fmt</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/add_artifact.html">add_artifact</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/add_reflection.html">add_reflection</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/block.html">block</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/can_retry.html">can_retry</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/complete_execution.html">complete_execution</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/complexity_stars.html">complexity_stars</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/fail.html">fail</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/fail_execution.html">fail_execution</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/last_execution.html">last_execution</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/new.html">new</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/record_tool_call.html">record_tool_call</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/skip.html">skip</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/start.html">start</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/PlanTask/start_execution.html">start_execution</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/TaskStatus/icon.html">icon</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/TaskStatus/std-fmt-display/fmt.html">fmt</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/TaskType/std-fmt-display/fmt.html">fmt</a> — Rust Method</li>
+<li><a href="../../functions/src/plan/default_max_retries.html">default_max_retries</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/chrono-datetime-utc</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/uuid-uuid</code></li>
+<li><code>external/std-collections-hashmap-vecdeque</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/plan/mod.rs#L1-L960</p>
+</body>
+</html>

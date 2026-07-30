@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>run_migrations — Rust Method</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../functions/@index.html">functions</a></nav>
+<h1>run_migrations</h1>
+<p class="type">Rust Method</p>
+<pre><code>pub async fn run_migrations(&amp;self) -&gt; Result&lt;()&gt;</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../functions/src/llm/tools/task/FileLock/acquire.html">acquire</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../functions/benches/database/setup_test_db.html">setup_test_db</a></li>
+<li><a href="../../../../functions/src/cli/cmd_db.html">cmd_db</a></li>
+<li><a href="../../../../functions/src/cli/cmd_chat.html">cmd_chat</a></li>
+<li><a href="../../../../functions/src/cli/cmd_run.html">cmd_run</a></li>
+<li><a href="../../../../functions/src/db/foreign_keys_are_enforced.html">foreign_keys_are_enforced</a></li>
+<li><a href="../../../../functions/src/db/deleting_a_session_cascades_to_its_messages.html">deleting_a_session_cascades_to_its_messages</a></li>
+<li><a href="../../../../functions/src/db/migrating_from_pre_modernization_schema_preserves_existing_messages.html">migrating_from_pre_modernization_schema_preserves_existing_messages</a></li>
+<li><a href="../../../../functions/src/db/repository/file/test_file_crud.html">test_file_crud</a></li>
+<li><a href="../../../../functions/src/db/repository/file/test_file_list_by_session.html">test_file_list_by_session</a></li>
+<li><a href="../../../../functions/src/db/repository/message/test_message_crud.html">test_message_crud</a></li>
+<li><a href="../../../../functions/src/db/repository/message/test_message_list_by_session.html">test_message_list_by_session</a></li>
+<li><a href="../../../../functions/src/db/repository/plan/setup_test_db.html">setup_test_db</a></li>
+<li><a href="../../../../functions/src/db/repository/session/test_session_crud.html">test_session_crud</a></li>
+<li><a href="../../../../functions/src/db/repository/session/test_session_archive.html">test_session_archive</a></li>
+<li><a href="../../../../functions/src/llm/agent/service/create_test_service.html">create_test_service</a></li>
+<li><a href="../../../../functions/src/llm/agent/service/sub_agent_launcher_does_not_auto_approve_tools.html">sub_agent_launcher_does_not_auto_approve_tools</a></li>
+<li><a href="../../../../functions/src/llm/agent/service/test_send_message_with_tool_execution.html">test_send_message_with_tool_execution</a></li>
+<li><a href="../../../../functions/src/services/file/create_test_service.html">create_test_service</a></li>
+<li><a href="../../../../functions/src/services/message/create_test_service.html">create_test_service</a></li>
+<li><a href="../../../../functions/src/services/message/create_then_update_survives_a_file_backed_wal_pool.html">create_then_update_survives_a_file_backed_wal_pool</a></li>
+<li><a href="../../../../functions/src/services/create_test_pool.html">create_test_pool</a></li>
+<li><a href="../../../../functions/src/services/plan/setup_test_service.html">setup_test_service</a></li>
+<li><a href="../../../../functions/src/services/session/create_test_service.html">create_test_service</a></li>
+<li><a href="../../../../functions/src/tui/app/test_app.html">test_app</a></li>
+<li><a href="../../../../functions/src/tui/render/test_app.html">test_app</a></li>
+<li><a href="../../../../functions/src/tui/runner/run_loop_exits_immediately_when_should_quit_is_set.html">run_loop_exits_immediately_when_should_quit_is_set</a></li>
+<li><a href="../../../../functions/tests/compaction_test/compaction_preserves_last_10_turns.html">compaction_preserves_last_10_turns</a></li>
+<li><a href="../../../../functions/tests/compaction_test/compaction_fails_gracefully_with_insufficient_turns.html">compaction_fails_gracefully_with_insufficient_turns</a></li>
+<li><a href="../../../../functions/tests/compaction_test/compaction_writes_one_record_to_db.html">compaction_writes_one_record_to_db</a></li>
+<li><a href="../../../../functions/tests/error_scenarios_test/create_test_db.html">create_test_db</a></li>
+<li><a href="../../../../functions/tests/integration_test/create_test_db.html">create_test_db</a></li>
+<li><a href="../../../../functions/tests/integration_test/test_database_persistence.html">test_database_persistence</a></li>
+<li><a href="../../../../functions/tests/plan_crash_recovery_test/crash_recovery_resumes_at_correct_task.html">crash_recovery_resumes_at_correct_task</a></li>
+<li><a href="../../../../functions/tests/plan_crash_recovery_test/task_state_transitions_correct_order.html">task_state_transitions_correct_order</a></li>
+<li><a href="../../../../functions/tests/plan_crash_recovery_test/failed_task_stores_error_without_completion_timestamp.html">failed_task_stores_error_without_completion_timestamp</a></li>
+<li><a href="../../../../functions/tests/plan_mode_integration_test/setup_test_env.html">setup_test_env</a></li>
+</ul>
+<p class="resource">Source: src/db/mod.rs#L148-L174</p>
+</body>
+</html>

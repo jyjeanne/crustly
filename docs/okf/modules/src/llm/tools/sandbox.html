@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sandbox — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>sandbox</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/tools/sandbox/AllowAll.html">AllowAll</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/AllowToolRule.html">AllowToolRule</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/AndPolicy.html">AndPolicy</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/BashCommandAllowlist.html">BashCommandAllowlist</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/DenyPathPrefixRule.html">DenyPathPrefixRule</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/DenyToolRule.html">DenyToolRule</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/NotPolicy.html">NotPolicy</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/OrPolicy.html">OrPolicy</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/PanicIfCalled.html">PanicIfCalled</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/PanicIfCalled-2.html">PanicIfCalled</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/PathBoundaryRule.html">PathBoundaryRule</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/sandbox/PolicyDecision.html">PolicyDecision</a> — Rust Enum</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/AllowAll/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/AllowToolRule/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/AllowToolRule/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/AndPolicy/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/BashCommandAllowlist/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/DenyPathPrefixRule/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/DenyPathPrefixRule/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/DenyToolRule/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/DenyToolRule/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/NotPolicy/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/OrPolicy/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/PanicIfCalled/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/PanicIfCalled/permissionpolicy/evaluate-2.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/PathBoundaryRule/check.html">check</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/PathBoundaryRule/permissionpolicy/evaluate.html">evaluate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/PolicyDecision/is_permitted.html">is_permitted</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/absolute_path_outside_root_denied.html">absolute_path_outside_root_denied</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/absolute_path_to_nonexistent_file_in_subdir_allowed.html">absolute_path_to_nonexistent_file_in_subdir_allowed</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/absolute_path_to_nonexistent_file_inside_root_allowed.html">absolute_path_to_nonexistent_file_inside_root_allowed</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/absolute_path_to_nonexistent_file_outside_root_still_denied.html">absolute_path_to_nonexistent_file_outside_root_still_denied</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/absolute_path_to_nonexistent_file_through_a_symlinked_root_allowed.html">absolute_path_to_nonexistent_file_through_a_symlinked_root_allowed</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/allow_all_never_confers_trust.html">allow_all_never_confers_trust</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/and_policy_denies_trusted_command_that_a_later_rule_rejects.html">and_policy_denies_trusted_command_that_a_later_rule_rejects</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/and_policy_does_not_trust_unlisted_program.html">and_policy_does_not_trust_unlisted_program</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/and_policy_preserves_trust_when_no_rule_denies.html">and_policy_preserves_trust_when_no_rule_denies</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/and_policy_short_circuits_on_deny.html">and_policy_short_circuits_on_deny</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/bash_allowlist_allows_unlisted_operator_free_command_to_reach_approval.html">bash_allowlist_allows_unlisted_operator_free_command_to_reach_approval</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/bash_allowlist_never_trusts_shell_operator_chaining.html">bash_allowlist_never_trusts_shell_operator_chaining</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/bash_allowlist_permits_quoted_operator_characters.html">bash_allowlist_permits_quoted_operator_characters</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/bash_allowlist_trusts_listed_prompts_for_unlisted.html">bash_allowlist_trusts_listed_prompts_for_unlisted</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/check_path.html">check_path</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/deny_path_prefix_allows_unrelated_path.html">deny_path_prefix_allows_unrelated_path</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/deny_path_prefix_blocks_matching_path.html">deny_path_prefix_blocks_matching_path</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/find_active_shell_operator.html">find_active_shell_operator</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/make_root.html">make_root</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/normalize_path.html">normalize_path</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/not_policy_inverts_allow.html">not_policy_inverts_allow</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/not_policy_inverts_trusted_to_deny.html">not_policy_inverts_trusted_to_deny</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/or_policy_short_circuits_on_allow.html">or_policy_short_circuits_on_allow</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/path_traversal_denied.html">path_traversal_denied</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/resolve_existing_prefix.html">resolve_existing_prefix</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/strip_verbatim_prefix.html">strip_verbatim_prefix</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/symlink_outside_root_denied.html">symlink_outside_root_denied</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/sandbox/valid_path_inside_root_allowed.html">valid_path_inside_root_allowed</a> — Rust Function</li>
+<li><a href="../../../../interfaces/src/llm/tools/sandbox/PermissionPolicy.html">PermissionPolicy</a> — Rust Trait</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/serde-json-value</code></li>
+<li><code>external/std-path-path-pathbuf</code></li>
+<li><code>external/std-path-component-prefix</code></li>
+<li><code>external/super</code></li>
+<li><code>external/tempfile-tempdir</code></li>
+<li><code>external/std-sync-atomic-atomicbool-ordering</code></li>
+<li><code>external/std-sync-arc</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/tools/sandbox.rs#L1-L885</p>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>render — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../index.html">Home</a> / <a href="../../../modules/@index.html">modules</a></nav>
+<h1>render</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../classes/src/tui/render/DummyProvider.html">DummyProvider</a> — Rust Struct</li>
+<li><a href="../../../functions/src/tui/render/DummyProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/render/DummyProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/render/DummyProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/render/DummyProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/render/DummyProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/render/DummyProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/render/DummyProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/render/approval_dialog_area.html">approval_dialog_area</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/approval_dialog_details_view_shows_pretty_printed_json.html">approval_dialog_details_view_shows_pretty_printed_json</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/approval_dialog_shows_tool_name_capabilities_and_summarized_params.html">approval_dialog_shows_tool_name_capabilities_and_summarized_params</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/chat_input_renders_textarea_contents_and_hint.html">chat_input_renders_textarea_contents_and_hint</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/chat_message_perf_footer_reports_cold_and_warm_starts.html">chat_message_perf_footer_reports_cold_and_warm_starts</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/chat_message_thinking_block_toggles_between_collapsed_and_expanded.html">chat_message_thinking_block_toggles_between_collapsed_and_expanded</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/chat_shows_pending_plan_banner_only_while_awaiting_approval.html">chat_shows_pending_plan_banner_only_while_awaiting_approval</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/chat_shows_streaming_response_and_processing_indicator.html">chat_shows_streaming_response_and_processing_indicator</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/compute_scroll_offset.html">compute_scroll_offset</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/feature_row.html">feature_row</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/header_omits_tokens_per_second_when_unavailable.html">header_omits_tokens_per_second_when_unavailable</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/header_shows_ollama_provider_badge_and_tokens_per_second.html">header_shows_ollama_provider_badge_and_tokens_per_second</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_chat_mode.html">help_chat_mode</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_features.html">help_features</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_footer.html">help_footer</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_global_commands.html">help_global_commands</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_plan_mode.html">help_plan_mode</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_row.html">help_row</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_screen_lists_commands_from_every_section.html">help_screen_lists_commands_from_every_section</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_screen_shows_shift_enter_when_kitty_protocol_active.html">help_screen_shows_shift_enter_when_kitty_protocol_active</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_section_header.html">help_section_header</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/help_session_list.html">help_session_list</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/line_text.html">line_text</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/mcp_view_shows_connected_server_with_tool_count.html">mcp_view_shows_connected_server_with_tool_count</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/mcp_view_shows_connection_error.html">mcp_view_shows_connection_error</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/mcp_view_shows_empty_state_message.html">mcp_view_shows_empty_state_message</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/message_header_timestamp_is_shown_in_local_time.html">message_header_timestamp_is_shown_in_local_time</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/model_download_confirm_delete_shows_prompt.html">model_download_confirm_delete_shows_prompt</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/model_download_deleting_shows_status.html">model_download_deleting_shows_status</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/model_download_dialog_shows_prompt_and_suggestions.html">model_download_dialog_shows_prompt_and_suggestions</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/model_download_progress_shows_status_and_bar.html">model_download_progress_shows_status_and_bar</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/model_info_panel_shows_last_response_perf_metrics.html">model_info_panel_shows_last_response_perf_metrics</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/model_info_panel_shows_provider_model_and_context_window.html">model_info_panel_shows_provider_model_and_context_window</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/plan_mode_shows_empty_state_without_a_plan.html">plan_mode_shows_empty_state_without_a_plan</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/plan_mode_shows_full_document_with_tasks_and_criteria.html">plan_mode_shows_full_document_with_tasks_and_criteria</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/provider_icon.html">provider_icon</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render.html">render</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_approval.html">render_approval</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_approval_actions.html">render_approval_actions</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_approval_capabilities.html">render_approval_capabilities</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_approval_header.html">render_approval_header</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_approval_input_detailed.html">render_approval_input_detailed</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_approval_input_summary.html">render_approval_input_summary</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_chat.html">render_chat</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_file_picker.html">render_file_picker</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_header.html">render_header</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_help.html">render_help</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_input.html">render_input</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_mcp.html">render_mcp</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_message_lines.html">render_message_lines</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_model_download.html">render_model_download</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_model_download_confirm_delete.html">render_model_download_confirm_delete</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_model_download_deleting.html">render_model_download_deleting</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_model_download_progress.html">render_model_download_progress</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_model_info.html">render_model_info</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_pending_plan_banner.html">render_pending_plan_banner</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_perf_footer.html">render_perf_footer</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_plan.html">render_plan</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_plan_document.html">render_plan_document</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_plan_empty_state.html">render_plan_empty_state</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_plan_help.html">render_plan_help</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_plan_task_lines.html">render_plan_task_lines</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_processing_indicator.html">render_processing_indicator</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_provider_switch.html">render_provider_switch</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_sessions.html">render_sessions</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_settings.html">render_settings</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_skills.html">render_skills</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_status_bar.html">render_status_bar</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_streaming_response.html">render_streaming_response</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_thinking_block.html">render_thinking_block</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/render_to_string.html">render_to_string</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/skills_view_shows_empty_state_message.html">skills_view_shows_empty_state_message</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/skills_view_shows_name_and_description.html">skills_view_shows_name_and_description</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/status_bar_shows_full_auto_when_active.html">status_bar_shows_full_auto_when_active</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/status_bar_shows_interactive_by_default.html">status_bar_shows_interactive_by_default</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/test_app.html">test_app</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/render/test_approval_request.html">test_approval_request</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-app-app</code></li>
+<li><code>external/super-events-appmode</code></li>
+<li><code>external/super-markdown-parse-markdown-parse-plain-text</code></li>
+<li><code>external/super-splash</code></li>
+<li><code>external/crate-config-planexecmode</code></li>
+<li><code>external/ratatui-layout-alignment-constraint-direction-layout-rect-style-color-modifier-style-text-line-span-widgets-block-borders-paragraph-wrap-frame</code></li>
+<li><code>external/super</code></li>
+<li><code>external/crate-db-database</code></li>
+<li><code>external/crate-llm-agent-agentservice</code></li>
+<li><code>external/crate-llm-provider-llmrequest-llmresponse-provider-providerstream-result-as-providerresult</code></li>
+<li><code>external/crate-services-servicecontext</code></li>
+<li><code>external/crate-tui-app-displaymessage</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/ratatui-backend-testbackend</code></li>
+<li><code>external/ratatui-terminal</code></li>
+<li><code>external/std-sync-arc</code></li>
+<li><code>external/crate-llm-provider-perfmetrics</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/tui/render.rs#L1-L2629</p>
+</body>
+</html>
