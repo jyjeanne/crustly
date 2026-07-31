@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>add_task — Rust Method</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../functions/@index.html">functions</a></nav>
+<h1>add_task</h1>
+<p class="type">Rust Method</p>
+<pre><code>pub fn add_task(&amp;mut self, task: PlanTask)</code></pre>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../functions/src/db/repository/plan/create_test_plan.html">create_test_plan</a></li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_update.html">test_plan_update</a></li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_with_complex_task_graph.html">test_plan_with_complex_task_graph</a></li>
+<li><a href="../../../../functions/src/llm/tools/plan_tool/PlanTool/tool/execute.html">execute</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_add_task.html">test_add_task</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_get_task.html">test_get_task</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_get_task_mut.html">test_get_task_mut</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_count_by_status.html">test_count_by_status</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_progress_percentage.html">test_progress_percentage</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_is_complete.html">test_is_complete</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_topological_sort_no_dependencies.html">test_topological_sort_no_dependencies</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_topological_sort_with_dependencies.html">test_topological_sort_with_dependencies</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_topological_sort_circular_dependency.html">test_topological_sort_circular_dependency</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_validate_dependencies_success.html">test_validate_dependencies_success</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_validate_dependencies_invalid_reference.html">test_validate_dependencies_invalid_reference</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_validate_dependencies_circular.html">test_validate_dependencies_circular</a></li>
+<li><a href="../../../../functions/src/plan/plan_tests/test_complex_dependency_chain.html">test_complex_dependency_chain</a></li>
+<li><a href="../../../../functions/src/services/plan/create_test_plan.html">create_test_plan</a></li>
+<li><a href="../../../../functions/src/tui/app/plan_task_error_marks_task_failed_and_stops_auto_execution.html">plan_task_error_marks_task_failed_and_stops_auto_execution</a></li>
+<li><a href="../../../../functions/tests/plan_mode_integration_test/create_multi_task_plan.html">create_multi_task_plan</a></li>
+</ul>
+<p class="resource">Source: src/plan/mod.rs#L79-L82</p>
+</body>
+</html>

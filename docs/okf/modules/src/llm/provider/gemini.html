@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>gemini — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>gemini</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiCandidate.html">GeminiCandidate</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiContent.html">GeminiContent</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiError.html">GeminiError</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiErrorResponse.html">GeminiErrorResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiFunctionCall.html">GeminiFunctionCall</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiFunctionCallingConfig.html">GeminiFunctionCallingConfig</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiFunctionDeclaration.html">GeminiFunctionDeclaration</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiFunctionResponse.html">GeminiFunctionResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiGenerationConfig.html">GeminiGenerationConfig</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiInlineData.html">GeminiInlineData</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiPart.html">GeminiPart</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiProvider.html">GeminiProvider</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiRequest.html">GeminiRequest</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiResponse.html">GeminiResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiThinkingConfig.html">GeminiThinkingConfig</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiTool.html">GeminiTool</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiToolConfig.html">GeminiToolConfig</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/gemini/GeminiUsageMetadata.html">GeminiUsageMetadata</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiPart/text.html">text</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiPart/with_inline_data.html">with_inline_data</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response.html">from_gemini_response</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/generate_url.html">generate_url</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/handle_error.html">handle_error</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/headers.html">headers</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/supports_streaming.html">supports_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/supports_tools.html">supports_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/supports_vision.html">supports_vision</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/stream_url.html">stream_url</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request.html">to_gemini_request</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/with_base_url.html">with_base_url</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/GeminiProvider/with_default_model.html">with_default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/build_gemini_error.html">build_gemini_error</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/gemini_role.html">gemini_role</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/parse_gemini_sse.html">parse_gemini_sse</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_build_gemini_error_api_error_with_body.html">test_build_gemini_error_api_error_with_body</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_build_gemini_error_no_body_falls_back_to_unknown.html">test_build_gemini_error_no_body_falls_back_to_unknown</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_no_body.html">test_build_gemini_error_rate_limit_no_body</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_with_retry_after.html">test_build_gemini_error_rate_limit_with_retry_after</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_without_retry_after.html">test_build_gemini_error_rate_limit_without_retry_after</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_calculate_cost_all_known_models.html">test_calculate_cost_all_known_models</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_calculate_cost_gemini_flash.html">test_calculate_cost_gemini_flash</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_context_window.html">test_context_window</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_context_window_all_known_models.html">test_context_window_all_known_models</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_custom_default_model.html">test_custom_default_model</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_from_gemini_response_maps_thinking.html">test_from_gemini_response_maps_thinking</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_from_gemini_response_maps_tool_use.html">test_from_gemini_response_maps_tool_use</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_full_json_schema_sets_response_schema.html">test_full_json_schema_sets_response_schema</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_gemini_provider_creation.html">test_gemini_provider_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_gemma_cost_is_free.html">test_gemma_cost_is_free</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_image_url_source_is_skipped_without_panicking.html">test_image_url_source_is_skipped_without_panicking</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_inline_image_becomes_inline_data_part.html">test_inline_image_becomes_inline_data_part</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_json_mode_sets_response_mime_type.html">test_json_mode_sets_response_mime_type</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_parse_gemini_sse_function_call.html">test_parse_gemini_sse_function_call</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_parse_gemini_sse_ignores_non_data_lines.html">test_parse_gemini_sse_ignores_non_data_lines</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_parse_gemini_sse_max_tokens.html">test_parse_gemini_sse_max_tokens</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_parse_gemini_sse_skips_malformed_lines.html">test_parse_gemini_sse_skips_malformed_lines</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_parse_gemini_sse_text_response.html">test_parse_gemini_sse_text_response</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_parse_gemini_sse_thinking_part.html">test_parse_gemini_sse_thinking_part</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_role_mapping.html">test_role_mapping</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_supported_models_include_gemma.html">test_supported_models_include_gemma</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_thinking_config_forwarded.html">test_thinking_config_forwarded</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_to_gemini_request_maps_system_and_tools.html">test_to_gemini_request_maps_system_and_tools</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/gemini/test_to_gemini_request_tool_result_uses_function_name.html">test_to_gemini_request_tool_result_uses_function_name</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-providererror-result</code></li>
+<li><code>external/super-r-trait-provider-providerstream</code></li>
+<li><code>external/super-types</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/reqwest-client</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/std-collections-hashmap</code></li>
+<li><code>external/std-time-duration</code></li>
+<li><code>external/super-retry-retry-with-backoff-retryconfig</code></li>
+<li><code>external/futures-streamext-as</code></li>
+<li><code>external/super</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/gemini.rs#L1-L1363</p>
+</body>
+</html>

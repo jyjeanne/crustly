@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>handle_model_download_key — Rust Method</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>handle_model_download_key</h1>
+<p class="type">Rust Method</p>
+<p><span class="visibility">private</span></p>
+<pre><code>async fn handle_model_download_key(&amp;mut self, event: crossterm::event::KeyEvent) -&gt; Result&lt;()&gt;</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../../functions/src/tui/app/App/start_model_delete.html">start_model_delete</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_cancel.html">is_cancel</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/switch_mode.html">switch_mode</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_up.html">is_up</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_down.html">is_down</a></li>
+<li><a href="../../../../../functions/src/config/secrets/SecretString/is_empty.html">is_empty</a></li>
+<li><a href="../../../../../functions/src/config/secrets/SecretString/len.html">len</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/refresh_model_download_suggestions.html">refresh_model_download_suggestions</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_enter.html">is_enter</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/start_model_pull.html">start_model_pull</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/tui/app/App/handle_key_event.html">handle_key_event</a></li>
+<li><a href="../../../../../functions/src/tui/app/model_download_typing_filters_suggestions.html">model_download_typing_filters_suggestions</a></li>
+<li><a href="../../../../../functions/src/tui/app/model_download_backspace_removes_last_char.html">model_download_backspace_removes_last_char</a></li>
+<li><a href="../../../../../functions/src/tui/app/model_download_tab_adopts_highlighted_suggestion.html">model_download_tab_adopts_highlighted_suggestion</a></li>
+<li><a href="../../../../../functions/src/tui/app/model_download_esc_closes_dialog_without_running_pull.html">model_download_esc_closes_dialog_without_running_pull</a></li>
+<li><a href="../../../../../functions/src/tui/app/model_download_enter_starts_pull_then_esc_aborts_it.html">model_download_enter_starts_pull_then_esc_aborts_it</a></li>
+<li><a href="../../../../../functions/src/tui/app/delete_key_ignored_for_uninstalled_suggestion.html">delete_key_ignored_for_uninstalled_suggestion</a></li>
+<li><a href="../../../../../functions/src/tui/app/delete_key_on_installed_model_asks_for_confirmation.html">delete_key_on_installed_model_asks_for_confirmation</a></li>
+<li><a href="../../../../../functions/src/tui/app/confirm_delete_n_cancels_back_to_list.html">confirm_delete_n_cancels_back_to_list</a></li>
+<li><a href="../../../../../functions/src/tui/app/confirm_delete_esc_cancels_back_to_list_without_closing_dialog.html">confirm_delete_esc_cancels_back_to_list_without_closing_dialog</a></li>
+<li><a href="../../../../../functions/src/tui/app/confirm_delete_y_starts_delete.html">confirm_delete_y_starts_delete</a></li>
+</ul>
+<p class="resource">Source: src/tui/app.rs#L2291-L2379</p>
+</body>
+</html>

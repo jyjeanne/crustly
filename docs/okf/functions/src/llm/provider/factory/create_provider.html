@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>create_provider — Rust Function</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>create_provider</h1>
+<p class="type">Rust Function</p>
+<pre><code>pub fn create_provider(config: &amp;Config) -&gt; Result&lt;Arc&lt;dyn Provider&gt;&gt;</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../../functions/src/llm/provider/factory/try_create_qwen.html">try_create_qwen</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/try_create_openai.html">try_create_openai</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/try_create_gemini.html">try_create_gemini</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/try_create_azure.html">try_create_azure</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/create_anthropic.html">create_anthropic</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/cli/cmd_chat.html">cmd_chat</a></li>
+<li><a href="../../../../../functions/src/cli/cmd_run.html">cmd_run</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/test_create_provider_with_anthropic.html">test_create_provider_with_anthropic</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/test_create_provider_with_openai.html">test_create_provider_with_openai</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/test_create_provider_with_azure.html">test_create_provider_with_azure</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/test_disabled_azure_falls_through_to_anthropic.html">test_disabled_azure_falls_through_to_anthropic</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/test_create_provider_with_gemini.html">test_create_provider_with_gemini</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/test_create_provider_with_gemini_custom_base_url_and_model.html">test_create_provider_with_gemini_custom_base_url_and_model</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/gemini_without_api_key_falls_through_to_anthropic.html">gemini_without_api_key_falls_through_to_anthropic</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/disabled_gemini_is_skipped_in_favour_of_the_next_provider.html">disabled_gemini_is_skipped_in_favour_of_the_next_provider</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/disabled_openai_is_skipped_in_favour_of_the_next_provider.html">disabled_openai_is_skipped_in_favour_of_the_next_provider</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/disabled_qwen_is_skipped_in_favour_of_the_next_provider.html">disabled_qwen_is_skipped_in_favour_of_the_next_provider</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/disabled_anthropic_fallback_fails_with_a_clear_message.html">disabled_anthropic_fallback_fails_with_a_clear_message</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/test_create_provider_with_qwen.html">test_create_provider_with_qwen</a></li>
+<li><a href="../../../../../functions/src/llm/provider/factory/test_create_provider_no_credentials.html">test_create_provider_no_credentials</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/factory.rs#L141-L169</p>
+</body>
+</html>

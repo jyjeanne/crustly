@@ -1,0 +1,250 @@
+---
+type: Rust Method
+title: is_empty
+resource: src/config/secrets.rs#L144-L146
+generated:
+  by: okf-rs/0.2.0
+relationships:
+  called_by:
+  - functions/src/cli/cmd_ollama
+  - functions/src/cli/cmd_logs
+  - functions/src/config/SecurityConfig/to_policy
+  - functions/src/config/Config/validate
+  - functions/src/config/update/ProviderUpdater/update_provider_config
+  - functions/src/db/models/interrupted_plan_from_tasks
+  - functions/src/db/repository/memory/EpisodicMemoryRepository/inject_into_context
+  - functions/src/llm/agent/compaction/summarise_turns
+  - functions/src/llm/agent/context/AgentContext/trim_to_fit
+  - functions/src/llm/agent/context/token_count
+  - functions/src/llm/agent/service/plan_completion_rejection
+  - functions/src/llm/agent/service/route_text_delta
+  - functions/src/llm/agent/service/apply_streamed_tool_input
+  - functions/src/llm/agent/service/drain_stream_to_response
+  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+  - functions/src/llm/agent/service/AgentService/final_text_and_thinking
+  - functions/src/llm/agent/service/AgentService/extract_thinking_from_response
+  - functions/src/llm/pdf_context/augment_message_with_pdf
+  - functions/src/llm/provider/anthropic/parse_anthropic_sse_stream
+  - functions/src/llm/provider/factory/ollama_provider_from_config
+  - functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request
+  - functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response
+  - functions/src/llm/provider/gemini/parse_gemini_sse
+  - functions/src/llm/provider/ollama/OllamaProvider/overrides_for
+  - functions/src/llm/provider/ollama/OllamaProvider/to_ollama_request
+  - functions/src/llm/provider/ollama/OllamaProvider/from_ollama_response
+  - functions/src/llm/provider/ollama/OllamaProvider/provider/stream
+  - functions/src/llm/provider/ollama/stop_reason_for
+  - functions/src/llm/provider/ollama/maybe_tool_call_json
+  - functions/src/llm/provider/openai/OpenAIProvider/to_openai_request
+  - functions/src/llm/provider/openai/OpenAIProvider/from_openai_response
+  - functions/src/llm/provider/openai/OpenAIProvider/provider/stream
+  - functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls
+  - functions/src/llm/provider/qwen/QwenProvider/parse_native_qwen_tool_calls
+  - functions/src/llm/provider/qwen/QwenProvider/to_qwen_request
+  - functions/src/llm/provider/qwen/QwenProvider/push_fallback_or_text
+  - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+  - functions/src/llm/provider/qwen/QwenProvider/provider/stream
+  - functions/src/llm/provider/qwen/llm_response_to_stream_events
+  - functions/src/llm/provider/types/extract_think_tags
+  - functions/src/llm/tools/agent/AgentTool/tool/validate_input
+  - functions/src/llm/tools/agent/AgentTool/tool/execute
+  - functions/src/llm/tools/agent/slugify
+  - functions/src/llm/tools/apply_patch/parse_patch
+  - functions/src/llm/tools/apply_patch/find_subsequence
+  - functions/src/llm/tools/apply_patch/apply_hunks
+  - functions/src/llm/tools/ask_user/AskUserTool/tool/validate_input
+  - functions/src/llm/tools/ask_user/AskUserTool/tool/execute
+  - functions/src/llm/tools/bash/BashTool/tool/validate_input
+  - functions/src/llm/tools/bash/BashTool/tool/execute
+  - functions/src/llm/tools/code_exec/CodeExecTool/tool/validate_input
+  - functions/src/llm/tools/code_exec/CodeExecTool/tool/execute
+  - functions/src/llm/tools/context/ContextTool/tool/execute
+  - functions/src/llm/tools/doc_parser/DocParserTool/parse_pdf
+  - functions/src/llm/tools/doc_parser/DocParserTool/extract_text_from_docx_xml
+  - functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags
+  - functions/src/llm/tools/doc_parser/DocParserTool/parse_xml
+  - functions/src/llm/tools/glob/GlobTool/tool/validate_input
+  - functions/src/llm/tools/glob/GlobTool/tool/execute
+  - functions/src/llm/tools/grep/GrepTool/tool/validate_input
+  - functions/src/llm/tools/grep/GrepTool/tool/execute
+  - functions/src/llm/tools/http/HttpClientTool/tool/execute
+  - functions/src/llm/tools/plan_tool/validate_string
+  - functions/src/llm/tools/plan_tool/PlanTool/tool/execute
+  - functions/src/llm/tools/powershell/PowerShellTool/tool/validate_input
+  - functions/src/llm/tools/powershell/PowerShellTool/tool/execute
+  - functions/src/llm/tools/read/ReadTool/read_with_buffer
+  - functions/src/llm/tools/save_memory/append_fact
+  - functions/src/llm/tools/save_memory/SaveMemoryTool/tool/validate_input
+  - functions/src/llm/tools/save_memory/SaveMemoryTool/tool/execute
+  - functions/src/llm/tools/skill/SkillTool/tool/validate_input
+  - functions/src/llm/tools/skill/SkillTool/tool/execute
+  - functions/src/llm/tools/skill/parse_skill_frontmatter_value
+  - functions/src/llm/tools/ssrf_guard/SsrfSafeResolver/resolve/resolve
+  - functions/src/llm/tools/task/TaskTool/tool/execute
+  - functions/src/llm/tools/todo_write/render_todos
+  - functions/src/llm/tools/web_search/WebSearchTool/tool/validate_input
+  - functions/src/llm/tools/web_search/WebSearchTool/tool/execute
+  - functions/src/logging/init_debug_logging
+  - functions/src/plan/PlanDocument/tasks_in_order
+  - functions/src/plan/PlanDocument/progress_percentage
+  - functions/src/plan/PlanDocument/is_complete
+  - functions/src/plan/PlanDocument/validate_dependencies
+  - functions/src/plan/PlanDocument/get_validation_warnings
+  - functions/src/services/plan/PlanService/validate_plan
+  - functions/src/services/plan/PlanService/get_statistics
+  - functions/src/tui/app/App/input_is_blank
+  - functions/src/tui/app/App/history_prev
+  - functions/src/tui/app/App/handle_chat_key
+  - functions/src/tui/app/App/handle_skills_key
+  - functions/src/tui/app/App/handle_mcp_key
+  - functions/src/tui/app/App/export_plan_to_markdown
+  - functions/src/tui/app/App/start_model_pull
+  - functions/src/tui/app/App/handle_model_download_key
+  - functions/src/tui/app/App/handle_provider_switch_key
+  - functions/src/tui/events/is_submit
+  - functions/src/tui/events/is_enter
+  - functions/src/tui/events/is_up
+  - functions/src/tui/events/is_down
+  - functions/src/tui/events/is_approve
+  - functions/src/tui/events/is_deny
+  - functions/src/tui/events/is_view_details
+  - functions/src/tui/markdown/MarkdownRenderer/flush_current_line
+  - functions/src/tui/markdown/MarkdownRenderer/start_code_block
+  - functions/src/tui/markdown/MarkdownRenderer/end_heading
+  - functions/src/tui/markdown/MarkdownRenderer/end_code_block
+  - functions/src/tui/markdown/MarkdownRenderer/finish
+  - functions/src/tui/ollama_download/filter_suggestions
+  - functions/src/tui/prompt_analyzer/PromptAnalyzer/analyze_and_transform
+  - functions/src/tui/render/render_skills
+  - functions/src/tui/render/render_mcp
+  - functions/src/tui/render/render_plan_task_lines
+  - functions/src/tui/render/render_plan_document
+  - functions/src/tui/render/render_approval_capabilities
+  - functions/src/tui/render/render_approval_input_summary
+  - functions/src/tui/render/render_provider_switch
+  - functions/src/tui/render/render_model_download
+---
+
+# Signature
+
+`pub fn is_empty(&self) -> bool`
+
+# Called by
+
+- [cmd_ollama](../../../../../functions/src/cli/cmd_ollama.md)
+- [cmd_logs](../../../../../functions/src/cli/cmd_logs.md)
+- [to_policy](../../../../../functions/src/config/SecurityConfig/to_policy.md)
+- [validate](../../../../../functions/src/config/Config/validate.md)
+- [update_provider_config](../../../../../functions/src/config/update/ProviderUpdater/update_provider_config.md)
+- [interrupted_plan_from_tasks](../../../../../functions/src/db/models/interrupted_plan_from_tasks.md)
+- [inject_into_context](../../../../../functions/src/db/repository/memory/EpisodicMemoryRepository/inject_into_context.md)
+- [summarise_turns](../../../../../functions/src/llm/agent/compaction/summarise_turns.md)
+- [trim_to_fit](../../../../../functions/src/llm/agent/context/AgentContext/trim_to_fit.md)
+- [token_count](../../../../../functions/src/llm/agent/context/token_count.md)
+- [plan_completion_rejection](../../../../../functions/src/llm/agent/service/plan_completion_rejection.md)
+- [route_text_delta](../../../../../functions/src/llm/agent/service/route_text_delta.md)
+- [apply_streamed_tool_input](../../../../../functions/src/llm/agent/service/apply_streamed_tool_input.md)
+- [drain_stream_to_response](../../../../../functions/src/llm/agent/service/drain_stream_to_response.md)
+- [send_message_with_tools_inner](../../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.md)
+- [final_text_and_thinking](../../../../../functions/src/llm/agent/service/AgentService/final_text_and_thinking.md)
+- [extract_thinking_from_response](../../../../../functions/src/llm/agent/service/AgentService/extract_thinking_from_response.md)
+- [augment_message_with_pdf](../../../../../functions/src/llm/pdf_context/augment_message_with_pdf.md)
+- [parse_anthropic_sse_stream](../../../../../functions/src/llm/provider/anthropic/parse_anthropic_sse_stream.md)
+- [ollama_provider_from_config](../../../../../functions/src/llm/provider/factory/ollama_provider_from_config.md)
+- [to_gemini_request](../../../../../functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request.md)
+- [from_gemini_response](../../../../../functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response.md)
+- [parse_gemini_sse](../../../../../functions/src/llm/provider/gemini/parse_gemini_sse.md)
+- [overrides_for](../../../../../functions/src/llm/provider/ollama/OllamaProvider/overrides_for.md)
+- [to_ollama_request](../../../../../functions/src/llm/provider/ollama/OllamaProvider/to_ollama_request.md)
+- [from_ollama_response](../../../../../functions/src/llm/provider/ollama/OllamaProvider/from_ollama_response.md)
+- [stream](../../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/stream.md)
+- [stop_reason_for](../../../../../functions/src/llm/provider/ollama/stop_reason_for.md)
+- [maybe_tool_call_json](../../../../../functions/src/llm/provider/ollama/maybe_tool_call_json.md)
+- [to_openai_request](../../../../../functions/src/llm/provider/openai/OpenAIProvider/to_openai_request.md)
+- [from_openai_response](../../../../../functions/src/llm/provider/openai/OpenAIProvider/from_openai_response.md)
+- [stream](../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/stream.md)
+- [parse_fallback_tool_calls](../../../../../functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls.md)
+- [parse_native_qwen_tool_calls](../../../../../functions/src/llm/provider/qwen/QwenProvider/parse_native_qwen_tool_calls.md)
+- [to_qwen_request](../../../../../functions/src/llm/provider/qwen/QwenProvider/to_qwen_request.md)
+- [push_fallback_or_text](../../../../../functions/src/llm/provider/qwen/QwenProvider/push_fallback_or_text.md)
+- [from_qwen_response](../../../../../functions/src/llm/provider/qwen/QwenProvider/from_qwen_response.md)
+- [stream](../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/stream.md)
+- [llm_response_to_stream_events](../../../../../functions/src/llm/provider/qwen/llm_response_to_stream_events.md)
+- [extract_think_tags](../../../../../functions/src/llm/provider/types/extract_think_tags.md)
+- [validate_input](../../../../../functions/src/llm/tools/agent/AgentTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/agent/AgentTool/tool/execute.md)
+- [slugify](../../../../../functions/src/llm/tools/agent/slugify.md)
+- [parse_patch](../../../../../functions/src/llm/tools/apply_patch/parse_patch.md)
+- [find_subsequence](../../../../../functions/src/llm/tools/apply_patch/find_subsequence.md)
+- [apply_hunks](../../../../../functions/src/llm/tools/apply_patch/apply_hunks.md)
+- [validate_input](../../../../../functions/src/llm/tools/ask_user/AskUserTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/ask_user/AskUserTool/tool/execute.md)
+- [validate_input](../../../../../functions/src/llm/tools/bash/BashTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/bash/BashTool/tool/execute.md)
+- [validate_input](../../../../../functions/src/llm/tools/code_exec/CodeExecTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/code_exec/CodeExecTool/tool/execute.md)
+- [execute](../../../../../functions/src/llm/tools/context/ContextTool/tool/execute.md)
+- [parse_pdf](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/parse_pdf.md)
+- [extract_text_from_docx_xml](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/extract_text_from_docx_xml.md)
+- [strip_html_tags](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags.md)
+- [parse_xml](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/parse_xml.md)
+- [validate_input](../../../../../functions/src/llm/tools/glob/GlobTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/glob/GlobTool/tool/execute.md)
+- [validate_input](../../../../../functions/src/llm/tools/grep/GrepTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/grep/GrepTool/tool/execute.md)
+- [execute](../../../../../functions/src/llm/tools/http/HttpClientTool/tool/execute.md)
+- [validate_string](../../../../../functions/src/llm/tools/plan_tool/validate_string.md)
+- [execute](../../../../../functions/src/llm/tools/plan_tool/PlanTool/tool/execute.md)
+- [validate_input](../../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/execute.md)
+- [read_with_buffer](../../../../../functions/src/llm/tools/read/ReadTool/read_with_buffer.md)
+- [append_fact](../../../../../functions/src/llm/tools/save_memory/append_fact.md)
+- [validate_input](../../../../../functions/src/llm/tools/save_memory/SaveMemoryTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/save_memory/SaveMemoryTool/tool/execute.md)
+- [validate_input](../../../../../functions/src/llm/tools/skill/SkillTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/skill/SkillTool/tool/execute.md)
+- [parse_skill_frontmatter_value](../../../../../functions/src/llm/tools/skill/parse_skill_frontmatter_value.md)
+- [resolve](../../../../../functions/src/llm/tools/ssrf_guard/SsrfSafeResolver/resolve/resolve.md)
+- [execute](../../../../../functions/src/llm/tools/task/TaskTool/tool/execute.md)
+- [render_todos](../../../../../functions/src/llm/tools/todo_write/render_todos.md)
+- [validate_input](../../../../../functions/src/llm/tools/web_search/WebSearchTool/tool/validate_input.md)
+- [execute](../../../../../functions/src/llm/tools/web_search/WebSearchTool/tool/execute.md)
+- [init_debug_logging](../../../../../functions/src/logging/init_debug_logging.md)
+- [tasks_in_order](../../../../../functions/src/plan/PlanDocument/tasks_in_order.md)
+- [progress_percentage](../../../../../functions/src/plan/PlanDocument/progress_percentage.md)
+- [is_complete](../../../../../functions/src/plan/PlanDocument/is_complete.md)
+- [validate_dependencies](../../../../../functions/src/plan/PlanDocument/validate_dependencies.md)
+- [get_validation_warnings](../../../../../functions/src/plan/PlanDocument/get_validation_warnings.md)
+- [validate_plan](../../../../../functions/src/services/plan/PlanService/validate_plan.md)
+- [get_statistics](../../../../../functions/src/services/plan/PlanService/get_statistics.md)
+- [input_is_blank](../../../../../functions/src/tui/app/App/input_is_blank.md)
+- [history_prev](../../../../../functions/src/tui/app/App/history_prev.md)
+- [handle_chat_key](../../../../../functions/src/tui/app/App/handle_chat_key.md)
+- [handle_skills_key](../../../../../functions/src/tui/app/App/handle_skills_key.md)
+- [handle_mcp_key](../../../../../functions/src/tui/app/App/handle_mcp_key.md)
+- [export_plan_to_markdown](../../../../../functions/src/tui/app/App/export_plan_to_markdown.md)
+- [start_model_pull](../../../../../functions/src/tui/app/App/start_model_pull.md)
+- [handle_model_download_key](../../../../../functions/src/tui/app/App/handle_model_download_key.md)
+- [handle_provider_switch_key](../../../../../functions/src/tui/app/App/handle_provider_switch_key.md)
+- [is_submit](../../../../../functions/src/tui/events/is_submit.md)
+- [is_enter](../../../../../functions/src/tui/events/is_enter.md)
+- [is_up](../../../../../functions/src/tui/events/is_up.md)
+- [is_down](../../../../../functions/src/tui/events/is_down.md)
+- [is_approve](../../../../../functions/src/tui/events/is_approve.md)
+- [is_deny](../../../../../functions/src/tui/events/is_deny.md)
+- [is_view_details](../../../../../functions/src/tui/events/is_view_details.md)
+- [flush_current_line](../../../../../functions/src/tui/markdown/MarkdownRenderer/flush_current_line.md)
+- [start_code_block](../../../../../functions/src/tui/markdown/MarkdownRenderer/start_code_block.md)
+- [end_heading](../../../../../functions/src/tui/markdown/MarkdownRenderer/end_heading.md)
+- [end_code_block](../../../../../functions/src/tui/markdown/MarkdownRenderer/end_code_block.md)
+- [finish](../../../../../functions/src/tui/markdown/MarkdownRenderer/finish.md)
+- [filter_suggestions](../../../../../functions/src/tui/ollama_download/filter_suggestions.md)
+- [analyze_and_transform](../../../../../functions/src/tui/prompt_analyzer/PromptAnalyzer/analyze_and_transform.md)
+- [render_skills](../../../../../functions/src/tui/render/render_skills.md)
+- [render_mcp](../../../../../functions/src/tui/render/render_mcp.md)
+- [render_plan_task_lines](../../../../../functions/src/tui/render/render_plan_task_lines.md)
+- [render_plan_document](../../../../../functions/src/tui/render/render_plan_document.md)
+- [render_approval_capabilities](../../../../../functions/src/tui/render/render_approval_capabilities.md)
+- [render_approval_input_summary](../../../../../functions/src/tui/render/render_approval_input_summary.md)
+- [render_provider_switch](../../../../../functions/src/tui/render/render_provider_switch.md)
+- [render_model_download](../../../../../functions/src/tui/render/render_model_download.md)

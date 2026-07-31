@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ollama — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>ollama</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/provider/ollama/ModelOverrides.html">ModelOverrides</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/ollama/OllamaProvider.html">OllamaProvider</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/ModelOverrides/from_config.html">from_config</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/default_local.html">default_local</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/from_ollama_response.html">from_ollama_response</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/overrides_for.html">overrides_for</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/supports_streaming.html">supports_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/supports_tools.html">supports_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/supports_vision.html">supports_vision</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/validate_model.html">validate_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/to_ollama_request.html">to_ollama_request</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/with_default_model.html">with_default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/with_keep_alive.html">with_keep_alive</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/with_num_ctx.html">with_num_ctx</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/with_per_model.html">with_per_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/with_sampling.html">with_sampling</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/OllamaProvider/with_think.html">with_think</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/bash_tool.html">bash_tool</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/collect_tool_calls.html">collect_tool_calls</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/context_window_reflects_the_per_model_num_ctx_that_is_actually_requested.html">context_window_reflects_the_per_model_num_ctx_that_is_actually_requested</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/fenced_call_in_prose_becomes_a_tool_use_block.html">fenced_call_in_prose_becomes_a_tool_use_block</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/fenced_json_blocks.html">fenced_json_blocks</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/fenced_non_tool_json_is_not_recovered.html">fenced_non_tool_json_is_not_recovered</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/first_of_several_fenced_calls_is_recovered.html">first_of_several_fenced_calls_is_recovered</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/from_ollama_response_extracts_tool_calls.html">from_ollama_response_extracts_tool_calls</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/from_ollama_response_falls_back_to_think_tags.html">from_ollama_response_falls_back_to_think_tags</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/from_ollama_response_plain_text_with_final_data.html">from_ollama_response_plain_text_with_final_data</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/from_ollama_response_uses_explicit_thinking_field.html">from_ollama_response_uses_explicit_thinking_field</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/from_ollama_response_without_final_data_has_zero_usage_and_no_perf.html">from_ollama_response_without_final_data_has_zero_usage_and_no_perf</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/invalid_think_value_is_ignored.html">invalid_think_value_is_ignored</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/map_ollama_error.html">map_ollama_error</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/maybe_tool_call_json.html">maybe_tool_call_json</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/mock_response.html">mock_response</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/model_not_found_error_is_unwrapped_and_actionable.html">model_not_found_error_is_unwrapped_and_actionable</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/only_json_like_content_is_withheld_from_streaming.html">only_json_like_content_is_withheld_from_streaming</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/overrides_for_returns_provider_defaults_when_no_per_model_map.html">overrides_for_returns_provider_defaults_when_no_per_model_map</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/parse_keep_alive.html">parse_keep_alive</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/parse_think.html">parse_think</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/parse_tool_call_object.html">parse_tool_call_object</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/per_model_override_falls_back_field_by_field.html">per_model_override_falls_back_field_by_field</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/per_model_override_wins_over_provider_default_for_that_model.html">per_model_override_wins_over_provider_default_for_that_model</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/per_model_think_false_is_sent_when_request_has_no_thinking.html">per_model_think_false_is_sent_when_request_has_no_thinking</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/perf_metrics_from_final_data.html">perf_metrics_from_final_data</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/prose_is_never_mistaken_for_a_tool_call.html">prose_is_never_mistaken_for_a_tool_call</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/recovered_tool_call_becomes_a_tool_use_block.html">recovered_tool_call_becomes_a_tool_use_block</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/request_thinking_wins_over_configured_think.html">request_thinking_wins_over_configured_think</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/stop_reason_for.html">stop_reason_for</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/stream_without_tool_calls_ends_the_turn.html">stream_without_tool_calls_ends_the_turn</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/streamed_tool_call_reaches_caller.html">streamed_tool_call_reaches_caller</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/streamed_tool_calls_arrive_before_the_done_chunk.html">streamed_tool_calls_arrive_before_the_done_chunk</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_calculate_cost_is_always_zero.html">test_calculate_cost_is_always_zero</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_context_window_default_and_custom.html">test_context_window_default_and_custom</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_invalid_host_falls_back_to_default.html">test_invalid_host_falls_back_to_default</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_map_ollama_error_not_found.html">test_map_ollama_error_not_found</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_ollama_provider_creation.html">test_ollama_provider_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_parse_keep_alive.html">test_parse_keep_alive</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_perf_metrics_from_final_data.html">test_perf_metrics_from_final_data</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_supported_models_includes_gemma4.html">test_supported_models_includes_gemma4</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_supported_models_includes_ornith.html">test_supported_models_includes_ornith</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_supports_vision_detection.html">test_supports_vision_detection</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_to_ollama_request_maps_common_fields.html">test_to_ollama_request_maps_common_fields</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_validate_model_always_true.html">test_validate_model_always_true</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/test_with_default_model.html">test_with_default_model</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_format.html">to_ollama_format</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_format_json_object_marker.html">to_ollama_format_json_object_marker</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_format_structured_schema.html">to_ollama_format_structured_schema</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_request_embeds_base64_image.html">to_ollama_request_embeds_base64_image</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_request_maps_thinking_and_response_format.html">to_ollama_request_maps_thinking_and_response_format</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_request_maps_tool_messages.html">to_ollama_request_maps_tool_messages</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_tool.html">to_ollama_tool</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_tool_converts_valid_schema.html">to_ollama_tool_converts_valid_schema</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/to_ollama_tool_falls_back_on_invalid_schema.html">to_ollama_tool_falls_back_on_invalid_schema</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/tool_call_from_content.html">tool_call_from_content</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/tool_call_in_a_fence_embedded_in_prose_is_recovered.html">tool_call_in_a_fence_embedded_in_prose_is_recovered</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/tool_call_in_a_json_fence_is_recovered.html">tool_call_in_a_json_fence_is_recovered</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/ollama/tool_call_printed_as_content_is_recovered.html">tool_call_printed_as_content_is_recovered</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-providererror-result</code></li>
+<li><code>external/super-r-trait-provider-providerstream</code></li>
+<li><code>external/super-types</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/ollama-rs-error-ollamaerror-generation-chat-request-chatmessagerequest-chatmessage-chatmessagefinalresponsedata-chatmessageresponse-messagerole-generation-images-image-generation-parameters-formattype-jsonstructure-keepalive-thinktype-timeunit-generation-tools-toolcall-toolcallfunction-toolfunctioninfo-toolinfo-tooltype-models-modeloptions-ollama</code></li>
+<li><code>external/futures-streamext-as</code></li>
+<li><code>external/super</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/ollama.rs#L1-L1804</p>
+</body>
+</html>

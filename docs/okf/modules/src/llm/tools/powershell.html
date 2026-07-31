@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>powershell — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>powershell</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/tools/powershell/PowerShellInput.html">PowerShellInput</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/powershell/PowerShellTool.html">PowerShellTool</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/capabilities.html">capabilities</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/description.html">description</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/execute.html">execute</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/input_schema.html">input_schema</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/requires_approval.html">requires_approval</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/PowerShellTool/tool/validate_input.html">validate_input</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/execute_allows_read_only_command_in_plan_mode.html">execute_allows_read_only_command_in_plan_mode</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/execute_blocks_dangerous_command_in_read_only_mode.html">execute_blocks_dangerous_command_in_read_only_mode</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/is_read_only_powershell.html">is_read_only_powershell</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/make_ctx.html">make_ctx</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/probe_executable.html">probe_executable</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_allows_get_childitem.html">read_only_allows_get_childitem</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_allows_get_content.html">read_only_allows_get_content</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_allows_gt_in_string_argument.html">read_only_allows_gt_in_string_argument</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_allows_select_string.html">read_only_allows_select_string</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_blocks_append_no_spaces.html">read_only_blocks_append_no_spaces</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_blocks_iex_without_space.html">read_only_blocks_iex_without_space</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_blocks_invoke_expression.html">read_only_blocks_invoke_expression</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_blocks_net_method_call.html">read_only_blocks_net_method_call</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_blocks_pipe_to_out_file.html">read_only_blocks_pipe_to_out_file</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_blocks_redirection_with_space.html">read_only_blocks_redirection_with_space</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/read_only_blocks_remove_item.html">read_only_blocks_remove_item</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/tool_metadata.html">tool_metadata</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/validate_accepts_valid_input.html">validate_accepts_valid_input</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/validate_rejects_empty_command.html">validate_rejects_empty_command</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/validate_rejects_timeout_over_600.html">validate_rejects_timeout_over_600</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/powershell/validate_rejects_zero_timeout.html">validate_rejects_zero_timeout</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-result-toolerror</code></li>
+<li><code>external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/once-cell-sync-lazy</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/serde-json-value</code></li>
+<li><code>external/std-collections-hashmap</code></li>
+<li><code>external/tokio-process-command</code></li>
+<li><code>external/tokio-time-timeout-duration</code></li>
+<li><code>external/super</code></li>
+<li><code>external/uuid-uuid</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/tools/powershell.rs#L1-L524</p>
+</body>
+</html>

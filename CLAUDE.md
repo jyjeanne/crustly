@@ -279,3 +279,7 @@ Several scripts in `scripts/` enforce architectural integrity:
 - Plan domain model lives at `src/plan/mod.rs` (crate root, not under `tui/`)
 - This prevents circular dependencies between TUI, database, and tools
 - See ADR 0004 in `docs/architecture/decisions/` for rationale
+
+<!-- okf-rs:begin -->
+@AGENTS.md
+<!-- okf-rs:end -->

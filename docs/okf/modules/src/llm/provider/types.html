@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>types — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>types</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/provider/types/CacheMetrics.html">CacheMetrics</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/ContentBlock.html">ContentBlock</a> — Rust Enum</li>
+<li><a href="../../../../classes/src/llm/provider/types/ContentDelta.html">ContentDelta</a> — Rust Enum</li>
+<li><a href="../../../../classes/src/llm/provider/types/ImageSource.html">ImageSource</a> — Rust Enum</li>
+<li><a href="../../../../classes/src/llm/provider/types/LLMRequest.html">LLMRequest</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/LLMResponse.html">LLMResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/Message.html">Message</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/MessageDelta.html">MessageDelta</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/PerfMetrics.html">PerfMetrics</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/Role.html">Role</a> — Rust Enum</li>
+<li><a href="../../../../classes/src/llm/provider/types/StopReason.html">StopReason</a> — Rust Enum</li>
+<li><a href="../../../../classes/src/llm/provider/types/StreamEvent.html">StreamEvent</a> — Rust Enum</li>
+<li><a href="../../../../classes/src/llm/provider/types/StreamMessage.html">StreamMessage</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/ThinkingConfig.html">ThinkingConfig</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/TokenUsage.html">TokenUsage</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/types/Tool.html">Tool</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/provider/types/CacheMetrics/hit_rate.html">hit_rate</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_frequency_penalty.html">with_frequency_penalty</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_max_tokens.html">with_max_tokens</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_presence_penalty.html">with_presence_penalty</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_response_format.html">with_response_format</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_seed.html">with_seed</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_stop.html">with_stop</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_streaming.html">with_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_system.html">with_system</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_temperature.html">with_temperature</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_thinking.html">with_thinking</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_tools.html">with_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/LLMRequest/with_top_p.html">with_top_p</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/Message/assistant.html">assistant</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/Message/system.html">system</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/Message/user.html">user</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/PerfMetrics/tokens_per_second.html">tokens_per_second</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/TokenUsage/total.html">total</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/types/cache_metrics_hit_rate.html">cache_metrics_hit_rate</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/extract_think_tags.html">extract_think_tags</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/extract_think_tags_multiple_blocks.html">extract_think_tags_multiple_blocks</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/extract_think_tags_no_tags.html">extract_think_tags_no_tags</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/extract_think_tags_only_block.html">extract_think_tags_only_block</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/extract_think_tags_single_block.html">extract_think_tags_single_block</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/extract_think_tags_unclosed.html">extract_think_tags_unclosed</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/perf_metrics_tokens_per_second.html">perf_metrics_tokens_per_second</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/perf_metrics_tokens_per_second_missing_duration.html">perf_metrics_tokens_per_second_missing_duration</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/perf_metrics_tokens_per_second_zero_duration.html">perf_metrics_tokens_per_second_zero_duration</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/test_llm_request_builder.html">test_llm_request_builder</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/test_message_creation.html">test_message_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/test_token_usage.html">test_token_usage</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/with_thinking_sets_temperature.html">with_thinking_sets_temperature</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/with_thinking_sets_temperature_and_config.html">with_thinking_sets_temperature_and_config</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/types/with_thinking_zero_budget_is_noop.html">with_thinking_zero_budget_is_noop</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/std-collections-hashmap</code></li>
+<li><code>external/super</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/types.rs#L1-L611</p>
+</body>
+</html>

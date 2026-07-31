@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>retry_with_backoff — Rust Function</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>retry_with_backoff</h1>
+<p class="type">Rust Function</p>
+<pre><code>pub async fn retry_with_backoff&lt;F, Fut, T&gt;(mut operation: F, config: &amp;RetryConfig) -&gt; Result&lt;T&gt; where F: FnMut() -&gt; Fut, Fut: Future&lt;Output = Result&lt;T&gt;&gt;,</code></pre>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete.html">complete</a></li>
+<li><a href="../../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/complete.html">complete</a></li>
+<li><a href="../../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/complete.html">complete</a></li>
+<li><a href="../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/complete.html">complete</a></li>
+<li><a href="../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../functions/src/llm/provider/retry/retry_with_rate_limit.html">retry_with_rate_limit</a></li>
+<li><a href="../../../../../functions/src/llm/provider/retry/test_retry_success_immediate.html">test_retry_success_immediate</a></li>
+<li><a href="../../../../../functions/src/llm/provider/retry/test_retry_success_after_retries.html">test_retry_success_after_retries</a></li>
+<li><a href="../../../../../functions/src/llm/provider/retry/test_retry_max_attempts_exceeded.html">test_retry_max_attempts_exceeded</a></li>
+<li><a href="../../../../../functions/src/llm/provider/retry/test_retry_non_retryable_error.html">test_retry_non_retryable_error</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/retry.rs#L112-L166</p>
+</body>
+</html>

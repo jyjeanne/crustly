@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>plan — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>plan</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/db/repository/plan/PlanRepository.html">PlanRepository</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/db/repository/plan/PlanTaskRepository.html">PlanTaskRepository</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/create.html">create</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/delete.html">delete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/find_by_id.html">find_by_id</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/find_by_session_id.html">find_by_session_id</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/find_tasks_by_plan_id.html">find_tasks_by_plan_id</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/format_plan_status.html">format_plan_status</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/format_task_status.html">format_task_status</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/format_task_type.html">format_task_type</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/parse_plan_status.html">parse_plan_status</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/parse_task_status.html">parse_task_status</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/parse_task_type.html">parse_task_type</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/plan_from_db.html">plan_from_db</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/plan_to_db.html">plan_to_db</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/task_from_db.html">task_from_db</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/task_to_db.html">task_to_db</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanRepository/update.html">update</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanTaskRepository/create_task.html">create_task</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanTaskRepository/get_incomplete_tasks.html">get_incomplete_tasks</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanTaskRepository/get_task.html">get_task</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanTaskRepository/list_tasks_for_plan.html">list_tasks_for_plan</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanTaskRepository/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/PlanTaskRepository/update_task_status.html">update_task_status</a> — Rust Method</li>
+<li><a href="../../../../functions/src/db/repository/plan/create_test_plan.html">create_test_plan</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/row_to_plan_task.html">row_to_plan_task</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/setup_test_db.html">setup_test_db</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_multiple_sessions_multiple_plans.html">test_multiple_sessions_multiple_plans</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_create.html">test_plan_create</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_delete.html">test_plan_delete</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_find_by_id.html">test_plan_find_by_id</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_find_by_session_id.html">test_plan_find_by_session_id</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_risks_serialization.html">test_plan_risks_serialization</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_status_conversion.html">test_plan_status_conversion</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_tasks_cascade_delete.html">test_plan_tasks_cascade_delete</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_update.html">test_plan_update</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_update_task_status.html">test_plan_update_task_status</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_with_complex_task_graph.html">test_plan_with_complex_task_graph</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_plan_with_no_tasks.html">test_plan_with_no_tasks</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_task_dependencies_serialization.html">test_task_dependencies_serialization</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_task_status_conversion.html">test_task_status_conversion</a> — Rust Function</li>
+<li><a href="../../../../functions/src/db/repository/plan/test_task_type_conversion.html">test_task_type_conversion</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/crate-db-models-plan-plantask-plantaskstatus</code></li>
+<li><code>external/crate-plan-plandocument-planstatus-taskstatus-tasktype</code></li>
+<li><code>external/anyhow-context-result</code></li>
+<li><code>external/sqlx-sqlitepool</code></li>
+<li><code>external/uuid-uuid</code></li>
+<li><code>external/chrono-datetime</code></li>
+<li><code>external/super</code></li>
+<li><code>external/crate-db-models-session</code></li>
+<li><code>external/crate-db-repository-session-sessionrepository</code></li>
+<li><code>external/crate-db-database</code></li>
+<li><code>external/crate-plan-plantask-tasktype</code></li>
+<li><code>external/chrono-utc</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/db/repository/plan.rs#L1-L1317</p>
+</body>
+</html>

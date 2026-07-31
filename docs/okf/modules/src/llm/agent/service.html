@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>service — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>service</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/agent/service/AgentResponse.html">AgentResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/agent/service/AgentService.html">AgentService</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/agent/service/AgentServiceLauncher.html">AgentServiceLauncher</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/agent/service/AgentStreamResponse.html">AgentStreamResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/agent/service/FinalText.html">FinalText</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/agent/service/MockProvider.html">MockProvider</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/agent/service/MockProviderWithTools.html">MockProviderWithTools</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/agent/service/MockTool.html">MockTool</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/agent/service/ToolApprovalInfo.html">ToolApprovalInfo</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/call_provider_streaming.html">call_provider_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/extract_text_from_response.html">extract_text_from_response</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/extract_thinking_from_response.html">extract_thinking_from_response</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/final_text_and_thinking.html">final_text_and_thinking</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/prepare_message_context.html">prepare_message_context</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/provider_context_window.html">provider_context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/provider_model.html">provider_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/provider_name.html">provider_name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/send_message.html">send_message</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/send_message_streaming.html">send_message_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools.html">send_message_with_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_and_mode.html">send_message_with_tools_and_mode</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_and_mode_streaming.html">send_message_with_tools_and_mode_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.html">send_message_with_tools_inner</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/set_provider.html">set_provider</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/system_prompt_with_env.html">system_prompt_with_env</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_allow_sub_agents.html">with_allow_sub_agents</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_approval_callback.html">with_approval_callback</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_auto_approve_tools.html">with_auto_approve_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_max_tool_iterations.html">with_max_tool_iterations</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_model_router.html">with_model_router</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_pool.html">with_pool</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_system_prompt.html">with_system_prompt</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_tool_registry.html">with_tool_registry</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentService/with_working_directory.html">with_working_directory</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentServiceLauncher/crate-llm-tools-subagentlauncher/launch.html">launch</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentServiceLauncher/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/AgentServiceLauncher/std-fmt-debug/fmt.html">fmt</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProviderWithTools/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProviderWithTools/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProviderWithTools/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProviderWithTools/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProviderWithTools/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProviderWithTools/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProviderWithTools/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockProviderWithTools/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockTool/crate-llm-tools-tool/capabilities.html">capabilities</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockTool/crate-llm-tools-tool/description.html">description</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockTool/crate-llm-tools-tool/execute.html">execute</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockTool/crate-llm-tools-tool/input_schema.html">input_schema</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockTool/crate-llm-tools-tool/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/MockTool/crate-llm-tools-tool/requires_approval.html">requires_approval</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/agent/service/apply_streamed_tool_input.html">apply_streamed_tool_input</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/create_test_service.html">create_test_service</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/drain_stream_assembles_anthropic_tool_input_from_json_deltas.html">drain_stream_assembles_anthropic_tool_input_from_json_deltas</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/drain_stream_to_response.html">drain_stream_to_response</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/drain_stream_to_response_carries_perf_metrics_through.html">drain_stream_to_response_carries_perf_metrics_through</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/final_text_falls_back_to_thinking_when_there_is_no_visible_text.html">final_text_falls_back_to_thinking_when_there_is_no_visible_text</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/final_text_of_an_empty_response_is_empty.html">final_text_of_an_empty_response_is_empty</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/final_text_prefers_visible_text_and_keeps_thinking_separate.html">final_text_prefers_visible_text_and_keeps_thinking_separate</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/has_mutating_capability.html">has_mutating_capability</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/is_parallelizable.html">is_parallelizable</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/loop_detection_recovery_message_logic.html">loop_detection_recovery_message_logic</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/plan_completion_gate_decision_matrix.html">plan_completion_gate_decision_matrix</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/plan_completion_rejection.html">plan_completion_rejection</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/response_with.html">response_with</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/route_text_delta.html">route_text_delta</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/signature_accepts_file_path_alias.html">signature_accepts_file_path_alias</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/signature_distinguishes_same_tool_different_args.html">signature_distinguishes_same_tool_different_args</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/signature_uses_path_key_so_different_edits_do_not_collide.html">signature_uses_path_key_so_different_edits_do_not_collide</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/streamed_ollama_tool_call_survives_drain.html">streamed_ollama_tool_call_survives_drain</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/sub_agent_launcher_does_not_auto_approve_tools.html">sub_agent_launcher_does_not_auto_approve_tools</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/system_prompt_tells_the_model_the_working_directory.html">system_prompt_tells_the_model_the_working_directory</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/system_prompt_with_env_is_none_when_no_prompt_is_set.html">system_prompt_with_env_is_none_when_no_prompt_is_set</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/test_agent_service_creation.html">test_agent_service_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/test_send_message.html">test_send_message</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/test_send_message_with_system_prompt.html">test_send_message_with_system_prompt</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/test_send_message_with_tool_execution.html">test_send_message_with_tool_execution</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/agent/service/tool_call_signature.html">tool_call_signature</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-context-agentcontext</code></li>
+<li><code>external/super-error-agenterror-result</code></li>
+<li><code>external/crate-llm-provider-router-modelrouter</code></li>
+<li><code>external/crate-llm-provider-contentblock-contentdelta-llmrequest-llmresponse-message-perfmetrics-provider-providerstream-stopreason-streamevent-tokenusage</code></li>
+<li><code>external/crate-llm-tools-cache-cachekey-toolresultcache-toolttlconfig</code></li>
+<li><code>external/crate-llm-tools-filereadcache-toolcapability-toolexecutioncontext-toolregistry</code></li>
+<li><code>external/crate-services-messageservice-servicecontext-sessionservice</code></li>
+<li><code>external/futures-future-join-all</code></li>
+<li><code>external/futures-streamext-as</code></li>
+<li><code>external/serde-json-value</code></li>
+<li><code>external/std-future-future</code></li>
+<li><code>external/std-pin-pin</code></li>
+<li><code>external/std-sync-arc</code></li>
+<li><code>external/tokio-sync-mpsc</code></li>
+<li><code>external/uuid-uuid</code></li>
+<li><code>external/std-collections-hash-map-defaulthasher</code></li>
+<li><code>external/std-hash-hash-hasher</code></li>
+<li><code>external/crate-llm-provider-providererror</code></li>
+<li><code>external/super</code></li>
+<li><code>external/crate-db-database</code></li>
+<li><code>external/crate-llm-provider-llmrequest-llmresponse-tokenusage</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/crate-llm-tools-subagentlauncher</code></li>
+<li><code>external/crate-llm-provider-ollamaprovider-provider-tool</code></li>
+<li><code>external/crate-llm-provider-types-messagedelta</code></li>
+<li><code>external/crate-llm-provider-contentdelta</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/agent/service.rs#L1-L2625</p>
+</body>
+</html>

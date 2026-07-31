@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>registry — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>registry</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/tools/registry/MockTool.html">MockTool</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/tools/registry/ToolRegistry.html">ToolRegistry</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/tools/registry/MockTool/tool/capabilities.html">capabilities</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/MockTool/tool/description.html">description</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/MockTool/tool/execute.html">execute</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/MockTool/tool/input_schema.html">input_schema</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/MockTool/tool/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/MockTool/tool/requires_approval.html">requires_approval</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/canonical_name.html">canonical_name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/count.html">count</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/default/default.html">default</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/execute.html">execute</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/get.html">get</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/get_tool_definitions.html">get_tool_definitions</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/has_tool.html">has_tool</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/is_trusted.html">is_trusted</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/list_tools.html">list_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/register.html">register</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/register_mcp_server.html">register_mcp_server</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/ToolRegistry/set_policy.html">set_policy</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/tools/registry/an_exact_match_wins_over_an_alias_entry.html">an_exact_match_wins_over_an_alias_entry</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/execute_evaluates_policy_against_the_canonical_name_not_the_alias.html">execute_evaluates_policy_against_the_canonical_name_not_the_alias</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/execute_reports_not_found_using_the_original_unresolved_name.html">execute_reports_not_found_using_the_original_unresolved_name</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/execute_resolves_an_alias_name_to_the_registered_tool.html">execute_resolves_an_alias_name_to_the_registered_tool</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/get_resolves_a_known_alias_to_the_registered_canonical_tool.html">get_resolves_a_known_alias_to_the_registered_canonical_tool</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/has_tool_is_false_for_an_alias_whose_target_is_not_registered.html">has_tool_is_false_for_an_alias_whose_target_is_not_registered</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/is_trusted_evaluates_policy_against_the_canonical_name_not_the_alias.html">is_trusted_evaluates_policy_against_the_canonical_name_not_the_alias</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/preview_input.html">preview_input</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/preview_input_shows_the_command.html">preview_input_shows_the_command</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/preview_input_truncates_a_large_payload.html">preview_input_truncates_a_large_payload</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/preview_input_truncates_on_char_boundaries.html">preview_input_truncates_on_char_boundaries</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/register_mcp_server_with_nonexistent_command_fails_gracefully.html">register_mcp_server_with_nonexistent_command_fails_gracefully</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/test_execute_nonexistent_tool.html">test_execute_nonexistent_tool</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/test_execute_requires_approval.html">test_execute_requires_approval</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/test_execute_tool.html">test_execute_tool</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/test_execute_with_auto_approve.html">test_execute_with_auto_approve</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/test_list_tools.html">test_list_tools</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/test_register_tool.html">test_register_tool</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/tools/registry/test_registry_creation.html">test_registry_creation</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-result-toolerror</code></li>
+<li><code>external/super-r-trait-tool-toolexecutioncontext-toolresult</code></li>
+<li><code>external/serde-json-value</code></li>
+<li><code>external/std-collections-hashmap</code></li>
+<li><code>external/std-sync-arc</code></li>
+<li><code>external/crate-llm-tools-sandbox-policydecision</code></li>
+<li><code>external/crate-mcp-client-mcpclient-mcptool</code></li>
+<li><code>external/tokio-sync-mutex</code></li>
+<li><code>external/super</code></li>
+<li><code>external/crate-llm-tools-r-trait-toolcapability</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/uuid-uuid</code></li>
+<li><code>external/crate-llm-tools-sandbox-denytoolrule</code></li>
+<li><code>external/crate-llm-tools-sandbox-allowtoolrule</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/tools/registry.rs#L1-L626</p>
+</body>
+</html>

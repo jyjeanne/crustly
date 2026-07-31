@@ -1,0 +1,29 @@
+---
+type: Rust Function
+title: test_llm_request_new_fields
+resource: src/llm/provider/openai.rs#L1248-L1264
+visibility: private
+generated:
+  by: okf-rs/0.2.0
+relationships:
+  calls:
+  - functions/src/llm/provider/types/LLMRequest/with_top_p
+  - functions/src/llm/provider/types/LLMRequest/with_seed
+  - functions/src/llm/provider/types/LLMRequest/with_stop
+  - functions/src/llm/provider/types/LLMRequest/with_frequency_penalty
+  - functions/src/llm/provider/types/LLMRequest/with_presence_penalty
+  - functions/src/llm/provider/types/LLMRequest/with_response_format
+---
+
+# Signature
+
+`fn test_llm_request_new_fields()`
+
+# Calls
+
+- [with_top_p](../../../../../functions/src/llm/provider/types/LLMRequest/with_top_p.md)
+- [with_seed](../../../../../functions/src/llm/provider/types/LLMRequest/with_seed.md)
+- [with_stop](../../../../../functions/src/llm/provider/types/LLMRequest/with_stop.md)
+- [with_frequency_penalty](../../../../../functions/src/llm/provider/types/LLMRequest/with_frequency_penalty.md)
+- [with_presence_penalty](../../../../../functions/src/llm/provider/types/LLMRequest/with_presence_penalty.md)
+- [with_response_format](../../../../../functions/src/llm/provider/types/LLMRequest/with_response_format.md)

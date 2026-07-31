@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>render_to_string — Rust Function</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../functions/@index.html">functions</a></nav>
+<h1>render_to_string</h1>
+<p class="type">Rust Function</p>
+<p><span class="visibility">private</span></p>
+<pre><code>fn render_to_string(app: &amp;App, width: u16, height: u16) -&gt; String</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../functions/src/tui/render/render.html">render</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../functions/src/tui/render/header_shows_ollama_provider_badge_and_tokens_per_second.html">header_shows_ollama_provider_badge_and_tokens_per_second</a></li>
+<li><a href="../../../../functions/src/tui/render/header_omits_tokens_per_second_when_unavailable.html">header_omits_tokens_per_second_when_unavailable</a></li>
+<li><a href="../../../../functions/src/tui/render/status_bar_shows_interactive_by_default.html">status_bar_shows_interactive_by_default</a></li>
+<li><a href="../../../../functions/src/tui/render/status_bar_shows_full_auto_when_active.html">status_bar_shows_full_auto_when_active</a></li>
+<li><a href="../../../../functions/src/tui/render/skills_view_shows_name_and_description.html">skills_view_shows_name_and_description</a></li>
+<li><a href="../../../../functions/src/tui/render/skills_view_shows_empty_state_message.html">skills_view_shows_empty_state_message</a></li>
+<li><a href="../../../../functions/src/tui/render/mcp_view_shows_connected_server_with_tool_count.html">mcp_view_shows_connected_server_with_tool_count</a></li>
+<li><a href="../../../../functions/src/tui/render/mcp_view_shows_connection_error.html">mcp_view_shows_connection_error</a></li>
+<li><a href="../../../../functions/src/tui/render/mcp_view_shows_empty_state_message.html">mcp_view_shows_empty_state_message</a></li>
+<li><a href="../../../../functions/src/tui/render/model_download_dialog_shows_prompt_and_suggestions.html">model_download_dialog_shows_prompt_and_suggestions</a></li>
+<li><a href="../../../../functions/src/tui/render/model_download_progress_shows_status_and_bar.html">model_download_progress_shows_status_and_bar</a></li>
+<li><a href="../../../../functions/src/tui/render/model_download_confirm_delete_shows_prompt.html">model_download_confirm_delete_shows_prompt</a></li>
+<li><a href="../../../../functions/src/tui/render/model_download_deleting_shows_status.html">model_download_deleting_shows_status</a></li>
+<li><a href="../../../../functions/src/tui/render/chat_input_renders_textarea_contents_and_hint.html">chat_input_renders_textarea_contents_and_hint</a></li>
+<li><a href="../../../../functions/src/tui/render/model_info_panel_shows_provider_model_and_context_window.html">model_info_panel_shows_provider_model_and_context_window</a></li>
+<li><a href="../../../../functions/src/tui/render/model_info_panel_shows_last_response_perf_metrics.html">model_info_panel_shows_last_response_perf_metrics</a></li>
+<li><a href="../../../../functions/src/tui/render/help_screen_lists_commands_from_every_section.html">help_screen_lists_commands_from_every_section</a></li>
+<li><a href="../../../../functions/src/tui/render/help_screen_shows_shift_enter_when_kitty_protocol_active.html">help_screen_shows_shift_enter_when_kitty_protocol_active</a></li>
+<li><a href="../../../../functions/src/tui/render/chat_shows_pending_plan_banner_only_while_awaiting_approval.html">chat_shows_pending_plan_banner_only_while_awaiting_approval</a></li>
+<li><a href="../../../../functions/src/tui/render/chat_message_thinking_block_toggles_between_collapsed_and_expanded.html">chat_message_thinking_block_toggles_between_collapsed_and_expanded</a></li>
+<li><a href="../../../../functions/src/tui/render/chat_message_perf_footer_reports_cold_and_warm_starts.html">chat_message_perf_footer_reports_cold_and_warm_starts</a></li>
+<li><a href="../../../../functions/src/tui/render/chat_shows_streaming_response_and_processing_indicator.html">chat_shows_streaming_response_and_processing_indicator</a></li>
+<li><a href="../../../../functions/src/tui/render/plan_mode_shows_full_document_with_tasks_and_criteria.html">plan_mode_shows_full_document_with_tasks_and_criteria</a></li>
+<li><a href="../../../../functions/src/tui/render/plan_mode_shows_empty_state_without_a_plan.html">plan_mode_shows_empty_state_without_a_plan</a></li>
+<li><a href="../../../../functions/src/tui/render/approval_dialog_shows_tool_name_capabilities_and_summarized_params.html">approval_dialog_shows_tool_name_capabilities_and_summarized_params</a></li>
+<li><a href="../../../../functions/src/tui/render/approval_dialog_details_view_shows_pretty_printed_json.html">approval_dialog_details_view_shows_pretty_printed_json</a></li>
+</ul>
+<p class="resource">Source: src/tui/render.rs#L2085-L2099</p>
+</body>
+</html>

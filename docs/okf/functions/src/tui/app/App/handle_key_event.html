@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>handle_key_event — Rust Method</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>handle_key_event</h1>
+<p class="type">Rust Method</p>
+<p><span class="visibility">private</span></p>
+<pre><code>async fn handle_key_event(&amp;mut self, event: crossterm::event::KeyEvent) -&gt; Result&lt;()&gt;</code></pre>
+<h2>Calls</h2>
+<ul>
+<li><a href="../../../../../functions/src/tui/events/is_quit.html">is_quit</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_new_session.html">is_new_session</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/create_new_session.html">create_new_session</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_list_sessions.html">is_list_sessions</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/switch_mode.html">switch_mode</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_help.html">is_help</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_clear_session.html">is_clear_session</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/clear_session.html">clear_session</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_toggle_plan.html">is_toggle_plan</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/load_plan_for_viewing.html">load_plan_for_viewing</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_toggle_auto_mode.html">is_toggle_auto_mode</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/cycle_auto_mode.html">cycle_auto_mode</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_model_download.html">is_model_download</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/open_model_download.html">open_model_download</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_model_info.html">is_model_info</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_provider_switch.html">is_provider_switch</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/open_provider_switch.html">open_provider_switch</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_chat_key.html">handle_chat_key</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_plan_key.html">handle_plan_key</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_sessions_key.html">handle_sessions_key</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_approval_key.html">handle_approval_key</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_file_picker_key.html">handle_file_picker_key</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_model_download_key.html">handle_model_download_key</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_provider_switch_key.html">handle_provider_switch_key</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_skills_key.html">handle_skills_key</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/handle_mcp_key.html">handle_mcp_key</a></li>
+<li><a href="../../../../../functions/src/tui/events/is_cancel.html">is_cancel</a></li>
+</ul>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/tui/app/App/handle_event.html">handle_event</a></li>
+<li><a href="../../../../../functions/src/tui/app/shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps.html">shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps</a></li>
+<li><a href="../../../../../functions/src/tui/app/shift_tab_works_from_any_mode_not_just_chat.html">shift_tab_works_from_any_mode_not_just_chat</a></li>
+<li><a href="../../../../../functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone.html">setting_auto_mode_state_shares_the_same_cell_as_a_clone</a></li>
+<li><a href="../../../../../functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it.html">ctrl_o_opens_model_info_panel_and_esc_closes_it</a></li>
+<li><a href="../../../../../functions/src/tui/app/ctrl_w_opens_provider_switch_dialog_in_loading_state.html">ctrl_w_opens_provider_switch_dialog_in_loading_state</a></li>
+</ul>
+<p class="resource">Source: src/tui/app.rs#L749-L858</p>
+</body>
+</html>

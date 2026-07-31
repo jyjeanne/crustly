@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>app — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../index.html">Home</a> / <a href="../../../modules/@index.html">modules</a></nav>
+<h1>app</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../classes/src/tui/app/App.html">App</a> — Rust Struct</li>
+<li><a href="../../../classes/src/tui/app/DisplayMessage.html">DisplayMessage</a> — Rust Struct</li>
+<li><a href="../../../classes/src/tui/app/DummyProvider.html">DummyProvider</a> — Rust Struct</li>
+<li><a href="../../../functions/src/tui/app/App/append_streaming_chunk.html">append_streaming_chunk</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/auto_mode.html">auto_mode</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/check_and_load_plan.html">check_and_load_plan</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/check_task_completion.html">check_task_completion</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/clear_input.html">clear_input</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/clear_session.html">clear_session</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/complete_response.html">complete_response</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/copy_last_response_to_clipboard.html">copy_last_response_to_clipboard</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/create_new_session.html">create_new_session</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/cursor_on_first_line.html">cursor_on_first_line</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/cursor_on_last_line.html">cursor_on_last_line</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/cycle_auto_mode.html">cycle_auto_mode</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/event_belongs_to_current_session.html">event_belongs_to_current_session</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/event_handler.html">event_handler</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/event_handler_mut.html">event_handler_mut</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/event_sender.html">event_sender</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/execute_next_plan_task.html">execute_next_plan_task</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/execute_plan_tasks.html">execute_plan_tasks</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/export_plan_to_markdown.html">export_plan_to_markdown</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/fail_current_plan_task.html">fail_current_plan_task</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_approval_key.html">handle_approval_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_approval_requested.html">handle_approval_requested</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_chat_key.html">handle_chat_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_event.html">handle_event</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_file_picker_key.html">handle_file_picker_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_key_event.html">handle_key_event</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_mcp_key.html">handle_mcp_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_model_download_key.html">handle_model_download_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_plan_key.html">handle_plan_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_provider_switch_key.html">handle_provider_switch_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_sessions_key.html">handle_sessions_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/handle_skills_key.html">handle_skills_key</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/history_next.html">history_next</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/history_prev.html">history_prev</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/initialize.html">initialize</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/input_is_blank.html">input_is_blank</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/input_text.html">input_text</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/last_assistant_message.html">last_assistant_message</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/load_history_entry.html">load_history_entry</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/load_plan_for_viewing.html">load_plan_for_viewing</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/load_session.html">load_session</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/load_sessions.html">load_sessions</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/new.html">new</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/next_event.html">next_event</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/open_file_picker.html">open_file_picker</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/open_mcp.html">open_mcp</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/open_model_download.html">open_model_download</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/open_provider_switch.html">open_provider_switch</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/open_skills.html">open_skills</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/paste_from_clipboard.html">paste_from_clipboard</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/provider_context_window.html">provider_context_window</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/provider_model.html">provider_model</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/provider_name.html">provider_name</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/push_input_history.html">push_input_history</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/refresh_model_download_suggestions.html">refresh_model_download_suggestions</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/save_plan.html">save_plan</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/send_message.html">send_message</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/set_agent_service.html">set_agent_service</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/set_auto_mode_state.html">set_auto_mode_state</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/set_input_text.html">set_input_text</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/set_kitty_keyboard_protocol_active.html">set_kitty_keyboard_protocol_active</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/set_mcp_status.html">set_mcp_status</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/set_ollama_config.html">set_ollama_config</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/set_ollama_host.html">set_ollama_host</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/show_error.html">show_error</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/start_model_delete.html">start_model_delete</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/start_model_pull.html">start_model_pull</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/switch_mode.html">switch_mode</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/switch_provider_to_ollama_model.html">switch_provider_to_ollama_model</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/sync_processing_state_for_current_session.html">sync_processing_state_for_current_session</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/total_cost.html">total_cost</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/total_tokens.html">total_tokens</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/try_handle_slash_command.html">try_handle_slash_command</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/App/try_next_event.html">try_next_event</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/DisplayMessage/from-message/from.html">from</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/DummyProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/DummyProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/DummyProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/DummyProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/DummyProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/DummyProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/DummyProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../functions/src/tui/app/altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut.html">altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/altgr_backslash_reaches_the_input.html">altgr_backslash_reaches_the_input</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/auto_mode_defaults_to_interactive.html">auto_mode_defaults_to_interactive</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_alt_enter_inserts_newline_as_non_kitty_fallback.html">chat_alt_enter_inserts_newline_as_non_kitty_fallback</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_backspace_deletes_at_cursor_not_always_the_last_char.html">chat_backspace_deletes_at_cursor_not_always_the_last_char</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_ctrl_backspace_deletes_whole_word.html">chat_ctrl_backspace_deletes_whole_word</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias.html">chat_ctrl_enter_still_submits_as_legacy_alias</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_ctrl_left_right_jump_by_word.html">chat_ctrl_left_right_jump_by_word</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_home_and_end_move_cursor_to_line_boundaries.html">chat_home_and_end_move_cursor_to_line_boundaries</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_input_text_is_not_underlined.html">chat_input_text_is_not_underlined</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_left_arrow_moves_cursor_for_mid_buffer_insert.html">chat_left_arrow_moves_cursor_for_mid_buffer_insert</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_plain_enter_on_empty_buffer_does_nothing.html">chat_plain_enter_on_empty_buffer_does_nothing</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer.html">chat_plain_enter_submits_and_clears_buffer</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting.html">chat_shift_enter_inserts_newline_instead_of_submitting</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/clear_session_is_refused_while_the_current_session_is_processing.html">clear_session_is_refused_while_the_current_session_is_processing</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/clear_session_proceeds_when_only_another_session_is_processing.html">clear_session_proceeds_when_only_another_session_is_processing</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/confirm_delete_esc_cancels_back_to_list_without_closing_dialog.html">confirm_delete_esc_cancels_back_to_list_without_closing_dialog</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/confirm_delete_n_cancels_back_to_list.html">confirm_delete_n_cancels_back_to_list</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/confirm_delete_y_starts_delete.html">confirm_delete_y_starts_delete</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once.html">consecutive_duplicate_submissions_are_stored_once</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it.html">ctrl_o_opens_model_info_panel_and_esc_closes_it</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking.html">ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/ctrl_w_opens_provider_switch_dialog_in_loading_state.html">ctrl_w_opens_provider_switch_dialog_in_loading_state</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/ctrl_y_copies_last_code_block_when_present.html">ctrl_y_copies_last_code_block_when_present</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard.html">ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/delete_key_ignored_for_uninstalled_suggestion.html">delete_key_ignored_for_uninstalled_suggestion</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/delete_key_on_installed_model_asks_for_confirmation.html">delete_key_on_installed_model_asks_for_confirmation</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/handle_ollama_delete_finished_failure_keeps_installed_and_posts_error.html">handle_ollama_delete_finished_failure_keeps_installed_and_posts_error</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/handle_ollama_delete_finished_success_removes_from_installed_and_posts_message.html">handle_ollama_delete_finished_success_removes_from_installed_and_posts_message</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/handle_ollama_models_listed_updates_installed_list.html">handle_ollama_models_listed_updates_installed_list</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/handle_ollama_pull_finished_failure_posts_error_message.html">handle_ollama_pull_finished_failure_posts_error_message</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/handle_ollama_pull_finished_success_posts_chat_message.html">handle_ollama_pull_finished_success_posts_chat_message</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/handle_ollama_pull_progress_updates_status_and_fraction.html">handle_ollama_pull_progress_updates_status_and_fraction</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/key.html">key</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/key_mod.html">key_mod</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/key_release_events_are_ignored.html">key_release_events_are_ignored</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/last_assistant_message_finds_most_recent_assistant_reply.html">last_assistant_message_finds_most_recent_assistant_reply</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/mcp_view_esc_returns_to_chat.html">mcp_view_esc_returns_to_chat</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/mcp_view_up_down_navigation_clamps_at_bounds.html">mcp_view_up_down_navigation_clamps_at_bounds</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/model_download_backspace_removes_last_char.html">model_download_backspace_removes_last_char</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/model_download_enter_starts_pull_then_esc_aborts_it.html">model_download_enter_starts_pull_then_esc_aborts_it</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/model_download_esc_closes_dialog_without_running_pull.html">model_download_esc_closes_dialog_without_running_pull</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/model_download_tab_adopts_highlighted_suggestion.html">model_download_tab_adopts_highlighted_suggestion</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/model_download_typing_filters_suggestions.html">model_download_typing_filters_suggestions</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/non_slash_message_is_never_treated_as_a_command.html">non_slash_message_is_never_treated_as_a_command</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/open_model_download_switches_mode_and_seeds_suggestions.html">open_model_download_switches_mode_and_seeds_suggestions</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end.html">paste_inserts_at_cursor_not_always_appended_at_the_end</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/paste_preserves_backslashes_and_newlines.html">paste_preserves_backslashes_and_newlines</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/paste_with_embedded_newline_produces_multiple_lines.html">paste_with_embedded_newline_produces_multiple_lines</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/plain_at_sign_still_opens_the_file_picker.html">plain_at_sign_still_opens_the_file_picker</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/plain_textarea.html">plain_textarea</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/plan_task_error_marks_task_failed_and_stops_auto_execution.html">plan_task_error_marks_task_failed_and_stops_auto_execution</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/provider_switch_esc_returns_to_chat.html">provider_switch_esc_returns_to_chat</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/provider_switch_models_listed_clears_loading_state.html">provider_switch_models_listed_clears_loading_state</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/provider_switch_up_down_navigation_clamps_at_bounds.html">provider_switch_up_down_navigation_clamps_at_bounds</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/recalled_message_can_be_edited_before_resending.html">recalled_message_can_be_edited_before_resending</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight.html">send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/send_message_still_works_for_a_different_session_than_the_one_processing.html">send_message_still_works_for_a_different_session_than_the_one_processing</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone.html">setting_auto_mode_state_shares_the_same_cell_as_a_clone</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps.html">shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/shift_tab_works_from_any_mode_not_just_chat.html">shift_tab_works_from_any_mode_not_just_chat</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/skills_view_esc_returns_to_chat.html">skills_view_esc_returns_to_chat</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/skills_view_up_down_navigation_clamps_at_bounds.html">skills_view_up_down_navigation_clamps_at_bounds</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/slash_help_command_opens_help_view.html">slash_help_command_opens_help_view</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/slash_mcp_command_opens_mcp_view.html">slash_mcp_command_opens_mcp_view</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/slash_skills_command_opens_skills_view.html">slash_skills_command_opens_skills_view</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/stale_session_response_chunk_is_dropped_after_switching_sessions.html">stale_session_response_chunk_is_dropped_after_switching_sessions</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions.html">stale_session_response_complete_is_dropped_after_switching_sessions</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/switch_provider_with_ollama_feature_swaps_provider_in_place.html">switch_provider_with_ollama_feature_swaps_provider_in_place</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/switch_provider_without_ollama_feature_shows_clear_error.html">switch_provider_without_ollama_feature_shows_clear_error</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state.html">switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/switching_sessions_clears_a_stuck_processing_state_from_the_previous_session.html">switching_sessions_clears_a_stuck_processing_state_from_the_previous_session</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/test_app.html">test_app</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/test_display_message_from_db_message.html">test_display_message_from_db_message</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/typed_backslashes_reach_the_input.html">typed_backslashes_reach_the_input</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end.html">typing_and_submitting_slash_skills_opens_the_dialog_end_to_end</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/unrecognized_slash_word_falls_through_instead_of_being_swallowed.html">unrecognized_slash_word_falls_through_instead_of_being_swallowed</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history.html">up_is_plain_cursor_movement_when_there_is_no_history</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft.html">up_moves_the_cursor_inside_a_multiline_draft</a> — Rust Function</li>
+<li><a href="../../../functions/src/tui/app/up_recalls_previous_messages_without_sending_them.html">up_recalls_previous_messages_without_sending_them</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-events-appmode-eventhandler-toolapprovalrequest-toolapprovalresponse-tuievent</code></li>
+<li><code>external/super-prompt-analyzer-promptanalyzer</code></li>
+<li><code>external/crate-config-planexecmode</code></li>
+<li><code>external/crate-db-models-message-session</code></li>
+<li><code>external/crate-llm-agent-agentservice</code></li>
+<li><code>external/crate-plan-plandocument</code></li>
+<li><code>external/crate-services-messageservice-planservice-servicecontext-sessionservice</code></li>
+<li><code>external/anyhow-result</code></li>
+<li><code>external/ratatui-textarea-cursormove-textarea</code></li>
+<li><code>external/std-sync-arc-mutex</code></li>
+<li><code>external/uuid-uuid</code></li>
+<li><code>external/super-events-keys</code></li>
+<li><code>external/crossterm-event-keycode-keymodifiers</code></li>
+<li><code>external/crate-db-repository-sessionlistoptions</code></li>
+<li><code>external/crossterm-event-keycode</code></li>
+<li><code>external/super</code></li>
+<li><code>external/crate-db-database</code></li>
+<li><code>external/crate-llm-provider-llmrequest-llmresponse-provider-providerstream-result-as-providerresult</code></li>
+<li><code>external/crossterm-event-keyevent-keyeventkind</code></li>
+<li><code>external/ratatui-style-style</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/tui/app.rs#L1-L4099</p>
+</body>
+</html>

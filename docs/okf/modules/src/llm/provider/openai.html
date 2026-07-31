@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>openai — Rust Module</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../index.html">Home</a> / <a href="../../../../modules/@index.html">modules</a></nav>
+<h1>openai</h1>
+<p class="type">Rust Module</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../../../../classes/src/llm/provider/openai/AuthStyle.html">AuthStyle</a> — Rust Enum</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIChoice.html">OpenAIChoice</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIError.html">OpenAIError</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIErrorResponse.html">OpenAIErrorResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIFunction.html">OpenAIFunction</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIFunctionCall.html">OpenAIFunctionCall</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIFunctionDelta.html">OpenAIFunctionDelta</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIMessage.html">OpenAIMessage</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIMessageDelta.html">OpenAIMessageDelta</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIProvider.html">OpenAIProvider</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIRequest.html">OpenAIRequest</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIResponse.html">OpenAIResponse</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIStreamChoice.html">OpenAIStreamChoice</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIStreamChunk.html">OpenAIStreamChunk</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIStreamOptions.html">OpenAIStreamOptions</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAITool.html">OpenAITool</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIToolCall.html">OpenAIToolCall</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIToolCallDelta.html">OpenAIToolCallDelta</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/OpenAIUsage.html">OpenAIUsage</a> — Rust Struct</li>
+<li><a href="../../../../classes/src/llm/provider/openai/ToolCallBuilder.html">ToolCallBuilder</a> — Rust Struct</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/from_openai_response.html">from_openai_response</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/handle_error.html">handle_error</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/headers.html">headers</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/local.html">local</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/new.html">new</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/calculate_cost.html">calculate_cost</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/complete.html">complete</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/context_window.html">context_window</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/default_model.html">default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/name.html">name</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/stream.html">stream</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/supported_models.html">supported_models</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/supports_streaming.html">supports_streaming</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/supports_tools.html">supports_tools</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/supports_vision.html">supports_vision</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/to_openai_request.html">to_openai_request</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/with_api_key_header.html">with_api_key_header</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/with_base_url.html">with_base_url</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/OpenAIProvider/with_default_model.html">with_default_model</a> — Rust Method</li>
+<li><a href="../../../../functions/src/llm/provider/openai/default_auth_style_still_sends_bearer.html">default_auth_style_still_sends_bearer</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_calculate_cost.html">test_calculate_cost</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_calculate_cost_unknown_model_returns_zero.html">test_calculate_cost_unknown_model_returns_zero</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_context_window.html">test_context_window</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_llm_request_new_fields.html">test_llm_request_new_fields</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_local_provider_creation.html">test_local_provider_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_new_fields_forwarded_to_openai_request.html">test_new_fields_forwarded_to_openai_request</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_openai_provider_creation.html">test_openai_provider_creation</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_supported_models.html">test_supported_models</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_supports_vision_detection.html">test_supports_vision_detection</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/test_tool_call_index_in_bounds.html">test_tool_call_index_in_bounds</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/tool_call_index_in_bounds.html">tool_call_index_in_bounds</a> — Rust Function</li>
+<li><a href="../../../../functions/src/llm/provider/openai/with_api_key_header_sends_api_key_not_bearer.html">with_api_key_header_sends_api_key_not_bearer</a> — Rust Function</li>
+</ul>
+<h2>Imports</h2>
+<ul>
+<li><code>external/super-error-providererror-result</code></li>
+<li><code>external/super-r-trait-provider-providerstream</code></li>
+<li><code>external/super-types</code></li>
+<li><code>external/async-trait-async-trait</code></li>
+<li><code>external/reqwest-client</code></li>
+<li><code>external/serde-deserialize-serialize</code></li>
+<li><code>external/std-time-duration</code></li>
+<li><code>external/super-retry-retry-with-backoff-retryconfig</code></li>
+<li><code>external/futures-streamext-as</code></li>
+<li><code>external/super</code></li>
+<li><code>external/crate-llm-provider-types-llmrequest-message</code></li>
+</ul>
+<h2>Member of</h2>
+<ul>
+<li><a href="../../../../packages/crustly.html">crustly</a></li>
+</ul>
+<p class="resource">Source: src/llm/provider/openai.rs#L1-L1312</p>
+</body>
+</html>

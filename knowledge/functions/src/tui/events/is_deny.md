@@ -1,0 +1,24 @@
+---
+type: Rust Function
+title: is_deny
+resource: src/tui/events.rs#L398-L403
+generated:
+  by: okf-rs/0.2.0
+relationships:
+  calls:
+  - functions/src/config/secrets/SecretString/is_empty
+  called_by:
+  - functions/src/tui/app/App/handle_approval_key
+---
+
+# Signature
+
+`pub fn is_deny(event: &KeyEvent) -> bool`
+
+# Calls
+
+- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
+
+# Called by
+
+- [handle_approval_key](../../../../functions/src/tui/app/App/handle_approval_key.md)

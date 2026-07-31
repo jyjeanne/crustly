@@ -1,0 +1,228 @@
+---
+type: Rust Module
+title: app
+resource: src/tui/app.rs#L1-L4099
+generated:
+  by: okf-rs/0.2.0
+relationships:
+  imports:
+  - external/super-events-appmode-eventhandler-toolapprovalrequest-toolapprovalresponse-tuievent
+  - external/super-prompt-analyzer-promptanalyzer
+  - external/crate-config-planexecmode
+  - external/crate-db-models-message-session
+  - external/crate-llm-agent-agentservice
+  - external/crate-plan-plandocument
+  - external/crate-services-messageservice-planservice-servicecontext-sessionservice
+  - external/anyhow-result
+  - external/ratatui-textarea-cursormove-textarea
+  - external/std-sync-arc-mutex
+  - external/uuid-uuid
+  - external/super-events-keys
+  - external/crossterm-event-keycode-keymodifiers
+  - external/crate-db-repository-sessionlistoptions
+  - external/crossterm-event-keycode
+  - external/super
+  - external/crate-db-database
+  - external/crate-llm-provider-llmrequest-llmresponse-provider-providerstream-result-as-providerresult
+  - external/crossterm-event-keyevent-keyeventkind
+  - external/ratatui-style-style
+  member_of:
+  - packages/crustly
+---
+
+# Contains
+
+- [DisplayMessage](../../../classes/src/tui/app/DisplayMessage.md)
+- [from](../../../functions/src/tui/app/DisplayMessage/from-message/from.md)
+- [App](../../../classes/src/tui/app/App.md)
+- [plain_textarea](../../../functions/src/tui/app/plain_textarea.md)
+- [new](../../../functions/src/tui/app/App/new.md)
+- [provider_name](../../../functions/src/tui/app/App/provider_name.md)
+- [provider_model](../../../functions/src/tui/app/App/provider_model.md)
+- [provider_context_window](../../../functions/src/tui/app/App/provider_context_window.md)
+- [last_assistant_message](../../../functions/src/tui/app/App/last_assistant_message.md)
+- [input_text](../../../functions/src/tui/app/App/input_text.md)
+- [input_is_blank](../../../functions/src/tui/app/App/input_is_blank.md)
+- [clear_input](../../../functions/src/tui/app/App/clear_input.md)
+- [set_input_text](../../../functions/src/tui/app/App/set_input_text.md)
+- [push_input_history](../../../functions/src/tui/app/App/push_input_history.md)
+- [cursor_on_first_line](../../../functions/src/tui/app/App/cursor_on_first_line.md)
+- [cursor_on_last_line](../../../functions/src/tui/app/App/cursor_on_last_line.md)
+- [load_history_entry](../../../functions/src/tui/app/App/load_history_entry.md)
+- [history_prev](../../../functions/src/tui/app/App/history_prev.md)
+- [history_next](../../../functions/src/tui/app/App/history_next.md)
+- [copy_last_response_to_clipboard](../../../functions/src/tui/app/App/copy_last_response_to_clipboard.md)
+- [paste_from_clipboard](../../../functions/src/tui/app/App/paste_from_clipboard.md)
+- [initialize](../../../functions/src/tui/app/App/initialize.md)
+- [event_handler](../../../functions/src/tui/app/App/event_handler.md)
+- [event_handler_mut](../../../functions/src/tui/app/App/event_handler_mut.md)
+- [event_sender](../../../functions/src/tui/app/App/event_sender.md)
+- [set_agent_service](../../../functions/src/tui/app/App/set_agent_service.md)
+- [set_ollama_host](../../../functions/src/tui/app/App/set_ollama_host.md)
+- [set_ollama_config](../../../functions/src/tui/app/App/set_ollama_config.md)
+- [set_kitty_keyboard_protocol_active](../../../functions/src/tui/app/App/set_kitty_keyboard_protocol_active.md)
+- [set_auto_mode_state](../../../functions/src/tui/app/App/set_auto_mode_state.md)
+- [auto_mode](../../../functions/src/tui/app/App/auto_mode.md)
+- [cycle_auto_mode](../../../functions/src/tui/app/App/cycle_auto_mode.md)
+- [set_mcp_status](../../../functions/src/tui/app/App/set_mcp_status.md)
+- [next_event](../../../functions/src/tui/app/App/next_event.md)
+- [try_next_event](../../../functions/src/tui/app/App/try_next_event.md)
+- [handle_event](../../../functions/src/tui/app/App/handle_event.md)
+- [handle_key_event](../../../functions/src/tui/app/App/handle_key_event.md)
+- [handle_chat_key](../../../functions/src/tui/app/App/handle_chat_key.md)
+- [handle_sessions_key](../../../functions/src/tui/app/App/handle_sessions_key.md)
+- [open_skills](../../../functions/src/tui/app/App/open_skills.md)
+- [handle_skills_key](../../../functions/src/tui/app/App/handle_skills_key.md)
+- [open_mcp](../../../functions/src/tui/app/App/open_mcp.md)
+- [handle_mcp_key](../../../functions/src/tui/app/App/handle_mcp_key.md)
+- [try_handle_slash_command](../../../functions/src/tui/app/App/try_handle_slash_command.md)
+- [handle_plan_key](../../../functions/src/tui/app/App/handle_plan_key.md)
+- [create_new_session](../../../functions/src/tui/app/App/create_new_session.md)
+- [load_session](../../../functions/src/tui/app/App/load_session.md)
+- [load_sessions](../../../functions/src/tui/app/App/load_sessions.md)
+- [clear_session](../../../functions/src/tui/app/App/clear_session.md)
+- [send_message](../../../functions/src/tui/app/App/send_message.md)
+- [event_belongs_to_current_session](../../../functions/src/tui/app/App/event_belongs_to_current_session.md)
+- [sync_processing_state_for_current_session](../../../functions/src/tui/app/App/sync_processing_state_for_current_session.md)
+- [append_streaming_chunk](../../../functions/src/tui/app/App/append_streaming_chunk.md)
+- [complete_response](../../../functions/src/tui/app/App/complete_response.md)
+- [check_task_completion](../../../functions/src/tui/app/App/check_task_completion.md)
+- [load_plan_for_viewing](../../../functions/src/tui/app/App/load_plan_for_viewing.md)
+- [check_and_load_plan](../../../functions/src/tui/app/App/check_and_load_plan.md)
+- [export_plan_to_markdown](../../../functions/src/tui/app/App/export_plan_to_markdown.md)
+- [save_plan](../../../functions/src/tui/app/App/save_plan.md)
+- [execute_plan_tasks](../../../functions/src/tui/app/App/execute_plan_tasks.md)
+- [execute_next_plan_task](../../../functions/src/tui/app/App/execute_next_plan_task.md)
+- [fail_current_plan_task](../../../functions/src/tui/app/App/fail_current_plan_task.md)
+- [show_error](../../../functions/src/tui/app/App/show_error.md)
+- [switch_mode](../../../functions/src/tui/app/App/switch_mode.md)
+- [total_tokens](../../../functions/src/tui/app/App/total_tokens.md)
+- [total_cost](../../../functions/src/tui/app/App/total_cost.md)
+- [handle_approval_requested](../../../functions/src/tui/app/App/handle_approval_requested.md)
+- [handle_approval_key](../../../functions/src/tui/app/App/handle_approval_key.md)
+- [open_file_picker](../../../functions/src/tui/app/App/open_file_picker.md)
+- [handle_file_picker_key](../../../functions/src/tui/app/App/handle_file_picker_key.md)
+- [open_model_download](../../../functions/src/tui/app/App/open_model_download.md)
+- [refresh_model_download_suggestions](../../../functions/src/tui/app/App/refresh_model_download_suggestions.md)
+- [start_model_pull](../../../functions/src/tui/app/App/start_model_pull.md)
+- [start_model_delete](../../../functions/src/tui/app/App/start_model_delete.md)
+- [handle_model_download_key](../../../functions/src/tui/app/App/handle_model_download_key.md)
+- [open_provider_switch](../../../functions/src/tui/app/App/open_provider_switch.md)
+- [handle_provider_switch_key](../../../functions/src/tui/app/App/handle_provider_switch_key.md)
+- [switch_provider_to_ollama_model](../../../functions/src/tui/app/App/switch_provider_to_ollama_model.md)
+- [test_display_message_from_db_message](../../../functions/src/tui/app/test_display_message_from_db_message.md)
+- [DummyProvider](../../../classes/src/tui/app/DummyProvider.md)
+- [complete](../../../functions/src/tui/app/DummyProvider/provider/complete.md)
+- [stream](../../../functions/src/tui/app/DummyProvider/provider/stream.md)
+- [name](../../../functions/src/tui/app/DummyProvider/provider/name.md)
+- [default_model](../../../functions/src/tui/app/DummyProvider/provider/default_model.md)
+- [supported_models](../../../functions/src/tui/app/DummyProvider/provider/supported_models.md)
+- [context_window](../../../functions/src/tui/app/DummyProvider/provider/context_window.md)
+- [calculate_cost](../../../functions/src/tui/app/DummyProvider/provider/calculate_cost.md)
+- [test_app](../../../functions/src/tui/app/test_app.md)
+- [key](../../../functions/src/tui/app/key.md)
+- [open_model_download_switches_mode_and_seeds_suggestions](../../../functions/src/tui/app/open_model_download_switches_mode_and_seeds_suggestions.md)
+- [model_download_typing_filters_suggestions](../../../functions/src/tui/app/model_download_typing_filters_suggestions.md)
+- [model_download_backspace_removes_last_char](../../../functions/src/tui/app/model_download_backspace_removes_last_char.md)
+- [model_download_tab_adopts_highlighted_suggestion](../../../functions/src/tui/app/model_download_tab_adopts_highlighted_suggestion.md)
+- [model_download_esc_closes_dialog_without_running_pull](../../../functions/src/tui/app/model_download_esc_closes_dialog_without_running_pull.md)
+- [model_download_enter_starts_pull_then_esc_aborts_it](../../../functions/src/tui/app/model_download_enter_starts_pull_then_esc_aborts_it.md)
+- [handle_ollama_models_listed_updates_installed_list](../../../functions/src/tui/app/handle_ollama_models_listed_updates_installed_list.md)
+- [handle_ollama_pull_progress_updates_status_and_fraction](../../../functions/src/tui/app/handle_ollama_pull_progress_updates_status_and_fraction.md)
+- [handle_ollama_pull_finished_success_posts_chat_message](../../../functions/src/tui/app/handle_ollama_pull_finished_success_posts_chat_message.md)
+- [handle_ollama_pull_finished_failure_posts_error_message](../../../functions/src/tui/app/handle_ollama_pull_finished_failure_posts_error_message.md)
+- [delete_key_ignored_for_uninstalled_suggestion](../../../functions/src/tui/app/delete_key_ignored_for_uninstalled_suggestion.md)
+- [delete_key_on_installed_model_asks_for_confirmation](../../../functions/src/tui/app/delete_key_on_installed_model_asks_for_confirmation.md)
+- [confirm_delete_n_cancels_back_to_list](../../../functions/src/tui/app/confirm_delete_n_cancels_back_to_list.md)
+- [confirm_delete_esc_cancels_back_to_list_without_closing_dialog](../../../functions/src/tui/app/confirm_delete_esc_cancels_back_to_list_without_closing_dialog.md)
+- [confirm_delete_y_starts_delete](../../../functions/src/tui/app/confirm_delete_y_starts_delete.md)
+- [handle_ollama_delete_finished_success_removes_from_installed_and_posts_message](../../../functions/src/tui/app/handle_ollama_delete_finished_success_removes_from_installed_and_posts_message.md)
+- [handle_ollama_delete_finished_failure_keeps_installed_and_posts_error](../../../functions/src/tui/app/handle_ollama_delete_finished_failure_keeps_installed_and_posts_error.md)
+- [up_recalls_previous_messages_without_sending_them](../../../functions/src/tui/app/up_recalls_previous_messages_without_sending_them.md)
+- [key_release_events_are_ignored](../../../functions/src/tui/app/key_release_events_are_ignored.md)
+- [recalled_message_can_be_edited_before_resending](../../../functions/src/tui/app/recalled_message_can_be_edited_before_resending.md)
+- [up_moves_the_cursor_inside_a_multiline_draft](../../../functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft.md)
+- [up_is_plain_cursor_movement_when_there_is_no_history](../../../functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history.md)
+- [consecutive_duplicate_submissions_are_stored_once](../../../functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once.md)
+- [key_mod](../../../functions/src/tui/app/key_mod.md)
+- [chat_shift_enter_inserts_newline_instead_of_submitting](../../../functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting.md)
+- [chat_alt_enter_inserts_newline_as_non_kitty_fallback](../../../functions/src/tui/app/chat_alt_enter_inserts_newline_as_non_kitty_fallback.md)
+- [chat_left_arrow_moves_cursor_for_mid_buffer_insert](../../../functions/src/tui/app/chat_left_arrow_moves_cursor_for_mid_buffer_insert.md)
+- [chat_backspace_deletes_at_cursor_not_always_the_last_char](../../../functions/src/tui/app/chat_backspace_deletes_at_cursor_not_always_the_last_char.md)
+- [chat_home_and_end_move_cursor_to_line_boundaries](../../../functions/src/tui/app/chat_home_and_end_move_cursor_to_line_boundaries.md)
+- [chat_ctrl_left_right_jump_by_word](../../../functions/src/tui/app/chat_ctrl_left_right_jump_by_word.md)
+- [chat_ctrl_backspace_deletes_whole_word](../../../functions/src/tui/app/chat_ctrl_backspace_deletes_whole_word.md)
+- [paste_preserves_backslashes_and_newlines](../../../functions/src/tui/app/paste_preserves_backslashes_and_newlines.md)
+- [altgr_backslash_reaches_the_input](../../../functions/src/tui/app/altgr_backslash_reaches_the_input.md)
+- [altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut](../../../functions/src/tui/app/altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut.md)
+- [plain_at_sign_still_opens_the_file_picker](../../../functions/src/tui/app/plain_at_sign_still_opens_the_file_picker.md)
+- [typed_backslashes_reach_the_input](../../../functions/src/tui/app/typed_backslashes_reach_the_input.md)
+- [paste_inserts_at_cursor_not_always_appended_at_the_end](../../../functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end.md)
+- [paste_with_embedded_newline_produces_multiple_lines](../../../functions/src/tui/app/paste_with_embedded_newline_produces_multiple_lines.md)
+- [ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard](../../../functions/src/tui/app/ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard.md)
+- [ctrl_y_copies_last_code_block_when_present](../../../functions/src/tui/app/ctrl_y_copies_last_code_block_when_present.md)
+- [ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking](../../../functions/src/tui/app/ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking.md)
+- [auto_mode_defaults_to_interactive](../../../functions/src/tui/app/auto_mode_defaults_to_interactive.md)
+- [shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps](../../../functions/src/tui/app/shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps.md)
+- [shift_tab_works_from_any_mode_not_just_chat](../../../functions/src/tui/app/shift_tab_works_from_any_mode_not_just_chat.md)
+- [setting_auto_mode_state_shares_the_same_cell_as_a_clone](../../../functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone.md)
+- [slash_skills_command_opens_skills_view](../../../functions/src/tui/app/slash_skills_command_opens_skills_view.md)
+- [slash_mcp_command_opens_mcp_view](../../../functions/src/tui/app/slash_mcp_command_opens_mcp_view.md)
+- [slash_help_command_opens_help_view](../../../functions/src/tui/app/slash_help_command_opens_help_view.md)
+- [unrecognized_slash_word_falls_through_instead_of_being_swallowed](../../../functions/src/tui/app/unrecognized_slash_word_falls_through_instead_of_being_swallowed.md)
+- [chat_input_text_is_not_underlined](../../../functions/src/tui/app/chat_input_text_is_not_underlined.md)
+- [non_slash_message_is_never_treated_as_a_command](../../../functions/src/tui/app/non_slash_message_is_never_treated_as_a_command.md)
+- [typing_and_submitting_slash_skills_opens_the_dialog_end_to_end](../../../functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end.md)
+- [skills_view_up_down_navigation_clamps_at_bounds](../../../functions/src/tui/app/skills_view_up_down_navigation_clamps_at_bounds.md)
+- [skills_view_esc_returns_to_chat](../../../functions/src/tui/app/skills_view_esc_returns_to_chat.md)
+- [mcp_view_up_down_navigation_clamps_at_bounds](../../../functions/src/tui/app/mcp_view_up_down_navigation_clamps_at_bounds.md)
+- [mcp_view_esc_returns_to_chat](../../../functions/src/tui/app/mcp_view_esc_returns_to_chat.md)
+- [chat_plain_enter_submits_and_clears_buffer](../../../functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer.md)
+- [chat_plain_enter_on_empty_buffer_does_nothing](../../../functions/src/tui/app/chat_plain_enter_on_empty_buffer_does_nothing.md)
+- [ctrl_o_opens_model_info_panel_and_esc_closes_it](../../../functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it.md)
+- [last_assistant_message_finds_most_recent_assistant_reply](../../../functions/src/tui/app/last_assistant_message_finds_most_recent_assistant_reply.md)
+- [chat_ctrl_enter_still_submits_as_legacy_alias](../../../functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias.md)
+- [ctrl_w_opens_provider_switch_dialog_in_loading_state](../../../functions/src/tui/app/ctrl_w_opens_provider_switch_dialog_in_loading_state.md)
+- [provider_switch_models_listed_clears_loading_state](../../../functions/src/tui/app/provider_switch_models_listed_clears_loading_state.md)
+- [provider_switch_up_down_navigation_clamps_at_bounds](../../../functions/src/tui/app/provider_switch_up_down_navigation_clamps_at_bounds.md)
+- [provider_switch_esc_returns_to_chat](../../../functions/src/tui/app/provider_switch_esc_returns_to_chat.md)
+- [switch_provider_without_ollama_feature_shows_clear_error](../../../functions/src/tui/app/switch_provider_without_ollama_feature_shows_clear_error.md)
+- [switch_provider_with_ollama_feature_swaps_provider_in_place](../../../functions/src/tui/app/switch_provider_with_ollama_feature_swaps_provider_in_place.md)
+- [stale_session_response_chunk_is_dropped_after_switching_sessions](../../../functions/src/tui/app/stale_session_response_chunk_is_dropped_after_switching_sessions.md)
+- [plan_task_error_marks_task_failed_and_stops_auto_execution](../../../functions/src/tui/app/plan_task_error_marks_task_failed_and_stops_auto_execution.md)
+- [stale_session_response_complete_is_dropped_after_switching_sessions](../../../functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions.md)
+- [switching_sessions_clears_a_stuck_processing_state_from_the_previous_session](../../../functions/src/tui/app/switching_sessions_clears_a_stuck_processing_state_from_the_previous_session.md)
+- [clear_session_is_refused_while_the_current_session_is_processing](../../../functions/src/tui/app/clear_session_is_refused_while_the_current_session_is_processing.md)
+- [clear_session_proceeds_when_only_another_session_is_processing](../../../functions/src/tui/app/clear_session_proceeds_when_only_another_session_is_processing.md)
+- [switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state](../../../functions/src/tui/app/switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state.md)
+- [send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight](../../../functions/src/tui/app/send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight.md)
+- [send_message_still_works_for_a_different_session_than_the_one_processing](../../../functions/src/tui/app/send_message_still_works_for_a_different_session_than_the_one_processing.md)
+
+# Imports
+
+- `super::events::{AppMode, EventHandler, ToolApprovalRequest, ToolApprovalResponse, TuiEvent}`
+- `super::prompt_analyzer::PromptAnalyzer`
+- `crate::config::PlanExecMode`
+- `crate::db::models::{Message, Session}`
+- `crate::llm::agent::AgentService`
+- `crate::plan::PlanDocument`
+- `crate::services::{MessageService, PlanService, ServiceContext, SessionService}`
+- `anyhow::Result`
+- `ratatui_textarea::{CursorMove, TextArea}`
+- `std::sync::{Arc, Mutex}`
+- `uuid::Uuid`
+- `super::events::keys`
+- `crossterm::event::{KeyCode, KeyModifiers}`
+- `crate::db::repository::SessionListOptions`
+- `crossterm::event::KeyCode`
+- `super::*`
+- `crate::db::Database`
+- `crate::llm::provider::{
+        LLMRequest, LLMResponse, Provider, ProviderStream, Result as ProviderResult,
+    }`
+- `crossterm::event::{KeyEvent, KeyEventKind}`
+- `ratatui::style::Style`
+
+# Member of
+
+- [crustly](../../../packages/crustly.md)

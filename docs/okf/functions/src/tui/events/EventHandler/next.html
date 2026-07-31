@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>next — Rust Method</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../../../../../index.html">Home</a> / <a href="../../../../../functions/@index.html">functions</a></nav>
+<h1>next</h1>
+<p class="type">Rust Method</p>
+<pre><code>pub async fn next(&amp;mut self) -&gt; Option&lt;TuiEvent&gt;</code></pre>
+<h2>Called by</h2>
+<ul>
+<li><a href="../../../../../functions/src/cli/cmd_ollama.html">cmd_ollama</a></li>
+<li><a href="../../../../../functions/src/llm/agent/service/drain_stream_to_response.html">drain_stream_to_response</a></li>
+<li><a href="../../../../../functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response.html">from_gemini_response</a></li>
+<li><a href="../../../../../functions/src/llm/provider/gemini/parse_gemini_sse.html">parse_gemini_sse</a></li>
+<li><a href="../../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../functions/src/llm/provider/ollama/streamed_tool_call_reaches_caller.html">streamed_tool_call_reaches_caller</a></li>
+<li><a href="../../../../../functions/src/llm/provider/ollama_models/pull_model.html">pull_model</a></li>
+<li><a href="../../../../../functions/src/llm/provider/openai/OpenAIProvider/from_openai_response.html">from_openai_response</a></li>
+<li><a href="../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../functions/src/llm/provider/qwen/QwenProvider/from_qwen_response.html">from_qwen_response</a></li>
+<li><a href="../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/stream.html">stream</a></li>
+<li><a href="../../../../../functions/src/llm/tools/bash/is_read_only_command.html">is_read_only_command</a></li>
+<li><a href="../../../../../functions/src/llm/tools/sandbox/strip_verbatim_prefix.html">strip_verbatim_prefix</a></li>
+<li><a href="../../../../../functions/src/llm/tools/sandbox/BashCommandAllowlist/permissionpolicy/evaluate.html">evaluate</a></li>
+<li><a href="../../../../../functions/src/llm/tools/sandbox/find_active_shell_operator.html">find_active_shell_operator</a></li>
+<li><a href="../../../../../functions/src/llm/tools/save_memory/append_fact.html">append_fact</a></li>
+<li><a href="../../../../../functions/src/llm/tools/skill/parse_skill_frontmatter_value.html">parse_skill_frontmatter_value</a></li>
+<li><a href="../../../../../functions/src/services/plan/PlanService/get_most_recent_plan.html">get_most_recent_plan</a></li>
+<li><a href="../../../../../functions/src/services/session/SessionService/get_most_recent_session.html">get_most_recent_session</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/next_event.html">next_event</a></li>
+<li><a href="../../../../../functions/src/tui/app/App/try_handle_slash_command.html">try_handle_slash_command</a></li>
+<li><a href="../../../../../functions/tests/streaming_test/test_streaming_basic.html">test_streaming_basic</a></li>
+<li><a href="../../../../../functions/tests/streaming_test/test_streaming_single_chunk.html">test_streaming_single_chunk</a></li>
+<li><a href="../../../../../functions/tests/streaming_test/test_streaming_multiple_chunks.html">test_streaming_multiple_chunks</a></li>
+<li><a href="../../../../../functions/tests/streaming_test/test_streaming_token_counting.html">test_streaming_token_counting</a></li>
+<li><a href="../../../../../functions/tests/streaming_test/test_streaming_stop_reason.html">test_streaming_stop_reason</a></li>
+<li><a href="../../../../../functions/tests/streaming_test/test_streaming_error_handling.html">test_streaming_error_handling</a></li>
+<li><a href="../../../../../functions/tests/streaming_test/test_streaming_empty_response.html">test_streaming_empty_response</a></li>
+<li><a href="../../../../../functions/tests/streaming_test/test_streaming_content_accumulation.html">test_streaming_content_accumulation</a></li>
+</ul>
+<p class="resource">Source: src/tui/events.rs#L211-L213</p>
+</body>
+</html>

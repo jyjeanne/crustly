@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>crustly — Rust Package</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { font-size: 0.9rem; margin-bottom: 1.5rem; opacity: 0.8; }
+nav a { color: inherit; }
+h1 { margin-bottom: 0.25rem; }
+.type { opacity: 0.7; margin-top: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.visibility { display: inline-block; background: #8882; padding: 0.1rem 0.5rem; border-radius: 0.3rem; font-size: 0.8rem; }
+pre { background: #8881; padding: 0.75rem 1rem; border-radius: 0.4rem; overflow-x: auto; }
+.resource, .tags { font-size: 0.85rem; opacity: 0.7; }
+ul { padding-left: 1.25rem; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav><a href="../index.html">Home</a> / <a href="../packages/@index.html">packages</a></nav>
+<h1>crustly</h1>
+<p class="type">Rust Package</p>
+<h2>Contains</h2>
+<ul>
+<li><a href="../modules/benches/database.html">database</a> — Rust Module</li>
+<li><a href="../modules/benches/parallel_tool_dispatch.html">parallel_tool_dispatch</a> — Rust Module</li>
+<li><a href="../modules/src.html">src</a> — Rust Module</li>
+<li><a href="../modules/src-2.html">src</a> — Rust Module</li>
+<li><a href="../modules/src/app.html">app</a> — Rust Module</li>
+<li><a href="../modules/src/cli.html">cli</a> — Rust Module</li>
+<li><a href="../modules/src/config.html">config</a> — Rust Module</li>
+<li><a href="../modules/src/config/crabrace.html">crabrace</a> — Rust Module</li>
+<li><a href="../modules/src/config/secrets.html">secrets</a> — Rust Module</li>
+<li><a href="../modules/src/config/update.html">update</a> — Rust Module</li>
+<li><a href="../modules/src/db.html">db</a> — Rust Module</li>
+<li><a href="../modules/src/db/models.html">models</a> — Rust Module</li>
+<li><a href="../modules/src/db/repository.html">repository</a> — Rust Module</li>
+<li><a href="../modules/src/db/repository/compaction.html">compaction</a> — Rust Module</li>
+<li><a href="../modules/src/db/repository/file.html">file</a> — Rust Module</li>
+<li><a href="../modules/src/db/repository/memory.html">memory</a> — Rust Module</li>
+<li><a href="../modules/src/db/repository/message.html">message</a> — Rust Module</li>
+<li><a href="../modules/src/db/repository/plan.html">plan</a> — Rust Module</li>
+<li><a href="../modules/src/db/repository/session.html">session</a> — Rust Module</li>
+<li><a href="../modules/src/db/retry.html">retry</a> — Rust Module</li>
+<li><a href="../modules/src/error.html">error</a> — Rust Module</li>
+<li><a href="../modules/src/events.html">events</a> — Rust Module</li>
+<li><a href="../modules/src/llm.html">llm</a> — Rust Module</li>
+<li><a href="../modules/src/llm/agent.html">agent</a> — Rust Module</li>
+<li><a href="../modules/src/llm/agent/compaction.html">compaction</a> — Rust Module</li>
+<li><a href="../modules/src/llm/agent/context.html">context</a> — Rust Module</li>
+<li><a href="../modules/src/llm/agent/error.html">error</a> — Rust Module</li>
+<li><a href="../modules/src/llm/agent/memory.html">memory</a> — Rust Module</li>
+<li><a href="../modules/src/llm/agent/service.html">service</a> — Rust Module</li>
+<li><a href="../modules/src/llm/pdf_context.html">pdf_context</a> — Rust Module</li>
+<li><a href="../modules/src/llm/prompt.html">prompt</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider.html">provider</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/anthropic.html">anthropic</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/azure.html">azure</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/error.html">error</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/factory.html">factory</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/gemini.html">gemini</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/model_hints.html">model_hints</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/ollama.html">ollama</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/ollama_models.html">ollama_models</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/openai.html">openai</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/qwen.html">qwen</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/retry.html">retry</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/router.html">router</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/trait.html">trait</a> — Rust Module</li>
+<li><a href="../modules/src/llm/provider/types.html">types</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools.html">tools</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/agent.html">agent</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/aliases.html">aliases</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/apply_patch.html">apply_patch</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/ask_user.html">ask_user</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/bash.html">bash</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/cache.html">cache</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/code_exec.html">code_exec</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/context.html">context</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/doc_parser.html">doc_parser</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/edit.html">edit</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/error.html">error</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/file_read_cache.html">file_read_cache</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/glob.html">glob</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/grep.html">grep</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/http.html">http</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/ls.html">ls</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/notebook.html">notebook</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/plan_tool.html">plan_tool</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/plan_tool_security_tests.html">plan_tool_security_tests</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/powershell.html">powershell</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/read.html">read</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/registry.html">registry</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/sandbox.html">sandbox</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/save_memory.html">save_memory</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/skill.html">skill</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/ssrf_guard.html">ssrf_guard</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/task.html">task</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/todo_write.html">todo_write</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/trait.html">trait</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/web_fetch.html">web_fetch</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/web_search.html">web_search</a> — Rust Module</li>
+<li><a href="../modules/src/llm/tools/write.html">write</a> — Rust Module</li>
+<li><a href="../modules/src/logging.html">logging</a> — Rust Module</li>
+<li><a href="../modules/src/lsp.html">lsp</a> — Rust Module</li>
+<li><a href="../modules/src/macros.html">macros</a> — Rust Module</li>
+<li><a href="../modules/src/mcp.html">mcp</a> — Rust Module</li>
+<li><a href="../modules/src/mcp/client.html">client</a> — Rust Module</li>
+<li><a href="../modules/src/mcp/transport.html">transport</a> — Rust Module</li>
+<li><a href="../modules/src/message.html">message</a> — Rust Module</li>
+<li><a href="../modules/src/plan.html">plan</a> — Rust Module</li>
+<li><a href="../modules/src/plan/plan_tests.html">plan_tests</a> — Rust Module</li>
+<li><a href="../modules/src/services.html">services</a> — Rust Module</li>
+<li><a href="../modules/src/services/file.html">file</a> — Rust Module</li>
+<li><a href="../modules/src/services/message.html">message</a> — Rust Module</li>
+<li><a href="../modules/src/services/plan.html">plan</a> — Rust Module</li>
+<li><a href="../modules/src/services/session.html">session</a> — Rust Module</li>
+<li><a href="../modules/src/sync.html">sync</a> — Rust Module</li>
+<li><a href="../modules/src/tui.html">tui</a> — Rust Module</li>
+<li><a href="../modules/src/tui/app.html">app</a> — Rust Module</li>
+<li><a href="../modules/src/tui/components.html">components</a> — Rust Module</li>
+<li><a href="../modules/src/tui/components/chat.html">chat</a> — Rust Module</li>
+<li><a href="../modules/src/tui/components/dialogs.html">dialogs</a> — Rust Module</li>
+<li><a href="../modules/src/tui/components/logo.html">logo</a> — Rust Module</li>
+<li><a href="../modules/src/tui/error.html">error</a> — Rust Module</li>
+<li><a href="../modules/src/tui/events.html">events</a> — Rust Module</li>
+<li><a href="../modules/src/tui/highlight.html">highlight</a> — Rust Module</li>
+<li><a href="../modules/src/tui/markdown.html">markdown</a> — Rust Module</li>
+<li><a href="../modules/src/tui/ollama_download.html">ollama_download</a> — Rust Module</li>
+<li><a href="../modules/src/tui/pages.html">pages</a> — Rust Module</li>
+<li><a href="../modules/src/tui/prompt_analyzer.html">prompt_analyzer</a> — Rust Module</li>
+<li><a href="../modules/src/tui/render.html">render</a> — Rust Module</li>
+<li><a href="../modules/src/tui/runner.html">runner</a> — Rust Module</li>
+<li><a href="../modules/src/tui/splash.html">splash</a> — Rust Module</li>
+<li><a href="../modules/src/tui/styles.html">styles</a> — Rust Module</li>
+<li><a href="../modules/src/tui/utils.html">utils</a> — Rust Module</li>
+<li><a href="../modules/src/utils.html">utils</a> — Rust Module</li>
+<li><a href="../modules/src/utils/retry.html">retry</a> — Rust Module</li>
+<li><a href="../modules/tests/cli_test.html">cli_test</a> — Rust Module</li>
+<li><a href="../modules/tests/codebase_index_test.html">codebase_index_test</a> — Rust Module</li>
+<li><a href="../modules/tests/compaction_test.html">compaction_test</a> — Rust Module</li>
+<li><a href="../modules/tests/error_scenarios_test.html">error_scenarios_test</a> — Rust Module</li>
+<li><a href="../modules/tests/integration_test.html">integration_test</a> — Rust Module</li>
+<li><a href="../modules/tests/mcp_contract_test.html">mcp_contract_test</a> — Rust Module</li>
+<li><a href="../modules/tests/model_routing_test.html">model_routing_test</a> — Rust Module</li>
+<li><a href="../modules/tests/plan_autorun_test.html">plan_autorun_test</a> — Rust Module</li>
+<li><a href="../modules/tests/plan_crash_recovery_test.html">plan_crash_recovery_test</a> — Rust Module</li>
+<li><a href="../modules/tests/plan_mode_integration_test.html">plan_mode_integration_test</a> — Rust Module</li>
+<li><a href="../modules/tests/streaming_test.html">streaming_test</a> — Rust Module</li>
+</ul>
+<p class="resource">Source: Cargo.toml#L1</p>
+</body>
+</html>
