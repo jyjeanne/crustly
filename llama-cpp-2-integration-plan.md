@@ -1,10 +1,19 @@
 # `llama-cpp-2` Integration Plan
 
-Status: **Planning — not started.** No code has been written yet; this
-document is the design and phasing reference for the implementation.
+Status: **Planning — not started, gated on §0.1.** No code has been
+written yet; this document is the design and phasing reference for the
+implementation, ready to execute once the Go/No-Go gate it inherits from
+the prior feasibility study is cleared.
 Branch: `claude/llama-cpp-2-integration-mfirvd`
-Dependency: [`llama-cpp-2`](https://crates.io/crates/llama-cpp-2) (Rust
-bindings over `llama.cpp` via `llama-cpp-sys-2`)
+Dependency: [`llama-cpp-2`](https://crates.io/crates/llama-cpp-2) v0.1.151
++ `llama-cpp-sys-2`, both published from
+[`utilityai/llama-cpp-rs`](https://github.com/utilityai/llama-cpp-rs) (Rust
+bindings over `llama.cpp`) — version/stats per `llm-file-gguf-support.md`
+§2.3, re-verify at implementation time (Phase 0).
+Prior art: `llm-file-gguf-support.md` (this repo) — a dedicated feasibility
+study of this exact integration, dated 2026-07-21, whose benefit/cost
+analysis and Go/No-Go framework this plan builds directly on rather than
+duplicating (§0.1).
 
 ## 0. Summary for reviewers
 
@@ -22,6 +31,49 @@ provider" has to own: model weights in memory, a KV-cache context, GPU
 memory, and a background thread, instead of just a `Client` struct. Section
 3 covers the compatibility constraints this creates, and Section 4 covers
 the threading model in detail — read those before starting Phase 1.
+
+### 0.1 Go/No-Go status inherited from the prior feasibility study
+
+`llm-file-gguf-support.md` did the benefit/cost work this plan doesn't
+repeat: seven sourced benefits (§4 there — resource footprint, air-gapped
+support, tool-calling reliability via grammar constraints, multimodal
+parity, model-lifecycle control, onboarding simplicity, competitive
+differentiation) weighed against real costs (build/toolchain complexity,
+new application code, long-term maintenance burden, capabilities lost
+relative to Ollama, several-weeks effort). It ends with an explicit
+decision grid (its §6) and a stated conclusion:
+
+> **NO-GO conditional** — no "hard" criterion is confirmed as of that
+> study's writing (no documented air-gapped target, no documented IT
+> constraint blocking daemons, no measured tool-calling failure-rate data).
+> The resource-footprint benefit (Ollama's daemon holds ~1GB+ RAM at idle
+> even with no model loaded — sourced from
+> [ollama/ollama#7168](https://github.com/ollama/ollama/issues/7168), a
+> maintainer-confirmed report) remains a real, secondary argument, but was
+> judged insufficient alone to justify several weeks of engineering plus a
+> new non-SemVer C++ dependency to maintain.
+
+**What this means for this document**: this plan is the ready-to-execute
+"if GO" companion the study's own §8 calls for — the technical spike,
+phased build-out, and rollout referenced there. It does **not** override
+that study's conclusion. Before Phase 1 (real code) starts, re-check the
+three hard criteria against current product priorities, not the ones on
+record when the study was written:
+
+1. Is air-gapped / no-local-network-access a documented target use case?
+2. Are target users on IT-restricted machines where installing/running a
+   background daemon is blocked?
+3. Has local-model tool-calling failure become measured as a real,
+   significant friction point (support requests, GitHub issues, user
+   reports)?
+
+One confirmed "yes" is enough per the study's own grid to justify
+proceeding past Phase 0. Absent that, this plan is deliberately left in a
+state where Phase 0 alone (§13) can be run on its own — it produces exactly
+the build-time/binary-size/API-surface data the decision grid's remaining
+soft factors need, without committing to Phases 1+. Re-open this gate
+whenever a hard criterion changes status; don't treat "the plan already
+exists" as itself a reason to proceed.
 
 ## 1. Objective
 
@@ -51,14 +103,20 @@ user who never configures `providers.llama_cpp` sees zero behavior change.
 | GPU backend control | Managed by Ollama, opaque to `crustly` | Direct: `n_gpu_layers`, CUDA/Metal/Vulkan feature flags chosen at compile time |
 | Model swap cost | Cheap — Ollama's server manages load/unload | Expensive — reloading a GGUF into this process is a multi-second-to-minute operation (Section 4.5) |
 | Multi-client sharing of one loaded model | ✅ (Ollama server can serve several clients) | ❌ (single process, single loaded model at a time) |
+| Idle memory footprint (daemon running, no active chat) | **~1GB+** — Ollama's own maintainers confirm this for the daemon's "embedded runners" alone, before any model is loaded ([ollama/ollama#7168](https://github.com/ollama/ollama/issues/7168)); grows further with a `keep_alive`-resident model | **0** outside an active `crustly` session — no daemon exists to be idle |
+| Cross-process model sharing | ✅ (Ollama's server holds one copy, serves every client) | ❌ — two `crustly` processes both configured with the same `providers.llama_cpp.model_path` each load their own independent copy into RAM/VRAM; no shared-weights mechanism in this plan (`llm-file-gguf-support.md` §5.4) |
 | Build complexity | None (pure Rust HTTP client) | Significant — native C++ compilation (Section 3.4) |
+| Process isolation on a crash | Ollama crashing drops the HTTP connection; `crustly` survives, shows a connection error | A native-code crash in `llama.cpp` can take the whole `crustly` process down — no separate process to insulate the TUI/DB/session state (§4.11) |
 
 In short: Ollama is the better choice for most users today and remains the
 recommended default. `llama-cpp-2` is for users who specifically want
 zero-server local inference, already manage their own GGUF files, or want
 tighter control over GPU offload than Ollama exposes. Given the build-cost
 tradeoff in the row above, this is deliberately **not** proposed for the
-`default` or even `all-llm` feature set — see Section 3.4.
+`default` or even `all-llm` feature set — see Section 3.4. The idle-memory
+row is the most concretely sourced benefit in `llm-file-gguf-support.md`
+(§4.1 there) but was, on its own, judged insufficient to flip that study's
+overall Go/No-Go verdict — see §0.1.
 
 ## 3. Constraints (non-negotiable)
 
@@ -86,6 +144,11 @@ tradeoff in the row above, this is deliberately **not** proposed for the
    completely unaffected: no new required system dependency (cmake, C++
    compiler) for anyone not opting in.
 7. All existing tests continue to pass, with and without the new feature.
+8. **License compatibility, confirmed, not assumed**: `llama-cpp-2` and
+   `llama-cpp-sys-2` are `MIT OR Apache-2.0` (`llm-file-gguf-support.md`
+   §2.2), compatible with Crustly's own `FSL-1.1-MIT` (`Cargo.toml:7`). No
+   legal blocker. Re-verify at Phase 0 in case the upstream license changes
+   before implementation.
 
 ### 3.1 Verified compatibility touch points
 
@@ -111,6 +174,54 @@ out where the row points, not deferred to an open question — this table
 exists to make the checking itself auditable, not to introduce new unowned
 risk.
 
+### 3.2 Known costs and risks (carried over from `llm-file-gguf-support.md` §5)
+
+The feasibility study's cost analysis is not superseded by this plan — it's
+the reason several design choices above look the way they do. Recorded here
+once, referenced rather than re-derived elsewhere in this document:
+
+- **Build/packaging** (study §5.1): cmake + a C++ compiler required to
+  build the vendored `llama.cpp` submodule on every `cargo build --features
+  llama-cpp`, breaking the project's current "just `cargo build`" promise
+  for anyone who opts in. Windows needs Visual Studio Build Tools (C++) or
+  MinGW; CUDA/Vulkan/ROCm/MKL each need their own SDK installed and
+  discoverable. Materially larger cold-build time and binary size. This is
+  exactly why constraint 4 (§3) keeps `llama-cpp` out of `all-llm`.
+- **New application code** (study §5.2): a new provider, new config
+  surface, a from-scratch tool-calling story (recovery heuristic and/or
+  grammar constraints — §4.7), worker-thread memory/concurrency management
+  (§4.3/4.4), and from-scratch model discovery/download (§8) — all
+  capabilities Ollama currently provides "for free" via its own server and
+  CLI. The study's own effort estimate (§5.5): **several weeks for a
+  correct MVP**, versus days for an HTTP client to an already-running
+  server. This plan's phase count (§13) is the concrete breakdown of that
+  estimate, not a separate one.
+- **Long-term maintenance** (study §5.3): `llama-cpp-2` does **not** follow
+  strict SemVer — it tracks upstream `llama.cpp` as closely as possible.
+  The pinned version needs more active watching on `cargo update` than this
+  codebase's other dependencies, most of which do follow SemVer.
+- **Process isolation / security surface** (study §5.3, expanded in §4.11
+  below): running native C++ code against a `.gguf` file — a format this
+  process did not produce and may not control the provenance of — in the
+  **same process** as the TUI, the SQLite DB connection, and every tool
+  execution is a real reduction in blast-radius compared to today, where a
+  bad response from Ollama is "just" an HTTP error. §4.11 covers the
+  mitigation this plan commits to (panic isolation) and is explicit about
+  what it does **not** cover (genuine memory-unsafety in the native
+  library, which `catch_unwind` cannot intercept).
+- **Lost relative to Ollama** (study §5.4): no cross-process model sharing
+  (§2's new table row above), idle-unload must be reimplemented from
+  scratch rather than inherited from Ollama's `keep_alive` (§4.5 already
+  does this), and Ollama's named model catalog (`llama3.2:3b`) is replaced
+  by manual `.gguf` file management (§8) — a real UX downgrade for users
+  used to `ollama pull <name>`, only partly offset by the `hf:org/repo/
+  file.gguf` shorthand (§8.2).
+
+None of these costs are new information relative to the study — they're
+restated here so a reader of *this* document doesn't have to cross-reference
+`llm-file-gguf-support.md` to know what tradeoffs Phase 0 onward is
+actually signing up for.
+
 ## 4. Architecture
 
 ### 4.0 Codebase precedents (confirmed via `docs/graph/graph.json` and `knowledge/`)
@@ -118,8 +229,11 @@ risk.
 Before designing anything new, the project's knowledge graph
 (`GRAPHIFY_OUT=docs/graph`, per `AGENTS.md`) and OKF bundle (`knowledge/`)
 were used to check whether this codebase already has patterns this plan
-would otherwise invent from scratch. It does, in four places, and this plan
-now follows them exactly rather than introducing parallel conventions:
+would otherwise invent from scratch. It does, in four places, plus one
+piece of prior art that isn't in the graph at all (it's a design document,
+not code) but is just as load-bearing — this plan now follows all five
+rather than introducing parallel conventions or re-deriving already-done
+analysis:
 
 1. **A worker-thread-bridged-to-tokio pattern already exists.**
    `src/app/mod.rs:38-100`, `start_file_watcher()`, spawns a dedicated
@@ -152,6 +266,14 @@ now follows them exactly rather than introducing parallel conventions:
    native Ollama provider"* but the columns themselves are plain nullable
    `TEXT`, keyed by provider name, not an Ollama-specific schema. This
    provider needs **zero new migrations**; see §4.8.
+5. **The benefit/cost/feasibility analysis is already done.**
+   `llm-file-gguf-support.md` (this repo, dated 2026-07-21) is a dedicated
+   study of exactly this integration — sourced benefits (§4 there),
+   itemized costs (§5), and an explicit Go/No-Go decision framework (§6).
+   This plan does not re-litigate any of that; §0.1, §3.2, §4.7, §4.9, and
+   §4.11 below each pull a specific, load-bearing fact from it (real crate
+   feature names, the `llguidance` grammar-constrained-decoding capability,
+   the process-isolation cost) rather than re-deriving or guessing at them.
 
 One place the graph was checked and came back *negative* — worth recording
 so it isn't re-investigated later: `src/config/crabrace.rs` (backing
@@ -162,22 +284,69 @@ integration for the same reason (§11).
 
 ### 4.1 Dependencies (`Cargo.toml`)
 
+Per `llm-file-gguf-support.md` §2.1/§2.4, the upstream repo
+(`utilityai/llama-cpp-rs`) publishes two crates: `llama-cpp-2` (the
+high-level Rust API this plan targets) and `llama-cpp-sys-2` (raw
+`bindgen` FFI, compiles the vendored `llama.cpp` submodule via the `cmake`
+crate at `cargo build` time — this is the actual source of §4.2's build
+requirements). As of the study, pinned at `llama-cpp-2` v0.1.151, with the
+project's own Cargo features being:
+
+```toml
+# llama-cpp-2's OWN Cargo.toml (upstream, as documented in
+# llm-file-gguf-support.md §2.4) — the actual feature surface this plan's
+# own features map onto, not a guess:
+[features]
+default = ["openmp", "android-shared-stdcxx", "common"]
+cuda = ["llama-cpp-sys-2/cuda"]
+metal = ["llama-cpp-sys-2/metal"]
+vulkan = ["llama-cpp-sys-2/vulkan"]
+rocm = ["llama-cpp-sys-2/rocm"]
+opencl = ["llama-cpp-sys-2/opencl"]
+mkl = ["llama-cpp-sys-2/mkl"]
+openmp = ["llama-cpp-sys-2/openmp"]
+mtmd = ["llama-cpp-sys-2/mtmd"]                # multimodal (vision), see §4.9
+llguidance = ["dep:llguidance", "dep:toktrie"] # grammar-constrained decoding, see §4.7
+sampler = []
+dynamic-link = ["llama-cpp-sys-2/dynamic-link"]
+system-ggml = ["llama-cpp-sys-2/system-ggml"]
+```
+
+This plan's own `Cargo.toml` additions, mapping onto the above:
+
 ```toml
 [dependencies]
-llama-cpp-2 = { version = "0.1", optional = true, default-features = false }
+llama-cpp-2 = { version = "0.1.151", optional = true, default-features = false }
 
 [features]
 llama-cpp = ["dep:llama-cpp-2"]
 llama-cpp-cuda = ["llama-cpp", "llama-cpp-2/cuda"]
 llama-cpp-metal = ["llama-cpp", "llama-cpp-2/metal"]
 llama-cpp-vulkan = ["llama-cpp", "llama-cpp-2/vulkan"]
+llama-cpp-rocm = ["llama-cpp", "llama-cpp-2/rocm"]
+llama-cpp-opencl = ["llama-cpp", "llama-cpp-2/opencl"]
+llama-cpp-mkl = ["llama-cpp", "llama-cpp-2/mkl"]
+llama-cpp-multimodal = ["llama-cpp", "llama-cpp-2/mtmd"]     # §4.9, deferred past MVP
+llama-cpp-llguidance = ["llama-cpp", "llama-cpp-2/llguidance"] # §4.7, deferred past MVP
 # NOTE: deliberately NOT added to `all-llm` — see §3.4.
 ```
 
-Exact version, feature names on the upstream crate (`cuda`/`metal`/`vulkan`
-vs. whatever `llama-cpp-2` currently calls them), and MSRV impact must be
-confirmed against the version on crates.io at implementation time — this is
-Phase 0's job, not assumed here.
+`default-features = false` is deliberate: upstream's own `default` set
+includes `android-shared-stdcxx` (irrelevant to every platform Crustly
+targets) and `openmp`/`common`, neither of which should be silently forced
+on Crustly's users. **Open item for Phase 0**: `llm-file-gguf-support.md`
+does not document what the `common`/`sampler`/`dynamic-link`/`system-ggml`
+features actually gate — read the upstream `Cargo.toml`/docs directly
+before finalizing which of them (if any) `llama-cpp` (the base feature)
+needs to enable to build and run at all, rather than assuming `openmp` is
+purely optional.
+
+Exact version, MSRV impact, and confirmation that the feature names above
+still match what's published (the study itself notes `llama-cpp-2` does
+**not** follow strict SemVer — §3.2) must be re-checked against
+crates.io/the upstream repo at implementation time, not trusted as
+permanently accurate from either this document or the study — this is
+Phase 0's job.
 
 ### 4.2 Build requirements (must be documented, not hidden)
 
@@ -185,11 +354,23 @@ Building with `--features llama-cpp` additionally requires, on the build
 machine:
 
 - A C and C++ toolchain (`cc`, `cmake` ≥ 3.14 — `llama-cpp-sys-2` builds
-  `llama.cpp` from its vendored/pinned source via `cmake`).
+  `llama.cpp` from its vendored/pinned source via `cmake`). Windows needs
+  Visual Studio Build Tools (C++ workload) or MinGW specifically — no
+  toolchain ships by default the way it effectively does on Linux/macOS
+  (`llm-file-gguf-support.md` §5.1).
 - For `llama-cpp-cuda`: the CUDA toolkit matching the GPU driver.
 - For `llama-cpp-metal`: Xcode command-line tools (macOS only; this feature
   is a no-op / should be excluded from non-Apple targets).
-- For `llama-cpp-vulkan`: the Vulkan SDK.
+- For `llama-cpp-vulkan`: the Vulkan SDK (`VULKAN_SDK` env var discoverable
+  at build time).
+- For `llama-cpp-rocm`: the ROCm toolkit (Linux/AMD GPUs only).
+- For `llama-cpp-opencl`: an OpenCL SDK/runtime.
+- For `llama-cpp-mkl`: Intel's oneMKL, installed and discoverable.
+- The `rocm`/`opencl`/`mkl` backends beyond `cuda`/`metal`/`vulkan` are
+  named here because they're real upstream features (§4.1), not because
+  this plan commits to shipping all six — §13 Phase 8 and open question
+  §10.8 (GPU backend launch scope) still need a product decision on which
+  subset, if any beyond CPU-only, ships first.
 
 This must be called out prominently in the README and `CLAUDE.md` build
 instructions the moment this feature lands, and CI must build **both**
@@ -411,16 +592,38 @@ tuning per model family — Llama-3-Instruct, Mistral, Qwen all respond
 differently to the exact phrasing), instructing the model to answer with a
 JSON object naming the function and arguments when it wants to call one.
 
-**Stretch goal, later phase, not v1**: grammar-constrained decoding via
-GBNF (`llama.cpp`'s grammar sampler) built from the offered tool's JSON
-Schema, which would make malformed tool-call JSON structurally impossible
-rather than merely recovered/retried. This needs either a JSON-Schema→GBNF
-converter (porting the relevant slice of `llama.cpp`'s own
-`json-schema-to-grammar` logic) or accepting a coarser "valid JSON object"
-grammar and keeping the existing strict `parse_tool_call_object` validation
-on top. Flagged as an open question (§10) rather than committed to a phase
-number, since it depends on what the pinned `llama-cpp-2` version actually
-exposes for grammar sampling.
+**Not a stretch goal anymore — a concrete, deferred phase.** The first
+draft of this plan treated grammar-constrained decoding as speculative,
+requiring a hand-built JSON-Schema→GBNF converter. `llm-file-gguf-support.md`
+§2.4/§4.3 corrects this: `llama-cpp-2` already ships a first-class
+`llguidance` Cargo feature (`llguidance = ["dep:llguidance", "dep:toktrie"]`,
+§4.1) wrapping [`llguidance`](https://github.com/guidance-ai/llguidance) —
+grammar-constrained generation is a real, existing, documented capability
+of the pinned crate, not something this plan would need to build from
+scratch.
+
+Design for the deferred `llama-cpp-llguidance` feature (§4.1): map the
+already-generic `Tool.input_schema` (JSON Schema, `src/llm/provider/types.rs`
+— the same schemas `to_ollama_tool()` in `ollama.rs` already converts for
+Ollama's native tool format) into a constraint that restricts decoding to
+only tokens that keep the output a valid instance of that schema, so the
+model **cannot** emit syntactically-malformed tool-call JSON — a
+categorically different guarantee than "recovered after the fact." The
+study's own honest caveat (§4.3 there) carries over unchanged: grammar
+constraints guarantee **syntax**, not that generation won't be truncated by
+the token budget before a valid JSON value completes — so the recovery
+heuristic above stays the *always-on* path (works with zero extra build
+complexity, zero extra dependencies), and `llguidance` is an **additive**
+reliability upgrade behind its own feature flag, not a replacement for it.
+This composes cleanly with the shared-module extraction already planned:
+`tool_call_recovery.rs` (used by both `OllamaProvider` and
+`LlamaCppProvider`) remains the fallback/default; `llama-cpp-llguidance`,
+when compiled in, additionally constrains generation before recovery is
+ever needed. Sequencing: land the recovery-heuristic path in Phase 4 (§13)
+as originally planned — it needs no new upstream feature and is proven by
+Ollama's existing tests — and treat `llguidance` wiring as its own
+follow-on phase (§13 Phase 4b) once Phase 0 confirms the feature builds
+and its Rust API shape (open question §10.1).
 
 ### 4.8 Performance metrics (reuse, don't reinvent)
 
@@ -463,14 +666,26 @@ migration file.
 
 ### 4.9 Vision support
 
-Multimodal (LLaVA-style, via a companion `mmproj` GGUF file) is **out of
-scope for v1**. `llama-cpp-2`'s multimodal support is less mature/stable
-than its text-only path as of this writing, and Crustly's existing
-`ContentBlock::Image` handling would need a second GGUF file's worth of new
-config (`mmproj_path`) and a different decode path (image embedding before
-text tokens). `supports_vision()` returns `false` unconditionally for v1;
-revisit as a follow-up plan once the text-only path is stable, not bundled
-into this one.
+**Correction from this plan's first draft**: multimodal is not an
+immature/unstable corner of `llama-cpp-2` — `llm-file-gguf-support.md`
+§2.4/§4.4 found it's a real, documented, first-class Cargo feature
+(`mtmd = ["llama-cpp-sys-2/mtmd"]`, §4.1) with its own example in the
+upstream repo, and the study explicitly frames a native GGUF engine
+*without* it as a **regression** relative to Ollama/OpenAI-compat, which
+already handle vision today. This plan still defers it past the MVP, but
+for scope-control reasons (keep Phases 1-5 to a mergeable, testable slice —
+§13), not because the capability is shaky.
+
+Deferred design, `llama-cpp-multimodal` feature (§4.1): LLaVA-style
+multimodal needs a companion `mmproj` GGUF file alongside the main model
+(`providers.llama_cpp.mmproj_path`, new optional config field) and a
+different decode path (image embedding before text tokens) from the
+text-only flow §4.6 describes. `supports_vision()` returns `false`
+unconditionally until this lands — a real, temporary capability gap versus
+Ollama/OpenAI-compat, called out explicitly (not silently) so it isn't
+mistaken for parity before it exists. Phase ordering: land after the MVP
+(§13 Phases 0-5) is stable and tool-calling (§4.7) is in, given the study's
+own framing that this is closing a gap rather than adding a differentiator.
 
 ### 4.10 Compatibility with `ModelRouter` / prompt-tier auto-routing
 
@@ -561,6 +776,77 @@ Rust-code post-commit hook covers `docs/graph/` automatically per
 call), so both reflect `try_create_ollama`, the new `try_create_llama_cpp`,
 and this `ModelRouter` compatibility fix before anyone queries them for the
 next feature.
+
+### 4.11 Process isolation & security surface
+
+Flagged by `llm-file-gguf-support.md` §5.3 and its open question §7.6, and
+not addressed anywhere in this plan's first draft — worth fixing before
+Phase 1, not discovered during it.
+
+**The gap**: every existing provider is an HTTP client. A malformed or
+malicious response from Ollama/OpenAI/Anthropic/Qwen/Azure can, at worst,
+produce a `ProviderError` — the response is untrusted *data*, parsed by
+Rust code with Rust's normal memory safety. A `.gguf` file loaded by
+`LlamaCppProvider` is different in kind: it's an input to a **native C++
+parser and inference engine** (`llama.cpp` itself), running with the same
+memory-safety guarantees as any other C++ code — none — and running
+**inside the same process** as the TUI, the SQLite connection, and every
+tool execution. There is no separate process boundary the way there is with
+Ollama; a crash in `llama.cpp` while parsing a bad GGUF header or during
+decode takes the entire `crustly` process down, including any unsaved TUI
+state.
+
+**What this plan already mitigates, and what it explicitly does not**:
+
+- The `catch_unwind`-wrapped worker loop (§4.3, §9) catches Rust-level
+  **panics** inside the FFI call boundary — an `unwrap()` on an unexpected
+  return value inside `llama-cpp-2`'s own Rust wrapper code, for instance —
+  and turns them into an `Err` for that one caller without taking the
+  worker thread (or the process) down.
+- It does **not**, and cannot, catch genuine memory-unsafety in the vendored
+  C++ `llama.cpp` itself (a buffer overrun triggered by a corrupt GGUF
+  header, for instance) — that class of bug is a segfault/UB, not a
+  catchable Rust panic, and no amount of Rust-side wrapping changes that.
+  This is a real, honest limitation to document for users, not a solved
+  problem.
+
+**Mitigations this plan commits to, scoped to what's actually achievable**:
+
+1. **User-supplied local files are already a trust boundary Crustly
+   accepts elsewhere** (reading arbitrary files via the `read_file`/`glob`
+   tools, parsing arbitrary documents via `doc_parser.rs`) — loading a
+   `.gguf` the user explicitly configured via `model_path` is consistent
+   with that existing posture, not a new category of risk for a
+   user's *own* files. The README/config docs (§13 Phase 10) say this
+   plainly: pointing `llama-cpp` at a `.gguf` file means trusting that file
+   to the same degree as running any other native binary/library against
+   it — not a Crustly-specific risk, but one worth stating rather than
+   implying false isolation.
+2. **Downloaded files are a different story** and get an integrity check:
+   `download_model()` (§8) verifies a SHA-256 checksum against the value
+   published for that file (Hugging Face model repos commonly publish
+   per-file SHA-256 in their metadata/LFS pointers) when the source exposes
+   one, and surfaces a clear warning — not a silent pass — when it doesn't.
+   This doesn't prevent a malicious-but-correctly-hashed file, only
+   corruption/tampering-in-transit; full provenance verification (signed
+   manifests, publisher identity) is out of scope for this plan, consistent
+   with the study's own framing of this as an open question (§7.6 there)
+   rather than a solved one.
+3. **No elevated trust for `.gguf` parsing relative to any other tool
+   execution**: the panic-isolation in §4.3/§9 is the same category of
+   defense-in-depth this codebase already applies elsewhere (tool execution
+   timeouts, sandboxed bash allowlists — `src/llm/tools/sandbox.rs`), not a
+   claim that `llama-cpp` is as safe as an HTTP provider. That asymmetry is
+   real and should be stated in the README (§13 Phase 10), not glossed
+   over.
+
+This section doesn't resolve the underlying risk — it can't, short of
+sandboxing the whole `llama.cpp` call surface in a separate process (which
+would reintroduce the process-boundary cost this plan exists to remove, or
+require unrelated work like `wasm`-sandboxing the inference engine, well
+outside this plan's scope). Its job is to make sure the risk is documented
+and deliberately accepted, not silently absent from the plan the way it was
+in this document's first draft.
 
 ## 5. Configuration (`src/config/mod.rs`)
 
@@ -807,9 +1093,21 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>>;
 /// `ollama-rs`, this needs no isolated client — see the reqwest-version
 /// note already in `src/llm/provider/ollama.rs`'s module doc, which does
 /// not apply here).
+///
+/// If `expected_sha256` is `Some` (resolved from the source's published
+/// metadata where available — e.g. a Hugging Face repo's LFS pointer/file
+/// info, fetched alongside the download URL in §8.2's resolution step), the
+/// downloaded bytes are hashed and checked before the file is left in
+/// `models_dir`; a mismatch deletes the partial file and returns an error
+/// naming both hashes, rather than silently keeping a corrupted/tampered
+/// file. If `expected_sha256` is `None` (source has no published hash),
+/// this is **not** treated as success-with-no-check: the caller (CLI/TUI)
+/// surfaces an explicit "no integrity hash available for this download"
+/// warning rather than staying silent about the gap — see §4.11 point 2.
 pub async fn download_model(
     source: &str,
     models_dir: &Path,
+    expected_sha256: Option<&str>,
     progress_tx: tokio::sync::mpsc::UnboundedSender<DownloadProgress>,
 ) -> Result<PathBuf>;
 
@@ -865,6 +1163,19 @@ v1. Document that gated/private HF repos aren't supported without a token
 (`HF_TOKEN` env var forwarded as an `Authorization` header is a reasonable
 Phase-6 addition if requested; not assumed here).
 
+**Checksum resolution** (feeding `download_model()`'s `expected_sha256`,
+§8): Hugging Face serves a file's SHA-256 via its API metadata
+(`https://huggingface.co/api/models/org/repo` → file entries include an
+`lfs.sha256` for LFS-tracked files, which `.gguf` files always are given
+their size) — a plain unauthenticated `GET`, no HF client dependency needed,
+same reasoning as the shorthand resolution itself. When the resolved file
+isn't LFS-tracked or the API doesn't return a hash, `expected_sha256` is
+`None` and the "no integrity hash available" warning (§4.11 point 2) is
+what the user sees — not a silent skip. A direct-URL `source` (not an
+`hf:` shorthand) has no metadata endpoint to query at all, so it always
+downloads with `expected_sha256 = None` unless a future CLI flag lets the
+user supply a known-good hash manually (not assumed in v1).
+
 ## 9. Error handling
 
 New `llama-cpp`-specific error mapping into the existing `ProviderError`
@@ -892,10 +1203,12 @@ enum (`src/llm/provider/error.rs`), analogous to `map_ollama_error`:
 ## 10. Open questions to settle before implementation
 
 1. **Exact `llama-cpp-2` version and its actual API surface** for: chat
-   template application, grammar/GBNF sampling, and performance-counter
-   access. This plan describes the *shape* of the integration; Phase 0 must
-   confirm these calls exist as described (or adjust) against the version
-   actually pinned.
+   template application, `llguidance`-backed grammar-constrained sampling
+   (§4.7 — confirmed to exist as a Cargo feature by
+   `llm-file-gguf-support.md`, but this plan hasn't verified its Rust API
+   shape), and performance-counter access. This plan describes the *shape*
+   of the integration; Phase 0 must confirm these calls exist as described
+   (or adjust) against the version actually pinned.
 2. **One provider instance per model, or one provider managing several
    `model_path`s with hot-swap?** This plan assumes the former (simpler,
    matches `OllamaProviderConfig`'s single-`host` shape) — multiple local
@@ -903,9 +1216,13 @@ enum (`src/llm/provider/error.rs`), analogous to `map_ollama_error`:
    or repeated single-model configs selected via the existing model-switch
    UX (§7 point 4). Needs a decision before §5's config shape is finalized
    if multi-model-without-reload turns out to be a common ask.
-3. **GBNF grammar-constrained tool calling** (§4.7 stretch goal) — commit to
-   a phase number, or leave as prompt-based recovery indefinitely (matching
-   what Ollama's fallback path already does for non-conforming templates)?
+3. ~~GBNF grammar-constrained tool calling — commit to a phase number, or
+   leave indefinitely as prompt-based recovery?~~ **Resolved** in §4.7: the
+   `llguidance` Cargo feature is real and documented
+   (`llm-file-gguf-support.md` §2.4/§4.3), so this is committed as Phase 4b
+   (§13) — additive on top of the always-on recovery heuristic, not a
+   replacement for it, and gated on Phase 0 confirming the feature's actual
+   Rust API shape (open question 1 above).
 4. **Windows support**: `llama-cpp-sys-2`'s cmake build on Windows
    (MSVC toolchain) needs an explicit CI leg before this is claimed to work
    cross-platform — don't assume parity with Linux/macOS without verifying.
@@ -926,6 +1243,39 @@ enum (`src/llm/provider/error.rs`), analogous to `map_ollama_error`:
    the existing Ollama-specific `ollama_download.rs`. Re-confirm the actual
    free key against `events.rs` at implementation time — new bindings may
    have been added since this plan was written.
+8. **GPU backend launch scope** (`llm-file-gguf-support.md` §7.3): CPU-only
+   for the first shipped release (simplest, smallest build/CI surface), or
+   CPU+GPU from day one? And if GPU, which of the six real backends named
+   in §4.1 (`cuda`/`metal`/`vulkan`/`rocm`/`opencl`/`mkl`) — likely
+   `cuda`+`metal` first given they cover the most common dev hardware
+   (NVIDIA Linux/Windows, Apple Silicon), with `vulkan`/`rocm`/`opencl`/`mkl`
+   as later additions if requested. This is a product/roadmap call, not an
+   engineering one — §13 Phase 8 executes whatever scope is decided here.
+9. **Are any of the three "hard" Go criteria confirmed yet?**
+   (`llm-file-gguf-support.md` §6/§7.1/§7.2, restated at §0.1 above.) This
+   is the actual gate on whether Phase 1 should start at all — everything
+   else in this open-questions list is downstream of this one being a
+   "yes" for at least one criterion. Re-check against current product
+   priorities before proceeding, not the answer on record when the study
+   was written.
+10. **Two blocking prerequisites, both from `llm-file-gguf-support.md`
+    §6**, independent of how many hard criteria (§9 above) are confirmed —
+    a "no" on either blocks proceeding regardless of §9's answer:
+    - **Team CMake/C++ maintenance capacity** (study §7.5): does the team
+      have the expertise/bandwidth to maintain a non-SemVer C++ dependency
+      long-term (version bumps that can change build requirements,
+      platform-specific build failures, etc.)?
+    - **Engineering-weeks budget**: is a multi-week effort (§3.2/§5.5's
+      estimate) available now without displacing another priority, or
+      does this wait regardless of how compelling the benefits are?
+11. ~~Who verifies integrity/provenance of `.gguf` files, especially
+    downloaded ones?~~ **Resolved** in §4.11/§8.2: downloaded files get a
+    SHA-256 check against Hugging Face's published LFS hash when available,
+    with an explicit (not silent) warning when it isn't; user-supplied local
+    files are treated like any other local file this codebase already reads
+    (§4.11 point 1). Full provenance/signature verification remains out of
+    scope, consistent with the study's own framing of this as unresolved
+    beyond checksum-level integrity.
 
 ## 11. What does NOT change
 
@@ -985,6 +1335,20 @@ enum (`src/llm/provider/error.rs`), analogous to `map_ollama_error`:
    recovery/perf-metrics display/model-swap-loading-UX/idle-unload, and
    confirm the existing Ollama/OpenAI/Anthropic paths are unaffected running
    side by side in the same build.
+6. **Download integrity, offline-testable** (§4.11/§8): a mocked HTTP
+   response with a known body and a matching `expected_sha256` succeeds; a
+   mismatched hash deletes the partial file and errors with both hashes in
+   the message (never leaves a silently-corrupt file in `models_dir`); a
+   response with no resolvable hash surfaces the "no integrity hash
+   available" warning rather than downloading silently — same style as the
+   existing `ollama_models.rs` tests that mock HTTP responses
+   (`mock_server()`, `list_models_parses_tags_response`, etc.) rather than
+   hitting a real network.
+7. **Phase 4b non-regression** (once built): `cargo test --features
+   llama-cpp` (without `llguidance`) and `cargo test --features
+   llama-cpp-llguidance` both pass, and the recovery-heuristic test suite
+   from Phase 4 passes identically under both — confirming `llguidance` is
+   additive, not a silent behavior change for anyone who didn't opt into it.
 
 ## 13. Phasing
 
@@ -997,23 +1361,39 @@ implemented phases against honest gaps rather than intent.
 
 ### Phase 0 — Feasibility spike (no user-facing code)
 
-- **Deliverables**: exact `llama-cpp-2` version pinned; a throwaway
-  spike binary (not merged) that loads one small GGUF and runs a single
-  `complete()`-equivalent call outside the main crate, to validate the FFI
-  surface before it's load-bearing in `LlamaCppProvider`; a written
-  confirmation of which of chat-template application, grammar/GBNF
-  sampling, and performance counters (§10.1) the pinned version actually
-  exposes, since §4.6/§4.7/§4.8 all assume specific API shapes that must be
-  checked, not assumed.
-- **Files**: none in `src/` — spike lives outside the crate or on a
-  throwaway branch; `Cargo.toml`/`Cargo.lock` diff kept for Phase 1 to reuse.
-- **Exit criteria (go/no-go gate for every later phase)**: spike builds
-  clean against this project's existing `Cargo.lock` with no version
-  conflicts; clean-build time and binary size delta measured and recorded
-  in this document's §3.4/§4.2; a documented answer (yes/no/how) for each
-  of the three API-surface questions above. A "no" on perf counters or chat
-  templates means §4.6/§4.8 are revised **before** Phase 1 starts, not
-  discovered mid-implementation.
+Two distinct gates live in this phase, in order — a technical spike cannot
+substitute for the product decision, and shouldn't be read as one:
+
+- **Gate A — product decision (§0.1), before anything else**: confirm at
+  least one hard criterion from `llm-file-gguf-support.md` §6 is a "yes"
+  against *current* priorities (air-gapped/IT-restricted target; measured
+  tool-calling friction — open question §10.9), or that the two blocking
+  prerequisites (C++/CMake maintenance capacity, engineering-weeks budget —
+  open question §10.10) are otherwise explicitly accepted by whoever owns
+  that tradeoff.
+  This is not an engineering task and has no "exit criteria" beyond a
+  documented decision — the rest of Phase 0 (and every later phase) is
+  conditional on it, not a way to arrive at it.
+- **Gate B — technical spike**, once Gate A clears:
+  - **Deliverables**: exact `llama-cpp-2` version pinned; a throwaway spike
+    binary (not merged) that loads one small GGUF and runs a single
+    `complete()`-equivalent call outside the main crate, to validate the FFI
+    surface before it's load-bearing in `LlamaCppProvider`; a written
+    confirmation of which of chat-template application, `llguidance`
+    grammar-constrained sampling, and performance counters (§10.1) the
+    pinned version actually exposes, since §4.6/§4.7/§4.8 all assume
+    specific API shapes that must be checked, not assumed; confirmation of
+    what the `common`/`sampler`/`dynamic-link`/`system-ggml` upstream
+    features actually gate (§4.1's open item).
+  - **Files**: none in `src/` — spike lives outside the crate or on a
+    throwaway branch; `Cargo.toml`/`Cargo.lock` diff kept for Phase 1 to
+    reuse.
+  - **Exit criteria**: spike builds clean against this project's existing
+    `Cargo.lock` with no version conflicts; clean-build time and binary
+    size delta measured and recorded in this document's §3.4/§4.2;
+    a documented answer (yes/no/how) for each of the API-surface questions
+    above. A "no" on perf counters or chat templates means §4.6/§4.8 are
+    revised **before** Phase 1 starts, not discovered mid-implementation.
 
 ### Phase 1 — MVP provider (CPU only, non-streaming)
 
@@ -1106,6 +1486,31 @@ implemented phases against honest gaps rather than intent.
   call); a manual test drives a real local model through a multi-tool
   agentic turn (e.g. `bash` + `read_file`) end to end.
 
+### Phase 4b — Grammar-constrained tool calling (`llguidance`, optional)
+
+Deferred, additive, and gated on Phase 0 confirming the feature's actual
+Rust API shape (open question §10.1) — not part of the Phases 0-5
+mergeable slice (§4.7).
+
+- **Deliverables**: `llama-cpp-llguidance` Cargo feature (§4.1); mapping
+  from `Tool.input_schema` (JSON Schema, already generic in
+  `provider/types.rs`) to an `llguidance`-consumable grammar constraining
+  decoding to valid-schema output; wired as a pre-check *before* the
+  Phase 4 recovery heuristic runs, which stays the always-on fallback
+  (§4.7 — grammar constraints guarantee syntax, not budget-safe
+  completion, so recovery remains meaningful even with this on).
+- **Files**: `Cargo.toml` (new feature); `src/llm/provider/llama_cpp.rs`
+  (grammar construction + sampler wiring, behind
+  `#[cfg(feature = "llama-cpp-llguidance")]`).
+- **Exit criteria**: with the feature compiled in, a manual multi-tool
+  agentic turn against a model previously observed to print malformed
+  tool-call JSON (if one was identified during Phase 4's manual testing)
+  no longer needs the recovery heuristic to succeed — verified by adding a
+  temporary log line confirming the heuristic path wasn't hit; without the
+  feature compiled in, behavior is byte-for-byte identical to Phase 4
+  (recovery-only), confirming this is genuinely additive, not a silent
+  behavior change gated on a feature flag.
+
 ### Phase 5 — Performance metrics
 
 - **Deliverables**: `PerfMetrics` populated from `llama.cpp`'s
@@ -1128,13 +1533,14 @@ implemented phases against honest gaps rather than intent.
 *Phases 0–5 are the minimum viable, mergeable slice: a working, tool-capable,
 tested provider with performance metrics, reachable via config and the
 factory, with no TUI-specific code beyond the one-line provider-icon
-addition.*
+addition. Phase 4b (`llguidance`) is explicitly outside this slice — an
+optional reliability upgrade on top of it, not a dependency of it.*
 
 ### Phase 6 — Model management (file-based)
 
 - **Deliverables**: `list_local_models`/`download_model`/`delete_model`
-  (§8); `hf:org/repo/file.gguf` shorthand resolution (§8.2); CLI
-  subcommand (§8.1).
+  (§8); `hf:org/repo/file.gguf` shorthand resolution plus its SHA-256
+  metadata lookup (§8.2, §4.11 point 2); CLI subcommand (§8.1).
 - **Files**: new `src/llm/provider/llama_cpp_models.rs`; `src/cli/mod.rs`
   (`Commands::LlamaCpp`, `LlamaCppCommands`, `cmd_llama_cpp`,
   `llama_cpp_models_dir` — mirroring the `Ollama`/`cmd_ollama`/
@@ -1143,11 +1549,15 @@ addition.*
 - **Exit criteria**: `crustly llama-cpp list` on an empty `models_dir`
   prints the same style of "(none) — pull one with…" hint `crustly ollama
   list` does; `crustly llama-cpp pull hf:org/repo/file.gguf` downloads with
-  a visible terminal progress bar and the file appears in a subsequent
-  `list`; `crustly llama-cpp rm <file>` requires confirmation and removes
-  the file; without `--features llama-cpp`, all three subcommands print the
-  same "rebuild with `--features llama-cpp`" message `cmd_ollama`'s
-  disabled path does, not a panic or a silent no-op.
+  a visible terminal progress bar, checks the file's SHA-256 against
+  Hugging Face's published hash when available (§8.2) and fails loudly with
+  both hashes shown on a mismatch, and the file appears in a subsequent
+  `list`; a source with no published hash prints the "no integrity hash
+  available" warning rather than downloading silently (§4.11); `crustly
+  llama-cpp rm <file>` requires confirmation and removes the file; without
+  `--features llama-cpp`, all three subcommands print the same "rebuild
+  with `--features llama-cpp`" message `cmd_ollama`'s disabled path does,
+  not a panic or a silent no-op.
 
 ### Phase 7 — TUI integration
 
@@ -1178,10 +1588,18 @@ addition.*
 
 ### Phase 8 — GPU acceleration
 
+Scope gated on open question §10.8 (which backends launch first) — the
+deliverables below cover `cuda`/`metal` as the recommended first pair
+(§10.8); `rocm`/`opencl`/`mkl` are real, equally-supported upstream
+features (§4.1) that can follow the same pattern if/when prioritized, not
+a fundamentally different effort.
+
 - **Deliverables**: `llama-cpp-cuda`/`llama-cpp-metal`/`llama-cpp-vulkan`
-  Cargo features (§4.1); `n_gpu_layers` wired through to context creation;
-  documentation of hardware requirements and approximate VRAM usage per
-  quantization level (e.g. Q4_K_M vs Q8_0 vs F16) for common model sizes.
+  Cargo features, plus `llama-cpp-rocm`/`llama-cpp-opencl`/`llama-cpp-mkl`
+  if in scope per §10.8 (§4.1); `n_gpu_layers` wired through to context
+  creation; documentation of hardware requirements and approximate VRAM
+  usage per quantization level (e.g. Q4_K_M vs Q8_0 vs F16) for common
+  model sizes.
 - **Files**: `Cargo.toml`; `src/llm/provider/llama_cpp.rs` (GPU-layers
   param, warning log when `n_gpu_layers > 0` but no GPU feature compiled
   in); `docs/guides/LLAMA_CPP_GUIDE.md` (started here, finished in Phase 10).
@@ -1214,20 +1632,24 @@ addition.*
   path distinct from both Ollama modes); `config.toml.example`
   `[providers.llama_cpp]` block; `docs/guides/LLAMA_CPP_GUIDE.md` completed;
   ADR recording the worker-thread-per-model decision from §4.4.
-- **Files**: `README.md`; `config.toml.example`;
+- **Files**: `README.md` (including the process-isolation/trust posture
+  from §4.11, stated plainly rather than implied); `config.toml.example`;
   `docs/guides/LLAMA_CPP_GUIDE.md`; new
   `docs/architecture/decisions/000X-llama-cpp-in-process-worker-thread.md`
   (next free number after `0004-plan-mode-read-only-with-approval-gating.md`
   — confirm the actual next number at implementation time), following the
   format of `0002-sqlx-over-rusqlite.md`/`0003-crabrace-provider-registry.md`
-  (Context/Decision/Consequences) and explicitly recording the §7 point 4
-  keybinding/dialog decision as a Consequence, since it's the one
-  user-facing tradeoff (two picker dialogs instead of one unified switcher)
-  a future contributor would otherwise have to re-derive.
+  (Context/Decision/Consequences), explicitly recording the §7 point 4
+  keybinding/dialog decision as a Consequence, and — like ADR `0003`
+  pointing to `docs/guides/CRABRACE_INTEGRATION.md` for wire-protocol detail
+  — pointing to **both** `llm-file-gguf-support.md` (the original
+  benefit/cost/Go-No-Go analysis) and this plan (the execution detail) for
+  anyone asking "why does this exist and why does it work this way" later.
 - **Exit criteria**: a new contributor can go from a clean checkout to a
   running local `llama.cpp` chat session using only the README section, no
   tribal knowledge; the ADR is linked from `docs/architecture/decisions/README.md`
-  alongside the existing four.
+  alongside the existing four, and itself links back to both source
+  documents rather than restating their analysis.
 
 Phases 6–10 are additive UX/ops polish and can ship incrementally after
 Phase 5 without blocking each other or requiring a specific order beyond
