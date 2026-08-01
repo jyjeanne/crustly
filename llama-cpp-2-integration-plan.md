@@ -87,6 +87,30 @@ tradeoff in the row above, this is deliberately **not** proposed for the
    compiler) for anyone not opting in.
 7. All existing tests continue to pass, with and without the new feature.
 
+### 3.1 Verified compatibility touch points
+
+Constraint 2 above ("no regression to any existing provider") is only as
+good as actually knowing every place in the codebase that assumes there is
+exactly one active `Provider`, or assumes properties true of the HTTP-based
+providers that may not hold for an in-process one. Rather than asserting
+this, each touch point below was traced via the knowledge graph
+(`knowledge/`, `docs/graph/`) and confirmed against source — the outcome
+for `llama-cpp` is recorded next to each, not just "checked":
+
+| Touch point | Where | Assumption it makes | Safe for `llama-cpp`? |
+|---|---|---|---|
+| `create_provider()` call sites | `cmd_chat`, `cmd_run` (`src/cli/mod.rs`) — confirmed via `create_provider.md`'s `called_by` list and cross-checked in source | Called once at startup; result is the single active provider for the process's lifetime | ✅ — no different from any other provider; §6 |
+| `ModelRouter`/tier auto-routing | `AgentService::send_message`, `service.rs:872-896` | A tier switch can swap the served model on the *same* active provider, cheaply, mid-conversation | ⚠️ **Not safe as-is** — full analysis and the mitigation in §4.10 |
+| `provider_icon()` | `src/tui/render.rs:89-98` | Provider names are a fixed, small known set; unknown names degrade to a generic icon | ✅ — additive match arm, unknown-name fallback already exists so even forgetting the arm degrades gracefully, not incorrectly |
+| `AgentResponse`/`DisplayMessage`/DB perf fields | `service.rs:1740-1769`, migration `20260701000001_provider_perf_metrics.sql` | Fields are `Option<T>`/nullable, provider-agnostic | ✅ — confirmed in §4.8; zero schema change needed |
+| Crabrace provider registry | `src/config/crabrace.rs`, ADR 0003 | Providers may optionally be registered for discovery | ✅ — confirmed no local-provider concept exists; Ollama isn't registered either, so `llama-cpp` following the same non-integration is consistent, not a gap (§11) |
+| `FailoverProvider` chain | `src/llm/provider/factory.rs` (`FailoverProvider`) | Chained providers are interchangeable on `RateLimitExceeded`/`Timeout`/5xx `ApiError` | ✅ but **not recommended** — `llama-cpp` errors map to `ApiError{status:0,..}`-style codes that don't trip the `>= 500` failover check by default (mirrors `OllamaProvider`'s own documented non-retry behavior, `ollama.rs` module doc); chaining it as a failover target would silently never activate. Not a defect (no worse than Ollama today), just not a useful pairing — noted so it isn't proposed later as if it already worked. |
+
+Every "not fully safe" row above (`ModelRouter`) has its mitigation spelled
+out where the row points, not deferred to an open question — this table
+exists to make the checking itself auditable, not to introduce new unowned
+risk.
+
 ## 4. Architecture
 
 ### 4.0 Codebase precedents (confirmed via `docs/graph/graph.json` and `knowledge/`)
@@ -448,6 +472,96 @@ text tokens). `supports_vision()` returns `false` unconditionally for v1;
 revisit as a follow-up plan once the text-only path is stable, not bundled
 into this one.
 
+### 4.10 Compatibility with `ModelRouter` / prompt-tier auto-routing
+
+This is a real compatibility hazard the OKF call-graph surfaced (`okf-rs
+graph callers` over `functions/src/llm/provider/router/ModelRouter/resolve`,
+cross-checked directly against `src/llm/agent/service.rs` since — see the
+staleness note in §4.10.1 below — the graph itself under-reports this
+function's callers) — not something either the Ollama plan or this plan's
+first draft accounted for.
+
+`AgentService` optionally holds a `model_router: Option<ModelRouter>`
+(`service.rs:288`). When set, **every** `send_message` call classifies the
+prompt into a `ModelTier` (`PromptAnalyzer::classify_tier`,
+`src/tui/prompt_analyzer.rs:252`) and resolves it to a model id
+(`service.rs:872-896`):
+
+```rust
+let (_, model_id) = router.resolve(tier);   // service.rs:892
+model_id.to_string()                        // provider_name is discarded
+```
+
+Note what's discarded: `ModelRouter::resolve()` returns `(provider_name,
+model_id)` (`router.rs:42-48`), but the call site only keeps `model_id`.
+**`self.provider` — the `Arc<dyn Provider>` chosen once by `create_provider()`
+at startup — never changes per tier.** Only the `model` string in the
+outgoing `LLMRequest` changes. This is silently correct for every provider
+in the codebase today, because all of them are HTTP clients addressing a
+server that can serve an arbitrary named model per request with no
+process-level cost: Anthropic (any Claude model id), OpenAI-compatible
+(any model the endpoint hosts), Ollama (any locally-pulled model, server
+loads/unloads it), Qwen/DashScope. Swapping `request.model` per message is
+exactly what these providers are built to accept.
+
+**It is not safe for `LlamaCppProvider` as designed in §4.3-§4.5.** A
+`LlamaCppProvider` instance has exactly one `LlamaModel`/`LlamaContext`
+loaded on its worker thread, tied to one `model_path` at construction. If a
+`model_router` tier resolves to a *different* model id than the one
+actually loaded:
+
+- **Silently wrong** (if the provider ignores `request.model` and just
+  answers with whatever's loaded): the user believes tier-based routing
+  picked a more/less capable model; it didn't — every tier gets the same
+  weights, just mislabeled in the response's `model` field.
+- **Hard failure** (if the provider validates `request.model` against its
+  loaded model, matching `OllamaProvider`'s stricter cousins): every tier
+  except the one matching the loaded GGUF errors out, breaking chat
+  entirely the moment `model_router` is configured.
+
+Neither is acceptable. **Decision for this plan**: `LlamaCppProvider`
+ignores the incoming `request.model` for routing purposes (it can only ever
+serve the one loaded GGUF) but **must not silently mislabel the response**
+— `LLMResponse.model`/`AgentResponse.model` report the *actually loaded*
+model's `display_name` (§5), not whatever `request.model` asked for. This
+makes a tier mismatch **visible** (the TUI shows the real model that
+answered) rather than silently swallowed. In addition, this plan's
+documentation (§13 Phase 10, README) explicitly recommends **against** naming a
+`llama-cpp` model in any `model_router` tier: per §4.5, actually honoring a
+tier switch would mean a multi-second-to-minute blocking model reload on
+every message where the tier differs from the last — the opposite of what
+tier-based routing exists for (fast, cheap dispatch). This is a
+documentation/convention guard, not a code-enforced one, consistent with
+`model_router` being an opt-in, currently Anthropic-oriented feature (see
+`ModelRouter::default_anthropic()`, `router.rs`) that no other provider
+(Ollama included) has been validated against either — this plan does not
+expand scope to "fix" tier-routing generally, only to ensure `llama-cpp`
+degrades visibly rather than silently if a user configures it there anyway.
+
+#### 4.10.1 Knowledge-graph staleness note (methodology, not a code issue)
+
+While tracing this, `knowledge/functions/src/llm/provider/factory/create_provider.md`'s
+recorded `calls` list was checked against `src/llm/provider/factory.rs` and
+found to **omit `try_create_ollama`**, even though `factory.rs`'s actual
+`create_provider()` body calls it (§4.0 point 3; confirmed by direct source
+read, not the graph). `docs/graph/graph.json`'s own `built_at_commit`
+(`acf04b75`) is several commits behind this branch's `HEAD`, which explains
+the gap — likely predating the Ollama provider's addition to the factory
+chain, or a `cfg`-gated function the AST extraction missed in that pass.
+
+**Practical consequence for this plan**: every call-graph fact pulled from
+`knowledge/`/`docs/graph/` in this document (§4.0, §4.10 above) was
+cross-checked against a direct source read before being relied on — the
+graph was used to find *candidates worth checking* (e.g., "does anything
+call `ModelRouter::resolve`?"), not as a final source of truth by itself.
+**Action item, folded into Phase 1's exit criteria (§13)**: run
+`graphify update .`/`okf-rs generate` after the new provider lands (the
+Rust-code post-commit hook covers `docs/graph/` automatically per
+`AGENTS.md`; `knowledge/`'s OKF bundle needs the explicit `okf-rs generate`
+call), so both reflect `try_create_ollama`, the new `try_create_llama_cpp`,
+and this `ModelRouter` compatibility fix before anyone queries them for the
+next feature.
+
 ## 5. Configuration (`src/config/mod.rs`)
 
 ```rust
@@ -564,8 +678,16 @@ Reuses every piece of plumbing already built for Ollama's Phase 2/3
 (`ollama-rs-integration-plan.md` §5, §5.7) rather than re-designing it:
 
 1. **Provider badge / tok/s in the header**: automatic, no new code beyond
-   a `provider_icon()` entry (e.g. `🦙+` or `⚙️` for `llama-cpp`) — the
-   pipeline is already generic over any provider that sets
+   one match arm in `provider_icon()` (`src/tui/render.rs:89-98` — currently
+   `"ollama" => "🦙"`, `"openai" => "🏠"`, `"anthropic" => "🤖"`,
+   `"qwen" => "🌀"`, `"azure" => "☁️"`, falling back to `"🤖"` for anything
+   unmatched, e.g. `"gemini"` today): add `"llama-cpp" => "⚙️"` (or `"🦙+"` —
+   bikeshed at implementation time), keyed to the **exact** string
+   `LlamaCppProvider::name()` returns. That string must also be exactly what
+   `factory.rs`'s `try_create_llama_cpp` names the provider and what gets
+   written to `messages.provider_name`/`sessions.provider` (§4.8) — one
+   canonical literal (`"llama-cpp"`), not three call sites each guessing —
+   the pipeline is already generic over any provider that sets
    `perf_metrics`/`provider_name` (§4.8).
 2. **Per-message perf footer**: automatic, same reason.
 3. **Model Info panel** (`Ctrl+O`, already built per the Ollama plan's
@@ -917,7 +1039,15 @@ implemented phases against honest gaps rather than intent.
   `cargo test --features llama-cpp` both green; config parsing round-trips
   through `toml`; a `providers.llama_cpp` section with the feature *not*
   compiled in produces the `anyhow::bail!` naming the missing feature
-  (mirrors the existing `test_disabled_*` style tests in `factory.rs`).
+  (mirrors the existing `test_disabled_*` style tests in `factory.rs`);
+  `LLMResponse.model`/`AgentResponse.model` on a completion always report
+  the actually-loaded GGUF's `display_name`, never a caller-requested
+  `request.model` that doesn't match it (§4.10 — this is the visible-not-
+  silent guard, verified here even though `model_router` integration itself
+  isn't exercised until a user configures one); `okf-rs generate` and
+  `graphify update .` run once against the finished phase so `knowledge/`
+  and `docs/graph/` stop being stale for the next person who queries them
+  (§4.10.1).
 
 ### Phase 2 — Streaming
 
@@ -982,9 +1112,13 @@ implemented phases against honest gaps rather than intent.
   load/prefill/eval counters (§4.8), flowing through the existing
   `LLMResponse → AgentResponse → DisplayMessage → Session` pipeline
   unchanged.
-- **Files**: `src/llm/provider/llama_cpp.rs` only. **No migration file** —
-  confirmed in §4.8 that `messages.provider_name`/`perf_metrics_json` and
-  `sessions.provider` already exist and are provider-agnostic.
+- **Files**: `src/llm/provider/llama_cpp.rs` only, plus a one-line doc
+  comment fix at `src/llm/agent/service.rs:1766-1767` (`AgentResponse
+  .perf_metrics`'s doc currently reads "if the provider exposes them
+  (currently only the native Ollama provider)" — no longer accurate once
+  this phase lands). **No migration file** — confirmed in §4.8 that
+  `messages.provider_name`/`perf_metrics_json` and `sessions.provider`
+  already exist and are provider-agnostic.
 - **Exit criteria**: TUI header shows the `llama-cpp` provider badge and
   tok/s segment on a real local generation, with no code changes needed in
   `tui/render.rs` beyond a new `provider_icon()` match arm; a fresh session
