@@ -1,19 +1,36 @@
 # `llama-cpp-2` Integration Plan
 
-Status: **Planning — not started, gated on §0.1.** No code has been
-written yet; this document is the design and phasing reference for the
-implementation, ready to execute once the Go/No-Go gate it inherits from
-the prior feasibility study is cleared.
+Status: **Phases 0–1 implemented** (non-streaming MVP; §0.1's Go/No-Go gate
+was explicitly overridden by the repo owner to proceed — see below).
+Phases 2+ (streaming, full sampling/config, tool calling, model management,
+TUI, GPU acceleration) not started.
 Branch: `claude/llama-cpp-2-integration-mfirvd`
-Dependency: [`llama-cpp-2`](https://crates.io/crates/llama-cpp-2) v0.1.151
-+ `llama-cpp-sys-2`, both published from
+Dependency: [`llama-cpp-2`](https://crates.io/crates/llama-cpp-2) v0.1.153
+(pinned — confirmed via the live crates.io index at implementation time,
+newer than the v0.1.151 the feasibility study cited) + `llama-cpp-sys-2`,
+both published from
 [`utilityai/llama-cpp-rs`](https://github.com/utilityai/llama-cpp-rs) (Rust
-bindings over `llama.cpp`) — version/stats per `llm-file-gguf-support.md`
-§2.3, re-verify at implementation time (Phase 0).
+bindings over `llama.cpp`).
 Prior art: `llm-file-gguf-support.md` (this repo) — a dedicated feasibility
 study of this exact integration, dated 2026-07-21, whose benefit/cost
-analysis and Go/No-Go framework this plan builds directly on rather than
-duplicating (§0.1).
+analysis and Go/No-Go framework this plan builds on (§0.1).
+
+## 0.0 Implementation status (honest, updated as phases land)
+
+| Phase | Status | Detail |
+|---|---|---|
+| §0.1 Go/No-Go gate | ⚠️ Overridden, not cleared | Re-checked and confirmed unconfirmed (no air-gapped/IT-restricted target, no measured tool-calling failure rate — see §0.1). The repo owner explicitly instructed implementation to proceed anyway; this is recorded here rather than silently treated as cleared. |
+| Phase 0 — Feasibility spike | ✅ Done | `llama-cpp-2` v0.1.153 builds clean via `cargo build --features llama-cpp`: cmake compiles vendored `llama.cpp` (CPU-only, no GPU backend) in ~40s on a 4-core machine, zero errors, two cosmetic CMake warnings only (missing `LICENSE` file in the published package, no `.git` metadata — both harmless, don't affect the build). API surface confirmed by reading the crate source directly (not assumed): `LlamaModel` is `Send + Sync`; `LlamaContext`/`LlamaBackend` are not (no `unsafe impl Send/Sync` in the crate) — confirms the worker-thread design in §4.4 is *required*, not a stylistic preference. Chat template application, performance counters, and the sampler chain all exist with the shapes §4.6/§4.7/§4.8 assumed. `all-llm` confirmed to still exclude `llama-cpp-2`/`llama-cpp-sys-2` entirely. |
+| Phase 1 — MVP provider | ✅ Done | `LlamaCppProvider` (`src/llm/provider/llama_cpp.rs`) implements `Provider::complete()` (non-streaming) via the worker-thread architecture in §4.3/4.4, including the `catch_unwind` panic isolation from §9. `LlamaCppProviderConfig` (`src/config/mod.rs`), factory wiring (`try_create_llama_cpp` in `src/llm/provider/factory.rs`, between Ollama and OpenAI), and module registration (`src/llm/provider/mod.rs`) all mirror the established Ollama pattern per §4.0. `cargo build`/`test`/`clippy -D warnings` all pass with no features, `--features llama-cpp`, and `--features all-llm` (783 tests green on the no-feature build). **Not yet done, by design (later phases)**: `stream()` returns `StreamingNotSupported`; sampling only covers temperature/top_p/top_k/repeat_penalty/seed (no mirostat, no per-model overrides); no tool-call recovery (`supports_tools()` returns `false`); no manual test against a real `.gguf` file yet (requires downloading a model, out of scope for this session — the code compiles and its offline unit tests pass, but end-to-end generation quality/correctness is unverified). |
+| Phase 2+ | Not started | Streaming, full sampling/config (Phase 3), tool calling (Phase 4/4b), performance-metrics TUI wiring (Phase 5 — the `PerfMetrics` plumbing exists in Phase 1 but hasn't been exercised against a real model or the TUI), model management (Phase 6), TUI integration (Phase 7), GPU acceleration (Phase 8), idle-unload hardening (Phase 9), docs/ADR (Phase 10). |
+
+Also fixed, while establishing a working baseline to build against: reqwest
+0.13 (already on `master` via an unrelated dependabot bump) gates
+`RequestBuilder::query()` behind a new `"query"` Cargo feature that wasn't
+enabled, breaking `cargo build` outright on a stock checkout. Unrelated to
+this plan but blocking any verification of it — fixed with one feature
+flag (`Cargo.toml`). This fix has not been forward-ported to `master`; flag
+it separately if `master` itself needs it independent of this branch.
 
 ## 0. Summary for reviewers
 
@@ -1387,7 +1404,7 @@ phase is not "complete" until its exit criteria pass, not just its code
 written — this mirrors how `ollama-rs-integration-plan.md` §0 tracks
 implemented phases against honest gaps rather than intent.
 
-### Phase 0 — Feasibility spike (no user-facing code)
+### Phase 0 — Feasibility spike (no user-facing code) ✅ Done — see §0.0
 
 Two distinct gates live in this phase, in order — a technical spike cannot
 substitute for the product decision, and shouldn't be read as one:
@@ -1423,7 +1440,7 @@ substitute for the product decision, and shouldn't be read as one:
     above. A "no" on perf counters or chat templates means §4.6/§4.8 are
     revised **before** Phase 1 starts, not discovered mid-implementation.
 
-### Phase 1 — MVP provider (CPU only, non-streaming)
+### Phase 1 — MVP provider (CPU only, non-streaming) ✅ Done — see §0.0
 
 - **Deliverables**: `llama-cpp` Cargo feature; `LlamaCppProvider`
   implementing `Provider::complete()` (not yet `stream()`) via the
