@@ -61,19 +61,44 @@ three hard criteria against current product priorities, not the ones on
 record when the study was written:
 
 1. Is air-gapped / no-local-network-access a documented target use case?
+   **Re-checked — still "no" as of this writing.** Searched the repo
+   (`ROADMAP.md`, `differentiation-strategy-vs-opencode.md`,
+   `llm-file-gguf-support.md`, `docs/`) and GitHub issues/PRs on
+   `jyjeanne/crustly` directly. `ROADMAP.md:154` states outright: *"currently
+   No-Go pending confirmation of either an air-gapped/IT-restricted
+   deployment requirement or a measured local-model tool-calling failure
+   rate; reopen the moment either appears."* `differentiation-strategy-
+   vs-opencode.md` §3.2 *proposes* an air-gapped/IT-restricted positioning
+   strategy but is itself explicitly unconfirmed ("propositions à valider
+   avant tout engagement" — proposals to validate before any commitment,
+   its own header). The merged PR that added both documents (#75) describes
+   the gate the same way in its own summary. A GitHub issue search for
+   `air-gapped`/`airgapped`/`offline`/`"IT policy"`/`firewall`/
+   `"no internet"`/`"restricted network"`/`"blocked daemon"` returned zero
+   results — no user has filed a request citing this. (`docs/CODING_FEATURES.md`'s
+   "Offline Mode ✅" marketing row and `ornith-9b-test-plan.md`'s "air-gapped
+   test scenario" both reference the *existing* Ollama-based local-LLM path,
+   not the zero-daemon criterion this gate is actually asking about — neither
+   counts as a confirmation.)
 2. Are target users on IT-restricted machines where installing/running a
-   background daemon is blocked?
+   background daemon is blocked? Same search, same result — no documented
+   confirmation found.
 3. Has local-model tool-calling failure become measured as a real,
    significant friction point (support requests, GitHub issues, user
-   reports)?
+   reports)? Not checked as part of this pass (out of scope for the
+   air-gapped/IT-restricted question that prompted this re-check) — revisit
+   separately before treating Gate A as fully evaluated.
 
 One confirmed "yes" is enough per the study's own grid to justify
-proceeding past Phase 0. Absent that, this plan is deliberately left in a
-state where Phase 0 alone (§13) can be run on its own — it produces exactly
-the build-time/binary-size/API-surface data the decision grid's remaining
-soft factors need, without committing to Phases 1+. Re-open this gate
-whenever a hard criterion changes status; don't treat "the plan already
-exists" as itself a reason to proceed.
+proceeding past Phase 0. As of this writing, **criteria 1 and 2 are
+confirmed "no"** — this plan's Gate A therefore does not clear on those two
+grounds alone; whether criterion 3 or the softer factors change that is
+still open. Absent a "yes," this plan is deliberately left in a state where
+Phase 0 alone (§13) can be run on its own — it produces exactly the
+build-time/binary-size/API-surface data the decision grid's remaining soft
+factors need, without committing to Phases 1+. Re-open this gate whenever
+a hard criterion changes status; don't treat "the plan already exists" as
+itself a reason to proceed.
 
 ## 1. Objective
 
@@ -1255,9 +1280,12 @@ enum (`src/llm/provider/error.rs`), analogous to `map_ollama_error`:
    (`llm-file-gguf-support.md` §6/§7.1/§7.2, restated at §0.1 above.) This
    is the actual gate on whether Phase 1 should start at all — everything
    else in this open-questions list is downstream of this one being a
-   "yes" for at least one criterion. Re-check against current product
-   priorities before proceeding, not the answer on record when the study
-   was written.
+   "yes" for at least one criterion. **Criteria 1 and 2 re-checked and
+   confirmed "no"** (repo docs + GitHub issue search, no results — detail
+   in §0.1). **Criterion 3 (measured tool-calling failure rate) not yet
+   re-checked** — still genuinely open. Re-check all three again against
+   current product priorities before proceeding, not the answer on record
+   here either, if meaningful time passes before Phase 1 starts.
 10. **Two blocking prerequisites, both from `llm-file-gguf-support.md`
     §6**, independent of how many hard criteria (§9 above) are confirmed —
     a "no" on either blocks proceeding regardless of §9's answer:
