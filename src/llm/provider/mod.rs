@@ -20,6 +20,8 @@ pub mod anthropic;
 pub mod azure;
 pub mod factory;
 pub mod gemini;
+#[cfg(feature = "llama-cpp")]
+pub mod llama_cpp;
 #[cfg(feature = "ollama")]
 pub mod ollama;
 #[cfg(feature = "ollama")]
@@ -33,6 +35,8 @@ pub use factory::create_provider;
 #[cfg(feature = "ollama")]
 pub use factory::ollama_provider_from_config;
 pub use gemini::GeminiProvider;
+#[cfg(feature = "llama-cpp")]
+pub use llama_cpp::LlamaCppProvider;
 #[cfg(feature = "ollama")]
 pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;

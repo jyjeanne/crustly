@@ -149,6 +149,11 @@ pub fn create_provider(config: &Config) -> Result<Arc<dyn Provider>> {
         return Ok(provider);
     }
 
+    // Try in-process llama.cpp (loads a local .gguf file directly)
+    if let Some(provider) = try_create_llama_cpp(config)? {
+        return Ok(provider);
+    }
+
     // Try OpenAI
     if let Some(provider) = try_create_openai(config)? {
         return Ok(provider);
@@ -331,6 +336,47 @@ fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
         anyhow::bail!(
             "providers.ollama is configured, but this build of crustly was compiled \
              without the 'ollama' feature. Rebuild with `--features ollama` (or `all-llm`)."
+        );
+    }
+    Ok(None)
+}
+
+/// Try to create the in-process llama.cpp provider if `providers.llama_cpp`
+/// is configured. Unlike every other `try_create_*` here, this one loads a
+/// model file (a multi-second-to-tens-of-seconds operation depending on
+/// size/disk speed) rather than just constructing an HTTP client - see
+/// `llama-cpp-2-integration-plan.md` §4.5.
+#[cfg(feature = "llama-cpp")]
+fn try_create_llama_cpp(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
+    let llama_cpp_config = match &config.providers.llama_cpp {
+        Some(cfg) if cfg.enabled => cfg,
+        _ => return Ok(None),
+    };
+
+    tracing::info!(
+        "Loading llama.cpp model: {}",
+        llama_cpp_config.model_path.display()
+    );
+    println!(
+        "🦙 Loading llama.cpp model: {}\n",
+        llama_cpp_config.model_path.display()
+    );
+
+    let provider = super::llama_cpp::LlamaCppProvider::new(llama_cpp_config)
+        .context("Failed to create llama.cpp provider")?;
+
+    Ok(Some(Arc::new(provider)))
+}
+
+/// Without the `llama-cpp` feature compiled in, a configured
+/// `providers.llama_cpp` section is not silently ignored - same rationale
+/// as `try_create_ollama`'s `not(feature = "ollama")` branch above.
+#[cfg(not(feature = "llama-cpp"))]
+fn try_create_llama_cpp(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
+    if config.providers.llama_cpp.is_some() {
+        anyhow::bail!(
+            "providers.llama_cpp is configured, but this build of crustly was compiled \
+             without the 'llama-cpp' feature. Rebuild with `--features llama-cpp`."
         );
     }
     Ok(None)
@@ -900,6 +946,65 @@ mod tests {
             "anthropic",
             "a disabled Qwen must not be selected despite having a base_url",
         );
+    }
+
+    // Only meaningful with the feature compiled in: `try_create_llama_cpp`'s
+    // `#[cfg(not(feature = "llama-cpp"))]` branch bails whenever
+    // `providers.llama_cpp` is merely *present*, regardless of `enabled`
+    // (mirroring `try_create_ollama`'s equivalent branch) - so this test
+    // would fail for the wrong reason (an error, not a fallback) if compiled
+    // without the feature. `absent_llama_cpp_config_does_not_affect_resolution`
+    // below covers the always-compiled case.
+    #[cfg(feature = "llama-cpp")]
+    #[test]
+    fn disabled_llama_cpp_is_skipped_in_favour_of_the_next_provider() {
+        let config = Config {
+            providers: ProviderConfigs {
+                llama_cpp: Some(crate::config::LlamaCppProviderConfig {
+                    enabled: false,
+                    model_path: "/models/whatever.gguf".into(),
+                    ..Default::default()
+                }),
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let provider = create_provider(&config).expect("anthropic should be selected");
+        assert_eq!(
+            provider.name(),
+            "anthropic",
+            "a disabled llama_cpp config must not be selected despite having a model_path",
+        );
+    }
+
+    /// Without `providers.llama_cpp` configured at all, resolution must be
+    /// bit-for-bit identical to today - the mere presence of the
+    /// `llama-cpp` feature (if compiled in) must not change anything.
+    #[test]
+    fn absent_llama_cpp_config_does_not_affect_resolution() {
+        let config = Config {
+            providers: ProviderConfigs {
+                llama_cpp: None,
+                anthropic: Some(ProviderConfig {
+                    enabled: true,
+                    api_key: Some("anthropic-key".to_string()),
+                    base_url: None,
+                    default_model: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let provider = create_provider(&config).expect("anthropic should be selected");
+        assert_eq!(provider.name(), "anthropic");
     }
 
     /// Anthropic is the terminal fallback: disabling it cannot fall through to

@@ -62,6 +62,11 @@ ollama-rs = { version = "0.3", optional = true, features = ["stream"] }
 # serde_json::Value tool definitions. Version must track ollama-rs's own
 # schemars dependency (currently 1.2.x).
 schemars = { version = "1.2", optional = true, features = ["preserve_order"] }
+# In-process llama.cpp inference (loads a local .gguf file directly, no
+# external server). Builds the vendored llama.cpp C++ sources via `cmake` at
+# `cargo build` time - requires a C/C++ toolchain, only when this feature is
+# enabled. See llama-cpp-2-integration-plan.md.
+llama-cpp-2 = { version = "0.1.153", optional = true, default-features = false }
 
 # Provider Registry (Crabrace - replaces Catwalk)
 crabrace = "0.1.0"
@@ -142,6 +147,10 @@ profiling = []
 openai = ["async-openai"]
 aws-bedrock = ["aws-sdk-bedrockruntime"]
 ollama = ["dep:ollama-rs", "dep:schemars"]
+# Deliberately NOT part of `all-llm`: unlike every other provider feature,
+# this one compiles native C++ (cmake + a C/C++ toolchain required) - see
+# llama-cpp-2-integration-plan.md §3/§3.4/§4.2.
+llama-cpp = ["dep:llama-cpp-2"]
 all-llm = ["openai", "aws-bedrock", "ollama"]
 
 [profile.dev]
