@@ -4,9 +4,9 @@
 //! client - it loads model weights and runs inference inside this process,
 //! via the `llama-cpp-2` crate (FFI bindings to `llama.cpp`). See
 //! `llama-cpp-2-integration-plan.md` for the full design; this file
-//! implements Phase 1 (non-streaming `complete()` only, CPU-only, no tool
-//! calling yet - `stream()` (Phase 2), sampling/config knobs beyond the
-//! basics (Phase 3), and tool-call recovery (Phase 4) land in later phases).
+//! implements Phases 1-2 (`complete()` and `stream()`, CPU-only, no tool
+//! calling yet - sampling/config knobs beyond the basics (Phase 3) and
+//! tool-call recovery (Phase 4) land in later phases).
 //!
 //! ## Threading model
 //!
@@ -73,9 +73,21 @@ impl Default for SamplingDefaults {
 }
 
 /// One request submitted to the worker thread.
-struct InferenceJob {
-    request: LLMRequest,
-    respond_to: oneshot::Sender<Result<LLMResponse>>,
+enum InferenceJob {
+    /// A non-streaming request: the full response is sent back once,
+    /// through a `oneshot`.
+    Complete {
+        request: LLMRequest,
+        respond_to: oneshot::Sender<Result<LLMResponse>>,
+    },
+    /// A streaming request: `StreamEvent`s are pushed incrementally through
+    /// `events_tx` as they're generated - `stream()` returns the receiver
+    /// end (wrapped as a `Stream`) immediately, without waiting for
+    /// generation to start or finish, unlike a buffer-then-replay approach.
+    Stream {
+        request: LLMRequest,
+        events_tx: mpsc::UnboundedSender<Result<StreamEvent>>,
+    },
 }
 
 /// In-process `llama.cpp` provider. Cloning shares the same worker thread
@@ -237,25 +249,53 @@ fn worker_loop(init: WorkerInit) {
     }
 
     while let Some(job) = job_rx.blocking_recv() {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            run_complete(
-                &model,
-                &mut context,
-                &chat_template,
-                &sampling_defaults,
-                seed,
-                job.request,
-            )
-        }));
-        let result = result.unwrap_or_else(|payload| {
-            let msg = panic_message(&payload);
-            tracing::error!("llama.cpp worker panicked during a request: {msg}");
-            Err(ProviderError::Internal(format!(
-                "llama.cpp inference panicked: {msg}"
-            )))
-        });
-        let _ = job.respond_to.send(result);
+        match job {
+            InferenceJob::Complete {
+                request,
+                respond_to,
+            } => {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    run_complete(
+                        &model,
+                        &mut context,
+                        &chat_template,
+                        &sampling_defaults,
+                        seed,
+                        request,
+                    )
+                }))
+                .unwrap_or_else(|payload| Err(panic_to_provider_error(&payload)));
+                let _ = respond_to.send(result);
+            }
+            InferenceJob::Stream { request, events_tx } => {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    run_stream(
+                        &model,
+                        &mut context,
+                        &chat_template,
+                        &sampling_defaults,
+                        seed,
+                        request,
+                        &events_tx,
+                    )
+                }));
+                if let Err(payload) = result {
+                    // A panic anywhere in run_stream means no terminal event
+                    // (ContentBlockStop/MessageStop) was sent - tell the
+                    // consumer why the stream just stops, rather than
+                    // leaving it hanging with no explanation.
+                    let _ = events_tx.send(Err(panic_to_provider_error(&payload)));
+                }
+            }
+        }
     }
+}
+
+/// Shared panic->error conversion + logging for both job kinds.
+fn panic_to_provider_error(payload: &(dyn std::any::Any + Send)) -> ProviderError {
+    let msg = panic_message(payload);
+    tracing::error!("llama.cpp worker panicked during a request: {msg}");
+    ProviderError::Internal(format!("llama.cpp inference panicked: {msg}"))
 }
 
 /// Best-effort extraction of a human-readable message from a caught panic
@@ -272,21 +312,26 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     }
 }
 
-/// Build the prompt for `request`, tokenize it, run prefill + generation,
-/// and translate the result into an `LLMResponse`. Runs entirely on the
-/// worker thread - `context` is `&mut` because decoding advances its
-/// internal KV-cache/state.
-fn run_complete(
+/// Everything Phase 1/2 need before the per-token generation loop starts:
+/// prompt built, tokenized, context-length checked, sampler ready, and the
+/// prompt itself already prefilled into `context`. Shared by `run_complete`
+/// and `run_stream` so the two can't drift on tokenization/prefill/sampler
+/// setup - only the per-token handling and final-response shape differ.
+struct PreparedGeneration {
+    sampler: LlamaSampler,
+    max_tokens: u32,
+    prompt_token_count: u32,
+}
+
+fn prepare_generation(
     model: &LlamaModel,
     context: &mut LlamaContext<'_>,
     chat_template: &Option<LlamaChatTemplate>,
     sampling_defaults: &SamplingDefaults,
     default_seed: Option<u32>,
-    request: LLMRequest,
-) -> Result<LLMResponse> {
-    let start = std::time::Instant::now();
-
-    let prompt = build_prompt(model, chat_template, &request)?;
+    request: &LLMRequest,
+) -> Result<PreparedGeneration> {
+    let prompt = build_prompt(model, chat_template, request)?;
 
     let prompt_tokens = model
         .str_to_token(&prompt, AddBos::Always)
@@ -304,7 +349,7 @@ fn run_complete(
         .unwrap_or(DEFAULT_MAX_TOKENS)
         .min(n_ctx.saturating_sub(prompt_tokens.len() as u32));
 
-    let mut sampler = build_sampler(sampling_defaults, &request, default_seed);
+    let sampler = build_sampler(sampling_defaults, request, default_seed);
 
     // Prefill: decode the whole prompt in one batch. `add_sequence` sets
     // logits=true only on the last token, which is all prefill needs -
@@ -317,11 +362,64 @@ fn run_complete(
         .decode(&mut batch)
         .map_err(|e| ProviderError::Internal(format!("prefill decode failed: {e}")))?;
 
+    Ok(PreparedGeneration {
+        sampler,
+        max_tokens,
+        prompt_token_count: prompt_tokens.len() as u32,
+    })
+}
+
+/// Decode exactly one new token into `context` at `pos` for sequence 0,
+/// mirroring the single-token extension step both `run_complete` and
+/// `run_stream` need after each sampled token.
+fn decode_one_more(
+    context: &mut LlamaContext<'_>,
+    batch: &mut LlamaBatch<'_>,
+    token: LlamaToken,
+    pos: i32,
+) -> Result<()> {
+    batch.clear();
+    batch
+        .add(token, pos, &[0], true)
+        .map_err(|e| ProviderError::Internal(format!("failed to extend batch: {e}")))?;
+    context
+        .decode(batch)
+        .map_err(|e| ProviderError::Internal(format!("decode failed: {e}")))
+}
+
+/// Build the prompt for `request`, tokenize it, run prefill + generation,
+/// and translate the result into an `LLMResponse`. Runs entirely on the
+/// worker thread - `context` is `&mut` because decoding advances its
+/// internal KV-cache/state.
+fn run_complete(
+    model: &LlamaModel,
+    context: &mut LlamaContext<'_>,
+    chat_template: &Option<LlamaChatTemplate>,
+    sampling_defaults: &SamplingDefaults,
+    default_seed: Option<u32>,
+    request: LLMRequest,
+) -> Result<LLMResponse> {
+    let start = std::time::Instant::now();
+
+    let PreparedGeneration {
+        mut sampler,
+        max_tokens,
+        prompt_token_count,
+    } = prepare_generation(
+        model,
+        context,
+        chat_template,
+        sampling_defaults,
+        default_seed,
+        &request,
+    )?;
+
     let stop_sequences = request.stop.clone().unwrap_or_default();
     let mut generated_bytes: Vec<u8> = Vec::new();
     let mut generated_count: u32 = 0;
     let mut stop_reason = StopReason::EndTurn;
-    let mut pos = prompt_tokens.len() as i32;
+    let mut pos = prompt_token_count as i32;
+    let mut batch = LlamaBatch::new(1, 1);
 
     for _ in 0..max_tokens {
         let token = sampler.sample(context, -1);
@@ -349,13 +447,7 @@ fn run_complete(
             break;
         }
 
-        batch.clear();
-        batch
-            .add(token, pos, &[0], true)
-            .map_err(|e| ProviderError::Internal(format!("failed to extend batch: {e}")))?;
-        context
-            .decode(&mut batch)
-            .map_err(|e| ProviderError::Internal(format!("decode failed: {e}")))?;
+        decode_one_more(context, &mut batch, token, pos)?;
         pos += 1;
     }
 
@@ -369,7 +461,7 @@ fn run_complete(
         content: vec![ContentBlock::Text { text }],
         stop_reason: Some(stop_reason),
         usage: TokenUsage {
-            input_tokens: prompt_tokens.len() as u32,
+            input_tokens: prompt_token_count,
             output_tokens: generated_count,
         },
         cache_metrics: None,
@@ -381,6 +473,187 @@ fn run_complete(
             model_was_loaded: Some(timings.t_load_ms() <= 0.0),
         }),
     })
+}
+
+/// Streaming counterpart of `run_complete`: pushes `StreamEvent`s through
+/// `events_tx` as each token is generated instead of collecting a final
+/// `LLMResponse`. Returns once the stream is finished (EOS/max
+/// tokens/stop-sequence/consumer gone) - the caller (`worker_loop`) doesn't
+/// wait for this to know the request was *accepted* (that already happened
+/// when `stream()` sent the job), only to know the worker is free again.
+#[allow(clippy::too_many_arguments)]
+fn run_stream(
+    model: &LlamaModel,
+    context: &mut LlamaContext<'_>,
+    chat_template: &Option<LlamaChatTemplate>,
+    sampling_defaults: &SamplingDefaults,
+    default_seed: Option<u32>,
+    request: LLMRequest,
+    events_tx: &mpsc::UnboundedSender<Result<StreamEvent>>,
+) {
+    let start = std::time::Instant::now();
+    let message_id = format!("llama-cpp-{}", uuid::Uuid::new_v4());
+    let model_name = request.model.clone();
+
+    let prepared = prepare_generation(
+        model,
+        context,
+        chat_template,
+        sampling_defaults,
+        default_seed,
+        &request,
+    );
+    let PreparedGeneration {
+        mut sampler,
+        max_tokens,
+        prompt_token_count,
+    } = match prepared {
+        Ok(p) => p,
+        Err(e) => {
+            // Setup failed before any event was sent - nothing to unwind,
+            // just report the error as the only item on the stream.
+            let _ = events_tx.send(Err(e));
+            return;
+        }
+    };
+
+    if events_tx
+        .send(Ok(StreamEvent::MessageStart {
+            message: StreamMessage {
+                id: message_id.clone(),
+                model: model_name.clone(),
+                role: Role::Assistant,
+                usage: TokenUsage {
+                    input_tokens: prompt_token_count,
+                    output_tokens: 0,
+                },
+            },
+        }))
+        .is_err()
+    {
+        return; // consumer already gone
+    }
+    if events_tx
+        .send(Ok(StreamEvent::ContentBlockStart {
+            index: 0,
+            content_block: ContentBlock::Text {
+                text: String::new(),
+            },
+        }))
+        .is_err()
+    {
+        return;
+    }
+
+    let stop_sequences = request.stop.clone().unwrap_or_default();
+    let mut pending_utf8: Vec<u8> = Vec::new();
+    let mut full_text = String::new();
+    let mut generated_count: u32 = 0;
+    let mut stop_reason = StopReason::EndTurn;
+    let mut pos = prompt_token_count as i32;
+    let mut batch = LlamaBatch::new(1, 1);
+
+    'generate: for _ in 0..max_tokens {
+        let token = sampler.sample(context, -1);
+
+        if model.is_eog_token(token) {
+            stop_reason = StopReason::EndTurn;
+            break;
+        }
+
+        if let Ok(piece) = token_to_piece_bytes(model, token) {
+            pending_utf8.extend_from_slice(&piece);
+        }
+        generated_count += 1;
+
+        if let Some(chunk) = drain_valid_utf8(&mut pending_utf8) {
+            full_text.push_str(&chunk);
+            if events_tx
+                .send(Ok(StreamEvent::ContentBlockDelta {
+                    index: 0,
+                    delta: ContentDelta::TextDelta { text: chunk },
+                }))
+                .is_err()
+            {
+                // Consumer dropped the stream (cancelled) - stop generating
+                // rather than burning CPU on tokens nobody will see, and
+                // return to the worker's job loop instead of hanging.
+                return;
+            }
+        }
+
+        if !stop_sequences.is_empty()
+            && stop_sequences.iter().any(|s| full_text.ends_with(s.as_str()))
+        {
+            stop_reason = StopReason::StopSequence;
+            break 'generate;
+        }
+
+        if generated_count >= max_tokens {
+            stop_reason = StopReason::MaxTokens;
+            break;
+        }
+
+        if let Err(e) = decode_one_more(context, &mut batch, token, pos) {
+            let _ = events_tx.send(Err(e));
+            return;
+        }
+        pos += 1;
+    }
+
+    // Flush any trailing bytes that never completed a UTF-8 sequence
+    // (generation ended mid-token) - lossy, but this is the same edge case
+    // `run_complete`'s final `from_utf8_lossy` already accepts.
+    if !pending_utf8.is_empty() {
+        let chunk = String::from_utf8_lossy(&pending_utf8).into_owned();
+        let _ = events_tx.send(Ok(StreamEvent::ContentBlockDelta {
+            index: 0,
+            delta: ContentDelta::TextDelta { text: chunk },
+        }));
+    }
+
+    let _ = events_tx.send(Ok(StreamEvent::ContentBlockStop { index: 0 }));
+
+    let timings = context.timings();
+    let total_ms = start.elapsed().as_millis() as u64;
+    let _ = events_tx.send(Ok(StreamEvent::MessageDelta {
+        delta: MessageDelta {
+            stop_reason: Some(stop_reason),
+            stop_sequence: None,
+        },
+        usage: TokenUsage {
+            input_tokens: prompt_token_count,
+            output_tokens: generated_count,
+        },
+        perf_metrics: Some(PerfMetrics {
+            load_duration_ms: Some(timings.t_load_ms().max(0.0) as u64),
+            prompt_eval_duration_ms: Some(timings.t_p_eval_ms().max(0.0) as u64),
+            eval_duration_ms: Some(timings.t_eval_ms().max(0.0) as u64),
+            total_duration_ms: Some(total_ms),
+            model_was_loaded: Some(timings.t_load_ms() <= 0.0),
+        }),
+    }));
+    let _ = events_tx.send(Ok(StreamEvent::MessageStop));
+}
+
+/// Incrementally decode as much valid UTF-8 as possible from `buffer`,
+/// leaving any trailing incomplete multi-byte sequence for the next call to
+/// complete (a token's raw bytes are not guaranteed to end on a UTF-8
+/// character boundary). Returns `None` when nothing new is decodable yet.
+fn drain_valid_utf8(buffer: &mut Vec<u8>) -> Option<String> {
+    if buffer.is_empty() {
+        return None;
+    }
+    let valid_up_to = match std::str::from_utf8(buffer) {
+        Ok(_) => buffer.len(),
+        Err(e) => e.valid_up_to(),
+    };
+    if valid_up_to == 0 {
+        return None;
+    }
+    let decoded = String::from_utf8_lossy(&buffer[..valid_up_to]).into_owned();
+    buffer.drain(..valid_up_to);
+    Some(decoded)
 }
 
 /// Convert a token to its raw UTF-8 bytes, retrying with a larger buffer if
@@ -492,7 +765,7 @@ impl Provider for LlamaCppProvider {
     async fn complete(&self, request: LLMRequest) -> Result<LLMResponse> {
         let (respond_to, response_rx) = oneshot::channel();
         self.job_tx
-            .send(InferenceJob {
+            .send(InferenceJob::Complete {
                 request,
                 respond_to,
             })
@@ -507,14 +780,24 @@ impl Provider for LlamaCppProvider {
         })?
     }
 
-    async fn stream(&self, _request: LLMRequest) -> Result<ProviderStream> {
-        // Phase 2 (llama-cpp-2-integration-plan.md §13): token-by-token
-        // streaming through the worker thread. Not yet implemented.
-        Err(ProviderError::StreamingNotSupported)
+    async fn stream(&self, request: LLMRequest) -> Result<ProviderStream> {
+        let (events_tx, events_rx) = mpsc::unbounded_channel::<Result<StreamEvent>>();
+        self.job_tx
+            .send(InferenceJob::Stream { request, events_tx })
+            .map_err(|_| {
+                ProviderError::Internal("llama.cpp worker thread is no longer running".to_string())
+            })?;
+
+        // Returned immediately, before generation starts - each StreamEvent
+        // is pushed by the worker thread as it's produced (see `run_stream`),
+        // not buffered and replayed after the fact.
+        Ok(Box::pin(
+            tokio_stream::wrappers::UnboundedReceiverStream::new(events_rx),
+        ))
     }
 
     fn supports_streaming(&self) -> bool {
-        false
+        true
     }
 
     fn supports_tools(&self) -> bool {
@@ -607,5 +890,68 @@ mod tests {
         assert_eq!(d.top_p, 0.95);
         assert_eq!(d.top_k, 40);
         assert_eq!(d.repeat_penalty, 1.1);
+    }
+
+    // ── drain_valid_utf8 (Phase 2 streaming) ──────────────────────────────
+
+    #[test]
+    fn drain_valid_utf8_full_ascii_chunk() {
+        let mut buf = b"hello".to_vec();
+        assert_eq!(drain_valid_utf8(&mut buf), Some("hello".to_string()));
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn drain_valid_utf8_empty_buffer_returns_none() {
+        let mut buf = Vec::new();
+        assert_eq!(drain_valid_utf8(&mut buf), None);
+    }
+
+    #[test]
+    fn drain_valid_utf8_holds_back_an_incomplete_multibyte_sequence() {
+        // "é" is 2 bytes (0xC3 0xA9) in UTF-8 - split across two "tokens"
+        // the way llama.cpp's per-token pieces can.
+        let full = "café".as_bytes().to_vec();
+        let (first, second) = full.split_at(full.len() - 1); // split mid "é"
+
+        let mut buf = first.to_vec();
+        // "caf" is complete; the lone lead byte of "é" must be held back.
+        assert_eq!(drain_valid_utf8(&mut buf), Some("caf".to_string()));
+        assert_eq!(buf.len(), 1, "the incomplete lead byte must be retained");
+
+        buf.extend_from_slice(second);
+        assert_eq!(drain_valid_utf8(&mut buf), Some("é".to_string()));
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn drain_valid_utf8_multiple_tokens_reassemble_correctly() {
+        // Simulates token-by-token delivery of a multi-byte-heavy string.
+        let pieces: Vec<Vec<u8>> = "日本語"
+            .as_bytes()
+            .chunks(2) // deliberately misaligned with 3-byte CJK boundaries
+            .map(|c| c.to_vec())
+            .collect();
+
+        let mut buf = Vec::new();
+        let mut reassembled = String::new();
+        for piece in pieces {
+            buf.extend_from_slice(&piece);
+            if let Some(chunk) = drain_valid_utf8(&mut buf) {
+                reassembled.push_str(&chunk);
+            }
+        }
+        assert!(buf.is_empty(), "no bytes should be stranded at the end");
+        assert_eq!(reassembled, "日本語");
+    }
+
+    #[test]
+    fn drain_valid_utf8_never_panics_on_arbitrary_bytes() {
+        // Not a claim of correctness for garbage input - just that it can't
+        // panic on the worker thread mid-stream.
+        for byte in 0u8..=255 {
+            let mut buf = vec![byte, byte, byte];
+            let _ = drain_valid_utf8(&mut buf);
+        }
     }
 }
