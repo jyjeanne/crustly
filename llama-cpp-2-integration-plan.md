@@ -89,6 +89,53 @@ tradeoff in the row above, this is deliberately **not** proposed for the
 
 ## 4. Architecture
 
+### 4.0 Codebase precedents (confirmed via `docs/graph/graph.json` and `knowledge/`)
+
+Before designing anything new, the project's knowledge graph
+(`GRAPHIFY_OUT=docs/graph`, per `AGENTS.md`) and OKF bundle (`knowledge/`)
+were used to check whether this codebase already has patterns this plan
+would otherwise invent from scratch. It does, in four places, and this plan
+now follows them exactly rather than introducing parallel conventions:
+
+1. **A worker-thread-bridged-to-tokio pattern already exists.**
+   `src/app/mod.rs:38-100`, `start_file_watcher()`, spawns a dedicated
+   `std::thread::spawn` to own a synchronous, non-async library (the
+   `notify::Watcher`), and bridges its output into async code via a
+   `tokio::sync::mpsc::channel`, consumed by a separate `tokio::spawn` task.
+   The module doc even says it explicitly: *"Spawn the synchronous watcher
+   on a dedicated OS thread (not tokio)"*. This is precisely the shape §4.4
+   needs for the FFI decode loop — §4.3/4.4 below are now written as "follow
+   `start_file_watcher`'s pattern," not as a novel design, which also means
+   its existing test coverage style/expectations are a template for this
+   provider's worker-thread tests (§12.2).
+2. **The model-management vocabulary is already established.**
+   `src/llm/provider/ollama_models.rs` defines `LocalModelInfo`,
+   `PullProgress` (with `is_success()`/`fraction()`), `ModelDetails`,
+   `client_for()`, and `list_models()`/`show_model()`/`delete_model()`/
+   `pull_model()`. §8 mirrors this shape/naming for
+   `llama_cpp_models.rs` instead of inventing new names for the same kind of
+   thing.
+3. **The CLI subcommand shape is already established.**
+   `src/cli/mod.rs:225-234` (`Commands::Ollama { operation: OllamaCommands }`)
+   and `cmd_ollama()` (`:1103` behind `#[cfg(feature = "ollama")]`, `:1197`
+   behind `#[cfg(not(feature = "ollama"))]` with a "rebuild with
+   `--features X`" message) is the exact template §8 follows for
+   `Commands::LlamaCpp`/`cmd_llama_cpp()`.
+4. **The perf-metrics DB columns are already generic, not Ollama-specific.**
+   Migration `migrations/20260701000001_provider_perf_metrics.sql` added
+   `sessions.provider`, `messages.provider_name`, and
+   `messages.perf_metrics_json` — its own comment says *"populated by the
+   native Ollama provider"* but the columns themselves are plain nullable
+   `TEXT`, keyed by provider name, not an Ollama-specific schema. This
+   provider needs **zero new migrations**; see §4.8.
+
+One place the graph was checked and came back *negative* — worth recording
+so it isn't re-investigated later: `src/config/crabrace.rs` (backing
+`docs/architecture/decisions/0003-crabrace-provider-registry.md`) has no
+concept of a filesystem-resident local provider; `providers.ollama` was
+never registered there either. `providers.llama_cpp` doesn't need Crabrace
+integration for the same reason (§11).
+
 ### 4.1 Dependencies (`Cargo.toml`)
 
 ```toml
@@ -166,6 +213,50 @@ enum InferenceJob {
     /// `Drop` to free GPU/RAM promptly rather than waiting on the OS.
     Shutdown,
 }
+
+/// Construction, following `start_file_watcher`'s bridge shape
+/// (`src/app/mod.rs:38`) with the direction reversed: there, a sync thread
+/// pushes events to an async consumer via `tx.blocking_send`; here, async
+/// callers push jobs to a sync worker thread, which drains them via the
+/// mirror-image primitive, `rx.blocking_recv()`.
+fn spawn_worker(model_path: PathBuf, n_gpu_layers: u32, n_ctx: u32)
+    -> tokio::sync::mpsc::UnboundedSender<InferenceJob>
+{
+    let (job_tx, mut job_rx) = tokio::sync::mpsc::unbounded_channel::<InferenceJob>();
+
+    std::thread::spawn(move || {
+        // Model load + LlamaContext construction happen here, on this
+        // thread, exactly once — not per job.
+        let backend = /* LlamaBackend::init() */;
+        let model = /* LlamaModel::load_from_file(&backend, &model_path, ...) */;
+        let mut ctx = /* model.new_context(&backend, n_ctx, ...) */;
+
+        while let Some(job) = job_rx.blocking_recv() {
+            // catch_unwind wraps every job (§9): an FFI panic must not take
+            // this thread down and orphan every future job silently.
+            match job {
+                InferenceJob::Complete { request, respond_to } => {
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        run_complete(&model, &mut ctx, request)
+                    }));
+                    let _ = respond_to.send(flatten_panic(result));
+                }
+                InferenceJob::Stream { request, events_tx } => {
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        run_stream(&model, &mut ctx, request, &events_tx)
+                    }));
+                    if let Err(e) = flatten_panic(result) {
+                        let _ = events_tx.send(Err(e));
+                    }
+                }
+                InferenceJob::Shutdown => break,
+            }
+        }
+        // model/ctx/backend drop here, freeing RAM/VRAM.
+    });
+
+    job_tx
+}
 ```
 
 `Provider::complete()`/`stream()` become thin: build the `LLMRequest` into
@@ -173,7 +264,9 @@ an `InferenceJob`, send it over the channel, and `.await` the response (a
 `oneshot` for `complete`, forwarding the `mpsc` receiver as the returned
 `ProviderStream` for `stream`). All actual `llama.cpp` FFI calls happen only
 on the worker thread — this is the load-bearing invariant of the whole
-design (§4.4 explains why).
+design (§4.4 explains why), and it is the same invariant `start_file_watcher`
+already enforces for `notify::Watcher` (all filesystem-watch calls happen on
+its dedicated thread, never on the tokio runtime).
 
 ### 4.4 Why a dedicated worker thread, not `spawn_blocking` per request
 
@@ -333,6 +426,17 @@ distinguishing "GPU offload: 32/32 layers" from Ollama's output. This is
 the main payoff of Ollama's Phase 2 having made `perf_metrics` generic
 instead of Ollama-specific.
 
+**No new database migration is needed for this.** Confirmed by reading
+`migrations/20260701000001_provider_perf_metrics.sql` directly: it adds
+`sessions.provider TEXT`, `messages.provider_name TEXT`, and
+`messages.perf_metrics_json TEXT`. The migration's own comment says these
+were "populated by the native Ollama provider," but the columns are plain
+nullable `TEXT` keyed by whatever string `Provider::name()` returns — there
+is nothing Ollama-specific in the schema itself. `LlamaCppProvider::name()`
+returning `"llama-cpp"` and serializing the same `PerfMetrics` struct into
+`perf_metrics_json` is enough; Phase 5 (§13) is pure Rust, no `sqlx`
+migration file.
+
 ### 4.9 Vision support
 
 Multimodal (LLaVA-style, via a companion `mmproj` GGUF file) is **out of
@@ -468,21 +572,56 @@ Reuses every piece of plumbing already built for Ollama's Phase 2/3
    follow-up): extend to show `llama.cpp`-specific fields (GPU layers
    offloaded, quantization type parsed from the GGUF filename/metadata,
    context size) when the active provider is `llama-cpp`.
-4. **Model picker / "download" dialog** (`Ctrl+D`, reusing
-   `src/tui/ollama_download.rs`'s pattern): for `llama.cpp` this is
-   necessarily different from Ollama's `pull <name>` — there is no
-   `llama.cpp` model registry API. Two sub-flows:
+4. **Model picker / "download" dialog — cannot literally reuse `Ctrl+D`.**
+   Checked `src/tui/events.rs` directly rather than assuming: `Ctrl+D` is
+   already `keys::is_model_download` (`:303`, Ollama's dialog), `Ctrl+O` is
+   `is_model_info` (`:308`), `Ctrl+W` is `is_provider_switch` (`:313`), and
+   `Ctrl+L`/`Ctrl+N`/`Ctrl+H`/`Ctrl+K`/`Ctrl+P`/`Ctrl+Y`/`Ctrl+V`/`Ctrl+C`
+   are all taken too. Two real design options, not one assumed answer:
+   - **(a) New dialog, new keybinding (recommended for v1).** Add
+     `keys::is_llama_cpp_models` bound to an unused combination (e.g.
+     `Ctrl+G`, free per the list above — confirm against the latest
+     `events.rs` at implementation time, not this list, since it will have
+     grown) and a new `AppMode::LlamaCppModelPicker` (`src/tui/events.rs`,
+     same family as `AppMode::ModelDownload`). Backed by a **new** module
+     `src/tui/llama_cpp_download.rs` mirroring `ollama_download.rs`'s
+     structure (`filter_suggestions`-equivalent over `LocalGgufModel`
+     entries, a `download` sub-flow) rather than branching inside
+     `ollama_download.rs` — that module's own doc comment states it is
+     Ollama-specific (`src/tui/ollama_download.rs:1-11`), and adding a
+     provider-conditional branch there would blur a currently
+     single-purpose, well-tested file. `App` gains
+     `llama_cpp_download_task: Option<tokio::task::JoinHandle<()>>`,
+     mirroring `model_download_task` (`src/tui/app.rs:153`) rather than
+     reusing that same field for two unrelated in-flight operations.
+   - **(b) Extend the existing Provider Switch dialog (`Ctrl+W`) instead of
+     adding a new key.** `src/tui/app.rs` shows this dialog is currently
+     Ollama-specific end-to-end (`switch_provider_to_ollama_model`, `:2447`,
+     driven by `TuiEvent::ProviderSwitchModelsListed`) — generalizing it to
+     list llama.cpp `.gguf` files alongside Ollama models is more invasive
+     (touches an existing, working dialog rather than adding beside it) but
+     gives the user one mental model for "switch what I'm talking to"
+     instead of two separate dialogs for two local backends. Both `.gguf`
+     selection *and* download-a-new-model don't fit naturally into a
+     "switch" dialog, though — download would still need its own surface.
+   Recommendation: **(a)** for v1 — smaller diff, no risk to the existing
+   Provider Switch dialog's behavior (constraint §3.2), consistent with how
+   Ollama's own model-management UI is a dedicated dialog rather than folded
+   into Provider Switch. Revisit unifying into (b) only if user feedback
+   says having two separate "pick a local model" dialogs is confusing.
+   Two sub-flows inside the new dialog, either way:
    - **Local pick**: list `.gguf` files already present under
-     `providers.llama_cpp.models_dir`, let the user select one to become
-     the active `model_path` (triggers the model-swap loading flow, §4.5,
-     with a blocking "Loading model…" progress state — explicitly not
-     instant like Ollama's swap).
+     `providers.llama_cpp.models_dir` via `list_local_models()` (§8), let
+     the user select one to become the active `model_path` (triggers the
+     model-swap loading flow, §4.5, with a blocking "Loading model…"
+     progress state — explicitly not instant like Ollama's swap).
    - **Download by URL/HF repo** (§8): a text field for a direct `.gguf`
-     URL or a `hf:org/repo/file.gguf`-style shorthand, downloaded into
-     `models_dir` with a byte-progress bar (reusing the same `Clear` +
-     `Block` overlay family as the Ollama pull dialog, but driven by
-     `reqwest`'s streaming byte progress instead of Ollama's layer-based
-     pull events — different progress unit, same UI shell).
+     URL or a `hf:org/repo/file.gguf`-style shorthand, downloaded via
+     `download_model()` into `models_dir` with a byte-progress bar (reusing
+     the same `Clear` + `Block` overlay family as the Ollama pull dialog,
+     driven by `DownloadProgress::fraction()` instead of Ollama's
+     layer-based `PullProgress::fraction()` — different progress unit, same
+     UI shell and the same method name/shape on purpose).
 5. **Status bar**: `llama.cpp`-specific error surfaces — model file not
    found, out-of-memory on load (common with GPU offload misconfigured),
    GGUF version incompatible with the compiled `llama.cpp` — mapped to
@@ -493,30 +632,112 @@ Reuses every piece of plumbing already built for Ollama's Phase 2/3
 New optional module `src/llm/provider/llama_cpp_models.rs` (feature-gated),
 providing what Ollama's `/api/tags`/`/api/pull`/`/api/delete` give for free
 from a server, implemented here as local filesystem + HTTP download
-operations:
+operations. Named and shaped to match `src/llm/provider/ollama_models.rs`
+field-for-field (§4.0 point 2) rather than inventing new vocabulary for the
+same kind of operation:
 
-- `list_local_models(models_dir) -> Vec<LocalGgufModel>` — scans
-  `models_dir` for `*.gguf`, parsing size on disk and, where feasible,
-  quantization/parameter-count hints from GGUF header metadata (a cheap
-  partial read, not a full model load) or the filename convention
-  (`*-q4_k_m.gguf`, `*-Q8_0.gguf`) as a fallback.
-- `download_model(url_or_hf_ref, models_dir, on_progress) -> PathBuf` —
-  streams the file via the crate's existing `reqwest` client (no new HTTP
-  dependency), reporting `(bytes_downloaded, total_bytes)` progress through
-  a channel, same shape as Ollama's `PullProgressEvent` so the TUI overlay
-  code can share structure. Supports resuming an interrupted download via
-  `Range` requests if the partial file is still present (nice-to-have, not
-  a Phase-1 requirement).
-- `delete_model(path) -> Result<()>` — simple file removal, with a
-  confirmation step in both the CLI and TUI (deleting a multi-GB file is not
-  reversible).
+```rust
+/// A locally-present .gguf file, the llama.cpp equivalent of
+/// ollama_models::LocalModelInfo (which reports installed models via
+/// Ollama's /api/tags instead of a directory scan).
+#[derive(Debug, Clone)]
+pub struct LocalGgufModel {
+    pub path: PathBuf,
+    pub size_bytes: u64,
+    pub modified_at: String,
+    /// Best-effort guess from the filename convention (e.g. "Q4_K_M",
+    /// "Q8_0") when GGUF header metadata isn't read. `None` if neither
+    /// yields a match — displayed as "unknown" in the TUI/CLI rather than
+    /// guessed further.
+    pub quantization_hint: Option<String>,
+}
 
-CLI subcommand `crustly llama-cpp <list|pull|rm>`, mirroring
-`crustly ollama <list|pull|rm|show>` (`src/cli/mod.rs`), feature-gated
-identically.
+/// One progress update from an in-flight `download_model` transfer.
+/// The llama.cpp equivalent of ollama_models::PullProgress, adapted to
+/// plain HTTP byte progress (no layer/digest concept — a .gguf download is
+/// a single file, not a multi-layer manifest pull).
+#[derive(Debug, Clone)]
+pub struct DownloadProgress {
+    pub bytes_downloaded: u64,
+    pub total_bytes: Option<u64>,
+}
 
-**`hf:org/repo/file.gguf` shorthand**: resolves to
-`https://huggingface.co/org/repo/resolve/main/file.gguf`. This is
+impl DownloadProgress {
+    /// Completion fraction (0.0-1.0), if the server reported Content-Length.
+    /// Same clamp-and-None-on-unknown-total shape as
+    /// ollama_models::PullProgress::fraction().
+    pub fn fraction(&self) -> Option<f64> {
+        let total = self.total_bytes.filter(|t| *t > 0)? as f64;
+        (self.bytes_downloaded as f64 / total).clamp(0.0, 1.0).into()
+    }
+}
+
+/// Scan `models_dir` for `*.gguf` files. Ollama's `list_models()`
+/// equivalent, but a directory listing instead of an `/api/tags` call —
+/// there is no `client_for()` analog because there is no server to address.
+pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>>;
+
+/// Download `source` (a direct URL, or an `hf:org/repo/file.gguf`
+/// shorthand resolved per §8.1) into `models_dir`, streaming progress
+/// through `progress_tx`. Ollama's `pull_model()` equivalent; same
+/// `UnboundedSender<Progress>` callback shape, reusing the crate's existing
+/// `reqwest` client rather than adding a second HTTP dependency (unlike
+/// `ollama-rs`, this needs no isolated client — see the reqwest-version
+/// note already in `src/llm/provider/ollama.rs`'s module doc, which does
+/// not apply here).
+pub async fn download_model(
+    source: &str,
+    models_dir: &Path,
+    progress_tx: tokio::sync::mpsc::UnboundedSender<DownloadProgress>,
+) -> Result<PathBuf>;
+
+/// Delete a local .gguf file. Ollama's `delete_model()` equivalent.
+pub fn delete_model(path: &Path) -> Result<()>;
+```
+
+No `show_model()`/`ModelDetails` equivalent in v1 — `llama.cpp` doesn't
+expose a cheap "describe this GGUF" call the way Ollama's `/api/show` does;
+the closest available data (architecture, parameter count, quantization) is
+already surfaced via `quantization_hint` on `LocalGgufModel` and the Model
+Info panel extension in §7 point 3, without a separate metadata-fetch
+function. Revisit only if GGUF header parsing turns out cheap enough to
+justify a dedicated call.
+
+### 8.1 CLI subcommand
+
+Mirrors `src/cli/mod.rs:225-234` (`Commands::Ollama { operation:
+OllamaCommands }`) and `cmd_ollama()` (`:1103`/`:1197`) exactly:
+
+```rust
+/// Manage local .gguf model files (native llama.cpp provider, requires the
+/// crate's 'llama-cpp' build feature)
+Commands::LlamaCpp {
+    #[command(subcommand)]
+    operation: LlamaCppCommands,
+}
+
+pub enum LlamaCppCommands {
+    /// List .gguf files in the configured models directory
+    List,
+    /// Download a model: a direct URL, or `hf:org/repo/file.gguf`
+    Pull { source: String },
+    /// Delete a local .gguf file by name or path
+    Rm { model: String },
+}
+```
+
+`#[cfg(feature = "llama-cpp")] async fn cmd_llama_cpp(...)` does the real
+work; `#[cfg(not(feature = "llama-cpp"))]` returns the same style of error
+`cmd_ollama` does without the feature: *"This build of crustly was compiled
+without the 'llama-cpp' feature. Rebuild with `--features llama-cpp` to use
+`crustly llama-cpp`."* A `llama_cpp_models_dir(config) -> PathBuf` helper
+mirrors `ollama_host(config)` (`src/cli/mod.rs:1090`), resolving
+`providers.llama_cpp.models_dir` with the same platform-cache-dir default
+used in §5.
+
+### 8.2 `hf:org/repo/file.gguf` shorthand
+
+Resolves to `https://huggingface.co/org/repo/resolve/main/file.gguf`. This is
 string-substitution only — no HuggingFace API client dependency needed for
 v1. Document that gated/private HF repos aren't supported without a token
 (`HF_TOKEN` env var forwarded as an `Authorization` header is a reasonable
@@ -575,6 +796,14 @@ enum (`src/llm/provider/error.rs`), analogous to `map_ollama_error`:
    any)? If not, `--features llama-cpp` is effectively a "build it yourself"
    feature for v1 — acceptable, but should be stated plainly in the README
    rather than implied.
+7. ~~Which keybinding/dialog design for the model picker?~~ **Resolved** in
+   §7 point 4 by checking `src/tui/events.rs` directly: none of the eight
+   existing `Ctrl+<letter>` bindings are free for reuse, so this is a new
+   `Ctrl+G`-style binding plus a new `AppMode::LlamaCppModelPicker` and a new
+   `src/tui/llama_cpp_download.rs` module (option (a)), not a branch inside
+   the existing Ollama-specific `ollama_download.rs`. Re-confirm the actual
+   free key against `events.rs` at implementation time — new bindings may
+   have been added since this plan was written.
 
 ## 11. What does NOT change
 
@@ -588,6 +817,20 @@ enum (`src/llm/provider/error.rs`), analogous to `map_ollama_error`:
 - TUI rendering for sessions/messages that predate this feature: unaffected
   (same `NULL`/`None` degrade-gracefully pattern as Ollama's `perf_metrics`
   rollout).
+- **No database migration** — reuses the generic columns already added by
+  `20260701000001_provider_perf_metrics.sql` (§4.8); no new `migrations/*.sql`
+  file ships with this plan.
+- **No Crabrace registry changes** (`src/config/crabrace.rs`,
+  `docs/architecture/decisions/0003-crabrace-provider-registry.md`) —
+  confirmed by reading that module that it has no concept of a
+  filesystem-resident local provider, and `providers.ollama` was never
+  registered there either (§4.0). `providers.llama_cpp` follows the same
+  precedent: config-driven, not registry-discovered.
+- The existing Provider Switch dialog (`Ctrl+W`,
+  `switch_provider_to_ollama_model` in `src/tui/app.rs:2447`) and the
+  existing Model Download dialog (`Ctrl+D`, `src/tui/ollama_download.rs`):
+  unmodified — §7 point 4 adds a parallel dialog rather than branching
+  inside either.
 
 ## 12. Test plan
 
@@ -623,52 +866,235 @@ enum (`src/llm/provider/error.rs`), analogous to `map_ollama_error`:
 
 ## 13. Phasing
 
-- **Phase 0 — Feasibility spike** (no user-facing code): pin an exact
-  `llama-cpp-2` version, build it in isolation against this project's
-  `Cargo.lock`, confirm no dependency conflicts, measure clean-build time
-  and binary size delta, confirm which of chat-template application /
-  grammar sampling / perf counters (§10.1) are actually exposed by the
-  pinned version. **Go/no-go gate** for the rest of the plan — if the pinned
-  version is missing something load-bearing (e.g. no perf counters), later
-  phases are adjusted before committing to their design above.
-- **Phase 1 — MVP provider (CPU only, non-streaming)**: `llama-cpp` feature
-  flag, `LlamaCppProvider` with the worker-thread architecture (§4.3–4.4),
-  `complete()` only, config (§5), factory wiring (§6), error mapping (§9,
-  minus the panic-catch hardening which can land with it or right after).
-  Testable in isolation; no TUI changes yet.
-- **Phase 2 — Streaming**: token-by-token generation through the worker
-  thread into a `ProviderStream`, matching `StreamEvent` sequencing used by
-  every other provider's `stream()`.
-- **Phase 3 — Sampling, context, chat templates**: full
-  `LlamaCppProviderConfig` sampling fields, embedded/override chat template
-  handling, `n_ctx` reporting, stop sequences, seed.
-- **Phase 4 — Tool calling**: extract the shared recovery module (§4.7),
-  wire it into both `OllamaProvider` (refactor, behavior-preserving) and
-  `LlamaCppProvider` (new).
-- **Phase 5 — Performance metrics**: wire `PerfMetrics` from `llama.cpp`'s
-  counters (§4.8) — this is expected to be quick, since the TUI plumbing
-  already exists from Ollama's rollout.
-- **Phase 6 — Model management**: `llama_cpp_models.rs` (list/download/
-  delete), CLI subcommand (§8).
-- **Phase 7 — TUI integration**: model picker/download dialog (§7 point 4),
-  Model Info panel extension, status-bar error surfaces. Provider badge and
-  perf footer need no dedicated work (already generic, §4.8/§7 points 1–2).
-- **Phase 8 — GPU acceleration**: `llama-cpp-cuda`/`-metal`/`-vulkan`
-  features, `n_gpu_layers` wiring, documentation of hardware requirements
-  and expected VRAM usage per quantization level.
-- **Phase 9 — Idle unload & model-swap hardening**: `idle_unload_secs`
-  timer (§4.5), worker-thread panic isolation (§9) if not already done in
-  Phase 1, resumable downloads (§8) if prioritized.
-- **Phase 10 — Documentation & rollout**: README section (mirroring the
-  Ollama section's "two paths" clarity — here, clarify this is a *third*
-  path, distinct from both Ollama modes), `config.toml.example` block,
-  `docs/guides/LLAMA_CPP_GUIDE.md`, and an ADR
-  (`docs/architecture/decisions/000X-llama-cpp-in-process-worker-thread.md`)
-  documenting the worker-thread-per-model decision from §4.4 — this is
-  exactly the kind of cross-cutting architectural choice the existing ADR
-  process (see `0002-sqlx-over-rusqlite.md`, `0003-crabrace-provider-registry.md`)
-  is for.
+Each phase below lists **Deliverables** (what ships), **Files** (new or
+touched — concrete paths, following §4.0's naming precedents rather than
+placeholders), and **Exit criteria** (how the phase is verified done). A
+phase is not "complete" until its exit criteria pass, not just its code
+written — this mirrors how `ollama-rs-integration-plan.md` §0 tracks
+implemented phases against honest gaps rather than intent.
 
-Phases 0–5 are the minimum viable, mergeable slice (a working, testable
-provider with no TUI changes). Phases 6–10 are additive UX/ops polish and
-can ship incrementally after Phase 5 without blocking each other.
+### Phase 0 — Feasibility spike (no user-facing code)
+
+- **Deliverables**: exact `llama-cpp-2` version pinned; a throwaway
+  spike binary (not merged) that loads one small GGUF and runs a single
+  `complete()`-equivalent call outside the main crate, to validate the FFI
+  surface before it's load-bearing in `LlamaCppProvider`; a written
+  confirmation of which of chat-template application, grammar/GBNF
+  sampling, and performance counters (§10.1) the pinned version actually
+  exposes, since §4.6/§4.7/§4.8 all assume specific API shapes that must be
+  checked, not assumed.
+- **Files**: none in `src/` — spike lives outside the crate or on a
+  throwaway branch; `Cargo.toml`/`Cargo.lock` diff kept for Phase 1 to reuse.
+- **Exit criteria (go/no-go gate for every later phase)**: spike builds
+  clean against this project's existing `Cargo.lock` with no version
+  conflicts; clean-build time and binary size delta measured and recorded
+  in this document's §3.4/§4.2; a documented answer (yes/no/how) for each
+  of the three API-surface questions above. A "no" on perf counters or chat
+  templates means §4.6/§4.8 are revised **before** Phase 1 starts, not
+  discovered mid-implementation.
+
+### Phase 1 — MVP provider (CPU only, non-streaming)
+
+- **Deliverables**: `llama-cpp` Cargo feature; `LlamaCppProvider`
+  implementing `Provider::complete()` (not yet `stream()`) via the
+  worker-thread architecture in §4.3/4.4 (following `start_file_watcher`,
+  `src/app/mod.rs:38`); `LlamaCppProviderConfig` (§5); factory wiring
+  (§6); basic error mapping (§9 — model-not-found and load-failure paths;
+  the panic-`catch_unwind` hardening may land here or slip to Phase 9,
+  decide when the spike's panic behavior from Phase 0 is known).
+- **Files**: `Cargo.toml` (new optional dep + feature); new
+  `src/llm/provider/llama_cpp.rs`; `src/config/mod.rs`
+  (`LlamaCppProviderConfig`, `ProviderConfigs.llama_cpp`);
+  `src/llm/provider/factory.rs` (`try_create_llama_cpp`, mirroring
+  `try_create_ollama` at `factory.rs:240-337` including its
+  `#[cfg(feature = "llama-cpp")]`/`#[cfg(not(...))]` split);
+  `src/llm/provider/mod.rs` (module registration, mirroring the existing
+  `#[cfg(feature = "ollama")]` re-export block at `mod.rs:23-37`).
+- **Exit criteria**: `cargo build` (no features) unaffected — zero diff in
+  build time/output; `cargo build --features llama-cpp` succeeds on at
+  least Linux; a manual test loads a small real GGUF and gets a coherent
+  non-streamed completion back; `cargo test` and
+  `cargo test --features llama-cpp` both green; config parsing round-trips
+  through `toml`; a `providers.llama_cpp` section with the feature *not*
+  compiled in produces the `anyhow::bail!` naming the missing feature
+  (mirrors the existing `test_disabled_*` style tests in `factory.rs`).
+
+### Phase 2 — Streaming
+
+- **Deliverables**: token-by-token generation via the worker thread into a
+  `ProviderStream`, `StreamEvent` sequencing (`MessageStart` →
+  `ContentBlockDelta` → `ContentBlockStop` → `MessageStop`) matching every
+  other provider's `stream()`.
+- **Files**: `src/llm/provider/llama_cpp.rs` only (`InferenceJob::Stream`
+  handling, §4.3).
+- **Exit criteria**: a manual streamed chat turn renders token-by-token in
+  the TUI exactly like an Ollama/OpenAI turn today (no visible difference
+  in rendering behavior — only the source provider differs); cancelling a
+  stream mid-generation (session switch, `Esc`, etc.) doesn't leave the
+  worker thread stuck mid-decode for the next request.
+
+### Phase 3 — Sampling, context, chat templates
+
+- **Deliverables**: full `LlamaCppProviderConfig` sampling fields
+  (temperature/top_p/top_k/repeat_penalty/seed) wired into the sampler
+  chain; embedded-vs-override chat template resolution (§4.6); `n_ctx`
+  reporting via `Provider::context_window()`; stop-sequence matching against
+  growing detokenized output; `max_tokens`/`n_predict` enforcement.
+- **Files**: `src/llm/provider/llama_cpp.rs`.
+- **Exit criteria**: a model with a known embedded GGUF chat template
+  produces well-formed turns without a configured `chat_template` override;
+  a model whose embedded template is missing/broken is usable once
+  `chat_template` is set manually; `context_window()` returns exactly the
+  `n_ctx` the context was created with, never a stale/assumed value (same
+  invariant `OllamaProvider::context_window()` already enforces per
+  `ollama.rs:756-772`).
+
+### Phase 4 — Tool calling
+
+- **Deliverables**: extract `OllamaProvider`'s private tool-call recovery
+  functions (`maybe_tool_call_json`, `tool_call_from_content`,
+  `fenced_json_blocks`, `parse_tool_call_object` — currently
+  `ollama.rs:807-921`; this deliberately excludes the neighboring
+  `collect_tool_calls`/`stop_reason_for` at `ollama.rs:785-799`, which stay
+  Ollama-specific stream-accumulation helpers, not recovery logic) into a
+  new shared module; re-point `OllamaProvider`
+  at it (behavior-preserving refactor); wire the same module into
+  `LlamaCppProvider`, plus a system-prompt template describing the offered
+  tools as JSON functions (§4.7).
+- **Files**: new `src/llm/provider/tool_call_recovery.rs`;
+  `src/llm/provider/ollama.rs` (delete the extracted functions, call the
+  shared module — its ~15 existing unit tests for this logic, e.g.
+  `tool_call_printed_as_content_is_recovered`,
+  `fenced_call_in_prose_becomes_a_tool_use_block`, move with it and must
+  still pass unmodified); `src/llm/provider/mod.rs` (module registration);
+  `src/llm/provider/llama_cpp.rs` (tool-prompt construction + recovery call).
+- **Exit criteria**: every existing Ollama tool-recovery test still passes
+  post-extraction with zero behavior change (this is the regression bar,
+  not just "tests exist"); a new equivalent suite for `LlamaCppProvider`
+  covers at least the same cases (recovered call, fenced-in-prose call,
+  first-of-several, non-tool JSON not recovered, prose never mistaken for a
+  call); a manual test drives a real local model through a multi-tool
+  agentic turn (e.g. `bash` + `read_file`) end to end.
+
+### Phase 5 — Performance metrics
+
+- **Deliverables**: `PerfMetrics` populated from `llama.cpp`'s
+  load/prefill/eval counters (§4.8), flowing through the existing
+  `LLMResponse → AgentResponse → DisplayMessage → Session` pipeline
+  unchanged.
+- **Files**: `src/llm/provider/llama_cpp.rs` only. **No migration file** —
+  confirmed in §4.8 that `messages.provider_name`/`perf_metrics_json` and
+  `sessions.provider` already exist and are provider-agnostic.
+- **Exit criteria**: TUI header shows the `llama-cpp` provider badge and
+  tok/s segment on a real local generation, with no code changes needed in
+  `tui/render.rs` beyond a new `provider_icon()` match arm; a fresh session
+  vs. a session reloaded from DB both show correct perf data (round-trips
+  through `perf_metrics_json` correctly).
+
+*Phases 0–5 are the minimum viable, mergeable slice: a working, tool-capable,
+tested provider with performance metrics, reachable via config and the
+factory, with no TUI-specific code beyond the one-line provider-icon
+addition.*
+
+### Phase 6 — Model management (file-based)
+
+- **Deliverables**: `list_local_models`/`download_model`/`delete_model`
+  (§8); `hf:org/repo/file.gguf` shorthand resolution (§8.2); CLI
+  subcommand (§8.1).
+- **Files**: new `src/llm/provider/llama_cpp_models.rs`; `src/cli/mod.rs`
+  (`Commands::LlamaCpp`, `LlamaCppCommands`, `cmd_llama_cpp`,
+  `llama_cpp_models_dir` — mirroring the `Ollama`/`cmd_ollama`/
+  `ollama_host` block at `cli/mod.rs:225-234,1090-1200` line-for-line in
+  structure).
+- **Exit criteria**: `crustly llama-cpp list` on an empty `models_dir`
+  prints the same style of "(none) — pull one with…" hint `crustly ollama
+  list` does; `crustly llama-cpp pull hf:org/repo/file.gguf` downloads with
+  a visible terminal progress bar and the file appears in a subsequent
+  `list`; `crustly llama-cpp rm <file>` requires confirmation and removes
+  the file; without `--features llama-cpp`, all three subcommands print the
+  same "rebuild with `--features llama-cpp`" message `cmd_ollama`'s
+  disabled path does, not a panic or a silent no-op.
+
+### Phase 7 — TUI integration
+
+- **Deliverables**: new model picker/download dialog per §7 point 4 option
+  (a) — new keybinding, `AppMode::LlamaCppModelPicker`, new
+  `src/tui/llama_cpp_download.rs`; Model Info panel extended for
+  `llama.cpp`-specific fields (GPU layers, quantization, `n_ctx`);
+  status-bar error surfaces for model-not-found/OOM/incompatible-GGUF.
+  Provider badge and per-message perf footer need **no dedicated
+  implementation** — already generic since Phase 5.
+- **Files**: `src/tui/events.rs` (new `keys::is_llama_cpp_models` + new
+  `AppMode` variant); new `src/tui/llama_cpp_download.rs` (mirrors
+  `src/tui/ollama_download.rs`'s shape: suggestions/filtering,
+  `DownloadProgress`-driven overlay); `src/tui/app.rs` (new
+  `llama_cpp_download_task` field, mirroring `model_download_task` at
+  `app.rs:153`; new `handle_*_key` dispatch arm alongside the existing
+  `AppMode::ModelDownload`/`AppMode::ProviderSwitch` arms at `app.rs:846-847`);
+  `src/tui/components/dialogs/mod.rs` (new render function, same
+  `Clear`+`Block` overlay family as `render_auto_exec_progress`);
+  `src/tui/render.rs` (one new `provider_icon()` match arm, Model Info
+  panel extension).
+- **Exit criteria**: opening the new dialog, picking a local `.gguf`, and
+  swapping to it shows the "Loading model…" blocking state (§4.5) rather
+  than an instant swap; downloading a new model shows live byte progress
+  and the model is immediately selectable afterward; none of the existing
+  Ollama dialogs' snapshot/behavior tests regress (constraint §3.2 — this
+  is the actual verification, not an assumption).
+
+### Phase 8 — GPU acceleration
+
+- **Deliverables**: `llama-cpp-cuda`/`llama-cpp-metal`/`llama-cpp-vulkan`
+  Cargo features (§4.1); `n_gpu_layers` wired through to context creation;
+  documentation of hardware requirements and approximate VRAM usage per
+  quantization level (e.g. Q4_K_M vs Q8_0 vs F16) for common model sizes.
+- **Files**: `Cargo.toml`; `src/llm/provider/llama_cpp.rs` (GPU-layers
+  param, warning log when `n_gpu_layers > 0` but no GPU feature compiled
+  in); `docs/guides/LLAMA_CPP_GUIDE.md` (started here, finished in Phase 10).
+- **Exit criteria**: a CUDA-enabled build measurably offloads layers (VRAM
+  usage visible via `nvidia-smi` during a real generation) and shows a
+  materially higher tok/s than the CPU-only build for the same model in the
+  perf-metrics footer (Phase 5) — the two builds' *own* metrics are the
+  proof, no separate benchmarking harness needed.
+
+### Phase 9 — Idle unload & model-swap hardening
+
+- **Deliverables**: `idle_unload_secs` timer (§4.5) on the worker thread;
+  worker-thread panic isolation via `catch_unwind` (§9) if not already done
+  in Phase 1; resumable downloads via HTTP `Range` requests (§8) if
+  prioritized by user feedback from Phase 6.
+- **Files**: `src/llm/provider/llama_cpp.rs`;
+  `src/llm/provider/llama_cpp_models.rs` (resumable download, optional).
+- **Exit criteria**: a provider left idle past `idle_unload_secs` frees its
+  RAM/VRAM (observable via process memory / `nvidia-smi`) and the next
+  request transparently reloads and succeeds, paying the load cost once; an
+  injected panic inside a `complete()`/`stream()` call (test harness, not
+  manual) is caught, reported as an `Err` to that one caller, and the
+  worker thread demonstrably serves the *next* request rather than hanging
+  or the process crashing.
+
+### Phase 10 — Documentation & rollout
+
+- **Deliverables**: README section (mirroring the Ollama section's
+  "two paths" clarity, extended to name this a *third* local-inference
+  path distinct from both Ollama modes); `config.toml.example`
+  `[providers.llama_cpp]` block; `docs/guides/LLAMA_CPP_GUIDE.md` completed;
+  ADR recording the worker-thread-per-model decision from §4.4.
+- **Files**: `README.md`; `config.toml.example`;
+  `docs/guides/LLAMA_CPP_GUIDE.md`; new
+  `docs/architecture/decisions/000X-llama-cpp-in-process-worker-thread.md`
+  (next free number after `0004-plan-mode-read-only-with-approval-gating.md`
+  — confirm the actual next number at implementation time), following the
+  format of `0002-sqlx-over-rusqlite.md`/`0003-crabrace-provider-registry.md`
+  (Context/Decision/Consequences) and explicitly recording the §7 point 4
+  keybinding/dialog decision as a Consequence, since it's the one
+  user-facing tradeoff (two picker dialogs instead of one unified switcher)
+  a future contributor would otherwise have to re-derive.
+- **Exit criteria**: a new contributor can go from a clean checkout to a
+  running local `llama.cpp` chat session using only the README section, no
+  tribal knowledge; the ADR is linked from `docs/architecture/decisions/README.md`
+  alongside the existing four.
+
+Phases 6–10 are additive UX/ops polish and can ship incrementally after
+Phase 5 without blocking each other or requiring a specific order beyond
+Phase 6 (file management) preceding Phase 7 (the TUI dialog that calls it).
