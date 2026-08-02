@@ -177,9 +177,16 @@ impl LlamaCppProvider {
         let seed = config.seed;
         let idle_unload_secs = config.idle_unload_secs;
 
+        // Cloned rather than moved: the worker needs its own copy to stamp
+        // onto every response (§4.10 - LLMResponse.model/StreamMessage.model
+        // must report the model actually loaded, never the possibly-mismatched
+        // request.model a ModelRouter tier might send), while `Self` below
+        // still needs the original for `default_model()`.
+        let worker_display_name = display_name.clone();
         std::thread::spawn(move || {
             worker_loop(WorkerInit {
                 model_path,
+                display_name: worker_display_name,
                 n_ctx,
                 n_gpu_layers,
                 n_threads,
@@ -212,6 +219,12 @@ impl LlamaCppProvider {
 
 struct WorkerInit {
     model_path: PathBuf,
+    /// Reported as `LLMResponse.model`/`StreamMessage.model` on every
+    /// response - never `request.model` (§4.10: a `ModelRouter` tier can
+    /// send an arbitrary model id, but this worker can only ever serve the
+    /// one GGUF it loaded; echoing the request's id back would silently
+    /// mislabel the response as having come from a different model).
+    display_name: String,
     n_ctx: u32,
     n_gpu_layers: u32,
     n_threads: u32,
@@ -251,6 +264,7 @@ const IDLE_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2
 fn worker_loop(init: WorkerInit) {
     let WorkerInit {
         model_path,
+        display_name,
         n_ctx,
         n_gpu_layers,
         n_threads,
@@ -341,7 +355,15 @@ fn worker_loop(init: WorkerInit) {
         // The job that triggered this reload (if any) is handled first,
         // before entering the wait-for-next-job loop below.
         if let Some(job) = carry_over_job.take() {
-            dispatch_job(&model, &mut context, &chat_template, &sampling_defaults, seed, job);
+            dispatch_job(
+                &model,
+                &mut context,
+                &chat_template,
+                &display_name,
+                &sampling_defaults,
+                seed,
+                job,
+            );
             last_activity = std::time::Instant::now();
         }
 
@@ -375,7 +397,15 @@ fn worker_loop(init: WorkerInit) {
                 }
             };
 
-            dispatch_job(&model, &mut context, &chat_template, &sampling_defaults, seed, job);
+            dispatch_job(
+                &model,
+                &mut context,
+                &chat_template,
+                &display_name,
+                &sampling_defaults,
+                seed,
+                job,
+            );
             last_activity = std::time::Instant::now();
         }
 
@@ -402,6 +432,7 @@ fn dispatch_job(
     model: &LlamaModel,
     context: &mut LlamaContext<'_>,
     chat_template: &Option<LlamaChatTemplate>,
+    display_name: &str,
     sampling_defaults: &SamplingDefaults,
     seed: Option<u32>,
     job: InferenceJob,
@@ -412,7 +443,15 @@ fn dispatch_job(
             respond_to,
         } => {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                run_complete(model, context, chat_template, sampling_defaults, seed, request)
+                run_complete(
+                    model,
+                    context,
+                    chat_template,
+                    display_name,
+                    sampling_defaults,
+                    seed,
+                    request,
+                )
             }))
             .unwrap_or_else(|payload| Err(panic_to_provider_error(&payload)));
             let _ = respond_to.send(result);
@@ -423,6 +462,7 @@ fn dispatch_job(
                     model,
                     context,
                     chat_template,
+                    display_name,
                     sampling_defaults,
                     seed,
                     request,
@@ -544,6 +584,7 @@ fn run_complete(
     model: &LlamaModel,
     context: &mut LlamaContext<'_>,
     chat_template: &Option<LlamaChatTemplate>,
+    display_name: &str,
     sampling_defaults: &SamplingDefaults,
     default_seed: Option<u32>,
     request: LLMRequest,
@@ -630,7 +671,10 @@ fn run_complete(
 
     Ok(LLMResponse {
         id: format!("llama-cpp-{}", uuid::Uuid::new_v4()),
-        model: request.model,
+        // Not `request.model`: this worker can only ever serve the one
+        // GGUF it loaded, so the response must say so even if a
+        // `ModelRouter` tier asked for a different model id (§4.10).
+        model: display_name.to_string(),
         content,
         stop_reason: Some(stop_reason),
         usage: TokenUsage {
@@ -659,6 +703,7 @@ fn run_stream(
     model: &LlamaModel,
     context: &mut LlamaContext<'_>,
     chat_template: &Option<LlamaChatTemplate>,
+    display_name: &str,
     sampling_defaults: &SamplingDefaults,
     default_seed: Option<u32>,
     request: LLMRequest,
@@ -666,7 +711,8 @@ fn run_stream(
 ) {
     let start = std::time::Instant::now();
     let message_id = format!("llama-cpp-{}", uuid::Uuid::new_v4());
-    let model_name = request.model.clone();
+    // Not `request.model`: see `run_complete`'s identical note (§4.10).
+    let model_name = display_name.to_string();
 
     let prepared = prepare_generation(
         model,

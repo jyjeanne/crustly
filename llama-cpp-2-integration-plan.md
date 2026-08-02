@@ -754,6 +754,28 @@ own framing that this is closing a gap rather than adding a differentiator.
 
 ### 4.10 Compatibility with `ModelRouter` / prompt-tier auto-routing
 
+**Status: the decision below is now implemented.** `WorkerInit` carries
+`display_name` alongside `model_path`; `dispatch_job`/`run_complete`/
+`run_stream` (`src/llm/provider/llama_cpp.rs`) now stamp
+`LLMResponse.model`/`StreamMessage.model` from that field, never from
+`request.model` (previously both `run_complete` and `run_stream` echoed
+`request.model` straight back — exactly the "silently wrong" failure mode
+this section warns against, found and fixed while auditing the plan for
+remaining gaps after Phase 7). `validate_model()` already returned `true`
+unconditionally (Phase 1), so the "ignore `request.model` for routing,
+never hard-fail" half of the decision was already correct — only the
+mislabeling half needed the fix. Not covered by an automated test: like
+every other FFI-touching code path in this file, exercising it needs a
+real loaded model, which this sandbox doesn't have; the fix was verified
+by code reading (grepping out every remaining `request.model` use in the
+response-construction paths) plus the full `build`/`clippy -D warnings`/
+`test` matrix, not a request/response assertion. The README/config
+documentation guard this section also calls for was intentionally not
+added: `model_router` has no `config.toml` surface yet (`AgentService::with_model_router`
+is defined but has no call site anywhere in the codebase), so there is
+nothing a user could currently configure for such a warning to guard
+against - add it if/when `model_router` gains a config-file surface.
+
 This is a real compatibility hazard the OKF call-graph surfaced (`okf-rs
 graph callers` over `functions/src/llm/provider/router/ModelRouter/resolve`,
 cross-checked directly against `src/llm/agent/service.rs` since — see the
