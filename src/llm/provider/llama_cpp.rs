@@ -92,6 +92,22 @@ enum InferenceJob {
     },
 }
 
+/// Whether this binary was built with at least one llama.cpp GPU backend
+/// feature (`llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`,
+/// `llama-cpp-2-integration-plan.md` §4.1/Phase 8). `n_gpu_layers` in
+/// config is otherwise a silent no-op - `llama.cpp` itself has no GPU
+/// kernels compiled in to offload to, so it just runs on CPU.
+const fn gpu_backend_compiled_in() -> bool {
+    cfg!(any(
+        feature = "llama-cpp-cuda",
+        feature = "llama-cpp-metal",
+        feature = "llama-cpp-vulkan",
+        feature = "llama-cpp-rocm",
+        feature = "llama-cpp-opencl",
+        feature = "llama-cpp-mkl",
+    ))
+}
+
 /// In-process `llama.cpp` provider. Cloning shares the same worker thread
 /// and loaded model (the `mpsc::UnboundedSender` is cheaply cloneable) -
 /// it does not load a second copy.
@@ -136,6 +152,15 @@ impl LlamaCppProvider {
         let model_path = config.model_path.clone();
         let n_ctx = config.n_ctx;
         let n_gpu_layers = config.n_gpu_layers;
+        if n_gpu_layers > 0 && !gpu_backend_compiled_in() {
+            tracing::warn!(
+                "providers.llama_cpp.n_gpu_layers = {n_gpu_layers}, but this build of crustly \
+                 was compiled without a GPU backend feature for llama-cpp (cuda/metal/vulkan/\
+                 rocm/opencl/mkl) - offload will not happen and inference runs on CPU only. \
+                 Rebuild with e.g. `--features llama-cpp-cuda` to actually use the GPU, or set \
+                 n_gpu_layers = 0 to silence this warning."
+            );
+        }
         let n_threads = config
             .n_threads
             .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get() as u32));
@@ -1161,6 +1186,15 @@ mod tests {
         assert_eq!(d.top_p, 0.95);
         assert_eq!(d.top_k, 40);
         assert_eq!(d.repeat_penalty, 1.1);
+    }
+
+    #[test]
+    fn gpu_backend_compiled_in_is_false_in_this_cpu_only_test_build() {
+        // This crate is built in CI/this sandbox with `--features
+        // llama-cpp` only, no GPU backend feature - if this ever flips to
+        // true unexpectedly, the n_gpu_layers warning (§ new()) would stop
+        // firing for a config that actually needs it.
+        assert!(!gpu_backend_compiled_in());
     }
 
     // ── drain_valid_utf8 (Phase 2 streaming) ──────────────────────────────

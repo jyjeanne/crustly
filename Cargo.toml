@@ -154,6 +154,16 @@ ollama = ["dep:ollama-rs", "dep:schemars"]
 # this one compiles native C++ (cmake + a C/C++ toolchain required) - see
 # llama-cpp-2-integration-plan.md §3/§3.4/§4.2.
 llama-cpp = ["dep:llama-cpp-2", "dep:sha2"]
+# GPU backends (llama-cpp-2-integration-plan.md §4.1/Phase 8), each layered
+# on top of `llama-cpp` and requiring its own SDK/toolkit at build time -
+# see §4.2. Opt-in individually; none are implied by `llama-cpp` alone
+# (CPU-only) or by `all-llm` (§3.4).
+llama-cpp-cuda = ["llama-cpp", "llama-cpp-2/cuda"]
+llama-cpp-metal = ["llama-cpp", "llama-cpp-2/metal"]
+llama-cpp-vulkan = ["llama-cpp", "llama-cpp-2/vulkan"]
+llama-cpp-rocm = ["llama-cpp", "llama-cpp-2/rocm"]
+llama-cpp-opencl = ["llama-cpp", "llama-cpp-2/opencl"]
+llama-cpp-mkl = ["llama-cpp", "llama-cpp-2/mkl"]
 all-llm = ["openai", "aws-bedrock", "ollama"]
 
 [profile.dev]
