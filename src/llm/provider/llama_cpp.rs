@@ -124,7 +124,12 @@ impl LlamaCppProvider {
         });
 
         let (job_tx, job_rx) = mpsc::unbounded_channel::<InferenceJob>();
-        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<std::result::Result<(), String>>();
+        // Carries back the context's *actually resolved* n_ctx, not just the
+        // requested one - `NonZeroU32::new(0)` (a user setting `n_ctx = 0` to
+        // mean "use the model's trained default") makes llama.cpp pick its
+        // own value, which `context_window()` must report accurately rather
+        // than echoing back a config value that was never really applied.
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<std::result::Result<u32, String>>();
 
         let model_path = config.model_path.clone();
         let n_ctx = config.n_ctx;
@@ -156,11 +161,11 @@ impl LlamaCppProvider {
         });
 
         match ready_rx.recv() {
-            Ok(Ok(())) => Ok(Self {
+            Ok(Ok(actual_n_ctx)) => Ok(Self {
                 job_tx,
                 model_path: config.model_path.clone(),
                 display_name,
-                n_ctx: config.n_ctx,
+                n_ctx: actual_n_ctx,
             }),
             Ok(Err(msg)) => Err(ProviderError::Internal(format!(
                 "failed to load llama.cpp model '{}': {msg}",
@@ -182,7 +187,7 @@ struct WorkerInit {
     sampling_defaults: SamplingDefaults,
     seed: Option<u32>,
     job_rx: mpsc::UnboundedReceiver<InferenceJob>,
-    ready_tx: std::sync::mpsc::Sender<std::result::Result<(), String>>,
+    ready_tx: std::sync::mpsc::Sender<std::result::Result<u32, String>>,
 }
 
 /// The worker thread body: loads the model once, then serially drains
@@ -230,6 +235,11 @@ fn worker_loop(init: WorkerInit) {
             return;
         }
     };
+    // The context's *actually resolved* n_ctx - may differ from the
+    // requested `n_ctx` (e.g. `n_ctx = 0` asks llama.cpp for the model's own
+    // trained default). This, not the config value, is what
+    // `Provider::context_window()` must report.
+    let actual_n_ctx = context.n_ctx();
 
     // Resolve the chat template once: an explicit config override always
     // wins; otherwise use the model's own embedded GGUF template if
@@ -242,7 +252,7 @@ fn worker_loop(init: WorkerInit) {
         .or_else(|| model.chat_template(None).ok());
 
     // Loading succeeded - tell `new()` it can return `Ok`.
-    if ready_tx.send(Ok(())).is_err() {
+    if ready_tx.send(Ok(actual_n_ctx)).is_err() {
         // The caller gave up waiting (e.g. it timed out or the process is
         // shutting down) - nothing to serve, exit quietly.
         return;
@@ -683,11 +693,21 @@ fn build_sampler(
 ) -> LlamaSampler {
     let temperature = request.temperature.unwrap_or(defaults.temperature);
     let top_p = request.top_p.unwrap_or(defaults.top_p);
+    // A seed that doesn't fit in u32 is dropped rather than silently
+    // truncated (truncation would reproduce a *different* sequence than the
+    // one the caller actually asked for, which is worse than falling back
+    // to the provider default/random the same way an absent seed does) -
+    // mirrors `OllamaProvider::to_ollama_request`'s `i32::try_from` handling
+    // of the same generic `LLMRequest.seed` field.
     let seed = request
         .seed
-        .map(|s| s as u32)
+        .and_then(|s| u32::try_from(s).ok())
         .or(default_seed)
         .unwrap_or_else(rand::random);
+    // 0.0 = disabled, matching both llama.cpp's own convention for these
+    // penalties and `LLMRequest`'s documented OpenAI-compatible semantics.
+    let frequency_penalty = request.frequency_penalty.unwrap_or(0.0);
+    let presence_penalty = request.presence_penalty.unwrap_or(0.0);
 
     if temperature <= 0.0 {
         return LlamaSampler::chain([LlamaSampler::greedy()], false);
@@ -695,7 +715,12 @@ fn build_sampler(
 
     LlamaSampler::chain(
         [
-            LlamaSampler::penalties(64, defaults.repeat_penalty, 0.0, 0.0),
+            LlamaSampler::penalties(
+                64,
+                defaults.repeat_penalty,
+                frequency_penalty,
+                presence_penalty,
+            ),
             LlamaSampler::top_k(defaults.top_k),
             LlamaSampler::top_p(top_p, 1),
             LlamaSampler::temp(temperature),
