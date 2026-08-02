@@ -4,9 +4,10 @@
 //! client - it loads model weights and runs inference inside this process,
 //! via the `llama-cpp-2` crate (FFI bindings to `llama.cpp`). See
 //! `llama-cpp-2-integration-plan.md` for the full design; this file
-//! implements Phases 1-2 (`complete()` and `stream()`, CPU-only, no tool
-//! calling yet - sampling/config knobs beyond the basics (Phase 3) and
-//! tool-call recovery (Phase 4) land in later phases).
+//! implements Phases 1-4 (`complete()`, `stream()`, full sampling/context
+//! reporting, and tool-call recovery via the shared
+//! `tool_call_recovery` module). Grammar-constrained tool calling
+//! (`llguidance`, Phase 4b) is not implemented yet.
 //!
 //! ## Threading model
 //!
@@ -30,6 +31,7 @@
 
 use super::error::{ProviderError, Result};
 use super::r#trait::{Provider, ProviderStream};
+use super::tool_call_recovery::{maybe_tool_call_json, tool_call_from_content};
 use super::types::*;
 use async_trait::async_trait;
 use llama_cpp_2::context::params::LlamaContextParams;
@@ -462,13 +464,37 @@ fn run_complete(
     }
 
     let text = String::from_utf8_lossy(&generated_bytes).into_owned();
+
+    // `llama.cpp` has no native tool-calling field to check first (unlike
+    // Ollama) - recovery from printed JSON is the *only* way a call is ever
+    // recognized here. See tool_call_recovery.rs and §4.7.
+    let offered_tools = request.tools.clone().unwrap_or_default();
+    let recovered = if offered_tools.is_empty() {
+        None
+    } else {
+        tool_call_from_content(&text, &offered_tools)
+    };
+
+    let mut content = Vec::new();
+    if recovered.is_none() && !text.is_empty() {
+        content.push(ContentBlock::Text { text });
+    }
+    if let Some((name, input)) = &recovered {
+        content.push(ContentBlock::ToolUse {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: name.clone(),
+            input: input.clone(),
+        });
+        stop_reason = StopReason::ToolUse;
+    }
+
     let timings = context.timings();
     let total_ms = start.elapsed().as_millis() as u64;
 
     Ok(LLMResponse {
         id: format!("llama-cpp-{}", uuid::Uuid::new_v4()),
         model: request.model,
-        content: vec![ContentBlock::Text { text }],
+        content,
         stop_reason: Some(stop_reason),
         usage: TokenUsage {
             input_tokens: prompt_token_count,
@@ -543,21 +569,21 @@ fn run_stream(
     {
         return; // consumer already gone
     }
-    if events_tx
-        .send(Ok(StreamEvent::ContentBlockStart {
-            index: 0,
-            content_block: ContentBlock::Text {
-                text: String::new(),
-            },
-        }))
-        .is_err()
-    {
-        return;
-    }
+    // The text ContentBlockStart is sent lazily, on the first delta that
+    // actually gets flushed (below) - not here. When tools are offered and
+    // the whole response turns out to be a recovered tool call, no text
+    // block is ever shown to the user at all, matching OllamaProvider's own
+    // streaming behavior for the same case.
 
+    let offered_tools = request.tools.clone().unwrap_or_default();
     let stop_sequences = request.stop.clone().unwrap_or_default();
     let mut pending_utf8: Vec<u8> = Vec::new();
     let mut full_text = String::new();
+    // Decoded text not yet flushed as a delta - withheld while it still
+    // might turn out to be a tool call printed as JSON (§4.7). Reset to
+    // empty every time it's actually flushed.
+    let mut pending_flush = String::new();
+    let mut text_block_started = false;
     let mut generated_count: u32 = 0;
     let mut stop_reason = StopReason::EndTurn;
     let mut pos = prompt_token_count as i32;
@@ -578,17 +604,40 @@ fn run_stream(
 
         if let Some(chunk) = drain_valid_utf8(&mut pending_utf8) {
             full_text.push_str(&chunk);
-            if events_tx
-                .send(Ok(StreamEvent::ContentBlockDelta {
-                    index: 0,
-                    delta: ContentDelta::TextDelta { text: chunk },
-                }))
-                .is_err()
-            {
-                // Consumer dropped the stream (cancelled) - stop generating
-                // rather than burning CPU on tokens nobody will see, and
-                // return to the worker's job loop instead of hanging.
-                return;
+            pending_flush.push_str(&chunk);
+
+            let might_be_tool_call =
+                !offered_tools.is_empty() && maybe_tool_call_json(&pending_flush);
+            if !might_be_tool_call {
+                if !text_block_started {
+                    text_block_started = true;
+                    if events_tx
+                        .send(Ok(StreamEvent::ContentBlockStart {
+                            index: 0,
+                            content_block: ContentBlock::Text {
+                                text: String::new(),
+                            },
+                        }))
+                        .is_err()
+                    {
+                        return;
+                    }
+                }
+                if events_tx
+                    .send(Ok(StreamEvent::ContentBlockDelta {
+                        index: 0,
+                        delta: ContentDelta::TextDelta {
+                            text: std::mem::take(&mut pending_flush),
+                        },
+                    }))
+                    .is_err()
+                {
+                    // Consumer dropped the stream (cancelled) - stop
+                    // generating rather than burning CPU on tokens nobody
+                    // will see, and return to the worker's job loop instead
+                    // of hanging.
+                    return;
+                }
             }
         }
 
@@ -612,17 +661,64 @@ fn run_stream(
     }
 
     // Flush any trailing bytes that never completed a UTF-8 sequence
-    // (generation ended mid-token) - lossy, but this is the same edge case
-    // `run_complete`'s final `from_utf8_lossy` already accepts.
+    // (generation ended mid-token) into the withheld buffer - lossy, but
+    // this is the same edge case `run_complete`'s final `from_utf8_lossy`
+    // already accepts.
     if !pending_utf8.is_empty() {
         let chunk = String::from_utf8_lossy(&pending_utf8).into_owned();
+        full_text.push_str(&chunk);
+        pending_flush.push_str(&chunk);
+    }
+
+    // Whatever is still withheld at the end is the only candidate for a
+    // recovered tool call - `llama.cpp` has no native tool-calling field,
+    // unlike Ollama, so this printed-JSON recovery is the only mechanism.
+    let recovered = if offered_tools.is_empty() {
+        None
+    } else {
+        tool_call_from_content(&pending_flush, &offered_tools)
+    };
+
+    if recovered.is_none() && !pending_flush.is_empty() {
+        // Turned out not to be a tool call after all - flush it now rather
+        // than silently dropping it.
+        if !text_block_started {
+            text_block_started = true;
+            let _ = events_tx.send(Ok(StreamEvent::ContentBlockStart {
+                index: 0,
+                content_block: ContentBlock::Text {
+                    text: String::new(),
+                },
+            }));
+        }
         let _ = events_tx.send(Ok(StreamEvent::ContentBlockDelta {
             index: 0,
-            delta: ContentDelta::TextDelta { text: chunk },
+            delta: ContentDelta::TextDelta {
+                text: pending_flush,
+            },
         }));
     }
 
-    let _ = events_tx.send(Ok(StreamEvent::ContentBlockStop { index: 0 }));
+    if text_block_started {
+        let _ = events_tx.send(Ok(StreamEvent::ContentBlockStop { index: 0 }));
+    }
+
+    if let Some((name, input)) = &recovered {
+        // Comes after any text block, offset by 1 if one was started -
+        // matches OllamaProvider::stream()'s own indexing for tool-use
+        // blocks that follow streamed text.
+        let tool_index = usize::from(text_block_started);
+        let _ = events_tx.send(Ok(StreamEvent::ContentBlockStart {
+            index: tool_index,
+            content_block: ContentBlock::ToolUse {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: name.clone(),
+                input: input.clone(),
+            },
+        }));
+        let _ = events_tx.send(Ok(StreamEvent::ContentBlockStop { index: tool_index }));
+        stop_reason = StopReason::ToolUse;
+    }
 
     let timings = context.timings();
     let total_ms = start.elapsed().as_millis() as u64;
@@ -730,6 +826,44 @@ fn build_sampler(
     )
 }
 
+/// Render the offered tools as a system-prompt instruction block.
+/// `llama.cpp` has no native tool-calling API (unlike Ollama's `tool_calls`
+/// field) - the model must be told, in the prompt itself, what tools exist
+/// and the exact JSON shape to answer with when it wants to call one. The
+/// response is then checked with `tool_call_recovery::tool_call_from_content`
+/// after generation - this block is what makes that check likely to find
+/// something, not what enforces it.
+fn tool_instructions_block(tools: &[Tool]) -> String {
+    let mut block = String::from(
+        "You have access to the following tools. To call one, respond with \
+         ONLY a single JSON object of the form {\"name\": \"<tool_name>\", \
+         \"arguments\": {...}} and nothing else - no explanation, no code \
+         fence, no extra text. If you don't need a tool, just answer \
+         normally.\n\nAvailable tools:\n",
+    );
+    for tool in tools {
+        block.push_str(&format!(
+            "- {}: {}\n  Parameters (JSON Schema): {}\n",
+            tool.name, tool.description, tool.input_schema
+        ));
+    }
+    block
+}
+
+/// Combine a request's `system` prompt with the tool-instructions block
+/// (§4.7), if any tools were offered. Pure and offline-testable on its own,
+/// separate from `build_prompt`'s `LlamaModel`-dependent chat-template
+/// logic.
+fn merged_system_prompt(system: Option<&str>, tools: Option<&[Tool]>) -> Option<String> {
+    let tools_block = tools.filter(|t| !t.is_empty()).map(|t| tool_instructions_block(t));
+    match (system, tools_block) {
+        (Some(system), Some(tools)) => Some(format!("{system}\n\n{tools}")),
+        (Some(system), None) => Some(system.to_string()),
+        (None, Some(tools)) => Some(tools),
+        (None, None) => None,
+    }
+}
+
 /// Build the prompt text for `request`: applies the resolved chat template
 /// if one is available, otherwise falls back to a minimal manual
 /// role-prefixed transcript (ChatML-style) so a model without a usable
@@ -740,8 +874,9 @@ fn build_prompt(
     request: &LLMRequest,
 ) -> Result<String> {
     let mut chat_messages = Vec::new();
-    if let Some(system) = &request.system {
-        chat_messages.push(("system", system.clone()));
+    if let Some(system) = merged_system_prompt(request.system.as_deref(), request.tools.as_deref())
+    {
+        chat_messages.push(("system", system));
     }
     for msg in &request.messages {
         let role = match msg.role {
@@ -826,9 +961,11 @@ impl Provider for LlamaCppProvider {
     }
 
     fn supports_tools(&self) -> bool {
-        // Phase 4 (tool-call recovery, mirroring OllamaProvider's approach)
-        // is not implemented yet.
-        false
+        // Recovery-based, like OllamaProvider's fallback path: llama.cpp has
+        // no native tool-calling field, so a call is only ever recognized by
+        // parsing printed JSON (tool_call_recovery.rs, §4.7). No
+        // grammar-constrained guarantee yet (Phase 4b, llguidance).
+        true
     }
 
     fn supports_vision(&self) -> bool {
@@ -978,5 +1115,82 @@ mod tests {
             let mut buf = vec![byte, byte, byte];
             let _ = drain_valid_utf8(&mut buf);
         }
+    }
+
+    // ── tool-prompt construction (Phase 4) ────────────────────────────────
+
+    fn bash_tool() -> Tool {
+        Tool {
+            name: "bash".to_string(),
+            description: "Run a shell command".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {"command": {"type": "string"}},
+                "required": ["command"],
+            }),
+        }
+    }
+
+    #[test]
+    fn merged_system_prompt_with_neither_is_none() {
+        assert_eq!(merged_system_prompt(None, None), None);
+    }
+
+    #[test]
+    fn merged_system_prompt_system_only_is_unchanged() {
+        assert_eq!(
+            merged_system_prompt(Some("be terse"), None),
+            Some("be terse".to_string())
+        );
+    }
+
+    #[test]
+    fn merged_system_prompt_empty_tools_list_behaves_like_none() {
+        // An empty `tools: Some(vec![])` (as opposed to `None`) must not
+        // inject an empty/useless instructions block.
+        assert_eq!(
+            merged_system_prompt(Some("be terse"), Some(&[])),
+            Some("be terse".to_string())
+        );
+        assert_eq!(merged_system_prompt(None, Some(&[])), None);
+    }
+
+    #[test]
+    fn merged_system_prompt_tools_only_still_produces_instructions() {
+        let tools = [bash_tool()];
+        let merged = merged_system_prompt(None, Some(&tools)).expect("tools alone must inject");
+        assert!(merged.contains("bash"));
+        assert!(merged.contains("Run a shell command"));
+    }
+
+    #[test]
+    fn merged_system_prompt_combines_system_and_tools_with_system_first() {
+        let tools = [bash_tool()];
+        let merged = merged_system_prompt(Some("be terse"), Some(&tools)).expect("both present");
+        let system_pos = merged.find("be terse").expect("system text present");
+        let tools_pos = merged.find("bash").expect("tool name present");
+        assert!(
+            system_pos < tools_pos,
+            "system prompt must come before the tool instructions"
+        );
+    }
+
+    #[test]
+    fn tool_instructions_block_names_every_offered_tool() {
+        let tools = [
+            bash_tool(),
+            Tool {
+                name: "read_file".to_string(),
+                description: "Read a file".to_string(),
+                input_schema: serde_json::json!({"type": "object"}),
+            },
+        ];
+        let block = tool_instructions_block(&tools);
+        assert!(block.contains("bash"));
+        assert!(block.contains("read_file"));
+        // The instruction to answer with bare JSON must be present, or the
+        // model has no idea what format to use.
+        assert!(block.contains("\"name\""));
+        assert!(block.contains("\"arguments\""));
     }
 }

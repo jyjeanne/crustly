@@ -8,6 +8,7 @@ pub mod retry;
 pub mod router;
 #[allow(clippy::module_inception)]
 mod r#trait;
+pub mod tool_call_recovery;
 pub mod types;
 
 // Re-exports
