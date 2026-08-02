@@ -630,7 +630,6 @@ fn run_complete(
     let mut generated_tokens: Vec<LlamaToken> = Vec::new();
     let mut generated_count: u32 = 0;
     let mut stop_reason = StopReason::EndTurn;
-    let mut pos = prompt_token_count as i32;
     let mut batch = LlamaBatch::new(1, 1);
     // Set once the mid-stream grammar swap has been attempted (successfully
     // or not) so it's only ever tried once per response (Phase 4b).
@@ -640,7 +639,7 @@ fn run_complete(
     // trigger check would otherwise add for the rest of this response.
     let swap_possible = !offered_tools.is_empty() && grammar_env.is_some();
 
-    for _ in 0..max_tokens {
+    for pos in (prompt_token_count as i32..).take(max_tokens as usize) {
         let token = sampler.sample(context, -1);
 
         if model.is_eog_token(token) {
@@ -692,7 +691,6 @@ fn run_complete(
         }
 
         decode_one_more(context, &mut batch, token, pos)?;
-        pos += 1;
     }
 
     let text = String::from_utf8_lossy(&generated_bytes).into_owned();
@@ -821,7 +819,6 @@ fn run_stream(
     let mut generated_count: u32 = 0;
     let mut generated_tokens: Vec<LlamaToken> = Vec::new();
     let mut stop_reason = StopReason::EndTurn;
-    let mut pos = prompt_token_count as i32;
     let mut batch = LlamaBatch::new(1, 1);
     // Set once the mid-stream grammar swap has been attempted (successfully
     // or not) so it's only ever tried once per response (Phase 4b).
@@ -831,7 +828,7 @@ fn run_stream(
     // check entirely for the rest of this response.
     let swap_possible = !offered_tools.is_empty() && grammar_env.is_some();
 
-    'generate: for _ in 0..max_tokens {
+    'generate: for pos in (prompt_token_count as i32..).take(max_tokens as usize) {
         let token = sampler.sample(context, -1);
 
         if model.is_eog_token(token) {
@@ -925,7 +922,6 @@ fn run_stream(
             let _ = events_tx.send(Err(e));
             return;
         }
-        pos += 1;
     }
 
     // Flush any trailing bytes that never completed a UTF-8 sequence
