@@ -34,7 +34,9 @@
 
 use super::error::{ProviderError, Result};
 use super::r#trait::{Provider, ProviderStream};
-use super::tool_call_recovery::{maybe_tool_call_json, tool_call_from_content};
+use super::tool_call_recovery::{
+    commits_to_an_offered_tool_call, maybe_tool_call_json, tool_call_from_content,
+};
 use super::types::*;
 use async_trait::async_trait;
 use llama_cpp_2::context::params::LlamaContextParams;
@@ -335,9 +337,9 @@ fn worker_loop(init: WorkerInit) {
         // Built once per load (Phase 4b, `llama-cpp-llguidance` only -
         // `None` without that feature or if construction fails) and reused
         // for every request against this loaded model - see
-        // `ToolCallTokEnv`'s own doc comment for why this can't be a
+        // `ToolCallGrammarEnv`'s own doc comment for why this can't be a
         // per-request cost.
-        let tok_env = build_tok_env(&model);
+        let grammar_env = build_grammar_env(&model);
 
         match ready_tx.take() {
             Some(tx) => {
@@ -367,7 +369,7 @@ fn worker_loop(init: WorkerInit) {
                 &mut context,
                 &chat_template,
                 &display_name,
-                &tok_env,
+                &grammar_env,
                 &sampling_defaults,
                 seed,
                 job,
@@ -410,7 +412,7 @@ fn worker_loop(init: WorkerInit) {
                 &mut context,
                 &chat_template,
                 &display_name,
-                &tok_env,
+                &grammar_env,
                 &sampling_defaults,
                 seed,
                 job,
@@ -443,7 +445,7 @@ fn dispatch_job(
     context: &mut LlamaContext<'_>,
     chat_template: &Option<LlamaChatTemplate>,
     display_name: &str,
-    tok_env: &Option<ToolCallTokEnv>,
+    grammar_env: &Option<ToolCallGrammarEnv>,
     sampling_defaults: &SamplingDefaults,
     seed: Option<u32>,
     job: InferenceJob,
@@ -459,7 +461,7 @@ fn dispatch_job(
                     context,
                     chat_template,
                     display_name,
-                    tok_env,
+                    grammar_env,
                     sampling_defaults,
                     seed,
                     request,
@@ -475,7 +477,7 @@ fn dispatch_job(
                     context,
                     chat_template,
                     display_name,
-                    tok_env,
+                    grammar_env,
                     sampling_defaults,
                     seed,
                     request,
@@ -551,7 +553,7 @@ fn prepare_generation(
         .unwrap_or(DEFAULT_MAX_TOKENS)
         .min(n_ctx.saturating_sub(prompt_tokens.len() as u32));
 
-    let sampler = build_sampler(sampling_defaults, request, default_seed, None);
+    let sampler = build_sampler(sampling_defaults, request, default_seed, 0, None);
 
     // Prefill: decode the whole prompt in one batch. `add_sequence` sets
     // logits=true only on the last token, which is all prefill needs -
@@ -599,7 +601,7 @@ fn run_complete(
     context: &mut LlamaContext<'_>,
     chat_template: &Option<LlamaChatTemplate>,
     display_name: &str,
-    tok_env: &Option<ToolCallTokEnv>,
+    grammar_env: &Option<ToolCallGrammarEnv>,
     sampling_defaults: &SamplingDefaults,
     default_seed: Option<u32>,
     request: LLMRequest,
@@ -633,6 +635,10 @@ fn run_complete(
     // Set once the mid-stream grammar swap has been attempted (successfully
     // or not) so it's only ever tried once per response (Phase 4b).
     let mut grammar_swap_attempted = false;
+    // Whether the swap could still happen at all - once false (no tools
+    // offered, or the feature/model don't support it), skip every cost the
+    // trigger check would otherwise add for the rest of this response.
+    let swap_possible = !offered_tools.is_empty() && grammar_env.is_some();
 
     for _ in 0..max_tokens {
         let token = sampler.sample(context, -1);
@@ -645,40 +651,48 @@ fn run_complete(
         if let Ok(piece) = token_to_piece_bytes(model, token) {
             generated_bytes.extend_from_slice(&piece);
         }
-        generated_tokens.push(token);
+        if swap_possible && !grammar_swap_attempted {
+            generated_tokens.push(token);
+        }
         generated_count += 1;
 
-        let text_so_far = String::from_utf8_lossy(&generated_bytes);
+        // `text_so_far` is only computed when something still needs it -
+        // stop-sequence matching, or the still-live swap trigger below -
+        // rather than re-validating the whole growing buffer every token
+        // unconditionally.
+        if !stop_sequences.is_empty() || (swap_possible && !grammar_swap_attempted) {
+            let text_so_far = String::from_utf8_lossy(&generated_bytes);
 
-        if !stop_sequences.is_empty()
-            && stop_sequences
-                .iter()
-                .any(|s| text_so_far.ends_with(s.as_str()))
-        {
-            stop_reason = StopReason::StopSequence;
-            break;
-        }
+            if !stop_sequences.is_empty()
+                && stop_sequences
+                    .iter()
+                    .any(|s| text_so_far.ends_with(s.as_str()))
+            {
+                stop_reason = StopReason::StopSequence;
+                break;
+            }
 
-        // Phase 4b: the moment generation commits to a bare JSON object
-        // (not a fenced block - see `try_build_constrained_sampler`'s doc
-        // comment on scope), swap to grammar-constrained decoding for the
-        // rest of this response. A no-op without `--features
-        // llama-cpp-llguidance` or without tools offered.
-        if !grammar_swap_attempted
-            && !offered_tools.is_empty()
-            && text_so_far.trim_start().starts_with('{')
-        {
-            grammar_swap_attempted = true;
-            if let Some(tok_env) = tok_env {
-                if let Some(constrained) = try_build_constrained_sampler(
-                    tok_env,
-                    &offered_tools,
-                    &generated_tokens,
-                    sampling_defaults,
-                    &request,
-                    default_seed,
-                ) {
-                    sampler = constrained;
+            // Phase 4b: only once generation has committed to a real call
+            // against an offered tool (not merely opened a brace - see
+            // `commits_to_an_offered_tool_call`'s doc comment on why that
+            // distinction matters), swap to grammar-constrained decoding
+            // for the rest of this response.
+            if swap_possible
+                && !grammar_swap_attempted
+                && commits_to_an_offered_tool_call(&text_so_far, &offered_tools)
+            {
+                grammar_swap_attempted = true;
+                if let Some(grammar_env) = grammar_env {
+                    if let Some(constrained) = try_build_constrained_sampler(
+                        grammar_env,
+                        &offered_tools,
+                        &generated_tokens,
+                        sampling_defaults,
+                        &request,
+                        default_seed,
+                    ) {
+                        sampler = constrained;
+                    }
                 }
             }
         }
@@ -751,7 +765,7 @@ fn run_stream(
     context: &mut LlamaContext<'_>,
     chat_template: &Option<LlamaChatTemplate>,
     display_name: &str,
-    tok_env: &Option<ToolCallTokEnv>,
+    grammar_env: &Option<ToolCallGrammarEnv>,
     sampling_defaults: &SamplingDefaults,
     default_seed: Option<u32>,
     request: LLMRequest,
@@ -823,6 +837,10 @@ fn run_stream(
     // Set once the mid-stream grammar swap has been attempted (successfully
     // or not) so it's only ever tried once per response (Phase 4b).
     let mut grammar_swap_attempted = false;
+    // Whether the swap could still happen at all - once false (no tools
+    // offered, or the feature/model don't support it), skip the trigger
+    // check entirely for the rest of this response.
+    let swap_possible = !offered_tools.is_empty() && grammar_env.is_some();
 
     'generate: for _ in 0..max_tokens {
         let token = sampler.sample(context, -1);
@@ -835,7 +853,9 @@ fn run_stream(
         if let Ok(piece) = token_to_piece_bytes(model, token) {
             pending_utf8.extend_from_slice(&piece);
         }
-        generated_tokens.push(token);
+        if swap_possible && !grammar_swap_attempted {
+            generated_tokens.push(token);
+        }
         generated_count += 1;
 
         if let Some(chunk) = drain_valid_utf8(&mut pending_utf8) {
@@ -845,18 +865,24 @@ fn run_stream(
             let might_be_tool_call =
                 !offered_tools.is_empty() && maybe_tool_call_json(&pending_flush);
 
-            // Phase 4b: swap to grammar-constrained decoding the moment
-            // generation commits to a bare JSON object (not a fenced block
-            // - see `try_build_constrained_sampler`'s doc comment on
-            // scope). A no-op without `--features llama-cpp-llguidance`.
-            if !grammar_swap_attempted
-                && might_be_tool_call
-                && pending_flush.trim_start().starts_with('{')
+            // Phase 4b: only once generation has committed to a real call
+            // against an offered tool, swap to grammar-constrained decoding
+            // for the rest of this response. Checked against `full_text`
+            // (the whole response so far, never reset) rather than
+            // `pending_flush` (reset to empty by `mem::take` below every
+            // time withheld content turns out to be ordinary prose and
+            // gets flushed) - `generated_tokens`, replayed into the
+            // constrained sampler below, accumulates the same way, so the
+            // trigger and the replay must agree on which window of the
+            // response they're each looking at.
+            if swap_possible
+                && !grammar_swap_attempted
+                && commits_to_an_offered_tool_call(&full_text, &offered_tools)
             {
                 grammar_swap_attempted = true;
-                if let Some(tok_env) = tok_env {
+                if let Some(grammar_env) = grammar_env {
                     if let Some(constrained) = try_build_constrained_sampler(
-                        tok_env,
+                        grammar_env,
                         &offered_tools,
                         &generated_tokens,
                         sampling_defaults,
@@ -1052,10 +1078,21 @@ fn token_to_piece_bytes(
 /// `common_sampler`'s "grammar first" ordering (`common/sampling.cpp`) -
 /// masked-out tokens simply never survive ranking, rather than the grammar
 /// fighting the other stages for what's already been pruned.
+///
+/// `seed_offset` perturbs the resolved seed (added, wrapping) before it
+/// reaches `LlamaSampler::dist` - `0` for the normal initial call. The
+/// Phase 4b swap passes the number of tokens already generated: without
+/// this, rebuilding `dist(seed)` fresh at swap time would restart the RNG
+/// from the very beginning of the same seeded stream, so the first
+/// post-swap draw would silently replay whatever the *first* pre-swap draw
+/// was instead of continuing independently - offsetting by the token count
+/// keeps the result deterministic for a given seed + prefix length without
+/// literally repeating the start of the stream.
 fn build_sampler(
     defaults: &SamplingDefaults,
     request: &LLMRequest,
     default_seed: Option<u32>,
+    seed_offset: u32,
     grammar: Option<LlamaSampler>,
 ) -> LlamaSampler {
     let temperature = request.temperature.unwrap_or(defaults.temperature);
@@ -1070,7 +1107,8 @@ fn build_sampler(
         .seed
         .and_then(|s| u32::try_from(s).ok())
         .or(default_seed)
-        .unwrap_or_else(rand::random);
+        .unwrap_or_else(rand::random)
+        .wrapping_add(seed_offset);
     // 0.0 = disabled, matching both llama.cpp's own convention for these
     // penalties and `LLMRequest`'s documented OpenAI-compatible semantics.
     let frequency_penalty = request.frequency_penalty.unwrap_or(0.0);
@@ -1099,45 +1137,63 @@ fn build_sampler(
     LlamaSampler::chain(chain, false)
 }
 
-/// The per-model tokenizer environment `llguidance` needs to build a
-/// grammar-constrained sampler (Phase 4b) - expensive to build (walks the
-/// entire vocabulary, see `LlamaSampler::llguidance_tok_env`'s own doc
-/// comment), so it's built once per model load and reused, never rebuilt
-/// per request. A plain `()` placeholder without the `llama-cpp-llguidance`
-/// feature, so `worker_loop`/`dispatch_job`/`run_complete`/`run_stream` can
-/// carry an `Option<ToolCallTokEnv>` unconditionally rather than needing a
+/// The per-model `llguidance` state needed to build a grammar-constrained
+/// sampler (Phase 4b) without paying per-request cost: building it walks
+/// the entire vocabulary (see `LlamaSampler::llguidance_tok_env`'s own doc
+/// comment) to construct a `toktrie::TokEnv`, which is then only needed
+/// transiently to build the `ParserFactory` this type actually holds -
+/// `llguidance::ParserFactory`'s own doc comment documents it as "typically
+/// created once per model/tokenizer and reused across requests", which is
+/// exactly what this is: built once per model load in `build_grammar_env`
+/// and reused for every request against it, never rebuilt per response. A
+/// plain `()` placeholder without the `llama-cpp-llguidance` feature, so
+/// `worker_loop`/`dispatch_job`/`run_complete`/`run_stream` can carry an
+/// `Option<ToolCallGrammarEnv>` unconditionally rather than needing a
 /// second, `#[cfg]`-gated copy of every function in between.
 #[cfg(feature = "llama-cpp-llguidance")]
-type ToolCallTokEnv = toktrie::TokEnv;
+type ToolCallGrammarEnv = llguidance::ParserFactory;
 #[cfg(not(feature = "llama-cpp-llguidance"))]
-type ToolCallTokEnv = ();
+type ToolCallGrammarEnv = ();
 
 #[cfg(feature = "llama-cpp-llguidance")]
-fn build_tok_env(model: &LlamaModel) -> Option<ToolCallTokEnv> {
-    Some(LlamaSampler::llguidance_tok_env(model))
+fn build_grammar_env(model: &LlamaModel) -> Option<ToolCallGrammarEnv> {
+    let tok_env = LlamaSampler::llguidance_tok_env(model);
+    match super::llama_cpp_grammar::build_parser_factory(&tok_env) {
+        Ok(factory) => Some(factory),
+        Err(e) => {
+            tracing::warn!(
+                "llama.cpp: failed to build the llguidance parser factory for this model - \
+                 grammar-constrained tool calling disabled for this load, recovery heuristic \
+                 still applies: {e}"
+            );
+            None
+        }
+    }
 }
 
 #[cfg(not(feature = "llama-cpp-llguidance"))]
-fn build_tok_env(_model: &LlamaModel) -> Option<ToolCallTokEnv> {
+fn build_grammar_env(_model: &LlamaModel) -> Option<ToolCallGrammarEnv> {
     None
 }
 
 /// Attempt the Phase 4b mid-stream sampler swap: once decoding has
-/// committed to what looks like a bare tool-call JSON object (the caller
-/// checks this - see `run_complete`/`run_stream`'s trigger condition),
-/// build a grammar-constrained sampler restricted to valid calls against
-/// `offered_tools`, replay the tokens generated so far into it so its
-/// parser state matches what's actually been decoded, and return the full
-/// replacement chain (grammar first, then the same
-/// penalties/top-k/top-p/temp/dist tail `build_sampler` always uses).
+/// committed to a real call against an offered tool (the caller checks this
+/// via `tool_call_recovery::commits_to_an_offered_tool_call` - see
+/// `run_complete`/`run_stream`'s trigger condition, and that function's own
+/// doc comment for why the trigger must be much stricter than just "looks
+/// like it might be JSON"), build a grammar-constrained sampler restricted
+/// to valid calls against `offered_tools`, replay the tokens generated so
+/// far into the *entire* replacement chain (not just the grammar stage) so
+/// both its parser state and its penalties/RNG state match what's actually
+/// been decoded, and return that chain as the new sampler.
 ///
 /// Returns `None` - falling back to continued unconstrained decoding, not
 /// failing the request - whenever the feature isn't compiled in, no
-/// `tok_env` was built for this model, or grammar construction itself
-/// fails (a malformed tool input schema, for instance). `run_complete`/
-/// `run_stream` still get their at-least-once shot at plain JSON recovery
-/// afterward either way (`tool_call_recovery.rs`, §4.7 - always-on,
-/// unaffected by whether this constrained path ever engaged).
+/// `ToolCallGrammarEnv` was built for this model, or grammar construction
+/// itself fails (a malformed tool input schema, for instance).
+/// `run_complete`/`run_stream` still get their at-least-once shot at plain
+/// JSON recovery afterward either way (`tool_call_recovery.rs`, §4.7 -
+/// always-on, unaffected by whether this constrained path ever engaged).
 ///
 /// Safety note on `accept_many`'s replay: if a generated token turns out
 /// not to match what the grammar's parser expects (a tokenization
@@ -1151,22 +1207,30 @@ fn build_tok_env(_model: &LlamaModel) -> Option<ToolCallTokEnv> {
 /// `llama-cpp-2` 0.1.153's `llguidance_sampler.rs` directly, not assumed.
 #[cfg(feature = "llama-cpp-llguidance")]
 fn try_build_constrained_sampler(
-    tok_env: &ToolCallTokEnv,
+    grammar_env: &ToolCallGrammarEnv,
     offered_tools: &[Tool],
     generated_tokens: &[LlamaToken],
     defaults: &SamplingDefaults,
     request: &LLMRequest,
     default_seed: Option<u32>,
 ) -> Option<LlamaSampler> {
-    match super::llama_cpp_grammar::build_tool_call_sampler(tok_env, offered_tools) {
-        Ok(mut grammar_sampler) => {
-            grammar_sampler.accept_many(generated_tokens.iter().copied());
-            Some(build_sampler(
+    match super::llama_cpp_grammar::build_tool_call_sampler(grammar_env, offered_tools) {
+        Ok(grammar_sampler) => {
+            let mut chain = build_sampler(
                 defaults,
                 request,
                 default_seed,
+                generated_tokens.len() as u32,
                 Some(grammar_sampler),
-            ))
+            );
+            // Replay into the *whole* chain, not just the grammar sampler in
+            // isolation - `LlamaSampler::chain`'s `accept` propagates to
+            // every member, so this also backfills `penalties`' repeat/
+            // frequency/presence history with (up to 64 of) the tokens
+            // already generated, instead of silently resetting it to empty
+            // at exactly the point the model is emitting tool-call JSON.
+            chain.accept_many(generated_tokens.iter().copied());
+            Some(chain)
         }
         Err(e) => {
             tracing::debug!(
@@ -1180,7 +1244,7 @@ fn try_build_constrained_sampler(
 
 #[cfg(not(feature = "llama-cpp-llguidance"))]
 fn try_build_constrained_sampler(
-    _tok_env: &ToolCallTokEnv,
+    _grammar_env: &ToolCallGrammarEnv,
     _offered_tools: &[Tool],
     _generated_tokens: &[LlamaToken],
     _defaults: &SamplingDefaults,
@@ -1418,6 +1482,24 @@ mod tests {
         assert_eq!(d.repeat_penalty, 1.1);
     }
 
+    /// Regression: the Phase 4b swap used to rebuild `dist(seed)` with the
+    /// exact same seed mid-response, replaying the start of the same RNG
+    /// stream instead of continuing it. `build_sampler`'s `seed_offset`
+    /// perturbs the resolved seed so a swap partway through a response
+    /// doesn't silently reproduce the beginning of the pre-swap sequence.
+    #[test]
+    fn build_sampler_seed_offset_changes_the_resolved_seed() {
+        let defaults = SamplingDefaults::default();
+        let request = LLMRequest::new("llama-cpp-model", vec![]);
+
+        let unshifted = build_sampler(&defaults, &request, Some(42), 0, None);
+        let shifted = build_sampler(&defaults, &request, Some(42), 17, None);
+
+        assert_eq!(unshifted.get_seed(), 42);
+        assert_eq!(shifted.get_seed(), 42u32.wrapping_add(17));
+        assert_ne!(unshifted.get_seed(), shifted.get_seed());
+    }
+
     #[test]
     fn gpu_backend_compiled_in_is_false_in_this_cpu_only_test_build() {
         // This crate is built in CI/this sandbox with `--features
@@ -1570,14 +1652,21 @@ mod tests {
     // ── mid-stream grammar swap (Phase 4b) ────────────────────────────────
 
     #[cfg(feature = "llama-cpp-llguidance")]
+    fn test_grammar_env() -> ToolCallGrammarEnv {
+        let tok_env = toktrie::ApproximateTokEnv::single_byte_env();
+        super::super::llama_cpp_grammar::build_parser_factory(&tok_env)
+            .expect("factory must build for the stand-in TokEnv")
+    }
+
+    #[cfg(feature = "llama-cpp-llguidance")]
     #[test]
     fn try_build_constrained_sampler_succeeds_for_a_valid_tool_schema() {
-        let tok_env = toktrie::ApproximateTokEnv::single_byte_env();
+        let grammar_env = test_grammar_env();
         let tools = [bash_tool()];
         let request = LLMRequest::new("llama-cpp-model", vec![]);
 
         let sampler = try_build_constrained_sampler(
-            &tok_env,
+            &grammar_env,
             &tools,
             &[],
             &SamplingDefaults::default(),
@@ -1599,13 +1688,13 @@ mod tests {
     #[cfg(feature = "llama-cpp-llguidance")]
     #[test]
     fn try_build_constrained_sampler_does_not_panic_on_an_arbitrary_token_replay() {
-        let tok_env = toktrie::ApproximateTokEnv::single_byte_env();
+        let grammar_env = test_grammar_env();
         let tools = [bash_tool()];
         let request = LLMRequest::new("llama-cpp-model", vec![]);
         let generated = [LlamaToken(0), LlamaToken(1), LlamaToken(2)];
 
         let sampler = try_build_constrained_sampler(
-            &tok_env,
+            &grammar_env,
             &tools,
             &generated,
             &SamplingDefaults::default(),

@@ -27,6 +27,47 @@ pub fn maybe_tool_call_json(text: &str) -> bool {
     t.is_empty() || t.starts_with('{') || t.starts_with("```")
 }
 
+/// Whether `text` (the *whole* response generated so far, from the very
+/// first token - never a withheld/reset suffix) has committed to naming one
+/// of `offered` via a `"name": "<tool>"` key.
+///
+/// Deliberately much stricter than [`maybe_tool_call_json`] - the two serve
+/// opposite risk directions and must not be confused for each other:
+/// `maybe_tool_call_json` decides what to *withhold* from a live stream, so
+/// a false positive there only delays a harmless flush. This function
+/// decides whether it's safe to switch to grammar-*constrained* decoding
+/// (`llama-cpp-2-integration-plan.md` Phase 4b) - a false positive there
+/// permanently forces whatever the model is actually generating (which
+/// could be ordinary prose or an unrelated JSON answer that merely starts
+/// with `{`) into a fabricated call to an offered tool, which then gets
+/// executed. So this only returns `true` once the model has already typed
+/// enough to unambiguously name a *real* offered tool, not merely opened a
+/// brace.
+///
+/// Two narrowing choices, both safe-by-default (a `false` here just means
+/// "keep decoding unconstrained, the always-on recovery heuristic still
+/// gets a chance at the end" - never a hard failure):
+/// - Only a *bare* leading `{` counts (mirrors `tool_call_from_content`'s
+///   unfenced case) - a fenced block needs unconstrained prose around it
+///   that a JSON-only grammar can't express, so that case is left entirely
+///   to the recovery heuristic, same as before this function existed.
+/// - The `"name": "<tool>"` match only recognizes the compact and
+///   single-space-after-colon spellings a model's own generated JSON
+///   typically uses (not arbitrary whitespace/newlines between key and
+///   value) - missing an unusual spacing just means the constrained path
+///   doesn't engage for that response, which is the safe direction to fail
+///   in, not a correctness problem.
+pub fn commits_to_an_offered_tool_call(text: &str, offered: &[Tool]) -> bool {
+    let trimmed = text.trim_start();
+    if !trimmed.starts_with('{') {
+        return false;
+    }
+    offered.iter().any(|tool| {
+        text.contains(&format!("\"name\":\"{}\"", tool.name))
+            || text.contains(&format!("\"name\": \"{}\"", tool.name))
+    })
+}
+
 /// Recover a tool call that the model printed as text instead of returning
 /// it via a provider's native structured tool-call mechanism (Ollama's
 /// `tool_calls` field, or - for `llama.cpp`, which has no such mechanism at
@@ -253,5 +294,66 @@ mod tests {
         assert!(maybe_tool_call_json("```json"));
         assert!(!maybe_tool_call_json("Here are the files"));
         assert!(!maybe_tool_call_json("I'll run ls."));
+    }
+
+    /// `commits_to_an_offered_tool_call` gates grammar-constrained decoding
+    /// (Phase 4b) - unlike `maybe_tool_call_json` above, a false positive
+    /// here is actively harmful (it hijacks unrelated output into an
+    /// executed tool call), so it must stay much stricter.
+    #[test]
+    fn commits_to_an_offered_tool_call_requires_a_real_tool_name_not_just_a_brace() {
+        let tools = [bash_tool()];
+        // A bare brace, or a name that isn't an offered tool, must not
+        // qualify - only `maybe_tool_call_json` is allowed to be this loose.
+        assert!(!commits_to_an_offered_tool_call("{", &tools));
+        assert!(!commits_to_an_offered_tool_call("{\"foo\": 1}", &tools));
+        assert!(!commits_to_an_offered_tool_call(
+            "{\"name\": \"rm_rf\"",
+            &tools
+        ));
+        // A JSON answer that merely starts with '{' and never names an
+        // offered tool must never trigger, however long it runs.
+        assert!(!commits_to_an_offered_tool_call(
+            "{\"schema\": {\"type\": \"object\"}}",
+            &tools
+        ));
+    }
+
+    #[test]
+    fn commits_to_an_offered_tool_call_recognizes_compact_and_spaced_name_keys() {
+        let tools = [bash_tool()];
+        assert!(commits_to_an_offered_tool_call(
+            "{\"name\":\"bash\", \"arg",
+            &tools
+        ));
+        assert!(commits_to_an_offered_tool_call(
+            "{\"name\": \"bash\", \"arg",
+            &tools
+        ));
+    }
+
+    #[test]
+    fn commits_to_an_offered_tool_call_rejects_a_fenced_block() {
+        // Fenced blocks are left entirely to the post-hoc recovery
+        // heuristic - a JSON-only grammar can't express the surrounding
+        // prose a fence implies.
+        let tools = [bash_tool()];
+        assert!(!commits_to_an_offered_tool_call(
+            "```json\n{\"name\": \"bash\"",
+            &tools
+        ));
+    }
+
+    #[test]
+    fn commits_to_an_offered_tool_call_requires_leading_brace_not_just_a_substring_match() {
+        // A name:tool substring appearing inside prose (not as the response's
+        // own leading JSON) must not trigger - matches
+        // `parse_tool_call_object`'s own "the whole content is the call"
+        // strictness in spirit.
+        let tools = [bash_tool()];
+        assert!(!commits_to_an_offered_tool_call(
+            "Sure, I'll use {\"name\": \"bash\"} as an example.",
+            &tools
+        ));
     }
 }
