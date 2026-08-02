@@ -6,9 +6,9 @@ pub mod error;
 pub mod model_hints;
 pub mod retry;
 pub mod router;
+pub mod tool_call_recovery;
 #[allow(clippy::module_inception)]
 mod r#trait;
-pub mod tool_call_recovery;
 pub mod types;
 
 // Re-exports

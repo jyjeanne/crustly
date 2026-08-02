@@ -187,7 +187,12 @@ pub async fn download_model(
 ) -> Result<PathBuf> {
     tokio::fs::create_dir_all(models_dir)
         .await
-        .with_context(|| format!("Failed to create models directory: {}", models_dir.display()))?;
+        .with_context(|| {
+            format!(
+                "Failed to create models directory: {}",
+                models_dir.display()
+            )
+        })?;
 
     let filename = url
         .rsplit('/')
@@ -225,7 +230,9 @@ pub async fn download_model(
             total_bytes,
         });
     }
-    file.flush().await.context("Failed to flush downloaded file")?;
+    file.flush()
+        .await
+        .context("Failed to flush downloaded file")?;
     drop(file);
 
     if let Some(expected) = expected_sha256 {
@@ -254,8 +261,7 @@ fn to_hex(bytes: &[u8]) -> String {
 
 /// Delete a local `.gguf` file. Ollama's `delete_model()` equivalent.
 pub fn delete_model(path: &Path) -> Result<()> {
-    std::fs::remove_file(path)
-        .with_context(|| format!("Failed to delete {}", path.display()))
+    std::fs::remove_file(path).with_context(|| format!("Failed to delete {}", path.display()))
 }
 
 #[cfg(test)]
@@ -280,7 +286,10 @@ mod tests {
 
     #[test]
     fn quantization_hint_none_for_unrecognized_filename() {
-        assert_eq!(quantization_hint_from_filename("my-custom-model.gguf"), None);
+        assert_eq!(
+            quantization_hint_from_filename("my-custom-model.gguf"),
+            None
+        );
     }
 
     #[test]
@@ -301,15 +310,19 @@ mod tests {
 
     #[test]
     fn parse_hf_shorthand_none_for_direct_url() {
-        assert_eq!(
-            parse_hf_shorthand("https://example.com/model.gguf"),
-            None
-        );
+        assert_eq!(parse_hf_shorthand("https://example.com/model.gguf"), None);
     }
 
     #[test]
     fn parse_hf_shorthand_none_for_malformed_shorthand() {
-        for bad in ["hf:", "hf:org", "hf:org/", "hf:org/repo", "hf:/repo/file", "hf:org//file"] {
+        for bad in [
+            "hf:",
+            "hf:org",
+            "hf:org/",
+            "hf:org/repo",
+            "hf:/repo/file",
+            "hf:org//file",
+        ] {
             assert_eq!(parse_hf_shorthand(bad), None, "should reject: {bad}");
         }
     }

@@ -1238,10 +1238,7 @@ async fn cmd_ollama(_config: &crate::config::Config, _operation: OllamaCommands)
 /// to a path: an absolute path or one containing a separator is used as-is,
 /// otherwise it's treated as a filename inside `models_dir`.
 #[cfg(feature = "llama-cpp")]
-fn resolve_llama_cpp_model_path(
-    models_dir: &std::path::Path,
-    model: &str,
-) -> std::path::PathBuf {
+fn resolve_llama_cpp_model_path(models_dir: &std::path::Path, model: &str) -> std::path::PathBuf {
     let candidate = std::path::Path::new(model);
     if candidate.is_absolute() || model.contains(std::path::MAIN_SEPARATOR) {
         candidate.to_path_buf()
@@ -1283,8 +1280,7 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
 
         LlamaCppCommands::Pull { source } => {
             println!("🦙 Resolving '{}'...\n", source);
-            let (url, expected_sha256) =
-                llama_cpp_models::resolve_download_source(&source).await?;
+            let (url, expected_sha256) = llama_cpp_models::resolve_download_source(&source).await?;
             if expected_sha256.is_none() {
                 println!(
                     "⚠️  No integrity hash available for this download - the file will \

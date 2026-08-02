@@ -9,6 +9,19 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # `--all-features` is deliberately NOT used anywhere below (Unix jobs used
+  # to use it, replaced by this explicit list): it would also enable
+  # llama-cpp-cuda/-metal/-vulkan/-rocm/-opencl/-mkl (Cargo.toml), each of
+  # which requires its own GPU SDK/toolkit at build time that isn't
+  # installed on standard GitHub-hosted runners - `cargo` builds every
+  # feature it's given regardless of hardware availability, so this fails
+  # every job that uses it (confirmed: cmake configure error "CUDA Toolkit
+  # not found" on ubuntu-latest). This list is every feature that only
+  # needs a C/C++ toolchain, already present on GitHub's ubuntu/macos
+  # runners (llama-cpp compiles vendored llama.cpp via cmake; see
+  # llama-cpp-2-integration-plan.md §3/§4.2). Windows keeps its own
+  # narrower openai,aws-bedrock list below, unrelated to this.
+  CI_FEATURES: openai,aws-bedrock,ollama,llama-cpp,llama-cpp-llguidance,profiling
 
 jobs:
   test:
@@ -54,7 +67,7 @@ jobs:
 
       - name: Run tests (Unix)
         if: runner.os != 'Windows'
-        run: cargo test --all-features --verbose
+        run: cargo test --features ${{ env.CI_FEATURES }} --verbose
 
       - name: Run doc tests (Windows)
         if: runner.os == 'Windows'
@@ -62,7 +75,7 @@ jobs:
 
       - name: Run doc tests (Unix)
         if: runner.os != 'Windows'
-        run: cargo test --doc --all-features
+        run: cargo test --doc --features ${{ env.CI_FEATURES }}
 
   clippy:
     name: Clippy
@@ -76,7 +89,7 @@ jobs:
           components: clippy
 
       - name: Run clippy
-        run: cargo clippy --lib --bins --tests --all-features -- -D warnings
+        run: cargo clippy --lib --bins --tests --features ${{ env.CI_FEATURES }} -- -D warnings
 
   fmt:
     name: Format
@@ -114,7 +127,7 @@ jobs:
 
       - name: Build (Unix)
         if: matrix.os != 'windows-latest'
-        run: cargo build --release --all-features
+        run: cargo build --release --features ${{ env.CI_FEATURES }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
@@ -136,7 +149,7 @@ jobs:
         run: cargo install cargo-tarpaulin
 
       - name: Generate coverage
-        run: cargo tarpaulin --out Xml --all-features
+        run: cargo tarpaulin --out Xml --features ${{ env.CI_FEATURES }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
