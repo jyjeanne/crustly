@@ -347,6 +347,22 @@ impl ProviderConfigs {
         }
         None
     }
+
+    /// Resolve where local `.gguf` model files live: `providers.llama_cpp.models_dir`
+    /// if set, otherwise `<cache_dir>/crustly/models` - shared by the CLI's
+    /// `llama-cpp` subcommand and the TUI's model picker dialog so both agree
+    /// on the same default without duplicating the fallback logic.
+    pub fn llama_cpp_models_dir(&self) -> std::path::PathBuf {
+        self.llama_cpp
+            .as_ref()
+            .and_then(|c| c.models_dir.clone())
+            .unwrap_or_else(|| {
+                dirs::cache_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                    .join("crustly")
+                    .join("models")
+            })
+    }
 }
 
 /// Individual provider configuration

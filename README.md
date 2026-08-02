@@ -473,6 +473,11 @@ daemon, no LM Studio server, no port to start.
   count, without going through a server's own defaults.
 - Same tool-calling reliability mechanism as native Ollama's fallback path
   (printed-JSON recovery, shared code — `src/llm/provider/tool_call_recovery.rs`).
+- **`Ctrl+G` Local Models dialog** — the TUI equivalent of Ollama's `Ctrl+D`:
+  pick an already-downloaded `.gguf` file to switch to (shows a "Loading
+  model…" state while it loads — not instant, unlike Ollama's swap), type a
+  URL or `hf:org/repo/file.gguf` shorthand to download a new one with a live
+  progress bar, or `Del` a file you no longer want.
 - Model management from the command line:
 
   ```bash

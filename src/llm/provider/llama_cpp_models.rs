@@ -61,7 +61,7 @@ const QUANTIZATION_TAGS: &[&str] = &[
 /// (e.g. `Ornith-1.0-9B-Q4_K_M.gguf` -> `Some("Q4_K_M")`). Not a GGUF
 /// header read - just the filename convention nearly every publisher
 /// follows. `None` if nothing recognizable matches.
-fn quantization_hint_from_filename(filename: &str) -> Option<String> {
+pub fn quantization_hint_from_filename(filename: &str) -> Option<String> {
     let upper = filename.to_uppercase();
     QUANTIZATION_TAGS
         .iter()

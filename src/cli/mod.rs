@@ -824,6 +824,14 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     if let Some(ollama_cfg) = &config.providers.ollama {
         app.set_ollama_config(ollama_cfg.clone());
     }
+    app.set_llama_cpp_models_dir(config.providers.llama_cpp_models_dir());
+    // Hand the [providers.llama_cpp] section to the TUI for the same reason
+    // as ollama_config above: the Ctrl+G model switch needs the same
+    // n_gpu_layers/n_ctx/sampling settings as the one built at startup, and
+    // the Model Info panel needs it to show GPU-layers/quantization.
+    if let Some(llama_cpp_cfg) = &config.providers.llama_cpp {
+        app.set_llama_cpp_config(llama_cpp_cfg.clone());
+    }
     app.set_mcp_status(mcp_status);
 
     // Get event sender from app
@@ -1226,30 +1234,6 @@ async fn cmd_ollama(_config: &crate::config::Config, _operation: OllamaCommands)
     );
 }
 
-/// Resolve the configured llama.cpp models directory, falling back to a
-/// platform cache dir (`~/.cache/crustly/models` on Linux). Used both by
-/// `crustly llama-cpp <...>` and, once built, the TUI's model picker
-/// dialog (`llama-cpp-2-integration-plan.md` §7 point 4).
-///
-/// Feature-gated for now (unlike `ollama_host`, which has an
-/// always-compiled TUI call site) since its only caller today is
-/// `cmd_llama_cpp` - drop the `cfg` once a Phase 7 call site needs it
-/// unconditionally, the same way `ollama_host` itself isn't gated.
-#[cfg(feature = "llama-cpp")]
-fn llama_cpp_models_dir(config: &crate::config::Config) -> std::path::PathBuf {
-    config
-        .providers
-        .llama_cpp
-        .as_ref()
-        .and_then(|c| c.models_dir.clone())
-        .unwrap_or_else(|| {
-            dirs::cache_dir()
-                .unwrap_or_else(|| std::path::PathBuf::from("."))
-                .join("crustly")
-                .join("models")
-        })
-}
-
 /// Resolve a user-supplied `model` argument (from `crustly llama-cpp rm`)
 /// to a path: an absolute path or one containing a separator is used as-is,
 /// otherwise it's treated as a filename inside `models_dir`.
@@ -1270,7 +1254,7 @@ fn resolve_llama_cpp_model_path(
 async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppCommands) -> Result<()> {
     use crate::llm::provider::llama_cpp_models;
 
-    let models_dir = llama_cpp_models_dir(config);
+    let models_dir = config.providers.llama_cpp_models_dir();
 
     match operation {
         LlamaCppCommands::List => {

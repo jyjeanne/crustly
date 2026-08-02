@@ -168,6 +168,37 @@ pub struct App {
     pub provider_switch_selected: usize,
     pub provider_switch_loading: bool,
 
+    // Local Models dialog state (Ctrl+G, llama.cpp)
+    pub llama_cpp_models: Vec<super::llama_cpp_download::LlamaCppModelSummary>,
+    pub llama_cpp_selected: usize,
+    pub llama_cpp_loading: bool,
+    pub llama_cpp_download_input: String,
+    pub llama_cpp_download_running: bool,
+    pub llama_cpp_download_status: Option<String>,
+    pub llama_cpp_download_fraction: Option<f64>,
+    llama_cpp_download_task: Option<tokio::task::JoinHandle<()>>,
+    /// Local model awaiting delete confirmation ('Y'/Enter confirms,
+    /// 'N'/Esc cancels back to the list) - mirrors
+    /// `model_download_confirm_delete`.
+    pub llama_cpp_confirm_delete: Option<std::path::PathBuf>,
+    pub llama_cpp_deleting: Option<std::path::PathBuf>,
+    llama_cpp_delete_task: Option<tokio::task::JoinHandle<()>>,
+    /// Set while a picked model is being loaded as the active provider
+    /// (`LlamaCppProvider::new()` blocks - see `llama_cpp_download`'s
+    /// module doc) - drives the "Loading model…" state.
+    pub llama_cpp_switching: Option<std::path::PathBuf>,
+    llama_cpp_switch_task: Option<tokio::task::JoinHandle<()>>,
+    llama_cpp_pending_provider: super::llama_cpp_download::PendingProvider,
+    llama_cpp_models_dir: std::path::PathBuf,
+    /// The `[providers.llama_cpp]` config section, applied (minus
+    /// `model_path`, which is always the picked file) when Ctrl+G switches
+    /// models - mirrors `ollama_config`'s rationale exactly.
+    llama_cpp_config: Option<crate::config::LlamaCppProviderConfig>,
+    /// The `.gguf` path actually active right now, if the active provider is
+    /// `llama-cpp` - used by the Model Info panel for GPU-layers/quantization
+    /// details, since neither is on the generic `Provider` trait.
+    llama_cpp_active_model_path: Option<std::path::PathBuf>,
+
     // `/skills` slash command state
     pub skills_list: Vec<crate::llm::tools::skill::SkillListing>,
     pub skills_selected: usize,
@@ -201,6 +232,19 @@ fn plain_textarea() -> TextArea<'static> {
     let mut textarea = TextArea::default();
     textarea.set_cursor_line_style(ratatui::style::Style::default());
     textarea
+}
+
+/// Best-effort quantization guess for the Model Info panel - `None` when
+/// this build wasn't compiled with `--features llama-cpp` (nothing to guess
+/// from) or the filename doesn't match a known convention.
+#[cfg(feature = "llama-cpp")]
+fn quantization_hint_for_path(path: &std::path::Path) -> Option<String> {
+    crate::llm::provider::llama_cpp_models::quantization_hint_from_filename(&path.to_string_lossy())
+}
+
+#[cfg(not(feature = "llama-cpp"))]
+fn quantization_hint_for_path(_path: &std::path::Path) -> Option<String> {
+    None
 }
 
 impl App {
@@ -253,6 +297,26 @@ impl App {
             provider_switch_models: Vec::new(),
             provider_switch_selected: 0,
             provider_switch_loading: false,
+            llama_cpp_models: Vec::new(),
+            llama_cpp_selected: 0,
+            llama_cpp_loading: false,
+            llama_cpp_download_input: String::new(),
+            llama_cpp_download_running: false,
+            llama_cpp_download_status: None,
+            llama_cpp_download_fraction: None,
+            llama_cpp_download_task: None,
+            llama_cpp_confirm_delete: None,
+            llama_cpp_deleting: None,
+            llama_cpp_delete_task: None,
+            llama_cpp_switching: None,
+            llama_cpp_switch_task: None,
+            llama_cpp_pending_provider: Arc::new(Mutex::new(None)),
+            llama_cpp_models_dir: dirs::cache_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from("."))
+                .join("crustly")
+                .join("models"),
+            llama_cpp_config: None,
+            llama_cpp_active_model_path: None,
             skills_list: Vec::new(),
             skills_selected: 0,
             mcp_selected: 0,
@@ -475,6 +539,46 @@ impl App {
     /// keep_alive) as the one built at startup.
     pub fn set_ollama_config(&mut self, config: crate::config::OllamaProviderConfig) {
         self.ollama_config = Some(config);
+    }
+
+    /// Record the resolved local `.gguf` models directory
+    /// (`ProviderConfigs::llama_cpp_models_dir()`) the Ctrl+G dialog scans
+    /// and downloads into.
+    pub fn set_llama_cpp_models_dir(&mut self, dir: std::path::PathBuf) {
+        self.llama_cpp_models_dir = dir;
+    }
+
+    /// Record the `[providers.llama_cpp]` config (and, if the active
+    /// provider is `llama-cpp` at startup, its `model_path`) so the Ctrl+G
+    /// switch rebuilds providers with the same settings as the one built at
+    /// startup, and the Model Info panel can show GPU-layers/quantization
+    /// for the model actually running - mirrors `set_ollama_config`.
+    pub fn set_llama_cpp_config(&mut self, config: crate::config::LlamaCppProviderConfig) {
+        if self.provider_name() == "llama-cpp" {
+            self.llama_cpp_active_model_path = Some(config.model_path.clone());
+        }
+        self.llama_cpp_config = Some(config);
+    }
+
+    /// GPU-layers/quantization details for the Model Info panel (Ctrl+O),
+    /// when the active provider is `llama-cpp`. `None` otherwise, or if no
+    /// `[providers.llama_cpp]` config was ever recorded - context size is
+    /// shown separately via `provider_context_window()`, already generic.
+    pub fn llama_cpp_model_details(
+        &self,
+    ) -> Option<super::llama_cpp_download::LlamaCppModelDetails> {
+        if self.provider_name() != "llama-cpp" {
+            return None;
+        }
+        let cfg = self.llama_cpp_config.as_ref()?;
+        let model_path = self
+            .llama_cpp_active_model_path
+            .as_ref()
+            .unwrap_or(&cfg.model_path);
+        Some(super::llama_cpp_download::LlamaCppModelDetails {
+            n_gpu_layers: cfg.n_gpu_layers,
+            quantization_hint: quantization_hint_for_path(model_path),
+        })
     }
 
     /// Record whether the terminal supports the Kitty keyboard enhancement
@@ -741,6 +845,161 @@ impl App {
 
                 self.switch_mode(AppMode::Chat).await?;
             }
+            TuiEvent::LlamaCppModelsListed(models) => {
+                self.llama_cpp_loading = false;
+                self.llama_cpp_models = models;
+                self.llama_cpp_selected = 0;
+            }
+            TuiEvent::LlamaCppDownloadProgress(progress) => {
+                self.llama_cpp_download_fraction = progress.fraction();
+                self.llama_cpp_download_status = Some(match progress.total_bytes {
+                    Some(total) => format!(
+                        "{:.1} / {:.1} MB",
+                        progress.bytes_downloaded as f64 / 1_048_576.0,
+                        total as f64 / 1_048_576.0
+                    ),
+                    None => format!("{:.1} MB", progress.bytes_downloaded as f64 / 1_048_576.0),
+                });
+            }
+            TuiEvent::LlamaCppDownloadFinished { source, error } => {
+                self.llama_cpp_download_running = false;
+                self.llama_cpp_download_task = None;
+                self.llama_cpp_download_status = None;
+                self.llama_cpp_download_fraction = None;
+
+                let content = match &error {
+                    None => format!("✅ Downloaded '{}' successfully.", source),
+                    Some(e) => format!("❌ Failed to download '{}': {}", source, e),
+                };
+                let notification = DisplayMessage {
+                    id: Uuid::new_v4(),
+                    role: "system".to_string(),
+                    content,
+                    thinking_text: None,
+                    thinking_expanded: false,
+                    timestamp: chrono::Utc::now(),
+                    token_count: None,
+                    cost: None,
+                    provider_name: None,
+                    perf_metrics: None,
+                    tokens_per_second: None,
+                };
+                self.messages.push(notification);
+                self.switch_mode(AppMode::Chat).await?;
+
+                // Refresh the local model list in the background so a
+                // successful download shows up next time the dialog opens.
+                let models_dir = self.llama_cpp_models_dir.clone();
+                let sender = self.event_sender();
+                tokio::spawn(async move {
+                    let models = super::llama_cpp_download::list_local(models_dir).await;
+                    let _ = sender.send(TuiEvent::LlamaCppModelsListed(models));
+                });
+            }
+            TuiEvent::LlamaCppDeleteFinished { path, error } => {
+                self.llama_cpp_deleting = None;
+                self.llama_cpp_delete_task = None;
+
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| path.display().to_string());
+                let content = match &error {
+                    None => format!("🗑️ Deleted '{}'.", name),
+                    Some(e) => format!("❌ Failed to delete '{}': {}", name, e),
+                };
+                let notification = DisplayMessage {
+                    id: Uuid::new_v4(),
+                    role: "system".to_string(),
+                    content,
+                    thinking_text: None,
+                    thinking_expanded: false,
+                    timestamp: chrono::Utc::now(),
+                    token_count: None,
+                    cost: None,
+                    provider_name: None,
+                    perf_metrics: None,
+                    tokens_per_second: None,
+                };
+                self.messages.push(notification);
+
+                if error.is_none() {
+                    self.llama_cpp_models.retain(|m| m.path != path);
+                    self.llama_cpp_selected = self
+                        .llama_cpp_selected
+                        .min(self.llama_cpp_models.len().saturating_sub(1));
+                }
+
+                self.switch_mode(AppMode::Chat).await?;
+            }
+            TuiEvent::LlamaCppSwitchFinished { model_path, error } => {
+                self.llama_cpp_switching = None;
+                self.llama_cpp_switch_task = None;
+
+                let name = model_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| model_path.display().to_string());
+
+                let content = match &error {
+                    None => {
+                        let provider = self
+                            .llama_cpp_pending_provider
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .take();
+                        match provider {
+                            Some(provider) => match Arc::get_mut(&mut self.agent_service) {
+                                Some(service) => {
+                                    service.set_provider(provider);
+                                    self.llama_cpp_active_model_path = Some(model_path.clone());
+                                    if let Some(cfg) = self.llama_cpp_config.as_mut() {
+                                        cfg.model_path = model_path.clone();
+                                    }
+                                    if let Some(session) = &mut self.current_session {
+                                        session.model = Some(name.clone());
+                                        session.provider = Some("llama-cpp".to_string());
+                                        if let Err(e) =
+                                            self.session_service.update_session(session).await
+                                        {
+                                            tracing::warn!(
+                                                "Failed to update session after model switch: {}",
+                                                e
+                                            );
+                                        }
+                                    }
+                                    format!("✅ Switched to '{}'.", name)
+                                }
+                                None => {
+                                    "❌ Can't switch provider while a response is in progress - \
+                                     try again once it finishes."
+                                        .to_string()
+                                }
+                            },
+                            None => format!(
+                                "❌ Model '{}' loaded but the result was lost - try again.",
+                                name
+                            ),
+                        }
+                    }
+                    Some(e) => format!("❌ Failed to load '{}': {}", name, e),
+                };
+                let notification = DisplayMessage {
+                    id: Uuid::new_v4(),
+                    role: "system".to_string(),
+                    content,
+                    thinking_text: None,
+                    thinking_expanded: false,
+                    timestamp: chrono::Utc::now(),
+                    token_count: None,
+                    cost: None,
+                    provider_name: None,
+                    perf_metrics: None,
+                    tokens_per_second: None,
+                };
+                self.messages.push(notification);
+                self.switch_mode(AppMode::Chat).await?;
+            }
         }
         Ok(())
     }
@@ -825,6 +1084,11 @@ impl App {
             return Ok(());
         }
 
+        if keys::is_llama_cpp_models(&event) && self.mode == AppMode::Chat {
+            self.open_llama_cpp_models().await?;
+            return Ok(());
+        }
+
         // Mode-specific handling
         tracing::trace!("Current mode: {:?}", self.mode);
         match self.mode {
@@ -845,6 +1109,7 @@ impl App {
             AppMode::FilePicker => self.handle_file_picker_key(event).await?,
             AppMode::ModelDownload => self.handle_model_download_key(event).await?,
             AppMode::ProviderSwitch => self.handle_provider_switch_key(event).await?,
+            AppMode::LlamaCppModelPicker => self.handle_llama_cpp_models_key(event).await?,
             AppMode::Skills => self.handle_skills_key(event).await?,
             AppMode::Mcp => self.handle_mcp_key(event).await?,
             AppMode::Help | AppMode::Settings | AppMode::ModelInfo => {
@@ -2495,6 +2760,177 @@ impl App {
 
         Ok(())
     }
+
+    /// Open the llama.cpp Local Models dialog (Ctrl+G). Scans
+    /// `llama_cpp_models_dir` in the background; the dialog opens
+    /// immediately showing a loading state until the scan completes.
+    async fn open_llama_cpp_models(&mut self) -> Result<()> {
+        self.llama_cpp_download_input.clear();
+        self.llama_cpp_selected = 0;
+        self.llama_cpp_download_running = false;
+        self.llama_cpp_download_status = None;
+        self.llama_cpp_download_fraction = None;
+        self.llama_cpp_confirm_delete = None;
+        self.llama_cpp_deleting = None;
+        self.llama_cpp_loading = true;
+
+        let models_dir = self.llama_cpp_models_dir.clone();
+        let sender = self.event_sender();
+        tokio::spawn(async move {
+            let models = super::llama_cpp_download::list_local(models_dir).await;
+            let _ = sender.send(TuiEvent::LlamaCppModelsListed(models));
+        });
+
+        self.switch_mode(AppMode::LlamaCppModelPicker).await
+    }
+
+    /// Start downloading the current input text as a new `.gguf` source. No-op
+    /// if a download is already running or the input is empty.
+    async fn start_llama_cpp_download(&mut self) {
+        let source = self.llama_cpp_download_input.trim().to_string();
+        if self.llama_cpp_download_running || source.is_empty() {
+            return;
+        }
+
+        self.llama_cpp_download_running = true;
+        self.llama_cpp_download_status = Some("resolving…".to_string());
+        self.llama_cpp_download_fraction = None;
+
+        let models_dir = self.llama_cpp_models_dir.clone();
+        let sender = self.event_sender();
+        let handle = super::llama_cpp_download::spawn_download(source, models_dir, sender).await;
+        self.llama_cpp_download_task = Some(handle);
+    }
+
+    /// Start deleting `path` in the background. No-op if a download,
+    /// delete, or switch is already in flight.
+    async fn start_llama_cpp_delete(&mut self, path: std::path::PathBuf) {
+        if self.llama_cpp_download_running
+            || self.llama_cpp_deleting.is_some()
+            || self.llama_cpp_switching.is_some()
+        {
+            return;
+        }
+
+        self.llama_cpp_deleting = Some(path.clone());
+
+        let sender = self.event_sender();
+        let handle = super::llama_cpp_download::spawn_delete(path, sender).await;
+        self.llama_cpp_delete_task = Some(handle);
+    }
+
+    /// Start switching the active provider to `path` in the background. This
+    /// blocks (via `spawn_blocking`) while the model loads, so the dialog
+    /// shows a "Loading model…" state rather than switching instantly the
+    /// way Ollama's Ctrl+W does - see `llama_cpp_download`'s module doc.
+    async fn start_llama_cpp_switch(&mut self, path: std::path::PathBuf) {
+        if self.llama_cpp_download_running
+            || self.llama_cpp_deleting.is_some()
+            || self.llama_cpp_switching.is_some()
+        {
+            return;
+        }
+
+        self.llama_cpp_switching = Some(path.clone());
+
+        let config = self.llama_cpp_config.clone();
+        let slot = self.llama_cpp_pending_provider.clone();
+        let sender = self.event_sender();
+        let handle = super::llama_cpp_download::spawn_switch(path, config, slot, sender).await;
+        self.llama_cpp_switch_task = Some(handle);
+    }
+
+    /// Handle keys in the llama.cpp Local Models dialog.
+    async fn handle_llama_cpp_models_key(
+        &mut self,
+        event: crossterm::event::KeyEvent,
+    ) -> Result<()> {
+        use super::events::keys;
+        use crossterm::event::KeyCode;
+
+        // Confirming a delete: only Y/Enter confirms, N/Esc cancels back to
+        // the list (without closing the whole dialog).
+        if let Some(path) = self.llama_cpp_confirm_delete.clone() {
+            match event.code {
+                KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+                    self.llama_cpp_confirm_delete = None;
+                    self.start_llama_cpp_delete(path).await;
+                }
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                    self.llama_cpp_confirm_delete = None;
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
+        if keys::is_cancel(&event) {
+            // Cancel an in-flight download/delete/switch (if any) and close
+            // the dialog. A switch that already swapped the provider (event
+            // already processed) can't be "cancelled" here - only an
+            // in-flight load can, since `llama_cpp_switching` is cleared the
+            // moment `LlamaCppSwitchFinished` lands.
+            if let Some(handle) = self.llama_cpp_download_task.take() {
+                handle.abort();
+            }
+            if let Some(handle) = self.llama_cpp_delete_task.take() {
+                handle.abort();
+            }
+            if let Some(handle) = self.llama_cpp_switch_task.take() {
+                handle.abort();
+            }
+            self.llama_cpp_download_running = false;
+            self.llama_cpp_deleting = None;
+            self.llama_cpp_switching = None;
+            self.llama_cpp_download_status = None;
+            self.llama_cpp_download_fraction = None;
+            self.switch_mode(AppMode::Chat).await?;
+            return Ok(());
+        }
+
+        // While a download/delete/switch is running, only Esc (handled
+        // above) does anything.
+        if self.llama_cpp_download_running
+            || self.llama_cpp_deleting.is_some()
+            || self.llama_cpp_switching.is_some()
+        {
+            return Ok(());
+        }
+
+        if keys::is_up(&event) {
+            self.llama_cpp_selected = self.llama_cpp_selected.saturating_sub(1);
+        } else if keys::is_down(&event) {
+            if !self.llama_cpp_models.is_empty() {
+                self.llama_cpp_selected =
+                    (self.llama_cpp_selected + 1).min(self.llama_cpp_models.len() - 1);
+            }
+        } else if event.code == KeyCode::Delete {
+            if let Some(model) = self.llama_cpp_models.get(self.llama_cpp_selected) {
+                self.llama_cpp_confirm_delete = Some(model.path.clone());
+            }
+        } else if keys::is_enter(&event) {
+            if !self.llama_cpp_download_input.trim().is_empty() {
+                // Typed text takes priority: download it as a new source.
+                self.start_llama_cpp_download().await;
+            } else if let Some(model) = self.llama_cpp_models.get(self.llama_cpp_selected).cloned()
+            {
+                // Empty input: switch to the highlighted local model.
+                self.start_llama_cpp_switch(model.path).await;
+            }
+        } else {
+            match event.code {
+                KeyCode::Char(c) => {
+                    self.llama_cpp_download_input.push(c);
+                }
+                KeyCode::Backspace => {
+                    self.llama_cpp_download_input.pop();
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -3753,6 +4189,226 @@ mod tests {
             .messages
             .iter()
             .any(|m| m.content.contains("Switched to Ollama model")));
+    }
+
+    #[tokio::test]
+    async fn ctrl_g_opens_llama_cpp_models_dialog_in_loading_state() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_key_event(key_mod(KeyCode::Char('g'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert_eq!(app.mode, AppMode::LlamaCppModelPicker);
+        assert!(app.llama_cpp_loading);
+        assert!(app.llama_cpp_models.is_empty());
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_models_listed_clears_loading_state() {
+        let mut app = test_app().await;
+        app.llama_cpp_loading = true;
+
+        app.handle_event(TuiEvent::LlamaCppModelsListed(vec![
+            super::super::llama_cpp_download::LlamaCppModelSummary {
+                path: std::path::PathBuf::from("/models/a.gguf"),
+                size_bytes: 100,
+                quantization_hint: Some("Q4_K_M".to_string()),
+            },
+            super::super::llama_cpp_download::LlamaCppModelSummary {
+                path: std::path::PathBuf::from("/models/b.gguf"),
+                size_bytes: 200,
+                quantization_hint: None,
+            },
+        ]))
+        .await
+        .unwrap();
+
+        assert!(!app.llama_cpp_loading);
+        assert_eq!(app.llama_cpp_models.len(), 2);
+        assert_eq!(app.llama_cpp_selected, 0);
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_up_down_navigation_clamps_at_bounds() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_loading = false;
+        app.llama_cpp_models = vec![
+            super::super::llama_cpp_download::LlamaCppModelSummary {
+                path: std::path::PathBuf::from("/models/a.gguf"),
+                size_bytes: 100,
+                quantization_hint: None,
+            },
+            super::super::llama_cpp_download::LlamaCppModelSummary {
+                path: std::path::PathBuf::from("/models/b.gguf"),
+                size_bytes: 100,
+                quantization_hint: None,
+            },
+        ];
+
+        app.handle_llama_cpp_models_key(key(KeyCode::Up))
+            .await
+            .unwrap();
+        assert_eq!(app.llama_cpp_selected, 0);
+
+        app.handle_llama_cpp_models_key(key(KeyCode::Down))
+            .await
+            .unwrap();
+        app.handle_llama_cpp_models_key(key(KeyCode::Down))
+            .await
+            .unwrap();
+        assert_eq!(app.llama_cpp_selected, 1);
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_esc_returns_to_chat() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_loading = true;
+
+        app.handle_llama_cpp_models_key(key(KeyCode::Esc))
+            .await
+            .unwrap();
+
+        assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_typing_fills_the_download_input() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_loading = false;
+
+        app.handle_llama_cpp_models_key(key(KeyCode::Char('h')))
+            .await
+            .unwrap();
+        app.handle_llama_cpp_models_key(key(KeyCode::Char('f')))
+            .await
+            .unwrap();
+
+        assert_eq!(app.llama_cpp_download_input, "hf");
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_delete_key_asks_for_confirmation_before_deleting() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_models = vec![super::super::llama_cpp_download::LlamaCppModelSummary {
+            path: std::path::PathBuf::from("/models/a.gguf"),
+            size_bytes: 100,
+            quantization_hint: None,
+        }];
+
+        app.handle_llama_cpp_models_key(key(KeyCode::Delete))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            app.llama_cpp_confirm_delete,
+            Some(std::path::PathBuf::from("/models/a.gguf"))
+        );
+        // Nothing deleted yet - only asked.
+        assert_eq!(app.llama_cpp_models.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_delete_finished_removes_model_from_list() {
+        let mut app = test_app().await;
+        app.llama_cpp_models = vec![super::super::llama_cpp_download::LlamaCppModelSummary {
+            path: std::path::PathBuf::from("/models/a.gguf"),
+            size_bytes: 100,
+            quantization_hint: None,
+        }];
+        app.llama_cpp_deleting = Some(std::path::PathBuf::from("/models/a.gguf"));
+
+        app.handle_event(TuiEvent::LlamaCppDeleteFinished {
+            path: std::path::PathBuf::from("/models/a.gguf"),
+            error: None,
+        })
+        .await
+        .unwrap();
+
+        assert!(app.llama_cpp_deleting.is_none());
+        assert!(app.llama_cpp_models.is_empty());
+        assert_eq!(app.mode, AppMode::Chat);
+        assert!(app.messages.iter().any(|m| m.content.contains("Deleted")));
+    }
+
+    /// The freshly-built provider crosses the switch task's thread boundary
+    /// through `llama_cpp_pending_provider`, not `TuiEvent` (which can't
+    /// carry a `Provider` trait object - see the field's own doc comment).
+    /// Simulating that here (rather than going through the real,
+    /// feature-gated `spawn_switch`) keeps this test exercising the same
+    /// event-driven swap-in logic the real path uses, without needing an
+    /// actual `.gguf` file.
+    #[tokio::test]
+    async fn llama_cpp_switch_finished_swaps_provider_in_place() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_switching = Some(std::path::PathBuf::from("/models/a.gguf"));
+        *app.llama_cpp_pending_provider.lock().unwrap() =
+            Some(Arc::new(DummyProvider) as Arc<dyn Provider>);
+
+        app.handle_event(TuiEvent::LlamaCppSwitchFinished {
+            model_path: std::path::PathBuf::from("/models/a.gguf"),
+            error: None,
+        })
+        .await
+        .unwrap();
+
+        assert!(app.llama_cpp_switching.is_none());
+        assert_eq!(app.mode, AppMode::Chat);
+        assert_eq!(app.provider_name(), "dummy");
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Switched to")));
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_switch_finished_with_error_reports_failure_without_swapping() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_switching = Some(std::path::PathBuf::from("/models/a.gguf"));
+        let original_provider_name = app.provider_name().to_string();
+
+        app.handle_event(TuiEvent::LlamaCppSwitchFinished {
+            model_path: std::path::PathBuf::from("/models/a.gguf"),
+            error: Some("model file not found".to_string()),
+        })
+        .await
+        .unwrap();
+
+        assert!(app.llama_cpp_switching.is_none());
+        assert_eq!(app.provider_name(), original_provider_name);
+        assert!(app
+            .messages
+            .iter()
+            .any(|m| m.content.contains("Failed to load")));
+    }
+
+    /// A switch, download, and delete all share one dialog - only one
+    /// operation may run at a time. Enter must not start a second switch
+    /// while a delete is already in flight.
+    #[tokio::test]
+    async fn llama_cpp_switch_is_a_noop_while_a_delete_is_already_running() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_deleting = Some(std::path::PathBuf::from("/models/a.gguf"));
+        app.llama_cpp_models = vec![super::super::llama_cpp_download::LlamaCppModelSummary {
+            path: std::path::PathBuf::from("/models/b.gguf"),
+            size_bytes: 100,
+            quantization_hint: None,
+        }];
+
+        // Enter would normally start a switch to the highlighted model.
+        app.handle_llama_cpp_models_key(key(KeyCode::Enter))
+            .await
+            .unwrap();
+
+        assert!(app.llama_cpp_switching.is_none());
     }
 
     /// Regression: `send_message` spawns the agent call as a detached
