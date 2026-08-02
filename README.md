@@ -1,5 +1,9 @@
 # Crustly 🥐
 
+<p align="center">
+  <img src="docs/images/crustly-badge.png" alt="Crustly — AI coding assistant, built with Rust" width="320">
+</p>
+
 **High-Performance Terminal AI Assistant for Software Development**
 
 > A blazingly fast, memory-efficient terminal-based AI assistant written in Rust.
