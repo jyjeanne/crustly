@@ -129,6 +129,41 @@ Crustly: [creates comprehensive docs]
 
 ## ✨ What's New
 
+### Unreleased — In-Process llama.cpp Provider
+
+A third local-inference path, alongside the OpenAI-compatible route and
+native Ollama: `providers.llama_cpp` loads a `.gguf` file **directly into
+the Crustly process** via [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) —
+no Ollama daemon, no LM Studio server, no port to start. See
+[docs/guides/LLAMA_CPP_GUIDE.md](docs/guides/LLAMA_CPP_GUIDE.md) for setup
+and [llama-cpp-2-integration-plan.md](llama-cpp-2-integration-plan.md) for
+the full technical design and phase-by-phase implementation record.
+
+- **Streaming, tool calling, GPU offload** — token-by-token streaming,
+  the same printed-JSON tool-call recovery Ollama falls back to, and six
+  optional GPU backend features (`llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`)
+  with a startup warning if `n_gpu_layers` is set without a matching
+  feature compiled in.
+- **Grammar-constrained tool calling** (`--features llama-cpp-llguidance`) —
+  the moment a response commits to a bare-JSON tool call, decoding swaps
+  mid-stream to a sampler that can only produce tokens forming a valid
+  call to one of the tools actually offered. Ships with the fixes from two
+  rounds of code review: the swap trigger requires the model to have
+  already typed a real offered tool's name (not just an opening brace, to
+  avoid hijacking legitimate JSON-shaped prose into a fabricated call),
+  and the sampler swap correctly carries over repeat-penalty history and
+  RNG state instead of discarding it.
+- **Local model management** — `Ctrl+G` TUI dialog (pick a downloaded
+  `.gguf`, download a new one by URL or `hf:org/repo/file.gguf` shorthand
+  with a live progress bar, delete with `Del`) and CLI equivalents
+  (`crustly llama-cpp list|pull|rm`).
+- **Idle-unload** — `providers.llama_cpp.idle_unload_secs` frees the
+  loaded model and its context after a configurable idle period, reloading
+  on the next request.
+- **Fixed:** responses echoed the requested model name instead of the
+  model actually loaded, breaking `ModelRouter`'s tier-based auto-routing
+  for this provider.
+
 ### v0.5.2 — Local-Model Reliability & Per-Model Tuning
 
 A hardening pass driven by end-to-end testing of the full agentic tool loop
