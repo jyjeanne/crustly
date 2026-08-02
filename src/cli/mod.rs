@@ -228,6 +228,13 @@ pub enum Commands {
         #[command(subcommand)]
         operation: OllamaCommands,
     },
+
+    /// Manage local .gguf model files (native llama.cpp provider, requires
+    /// the crate's 'llama-cpp' build feature)
+    LlamaCpp {
+        #[command(subcommand)]
+        operation: LlamaCppCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -256,6 +263,23 @@ pub enum OllamaCommands {
         model: String,
         /// Text to embed
         text: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum LlamaCppCommands {
+    /// List .gguf files in the configured models directory
+    List,
+    /// Download a model: a direct URL, or an `hf:org/repo/file.gguf`
+    /// shorthand resolved against Hugging Face
+    Pull {
+        /// Direct URL or `hf:org/repo/file.gguf` shorthand
+        source: String,
+    },
+    /// Delete a local .gguf file by name or path
+    Rm {
+        /// Filename (resolved inside the models directory) or full path
+        model: String,
     },
 }
 
@@ -380,6 +404,7 @@ pub async fn run() -> Result<()> {
             max_iterations,
         }) => cmd_autoplan(&config, goal, max_iterations).await,
         Some(Commands::Ollama { operation }) => cmd_ollama(&config, operation).await,
+        Some(Commands::LlamaCpp { operation }) => cmd_llama_cpp(&config, operation).await,
     }
 }
 
@@ -1201,6 +1226,164 @@ async fn cmd_ollama(_config: &crate::config::Config, _operation: OllamaCommands)
     );
 }
 
+/// Resolve the configured llama.cpp models directory, falling back to a
+/// platform cache dir (`~/.cache/crustly/models` on Linux). Used both by
+/// `crustly llama-cpp <...>` and, once built, the TUI's model picker
+/// dialog (`llama-cpp-2-integration-plan.md` §7 point 4).
+///
+/// Feature-gated for now (unlike `ollama_host`, which has an
+/// always-compiled TUI call site) since its only caller today is
+/// `cmd_llama_cpp` - drop the `cfg` once a Phase 7 call site needs it
+/// unconditionally, the same way `ollama_host` itself isn't gated.
+#[cfg(feature = "llama-cpp")]
+fn llama_cpp_models_dir(config: &crate::config::Config) -> std::path::PathBuf {
+    config
+        .providers
+        .llama_cpp
+        .as_ref()
+        .and_then(|c| c.models_dir.clone())
+        .unwrap_or_else(|| {
+            dirs::cache_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from("."))
+                .join("crustly")
+                .join("models")
+        })
+}
+
+/// Resolve a user-supplied `model` argument (from `crustly llama-cpp rm`)
+/// to a path: an absolute path or one containing a separator is used as-is,
+/// otherwise it's treated as a filename inside `models_dir`.
+#[cfg(feature = "llama-cpp")]
+fn resolve_llama_cpp_model_path(
+    models_dir: &std::path::Path,
+    model: &str,
+) -> std::path::PathBuf {
+    let candidate = std::path::Path::new(model);
+    if candidate.is_absolute() || model.contains(std::path::MAIN_SEPARATOR) {
+        candidate.to_path_buf()
+    } else {
+        models_dir.join(model)
+    }
+}
+
+#[cfg(feature = "llama-cpp")]
+async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppCommands) -> Result<()> {
+    use crate::llm::provider::llama_cpp_models;
+
+    let models_dir = llama_cpp_models_dir(config);
+
+    match operation {
+        LlamaCppCommands::List => {
+            println!("🦙 Models in {}\n", models_dir.display());
+            let models = llama_cpp_models::list_local_models(&models_dir)?;
+
+            if models.is_empty() {
+                println!("  (none) - pull one with: crustly llama-cpp pull <source>");
+            } else {
+                for m in models {
+                    let size_gb = m.size_bytes as f64 / 1_073_741_824.0;
+                    let quant = m.quantization_hint.as_deref().unwrap_or("unknown");
+                    let name = m
+                        .path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    println!(
+                        "  {:<45} {:>7.2} GB   {:<10} {}",
+                        name, size_gb, quant, m.modified_at
+                    );
+                }
+            }
+            Ok(())
+        }
+
+        LlamaCppCommands::Pull { source } => {
+            println!("🦙 Resolving '{}'...\n", source);
+            let (url, expected_sha256) =
+                llama_cpp_models::resolve_download_source(&source).await?;
+            if expected_sha256.is_none() {
+                println!(
+                    "⚠️  No integrity hash available for this download - the file will \
+                     not be checksum-verified.\n"
+                );
+            }
+            println!("Downloading {}...\n", url);
+
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            let models_dir_clone = models_dir.clone();
+            let pull_task = tokio::spawn(async move {
+                llama_cpp_models::download_model(
+                    &url,
+                    &models_dir_clone,
+                    expected_sha256.as_deref(),
+                    tx,
+                )
+                .await
+            });
+
+            let mut last_pct: i64 = -1;
+            while let Some(progress) = rx.recv().await {
+                use std::io::Write as _;
+                if let Some(fraction) = progress.fraction() {
+                    let pct = (fraction * 100.0) as i64;
+                    if pct != last_pct {
+                        print!("\r  {pct}%");
+                        let _ = std::io::stdout().flush();
+                        last_pct = pct;
+                    }
+                } else {
+                    print!("\r  {} bytes", progress.bytes_downloaded);
+                    let _ = std::io::stdout().flush();
+                }
+            }
+            println!();
+
+            let path = pull_task
+                .await
+                .context("Download task panicked")?
+                .with_context(|| format!("Failed to download '{}'", source))?;
+
+            println!("✅ Downloaded to {}", path.display());
+            Ok(())
+        }
+
+        LlamaCppCommands::Rm { model } => {
+            let path = resolve_llama_cpp_model_path(&models_dir, &model);
+            if !path.exists() {
+                anyhow::bail!("No such file: {}", path.display());
+            }
+
+            let size_gb = std::fs::metadata(&path)
+                .map(|m| m.len() as f64 / 1_073_741_824.0)
+                .unwrap_or(0.0);
+            print!("Delete '{}' ({:.2} GB)? [y/N] ", path.display(), size_gb);
+            use std::io::Write as _;
+            std::io::stdout().flush().ok();
+            let mut answer = String::new();
+            std::io::stdin().read_line(&mut answer).ok();
+            if !answer.trim().eq_ignore_ascii_case("y") {
+                println!("Cancelled.");
+                return Ok(());
+            }
+
+            llama_cpp_models::delete_model(&path)?;
+            println!("✅ Deleted '{}'", path.display());
+            Ok(())
+        }
+    }
+}
+
+#[cfg(not(feature = "llama-cpp"))]
+async fn cmd_llama_cpp(
+    _config: &crate::config::Config,
+    _operation: LlamaCppCommands,
+) -> Result<()> {
+    anyhow::bail!(
+        "This build of crustly was compiled without the 'llama-cpp' feature. \
+         Rebuild with `--features llama-cpp` to use `crustly llama-cpp`."
+    );
+}
+
 /// FullAuto plan mode: no approval gates, runs to completion or max_iterations.
 async fn cmd_autoplan(
     config: &crate::config::Config,
@@ -1516,6 +1699,55 @@ mod tests {
             }) => assert_eq!(model, "qwen2.5-coder:7b"),
             other => panic!("expected Ollama Pull command, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_llama_cpp_command_parses() {
+        let cli = Cli::parse_from([
+            "crustly",
+            "llama-cpp",
+            "pull",
+            "hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf",
+        ]);
+        match cli.command {
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::Pull { source },
+            }) => assert_eq!(source, "hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf"),
+            other => panic!("expected LlamaCpp Pull command, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_llama_cpp_list_and_rm_parse() {
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "list"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::List
+            })
+        ));
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "rm", "model.gguf"]);
+        match cli.command {
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::Rm { model },
+            }) => assert_eq!(model, "model.gguf"),
+            other => panic!("expected LlamaCpp Rm command, got {other:?}"),
+        }
+    }
+
+    #[cfg(feature = "llama-cpp")]
+    #[test]
+    fn resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir() {
+        let dir = std::path::Path::new("/models");
+        assert_eq!(
+            resolve_llama_cpp_model_path(dir, "model.gguf"),
+            std::path::PathBuf::from("/models/model.gguf")
+        );
+        assert_eq!(
+            resolve_llama_cpp_model_path(dir, "/elsewhere/model.gguf"),
+            std::path::PathBuf::from("/elsewhere/model.gguf")
+        );
     }
 
     #[test]

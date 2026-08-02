@@ -23,6 +23,8 @@ pub mod factory;
 pub mod gemini;
 #[cfg(feature = "llama-cpp")]
 pub mod llama_cpp;
+#[cfg(feature = "llama-cpp")]
+pub mod llama_cpp_models;
 #[cfg(feature = "ollama")]
 pub mod ollama;
 #[cfg(feature = "ollama")]
