@@ -172,6 +172,29 @@ correspondingly more. Partial offload (some layers on GPU, the rest on
 CPU) is also viable via `n_gpu_layers` set below the model's full layer
 count.
 
+## Grammar-constrained tool calling (optional)
+
+By default, tool calls are recognized by parsing the model's printed JSON
+after the fact (`tool_call_recovery.rs` — the same mechanism the native
+Ollama provider falls back to for models that don't populate a native
+`tool_calls` field). Building with the extra `llama-cpp-llguidance`
+feature adds a syntax guarantee on top: the moment a response commits to
+printing a bare JSON object (not a fenced ` ```json ` block — that case
+still relies on the always-on recovery heuristic above), decoding switches
+to a grammar-constrained sampler that can only produce tokens forming a
+valid call to one of the tools actually offered, so a malformed call is no
+longer possible for that shape of response.
+
+```bash
+cargo build --release --features llama-cpp-llguidance
+```
+
+Additive, not a replacement — the recovery heuristic still runs on every
+response regardless, since a grammar guarantees valid *syntax*, not that
+generation won't be cut off by the token budget before the JSON value
+completes. Nothing else needs configuring; this only changes internal
+decoding behavior when tools are offered.
+
 ## What's different from Ollama, concretely
 
 | | Native Ollama | `providers.llama_cpp` |
@@ -180,7 +203,7 @@ count.
 | Model swap cost | Cheap, near-instant | Multi-GB file reload (seconds+) |
 | Multiple clients sharing one loaded model | Yes | No — each instance loads its own copy |
 | Idle memory when not in use | ~1GB+ (daemon), more with a model resident | Zero — nothing running outside an active Crustly session |
-| Tool calling | Native for supporting models, text-recovery fallback otherwise | Text-recovery only (same mechanism, shared code) |
+| Tool calling | Native for supporting models, text-recovery fallback otherwise | Text-recovery by default; optionally grammar-constrained with `--features llama-cpp-llguidance` |
 | Model catalog | Named tags (`ollama pull qwen2.5-coder:7b`) | Manual file management |
 
 Both can be configured at once — `providers.ollama` and

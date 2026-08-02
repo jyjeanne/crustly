@@ -11,7 +11,7 @@
 //! pipeline that `llama-cpp-2` 0.1.153 exposes (`LlamaSampler::llguidance_tok_env`,
 //! `impl From<Matcher> for LlamaSampler`).
 //!
-//! ## Why this isn't wired into `run_complete`/`run_stream` yet
+//! ## How this is wired into `run_complete`/`run_stream`
 //!
 //! A grammar built from `tool_call_json_schema` matches *only* a tool call -
 //! there is no JSON Schema expression for "or arbitrary free-form text".
@@ -19,34 +19,39 @@
 //! `request.tools` is non-empty (which, in Crustly's agent loop, is nearly
 //! every turn) would make it *impossible* for the model to ever answer in
 //! plain text again once tools are offered - a severe regression, not an
-//! additive reliability upgrade.
+//! additive reliability upgrade. So it isn't chained unconditionally.
 //!
-//! The correct integration is a **mid-stream sampler swap**: decode
-//! unconstrained as today, reuse the same
-//! `tool_call_recovery::maybe_tool_call_json` trigger `run_stream` already
-//! uses to withhold output, and only once that trigger fires (the model has
-//! committed to something that looks like a call, typically after the very
-//! first non-whitespace token) build this constrained sampler, replay the
-//! handful of already-generated tokens into its `Matcher` via
-//! `consume_tokens`, and decode the remainder of that response constrained.
-//! A plain-text response never reaches the trigger and is never constrained,
-//! preserving free-text answers exactly as Phase 4 already does; a tool-call
-//! response gets syntax-guaranteed JSON instead of relying solely on the
-//! always-on recovery heuristic (`tool_call_recovery.rs`) after the fact.
+//! Instead, `run_complete`/`run_stream` (`llama_cpp.rs`) decode unconstrained
+//! as normal, reusing the same `tool_call_recovery::maybe_tool_call_json`
+//! trigger `run_stream`'s withholding logic already uses. The moment
+//! generation commits to a *bare* JSON object (accumulated text trims to a
+//! leading `{` - deliberately not the fenced-block case, since a fence needs
+//! unconstrained prose before/after it, which this grammar can't express),
+//! `try_build_constrained_sampler()` builds this module's sampler, replays
+//! the tokens generated so far into its `Matcher` via `accept_many()` (so its
+//! parser state matches what's actually been decoded), and the resulting
+//! chain (grammar first, then the normal penalties/top-k/top-p/temp/dist
+//! tail) becomes the sampler for the rest of that response. A plain-text
+//! response never reaches the trigger and is never constrained, preserving
+//! free-text answers exactly as Phase 4 already does; a tool-call response
+//! gets syntax-guaranteed JSON instead of relying solely on the always-on
+//! recovery heuristic (`tool_call_recovery.rs`) after the fact - which still
+//! runs regardless, as the final safety net.
 //!
-//! That swap touches `run_complete`/`run_stream`'s live decode loop and its
-//! correctness (in particular, whether `Matcher::consume_tokens` replaying a
-//! few already-decoded tokens keeps the parser state genuinely in sync with
-//! `llama.cpp`'s own KV cache) is not verifiable in this environment - no
-//! `.gguf` model is available to run it against, and `llama-cpp-2-integration-plan.md`
-//! §13 Phase 4b's own exit criteria requires exactly that manual, real-model
-//! verification. Shipping the swap unverified would risk shipping a decode
-//! loop that hangs, panics, or silently corrupts output for every user who
-//! enables `llama-cpp-llguidance` - worse than not having the feature.
-//!
-//! So this pass ships the infrastructure - correct, offline-testable,
-//! feature-gated - without wiring the swap into the hot path. The next step,
-//! once real-model testing is possible, is exactly the swap described above.
+//! **Not verified against a real `.gguf` model** - none is available in this
+//! sandbox (network access to fetch one is also blocked here). What *is*
+//! confirmed, by reading `llguidance` 1.7.6's `Matcher::consume_tokens`/
+//! `with_inner` and `llama-cpp-2` 0.1.153's `llg_accept`/`llg_apply` directly:
+//! a token-replay mismatch during `accept_many()` poisons the `Matcher` into
+//! an `Error` state, after which `llg_apply` becomes a documented no-op and
+//! `llg_accept` silently ignores further errors - the constrained sampler
+//! just stops masking anything from that point on, silently reverting to the
+//! exact unconstrained behavior this feature is additive on top of, with
+//! `tool_call_recovery.rs` still catching whatever comes out. That's the
+//! actual worst case: no improvement for that one response, not a hang,
+//! panic, or corrupted decode loop - see
+//! `try_build_constrained_sampler_does_not_panic_on_an_arbitrary_token_replay`
+//! (`llama_cpp.rs`) for the offline test exercising exactly this.
 
 use super::types::Tool;
 use llama_cpp_2::sampling::LlamaSampler;

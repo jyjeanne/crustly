@@ -472,7 +472,10 @@ daemon, no LM Studio server, no port to start.
   `llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`) and thread
   count, without going through a server's own defaults.
 - Same tool-calling reliability mechanism as native Ollama's fallback path
-  (printed-JSON recovery, shared code — `src/llm/provider/tool_call_recovery.rs`).
+  (printed-JSON recovery, shared code — `src/llm/provider/tool_call_recovery.rs`),
+  optionally upgraded with a syntax guarantee via `--features llama-cpp-llguidance`
+  (grammar-constrained decoding for bare-JSON tool calls — see the
+  [guide](docs/guides/LLAMA_CPP_GUIDE.md#grammar-constrained-tool-calling-optional)).
 - **`Ctrl+G` Local Models dialog** — the TUI equivalent of Ollama's `Ctrl+D`:
   pick an already-downloaded `.gguf` file to switch to (shows a "Loading
   model…" state while it loads — not instant, unlike Ollama's swap), type a
