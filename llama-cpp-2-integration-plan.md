@@ -1,11 +1,13 @@
 # `llama-cpp-2` Integration Plan
 
-Status: **Phases 0–4, 6, 8, 9, 10 implemented** (streaming MVP with
-sampling/context fixes, tool calling, model management, GPU backend
-features, idle-unload, and docs/ADR; §0.1's Go/No-Go gate was explicitly
-overridden by the repo owner to proceed — see below). Phase 4b
-(grammar-constrained tool calling via `llguidance`) and Phase 7 (TUI
-integration) not started.
+Status: **Phases 0–4, 6, 8, 9, 10 implemented, Phase 4b infrastructure
+implemented but not wired in** (streaming MVP with sampling/context fixes,
+tool calling, model management, GPU backend features, idle-unload, and
+docs/ADR; §0.1's Go/No-Go gate was explicitly overridden by the repo owner
+to proceed — see below). Phase 4b's grammar/sampler construction is built
+and tested (`src/llm/provider/llama_cpp_grammar.rs`) but deliberately not
+called from the live decode loop yet — see that phase's row below for why.
+Phase 7 (TUI integration) not started.
 Branch: `claude/llama-cpp-2-integration-mfirvd`
 Dependency: [`llama-cpp-2`](https://crates.io/crates/llama-cpp-2) v0.1.153
 (pinned — confirmed via the live crates.io index at implementation time,
@@ -33,7 +35,7 @@ analysis and Go/No-Go framework this plan builds on (§0.1).
 | Phase 8 — GPU acceleration | ✅ Done | Six Cargo features added (`llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`), each layered on `llama-cpp` and mapping straight to `llama-cpp-2`'s own real feature names (confirmed via `cargo tree -e features`, no unknown-feature errors, for all six). `n_gpu_layers` was already wired through to context creation in Phase 1; what Phase 8 added is `gpu_backend_compiled_in()` (a `cfg!`-based check) and a startup warning when `n_gpu_layers > 0` but no GPU feature is compiled in, so the setting's no-op-ness is surfaced instead of silent. Cannot be build-verified end-to-end in this sandbox (no CUDA/Metal/Vulkan/ROCm/OpenCL/MKL SDK installed) — consistent with the plan's own scope note for this phase. VRAM/hardware documentation landed in Phase 10's guide. |
 | Phase 9 — Idle-unload hardening | ✅ Done | `providers.llama_cpp.idle_unload_secs` implemented: `worker_loop` restructured from a single load-then-serve pass into an outer "load, then serve" loop, so an idle-unload just lets one iteration's `backend`/`model`/`context` go out of scope and the next iteration reloads them — sidesteps a genuine self-referential-struct problem (`LlamaContext<'a>` borrows from `LlamaModel`) without `unsafe`/`self_cell`. Idle detection polls `job_rx.try_recv()` every 2s while a model is loaded and the setting is configured; once unloaded, the worker returns to a real zero-CPU `blocking_recv()` and waits for the next job before reloading (not speculatively). `idle_unload_secs = None` (default) is behaviorally identical to before this phase — no polling overhead. Panic isolation (`catch_unwind`) was already done in Phase 1. The reload cycle itself needs a real `.gguf` file to exercise end-to-end (manual-test gap, below). |
 | Phase 10 — Documentation & rollout | ✅ Done | README.md (new "llama.cpp (no server, in-process)" overview subsection plus a detailed one next to native Ollama's), `config.toml.example` (`[providers.llama_cpp]` block matching the existing Ollama examples' style), `docs/guides/LLAMA_CPP_GUIDE.md` (build requirements, getting a model, GPU backend table with VRAM guidance, comparison table vs. Ollama, troubleshooting including the §4.11 process-isolation caveat stated plainly), and ADR `0005-llama-cpp-in-process-worker-thread.md` (the worker-thread decision from §4.4/ADR-worthy per the existing ADR process, indexed in `decisions/README.md`) — both new docs cross-reference this plan and `llm-file-gguf-support.md` rather than restating their analysis. |
-| Phase 4b — Grammar-constrained tool calling | Not started | Deferred per the plan's own framing (optional, additive on top of the always-on Phase 4 recovery). Requires the `llguidance`/`toktrie` optional deps and mapping `Tool.input_schema` to a constrained grammar - not attempted in this pass. |
+| Phase 4b — Grammar-constrained tool calling | ⚠️ Infrastructure done, not wired in | `llguidance`/`toktrie` added as explicit optional deps (`llama-cpp-2` names `toktrie` in a return type but re-exports neither crate); new `llama-cpp-llguidance` feature (`llama-cpp` + `llama-cpp-2/llguidance` + both deps). New module `src/llm/provider/llama_cpp_grammar.rs`: `tool_call_json_schema(&[Tool]) -> serde_json::Value` (pure, builds a `{"oneOf": [...]}` schema — one variant per offered tool, each pinning `name` via `const` and embedding the tool's own `input_schema` as `arguments`, matching the shape `tool_instructions_block` already instructs the model to produce and `parse_tool_call_object` already accepts) and `build_tool_call_sampler(&toktrie::TokEnv, &[Tool]) -> Result<LlamaSampler, String>` (the confirmed real API chain: `ParserFactory::new_simple` → `TopLevelGrammar::from_json_schema` → `factory.create_parser` → `Matcher::new` → `LlamaSampler::from`). 4/4 tests pass, including one that compiles a real two-tool schema through the full pipeline into a working `LlamaSampler` end-to-end (using `toktrie::ApproximateTokEnv::single_byte_env()` as a model-free stand-in `TokEnv`, since no `.gguf` file exists in this sandbox) — the only phase in this plan whose core logic is verified against the real upstream API rather than only compiled. **Deliberately not called from `run_complete`/`run_stream`**: a schema built this way matches *only* a tool call, and JSON Schema has no "or free text" expression, so chaining it unconditionally whenever tools are offered (nearly every turn, in Crustly's agent loop) would make the model unable to ever answer in plain text again — a regression, not the additive upgrade this phase is supposed to be. The correct integration is a mid-stream sampler swap (decode unconstrained, trigger on the same `tool_call_recovery::maybe_tool_call_json` check `run_stream` already uses for withholding, replay the handful of already-generated tokens into the `Matcher` via `consume_tokens`, then decode the rest constrained) — architecturally sound (`llguidance::Matcher::consume_tokens`/`try_consume_tokens` exist and are built for exactly this) but its correctness under real FFI/KV-cache state cannot be verified without a real `.gguf` model, which this sandbox doesn't have; §13 Phase 4b's own exit criteria requires exactly that manual verification. Shipping the swap unverified risked a hang/panic/corruption in every user's decode loop, which is worse than the feature not existing — so this pass stops at correct, tested, feature-gated infrastructure and documents the swap as the explicit next step (see the module's own doc comment) rather than silently wiring it in. |
 
 **No manual test against a real `.gguf` file has been run in any phase
 yet** (requires downloading a model, out of scope so far in this sandboxed
@@ -1576,6 +1578,23 @@ mergeable slice (§4.7).
   feature compiled in, behavior is byte-for-byte identical to Phase 4
   (recovery-only), confirming this is genuinely additive, not a silent
   behavior change gated on a feature flag.
+- **Correction found during implementation**: "wired as a pre-check before
+  recovery runs" undersold a real constraint discovered while implementing
+  this phase — a schema built from `Tool.input_schema` matches *only* a
+  tool call, and JSON Schema has no way to express "or arbitrary free
+  text" as an alternative. Applying it for the whole generation whenever
+  tools are offered (nearly every turn, in Crustly's agent loop) would
+  make the model unable to ever answer in plain text once any tool is
+  offered. The grammar/sampler infrastructure landed
+  (`src/llm/provider/llama_cpp_grammar.rs`, tested end-to-end against a
+  stand-in `TokEnv`), but wiring it in requires a mid-stream sampler swap
+  (unconstrained decode → trigger on `maybe_tool_call_json` → constrained
+  decode for the remainder), not a plain pre-check, and that swap's
+  correctness against real FFI/KV-cache state is exactly what this
+  section's own exit criteria already required manual real-model
+  verification for — so the swap itself is the remaining, still-unstarted
+  work. See the §0.0 status table row and the module's doc comment for the
+  full reasoning.
 
 ### Phase 5 — Performance metrics
 

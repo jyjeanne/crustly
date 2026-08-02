@@ -7,7 +7,10 @@
 //! implements Phases 1-4 (`complete()`, `stream()`, full sampling/context
 //! reporting, and tool-call recovery via the shared
 //! `tool_call_recovery` module). Grammar-constrained tool calling
-//! (`llguidance`, Phase 4b) is not implemented yet.
+//! (`llguidance`, Phase 4b) has its infrastructure built in the sibling
+//! `llama_cpp_grammar` module (behind the `llama-cpp-llguidance` feature)
+//! but is not yet wired into `run_complete`/`run_stream`'s decode loop -
+//! see that module's doc comment for why.
 //!
 //! ## Threading model
 //!
@@ -989,7 +992,7 @@ fn tool_instructions_block(tools: &[Tool]) -> String {
 /// separate from `build_prompt`'s `LlamaModel`-dependent chat-template
 /// logic.
 fn merged_system_prompt(system: Option<&str>, tools: Option<&[Tool]>) -> Option<String> {
-    let tools_block = tools.filter(|t| !t.is_empty()).map(|t| tool_instructions_block(t));
+    let tools_block = tools.filter(|t| !t.is_empty()).map(tool_instructions_block);
     match (system, tools_block) {
         (Some(system), Some(tools)) => Some(format!("{system}\n\n{tools}")),
         (Some(system), None) => Some(system.to_string()),

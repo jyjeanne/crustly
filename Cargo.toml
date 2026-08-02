@@ -70,6 +70,14 @@ llama-cpp-2 = { version = "0.1.153", optional = true, default-features = false }
 # Checksum verification for downloaded .gguf files (llama_cpp_models.rs) -
 # see llama-cpp-2-integration-plan.md §4.11/§8.
 sha2 = { version = "0.10", optional = true }
+# Grammar-constrained decoding for tool calls (Phase 4b, `llama-cpp-llguidance`
+# feature only) - builds the JSON-Schema-union grammar and the constrained
+# sampler in src/llm/provider/llama_cpp_grammar.rs. Neither is re-exported
+# by `llama-cpp-2` (its `LlamaSampler::llguidance_tok_env` merely returns a
+# `toktrie::TokEnv` by name), so both must be declared directly here (same
+# version constraint `llama-cpp-2` 0.1.153 itself pins, "1.7").
+llguidance = { version = "1.7", optional = true }
+toktrie = { version = "1.7", optional = true }
 
 # Provider Registry (Crabrace - replaces Catwalk)
 crabrace = "0.1.0"
@@ -164,6 +172,11 @@ llama-cpp-vulkan = ["llama-cpp", "llama-cpp-2/vulkan"]
 llama-cpp-rocm = ["llama-cpp", "llama-cpp-2/rocm"]
 llama-cpp-opencl = ["llama-cpp", "llama-cpp-2/opencl"]
 llama-cpp-mkl = ["llama-cpp", "llama-cpp-2/mkl"]
+# Grammar-constrained tool-call decoding (llama-cpp-2-integration-plan.md
+# Phase 4b) - additive on top of the always-on JSON-recovery heuristic
+# (§4.7), not a replacement for it. Not wired into the default generation
+# path yet - see src/llm/provider/llama_cpp_grammar.rs's module doc.
+llama-cpp-llguidance = ["llama-cpp", "llama-cpp-2/llguidance", "dep:llguidance", "dep:toktrie"]
 all-llm = ["openai", "aws-bedrock", "ollama"]
 
 [profile.dev]
