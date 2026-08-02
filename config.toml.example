@@ -161,6 +161,48 @@ default_model = "qwen2.5-coder-7b-instruct"
 #   crustly ollama show qwen2.5-coder:7b
 #   crustly ollama embed nomic-embed-text "some text to embed"
 
+# ========================================
+# llama.cpp (in-process, no external server) - requires building crustly
+# with `--features llama-cpp` (native C++ compilation, see
+# docs/guides/LLAMA_CPP_GUIDE.md before enabling this). Loads a local
+# .gguf file directly into the crustly process - no Ollama/LM Studio
+# daemon to install or keep running, unlike every other local-inference
+# option above. Trade-off: switching models means unloading and reloading
+# a multi-GB file (seconds to tens of seconds), not the near-instant swap
+# Ollama's server gives you - see llama-cpp-2-integration-plan.md §4.5.
+# ========================================
+# [providers.llama_cpp]
+# enabled = true
+# model_path = "/home/you/.cache/crustly/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf"
+# n_ctx = 8192          # Fixed for the life of the loaded context (unlike Ollama's per-request num_ctx)
+# n_gpu_layers = 0      # 0 = CPU only. Requires building with a GPU feature to have any effect -
+#                       # see "GPU acceleration" below - otherwise this is a silent no-op (a warning
+#                       # is logged at startup if you set it > 0 without one).
+# temperature = 0.10
+# top_p = 0.90
+# top_k = 20
+# repeat_penalty = 1.1
+# idle_unload_secs = 300   # Auto-unload after 5 min idle, reloaded lazily on the next request. Unset = never.
+# models_dir = "/home/you/.cache/crustly/models"  # Used by `crustly llama-cpp list|pull|rm`; defaults to a platform cache dir.
+#
+# Model management from the command line (list/pull/delete - no `show`,
+# unlike Ollama; llama.cpp has no equivalent of `/api/show`):
+#   crustly llama-cpp list
+#   crustly llama-cpp pull hf:Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+#   crustly llama-cpp pull https://example.com/direct/path/to/model.gguf
+#   crustly llama-cpp rm qwen2.5-coder-7b-instruct-q4_k_m.gguf
+#
+# The `hf:org/repo/file.gguf` shorthand resolves against Hugging Face and
+# verifies the downloaded file's SHA-256 when HF publishes one for it (LFS
+# files do); a direct URL has no checksum to verify against and downloads
+# with a warning instead.
+#
+# GPU acceleration: build with one (or more) of `--features
+# llama-cpp-cuda`, `llama-cpp-metal`, `llama-cpp-vulkan`, `llama-cpp-rocm`,
+# `llama-cpp-opencl`, `llama-cpp-mkl` (each requires its own SDK/toolkit
+# installed - see docs/guides/LLAMA_CPP_GUIDE.md), then set n_gpu_layers
+# above 0.
+
 # Environment variables for Qwen:
 # - QWEN_BASE_URL: Local endpoint URL
 # - DASHSCOPE_API_KEY: Cloud API key

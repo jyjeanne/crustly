@@ -458,6 +458,40 @@ Configure it with `[providers.ollama]` in `config.toml` (see `config.toml.exampl
 Ollama can be configured side by side; see [`ollama-rs-integration-plan.md`](./ollama-rs-integration-plan.md)
 for the full design and current status.
 
+#### ✅ In-process llama.cpp (via `llama-cpp-2`, no server)
+
+A third local-inference path, structurally different from the two above:
+`providers.llama_cpp` (enabled with `--features llama-cpp`, compiles native
+C++) loads a `.gguf` file **directly into the Crustly process**, via
+[`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs). No Ollama
+daemon, no LM Studio server, no port to start.
+
+- Zero idle memory footprint outside an active Crustly session — no
+  background process exists to be idle.
+- Direct control over GPU offload (`n_gpu_layers`, six backend features:
+  `llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`) and thread
+  count, without going through a server's own defaults.
+- Same tool-calling reliability mechanism as native Ollama's fallback path
+  (printed-JSON recovery, shared code — `src/llm/provider/tool_call_recovery.rs`).
+- Model management from the command line:
+
+  ```bash
+  crustly llama-cpp list                                                              # locally downloaded .gguf files
+  crustly llama-cpp pull hf:Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+  crustly llama-cpp rm qwen2.5-coder-7b-instruct-q4_k_m.gguf                           # asks for confirmation
+  ```
+
+Trade-offs versus the server-based routes above: requires building from
+source with the extra Cargo feature (native C++ compilation); switching
+models means unloading and reloading a multi-GB file rather than Ollama's
+near-instant swap; no sharing one loaded model across multiple clients.
+Configure it with `[providers.llama_cpp]` in `config.toml` (see
+`config.toml.example`). See
+**[docs/guides/LLAMA_CPP_GUIDE.md](docs/guides/LLAMA_CPP_GUIDE.md)** for
+the full setup guide and
+**[llama-cpp-2-integration-plan.md](./llama-cpp-2-integration-plan.md)**
+for the technical design and current implementation status.
+
 ### Environment Variables
 
 | Variable | Provider | Required |
@@ -724,8 +758,9 @@ If you can't afford cloud API costs, consider these legitimate alternatives:
 
 ## 🏠 Running Crustly with Local LLMs
 
-Crustly runs entirely offline against a local model server, for 100% private,
-$0-cost inference. Full step-by-step setup, troubleshooting, and model
+Crustly runs entirely offline for 100% private, $0-cost inference, via
+three different paths — two against a local model server, one with no
+server at all. Full step-by-step setup, troubleshooting, and model
 recommendations now live in dedicated guides:
 
 ### LM Studio
@@ -741,8 +776,19 @@ recommended local backend since it needs no GUI and reconnects instantly.
 See **[docs/guides/OLLAMA_GUIDE.md](docs/guides/OLLAMA_GUIDE.md)** for
 installation, model pulls, multi-model workflows, and troubleshooting.
 
+### llama.cpp (no server, in-process)
+Skips the server entirely: loads a `.gguf` file directly into the Crustly
+process itself via the `llama-cpp-2` crate — no daemon to install or keep
+running, at the cost of a from-source build (`--features llama-cpp`,
+compiles native C++) and a slower model-switch than Ollama's near-instant
+swap. See **[docs/guides/LLAMA_CPP_GUIDE.md](docs/guides/LLAMA_CPP_GUIDE.md)**
+for build requirements, getting a model, GPU acceleration, and
+troubleshooting — and
+**[llama-cpp-2-integration-plan.md](llama-cpp-2-integration-plan.md)** for
+the full technical design.
+
 ### Configuring `crustly.toml`
-Both routes are configured the same way, through `crustly.toml` or
+All three routes are configured the same way, through `crustly.toml` or
 environment variables. See
 **[docs/guides/CONFIGURATION_GUIDE.md](docs/guides/CONFIGURATION_GUIDE.md)**
 for the full option reference, file locations per OS, and example configs for
