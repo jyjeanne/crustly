@@ -57,15 +57,100 @@ pub fn maybe_tool_call_json(text: &str) -> bool {
 ///   value) - missing an unusual spacing just means the constrained path
 ///   doesn't engage for that response, which is the safe direction to fail
 ///   in, not a correctness problem.
+///
+/// The match must be at brace depth 1 (directly inside the response's own
+/// top-level object), not nested inside an array or sub-object - a
+/// response like `{"records": [{"id": 1, "name": "bash"}], "summary": ...}`
+/// must not trigger just because an unrelated, nested field happens to be
+/// spelled `"name": "bash"`.
+///
+/// Only the first [`NAME_KEY_SCAN_WINDOW`] bytes are scanned - see its own
+/// doc comment for why that's both correct and necessary for this to stay
+/// cheap when called every token/chunk across a whole response, as
+/// `run_complete`/`run_stream` do.
 pub fn commits_to_an_offered_tool_call(text: &str, offered: &[Tool]) -> bool {
     let trimmed = text.trim_start();
     if !trimmed.starts_with('{') {
         return false;
     }
-    offered.iter().any(|tool| {
-        text.contains(&format!("\"name\":\"{}\"", tool.name))
-            || text.contains(&format!("\"name\": \"{}\"", tool.name))
+    let window = leading_window(text, NAME_KEY_SCAN_WINDOW);
+    offered
+        .iter()
+        .any(|tool| top_level_name_key_matches(window, &tool.name))
+}
+
+/// How much of the response text [`commits_to_an_offered_tool_call`] scans.
+/// A genuine top-level `"name"` key (the shape it looks for) appears within
+/// the first few dozen bytes of any response that opens with it -
+/// `tool_instructions_block` instructs the model to answer with *only*
+/// `{"name": ..., "arguments": {...}}`, so `"name"` is always the very
+/// first key of a real call. Bounding the scan to a generous fixed prefix,
+/// instead of the whole ever-growing response, keeps the check O(1) per
+/// call regardless of response length - re-scanning the *entire*
+/// accumulated text from scratch on every token, for the common case of a
+/// response that opens with `{` but never turns out to be a tool call
+/// (tools are offered on nearly every turn; most responses aren't calls),
+/// was an O(n²) cost over the response length.
+const NAME_KEY_SCAN_WINDOW: usize = 256;
+
+/// The first `max_bytes` of `text`, shortened to the nearest earlier UTF-8
+/// character boundary so the slice never panics.
+fn leading_window(text: &str, max_bytes: usize) -> &str {
+    let mut end = text.len().min(max_bytes);
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
+/// Whether `window` contains `"name":"<tool_name>"` (or the
+/// single-space-after-colon spelling) as a complete string value at brace
+/// depth 1. Zero-allocation - no `format!`, just slice comparisons - since
+/// this runs on a hot per-token path.
+fn top_level_name_key_matches(window: &str, tool_name: &str) -> bool {
+    window.match_indices(tool_name).any(|(idx, _)| {
+        name_key_immediately_precedes(window, idx)
+            && window[idx + tool_name.len()..].starts_with('"')
+            && brace_depth_at(window, idx) == 1
     })
+}
+
+/// Whether `text[..idx]` ends with `"name":"` or `"name": "` - i.e. `idx`
+/// is the start of a `"name"` key's string *value*, not merely a
+/// coincidental occurrence of `tool_name` somewhere else in the text.
+fn name_key_immediately_precedes(text: &str, idx: usize) -> bool {
+    let prefix = &text[..idx];
+    prefix.ends_with("\"name\":\"") || prefix.ends_with("\"name\": \"")
+}
+
+/// The `{`/`}` nesting depth of `text` at `byte_pos`, ignoring braces
+/// inside string literals (respecting `\"` escapes). Used to tell a
+/// response's own top-level `"name"` key (depth 1) apart from an
+/// unrelated `"name"` field nested inside an array or sub-object (depth
+/// 2+) - deliberately not tracking `[`/`]`, since the grammar this gates
+/// already requires the top-level value to be an object, confirmed by the
+/// caller's own leading-`{` check.
+fn brace_depth_at(text: &str, byte_pos: usize) -> i32 {
+    let mut depth = 0i32;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (i, c) in text.char_indices() {
+        if i >= byte_pos {
+            break;
+        }
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match c {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            '{' if !in_string => depth += 1,
+            '}' if !in_string => depth -= 1,
+            _ => {}
+        }
+    }
+    depth
 }
 
 /// Recover a tool call that the model printed as text instead of returning
@@ -355,5 +440,54 @@ mod tests {
             "Sure, I'll use {\"name\": \"bash\"} as an example.",
             &tools
         ));
+    }
+
+    /// Regression: a nested `"name"` field (inside an array/sub-object) must
+    /// not be mistaken for the response's own top-level tool-call name -
+    /// otherwise a plain JSON answer that happens to embed the string
+    /// `"name": "bash"` somewhere inside it would get hijacked into a
+    /// fabricated tool call just as badly as the original "any leading `{`"
+    /// bug this function was written to replace.
+    #[test]
+    fn commits_to_an_offered_tool_call_rejects_a_nested_name_field() {
+        let tools = [bash_tool()];
+        assert!(!commits_to_an_offered_tool_call(
+            "{\"records\": [{\"id\": 1, \"name\": \"bash\"}], \"summary\": \"ok\"}",
+            &tools
+        ));
+    }
+
+    #[test]
+    fn commits_to_an_offered_tool_call_accepts_the_top_level_name_after_other_keys() {
+        // The offered-tool name key doesn't have to be literally the first
+        // byte after '{' - just at depth 1, wherever it lands.
+        let tools = [bash_tool()];
+        assert!(commits_to_an_offered_tool_call(
+            "{\"extra\": 1, \"name\": \"bash\", \"arg",
+            &tools
+        ));
+    }
+
+    #[test]
+    fn leading_window_never_panics_and_stays_within_a_char_boundary() {
+        // A multibyte character straddling the exact window cutoff must not
+        // panic the slice - only ASCII is used in practice (tool names,
+        // JSON syntax), but this must hold regardless.
+        let text = "{\"name\": \"€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€\"}";
+        let window = leading_window(text, NAME_KEY_SCAN_WINDOW);
+        assert!(text.starts_with(window));
+    }
+
+    #[test]
+    fn commits_to_an_offered_tool_call_does_not_scan_past_the_window() {
+        // A tool name appearing only far past NAME_KEY_SCAN_WINDOW bytes in
+        // must not trigger - the bound exists precisely so this check stays
+        // O(1) regardless of response length, at the deliberate cost of
+        // missing a "name" key an unusually verbose response pushed far
+        // past where a real call would ever put it.
+        let tools = [bash_tool()];
+        let padding = "x".repeat(NAME_KEY_SCAN_WINDOW + 50);
+        let text = format!("{{\"padding\": \"{padding}\", \"name\": \"bash\", \"arg");
+        assert!(!commits_to_an_offered_tool_call(&text, &tools));
     }
 }

@@ -672,29 +672,18 @@ fn run_complete(
                 break;
             }
 
-            // Phase 4b: only once generation has committed to a real call
-            // against an offered tool (not merely opened a brace - see
-            // `commits_to_an_offered_tool_call`'s doc comment on why that
-            // distinction matters), swap to grammar-constrained decoding
-            // for the rest of this response.
-            if swap_possible
-                && !grammar_swap_attempted
-                && commits_to_an_offered_tool_call(&text_so_far, &offered_tools)
-            {
-                grammar_swap_attempted = true;
-                if let Some(grammar_env) = grammar_env {
-                    if let Some(constrained) = try_build_constrained_sampler(
-                        grammar_env,
-                        &offered_tools,
-                        &generated_tokens,
-                        sampling_defaults,
-                        &request,
-                        default_seed,
-                    ) {
-                        sampler = constrained;
-                    }
-                }
-            }
+            maybe_swap_to_constrained_sampler(
+                &text_so_far,
+                swap_possible,
+                &mut grammar_swap_attempted,
+                grammar_env,
+                &offered_tools,
+                &generated_tokens,
+                sampling_defaults,
+                &request,
+                default_seed,
+                &mut sampler,
+            );
         }
 
         if generated_count >= max_tokens {
@@ -865,34 +854,25 @@ fn run_stream(
             let might_be_tool_call =
                 !offered_tools.is_empty() && maybe_tool_call_json(&pending_flush);
 
-            // Phase 4b: only once generation has committed to a real call
-            // against an offered tool, swap to grammar-constrained decoding
-            // for the rest of this response. Checked against `full_text`
-            // (the whole response so far, never reset) rather than
-            // `pending_flush` (reset to empty by `mem::take` below every
-            // time withheld content turns out to be ordinary prose and
-            // gets flushed) - `generated_tokens`, replayed into the
-            // constrained sampler below, accumulates the same way, so the
-            // trigger and the replay must agree on which window of the
-            // response they're each looking at.
-            if swap_possible
-                && !grammar_swap_attempted
-                && commits_to_an_offered_tool_call(&full_text, &offered_tools)
-            {
-                grammar_swap_attempted = true;
-                if let Some(grammar_env) = grammar_env {
-                    if let Some(constrained) = try_build_constrained_sampler(
-                        grammar_env,
-                        &offered_tools,
-                        &generated_tokens,
-                        sampling_defaults,
-                        &request,
-                        default_seed,
-                    ) {
-                        sampler = constrained;
-                    }
-                }
-            }
+            // Checked against `full_text` (the whole response so far, never
+            // reset) rather than `pending_flush` (reset to empty by
+            // `mem::take` below every time withheld content turns out to be
+            // ordinary prose and gets flushed) - `generated_tokens`,
+            // replayed into the constrained sampler on a successful swap,
+            // accumulates the same way, so the trigger and the replay must
+            // agree on which window of the response they're each looking at.
+            maybe_swap_to_constrained_sampler(
+                &full_text,
+                swap_possible,
+                &mut grammar_swap_attempted,
+                grammar_env,
+                &offered_tools,
+                &generated_tokens,
+                sampling_defaults,
+                &request,
+                default_seed,
+                &mut sampler,
+            );
 
             if !might_be_tool_call {
                 if !text_block_started {
@@ -1252,6 +1232,52 @@ fn try_build_constrained_sampler(
     _default_seed: Option<u32>,
 ) -> Option<LlamaSampler> {
     None
+}
+
+/// Check whether `text` now commits to a real call against an offered tool
+/// and, if so, attempt the Phase 4b mid-stream swap - the single trigger
+/// point shared by `run_complete`/`run_stream` so their conditions for
+/// *when* to swap and *what text* to check it against can never
+/// independently drift the way they once did (two separate inline copies,
+/// each with its own bug - see this file's git history).
+///
+/// A no-op if `swap_possible` is `false` or the swap was already attempted
+/// this response; otherwise always marks the attempt made (whether or not
+/// a constrained sampler actually ends up built), so it's tried at most
+/// once per response regardless of caller.
+#[allow(clippy::too_many_arguments)]
+fn maybe_swap_to_constrained_sampler(
+    text: &str,
+    swap_possible: bool,
+    grammar_swap_attempted: &mut bool,
+    grammar_env: &Option<ToolCallGrammarEnv>,
+    offered_tools: &[Tool],
+    generated_tokens: &[LlamaToken],
+    sampling_defaults: &SamplingDefaults,
+    request: &LLMRequest,
+    default_seed: Option<u32>,
+    sampler: &mut LlamaSampler,
+) {
+    if !swap_possible || *grammar_swap_attempted {
+        return;
+    }
+    if !commits_to_an_offered_tool_call(text, offered_tools) {
+        return;
+    }
+    *grammar_swap_attempted = true;
+    let Some(grammar_env) = grammar_env else {
+        return;
+    };
+    if let Some(constrained) = try_build_constrained_sampler(
+        grammar_env,
+        offered_tools,
+        generated_tokens,
+        sampling_defaults,
+        request,
+        default_seed,
+    ) {
+        *sampler = constrained;
+    }
 }
 
 /// Render the offered tools as a system-prompt instruction block.
