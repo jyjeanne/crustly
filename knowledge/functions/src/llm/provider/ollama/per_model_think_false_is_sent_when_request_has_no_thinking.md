@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: per_model_think_false_is_sent_when_request_has_no_thinking
-resource: src/llm/provider/ollama.rs#L1736-L1756
+resource: src/llm/provider/ollama.rs#L1524-L1544
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/ModelOverrides/from_config

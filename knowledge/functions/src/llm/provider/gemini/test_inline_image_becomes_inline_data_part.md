@@ -4,7 +4,7 @@ title: test_inline_image_becomes_inline_data_part
 resource: src/llm/provider/gemini.rs#L1113-L1129
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request

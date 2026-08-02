@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: paste_inserts_at_cursor_not_always_appended_at_the_end
-resource: src/tui/app.rs#L3210-L3223
+resource: src/tui/app.rs#L3646-L3659
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

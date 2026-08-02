@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: model_download_typing_filters_suggestions
-resource: src/tui/app.rs#L2585-L2601
+resource: src/tui/app.rs#L3021-L3037
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/open_model_download

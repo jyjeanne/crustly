@@ -3,7 +3,7 @@ type: Rust Function
 title: cleanup_old_logs
 resource: src/logging.rs#L266-L296
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/cmd_logs

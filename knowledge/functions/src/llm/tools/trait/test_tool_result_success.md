@@ -4,7 +4,7 @@ title: test_tool_result_success
 resource: src/llm/tools/trait.rs#L237-L245
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/trait/ToolResult/with_metadata

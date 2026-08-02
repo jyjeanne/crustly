@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_enter
-resource: src/tui/events.rs#L365-L367
+resource: src/tui/events.rs#L402-L404
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty
@@ -12,6 +12,7 @@ relationships:
   - functions/src/tui/app/App/handle_file_picker_key
   - functions/src/tui/app/App/handle_model_download_key
   - functions/src/tui/app/App/handle_provider_switch_key
+  - functions/src/tui/app/App/handle_llama_cpp_models_key
 ---
 
 # Signature
@@ -28,3 +29,4 @@ relationships:
 - [handle_file_picker_key](../../../../functions/src/tui/app/App/handle_file_picker_key.md)
 - [handle_model_download_key](../../../../functions/src/tui/app/App/handle_model_download_key.md)
 - [handle_provider_switch_key](../../../../functions/src/tui/app/App/handle_provider_switch_key.md)
+- [handle_llama_cpp_models_key](../../../../functions/src/tui/app/App/handle_llama_cpp_models_key.md)

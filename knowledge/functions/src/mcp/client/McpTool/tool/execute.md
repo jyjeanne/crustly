@@ -4,7 +4,7 @@ title: execute
 resource: src/mcp/client.rs#L361-L371
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/mcp/client/MCPClient/call_tool

@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: run
-resource: src/cli/mod.rs#L329-L384
+resource: src/cli/mod.rs#L353-L409
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/models/PlanTaskStatus/parse

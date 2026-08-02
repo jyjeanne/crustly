@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: handle_ollama_pull_finished_success_posts_chat_message
-resource: src/tui/app.rs#L2698-L2716
+resource: src/tui/app.rs#L3134-L3152
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_event

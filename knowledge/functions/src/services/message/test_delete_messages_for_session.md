@@ -4,7 +4,7 @@ title: test_delete_messages_for_session
 resource: src/services/message.rs#L431-L457
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/message/MessageService/create_message

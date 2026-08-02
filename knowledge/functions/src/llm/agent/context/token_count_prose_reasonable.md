@@ -4,7 +4,7 @@ title: token_count_prose_reasonable
 resource: src/llm/agent/context.rs#L347-L356
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/context/token_count

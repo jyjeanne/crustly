@@ -3,7 +3,7 @@ type: Rust Module
 title: pdf_context
 resource: src/llm/pdf_context.rs#L1-L215
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/std-path-path-pathbuf

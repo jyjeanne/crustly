@@ -4,7 +4,7 @@ title: extract_text_from_response
 resource: src/llm/agent/service.rs#L1661-L1678
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/AgentService/final_text_and_thinking

@@ -3,7 +3,7 @@ type: Rust Method
 title: update_stats
 resource: src/db/repository/session.rs#L204-L225
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

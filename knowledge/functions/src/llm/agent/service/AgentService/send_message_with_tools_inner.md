@@ -4,7 +4,7 @@ title: send_message_with_tools_inner
 resource: src/llm/agent/service.rs#L820-L1573
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/session/SessionService/get_session

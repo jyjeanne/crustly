@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: new
-resource: src/llm/provider/ollama.rs#L166-L188
+resource: src/llm/provider/ollama.rs#L167-L189
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

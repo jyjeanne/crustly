@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_config_validation
-resource: src/config/mod.rs#L1266-L1269
+resource: src/config/mod.rs#L1383-L1386
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

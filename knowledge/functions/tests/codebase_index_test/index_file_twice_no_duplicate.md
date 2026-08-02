@@ -4,7 +4,7 @@ title: index_file_twice_no_duplicate
 resource: tests/codebase_index_test.rs#L60-L77
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/tests/codebase_index_test/create_pool_with_schema

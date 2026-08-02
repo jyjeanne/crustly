@@ -4,7 +4,7 @@ title: streaming_assembles_hermes_tool_call_from_buffered_text
 resource: src/llm/provider/qwen.rs#L1912-L1936
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/stream_events_from_buffered_content

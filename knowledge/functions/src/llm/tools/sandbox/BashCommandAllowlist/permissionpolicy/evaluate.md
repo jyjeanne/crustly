@@ -4,7 +4,7 @@ title: evaluate
 resource: src/llm/tools/sandbox.rs#L249-L286
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/sandbox/find_active_shell_operator

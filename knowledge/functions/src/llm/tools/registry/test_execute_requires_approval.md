@@ -4,7 +4,7 @@ title: test_execute_requires_approval
 resource: src/llm/tools/registry.rs#L425-L444
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/registry/ToolRegistry/register

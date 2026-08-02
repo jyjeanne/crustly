@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: help_section_header
-resource: src/tui/render.rs#L726-L732
+resource: src/tui/render.rs#L730-L736
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/help_global_commands

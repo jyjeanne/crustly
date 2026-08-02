@@ -3,7 +3,7 @@ type: Rust Function
 title: checked_redirect_policy
 resource: src/llm/tools/ssrf_guard.rs#L165-L179
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

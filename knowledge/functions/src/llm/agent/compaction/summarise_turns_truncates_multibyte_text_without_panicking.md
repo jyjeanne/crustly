@@ -4,7 +4,7 @@ title: summarise_turns_truncates_multibyte_text_without_panicking
 resource: src/llm/agent/compaction.rs#L167-L178
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/compaction/summarise_turns

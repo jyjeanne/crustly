@@ -4,7 +4,7 @@ title: execute_is_atomic_across_files_on_failure
 resource: src/llm/tools/apply_patch.rs#L792-L834
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/file_read_cache/FileReadCache/record

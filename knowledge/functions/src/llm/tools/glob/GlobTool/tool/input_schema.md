@@ -4,7 +4,7 @@ title: input_schema
 resource: src/llm/tools/glob.rs#L43-L68
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

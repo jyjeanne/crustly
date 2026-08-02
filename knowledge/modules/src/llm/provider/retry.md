@@ -3,7 +3,7 @@ type: Rust Module
 title: retry
 resource: src/llm/provider/retry.rs#L1-L421
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-providererror-result

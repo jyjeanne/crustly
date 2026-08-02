@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: check_and_load_plan
-resource: src/tui/app.rs#L1638-L1788
+resource: src/tui/app.rs#L1903-L2053
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/plan/PlanService/get_most_recent_plan

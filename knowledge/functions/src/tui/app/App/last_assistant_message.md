@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: last_assistant_message
-resource: src/tui/app.rs#L287-L289
+resource: src/tui/app.rs#L351-L353
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/copy_last_response_to_clipboard

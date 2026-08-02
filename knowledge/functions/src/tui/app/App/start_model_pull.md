@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: start_model_pull
-resource: src/tui/app.rs#L2260-L2273
+resource: src/tui/app.rs#L2525-L2538
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

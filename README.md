@@ -1,5 +1,9 @@
 # Crustly 🥐
 
+<p align="center">
+  <img src="docs/images/crustly-badge.png" alt="Crustly — AI coding assistant, built with Rust" width="320">
+</p>
+
 **High-Performance Terminal AI Assistant for Software Development**
 
 > A blazingly fast, memory-efficient terminal-based AI assistant written in Rust.
@@ -128,6 +132,41 @@ Crustly: [creates comprehensive docs]
 ---
 
 ## ✨ What's New
+
+### Unreleased — In-Process llama.cpp Provider
+
+A third local-inference path, alongside the OpenAI-compatible route and
+native Ollama: `providers.llama_cpp` loads a `.gguf` file **directly into
+the Crustly process** via [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) —
+no Ollama daemon, no LM Studio server, no port to start. See
+[docs/guides/LLAMA_CPP_GUIDE.md](docs/guides/LLAMA_CPP_GUIDE.md) for setup
+and [llama-cpp-2-integration-plan.md](llama-cpp-2-integration-plan.md) for
+the full technical design and phase-by-phase implementation record.
+
+- **Streaming, tool calling, GPU offload** — token-by-token streaming,
+  the same printed-JSON tool-call recovery Ollama falls back to, and six
+  optional GPU backend features (`llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`)
+  with a startup warning if `n_gpu_layers` is set without a matching
+  feature compiled in.
+- **Grammar-constrained tool calling** (`--features llama-cpp-llguidance`) —
+  the moment a response commits to a bare-JSON tool call, decoding swaps
+  mid-stream to a sampler that can only produce tokens forming a valid
+  call to one of the tools actually offered. Ships with the fixes from two
+  rounds of code review: the swap trigger requires the model to have
+  already typed a real offered tool's name (not just an opening brace, to
+  avoid hijacking legitimate JSON-shaped prose into a fabricated call),
+  and the sampler swap correctly carries over repeat-penalty history and
+  RNG state instead of discarding it.
+- **Local model management** — `Ctrl+G` TUI dialog (pick a downloaded
+  `.gguf`, download a new one by URL or `hf:org/repo/file.gguf` shorthand
+  with a live progress bar, delete with `Del`) and CLI equivalents
+  (`crustly llama-cpp list|pull|rm`).
+- **Idle-unload** — `providers.llama_cpp.idle_unload_secs` frees the
+  loaded model and its context after a configurable idle period, reloading
+  on the next request.
+- **Fixed:** responses echoed the requested model name instead of the
+  model actually loaded, breaking `ModelRouter`'s tier-based auto-routing
+  for this provider.
 
 ### v0.5.2 — Local-Model Reliability & Per-Model Tuning
 
@@ -458,6 +497,48 @@ Configure it with `[providers.ollama]` in `config.toml` (see `config.toml.exampl
 Ollama can be configured side by side; see [`ollama-rs-integration-plan.md`](./ollama-rs-integration-plan.md)
 for the full design and current status.
 
+#### ✅ In-process llama.cpp (via `llama-cpp-2`, no server)
+
+A third local-inference path, structurally different from the two above:
+`providers.llama_cpp` (enabled with `--features llama-cpp`, compiles native
+C++) loads a `.gguf` file **directly into the Crustly process**, via
+[`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs). No Ollama
+daemon, no LM Studio server, no port to start.
+
+- Zero idle memory footprint outside an active Crustly session — no
+  background process exists to be idle.
+- Direct control over GPU offload (`n_gpu_layers`, six backend features:
+  `llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`) and thread
+  count, without going through a server's own defaults.
+- Same tool-calling reliability mechanism as native Ollama's fallback path
+  (printed-JSON recovery, shared code — `src/llm/provider/tool_call_recovery.rs`),
+  optionally upgraded with a syntax guarantee via `--features llama-cpp-llguidance`
+  (grammar-constrained decoding for bare-JSON tool calls — see the
+  [guide](docs/guides/LLAMA_CPP_GUIDE.md#grammar-constrained-tool-calling-optional)).
+- **`Ctrl+G` Local Models dialog** — the TUI equivalent of Ollama's `Ctrl+D`:
+  pick an already-downloaded `.gguf` file to switch to (shows a "Loading
+  model…" state while it loads — not instant, unlike Ollama's swap), type a
+  URL or `hf:org/repo/file.gguf` shorthand to download a new one with a live
+  progress bar, or `Del` a file you no longer want.
+- Model management from the command line:
+
+  ```bash
+  crustly llama-cpp list                                                              # locally downloaded .gguf files
+  crustly llama-cpp pull hf:Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+  crustly llama-cpp rm qwen2.5-coder-7b-instruct-q4_k_m.gguf                           # asks for confirmation
+  ```
+
+Trade-offs versus the server-based routes above: requires building from
+source with the extra Cargo feature (native C++ compilation); switching
+models means unloading and reloading a multi-GB file rather than Ollama's
+near-instant swap; no sharing one loaded model across multiple clients.
+Configure it with `[providers.llama_cpp]` in `config.toml` (see
+`config.toml.example`). See
+**[docs/guides/LLAMA_CPP_GUIDE.md](docs/guides/LLAMA_CPP_GUIDE.md)** for
+the full setup guide and
+**[llama-cpp-2-integration-plan.md](./llama-cpp-2-integration-plan.md)**
+for the technical design and current implementation status.
+
 ### Environment Variables
 
 | Variable | Provider | Required |
@@ -724,8 +805,9 @@ If you can't afford cloud API costs, consider these legitimate alternatives:
 
 ## 🏠 Running Crustly with Local LLMs
 
-Crustly runs entirely offline against a local model server, for 100% private,
-$0-cost inference. Full step-by-step setup, troubleshooting, and model
+Crustly runs entirely offline for 100% private, $0-cost inference, via
+three different paths — two against a local model server, one with no
+server at all. Full step-by-step setup, troubleshooting, and model
 recommendations now live in dedicated guides:
 
 ### LM Studio
@@ -741,8 +823,19 @@ recommended local backend since it needs no GUI and reconnects instantly.
 See **[docs/guides/OLLAMA_GUIDE.md](docs/guides/OLLAMA_GUIDE.md)** for
 installation, model pulls, multi-model workflows, and troubleshooting.
 
+### llama.cpp (no server, in-process)
+Skips the server entirely: loads a `.gguf` file directly into the Crustly
+process itself via the `llama-cpp-2` crate — no daemon to install or keep
+running, at the cost of a from-source build (`--features llama-cpp`,
+compiles native C++) and a slower model-switch than Ollama's near-instant
+swap. See **[docs/guides/LLAMA_CPP_GUIDE.md](docs/guides/LLAMA_CPP_GUIDE.md)**
+for build requirements, getting a model, GPU acceleration, and
+troubleshooting — and
+**[llama-cpp-2-integration-plan.md](llama-cpp-2-integration-plan.md)** for
+the full technical design.
+
 ### Configuring `crustly.toml`
-Both routes are configured the same way, through `crustly.toml` or
+All three routes are configured the same way, through `crustly.toml` or
 environment variables. See
 **[docs/guides/CONFIGURATION_GUIDE.md](docs/guides/CONFIGURATION_GUIDE.md)**
 for the full option reference, file locations per OS, and example configs for

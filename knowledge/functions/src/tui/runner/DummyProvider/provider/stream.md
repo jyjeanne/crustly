@@ -4,7 +4,7 @@ title: stream
 resource: src/tui/runner.rs#L167-L169
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: App
-resource: src/tui/app.rs#L67-L192
+resource: src/tui/app.rs#L67-L223
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

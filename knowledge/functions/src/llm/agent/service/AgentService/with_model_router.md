@@ -3,7 +3,7 @@ type: Rust Method
 title: with_model_router
 resource: src/llm/agent/service.rs#L555-L558
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -3,7 +3,7 @@ type: Rust Method
 title: with_console_output
 resource: src/logging.rs#L74-L77
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/logging/test_log_config_builder

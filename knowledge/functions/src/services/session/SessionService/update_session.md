@@ -3,9 +3,10 @@ type: Rust Method
 title: update_session
 resource: src/services/session.rs#L72-L85
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
+  - functions/src/tui/app/App/handle_event
   - functions/src/tui/app/App/create_new_session
   - functions/src/tui/app/App/load_session
   - functions/src/tui/app/App/complete_response
@@ -18,6 +19,7 @@ relationships:
 
 # Called by
 
+- [handle_event](../../../../../functions/src/tui/app/App/handle_event.md)
 - [create_new_session](../../../../../functions/src/tui/app/App/create_new_session.md)
 - [load_session](../../../../../functions/src/tui/app/App/load_session.md)
 - [complete_response](../../../../../functions/src/tui/app/App/complete_response.md)

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: overrides_for_returns_provider_defaults_when_no_per_model_map
-resource: src/llm/provider/ollama.rs#L1100-L1111
+resource: src/llm/provider/ollama.rs#L979-L990
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

@@ -3,7 +3,7 @@ type: Rust Method
 title: get_most_recent_plan
 resource: src/services/plan.rs#L101-L105
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/EventHandler/next

@@ -3,7 +3,7 @@ type: Rust Module
 title: crabrace
 resource: src/config/crabrace.rs#L1-L144
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/anyhow-context-result

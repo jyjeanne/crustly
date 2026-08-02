@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: switch_mode
-resource: src/tui/app.rs#L2064-L2073
+resource: src/tui/app.rs#L2329-L2338
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/load_sessions
@@ -25,6 +25,8 @@ relationships:
   - functions/src/tui/app/App/open_provider_switch
   - functions/src/tui/app/App/handle_provider_switch_key
   - functions/src/tui/app/App/switch_provider_to_ollama_model
+  - functions/src/tui/app/App/open_llama_cpp_models
+  - functions/src/tui/app/App/handle_llama_cpp_models_key
 ---
 
 # Signature
@@ -53,3 +55,5 @@ relationships:
 - [open_provider_switch](../../../../../functions/src/tui/app/App/open_provider_switch.md)
 - [handle_provider_switch_key](../../../../../functions/src/tui/app/App/handle_provider_switch_key.md)
 - [switch_provider_to_ollama_model](../../../../../functions/src/tui/app/App/switch_provider_to_ollama_model.md)
+- [open_llama_cpp_models](../../../../../functions/src/tui/app/App/open_llama_cpp_models.md)
+- [handle_llama_cpp_models_key](../../../../../functions/src/tui/app/App/handle_llama_cpp_models_key.md)

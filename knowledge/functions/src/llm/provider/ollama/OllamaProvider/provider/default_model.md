@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: default_model
-resource: src/llm/provider/ollama.rs#L731-L733
+resource: src/llm/provider/ollama.rs#L732-L734
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

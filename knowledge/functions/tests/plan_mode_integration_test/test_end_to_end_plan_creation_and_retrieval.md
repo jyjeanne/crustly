@@ -4,7 +4,7 @@ title: test_end_to_end_plan_creation_and_retrieval
 resource: tests/plan_mode_integration_test.rs#L127-L161
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/tests/plan_mode_integration_test/setup_test_env

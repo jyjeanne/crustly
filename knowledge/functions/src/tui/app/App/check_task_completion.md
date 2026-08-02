@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: check_task_completion
-resource: src/tui/app.rs#L1519-L1561
+resource: src/tui/app.rs#L1784-L1826
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/save_plan

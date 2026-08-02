@@ -3,7 +3,7 @@ type: Rust Function
 title: is_parallelizable
 resource: src/llm/agent/service.rs#L227-L240
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

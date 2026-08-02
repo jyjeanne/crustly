@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_provider_switch_key
-resource: src/tui/events.rs#L488-L494
+resource: src/tui/events.rs#L525-L531
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/logging/LoggerGuard/empty

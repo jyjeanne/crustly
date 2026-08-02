@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/grep.rs#L141-L234
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/sandbox/check_path

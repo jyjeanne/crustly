@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_toggle_auto_mode
-resource: src/tui/events.rs#L334-L336
+resource: src/tui/events.rs#L371-L373
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/handle_key_event

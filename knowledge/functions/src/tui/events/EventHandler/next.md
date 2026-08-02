@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: next
-resource: src/tui/events.rs#L211-L213
+resource: src/tui/events.rs#L243-L245
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/cmd_ollama
@@ -11,6 +11,8 @@ relationships:
   - functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response
   - functions/src/llm/provider/gemini/parse_gemini_sse
   - functions/src/llm/provider/gemini/GeminiProvider/provider/stream
+  - functions/src/llm/provider/llama_cpp_models/parse_hf_shorthand
+  - functions/src/llm/provider/llama_cpp_models/download_model
   - functions/src/llm/provider/ollama/OllamaProvider/provider/stream
   - functions/src/llm/provider/ollama/streamed_tool_call_reaches_caller
   - functions/src/llm/provider/ollama_models/pull_model
@@ -49,6 +51,8 @@ relationships:
 - [from_gemini_response](../../../../../functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response.md)
 - [parse_gemini_sse](../../../../../functions/src/llm/provider/gemini/parse_gemini_sse.md)
 - [stream](../../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/stream.md)
+- [parse_hf_shorthand](../../../../../functions/src/llm/provider/llama_cpp_models/parse_hf_shorthand.md)
+- [download_model](../../../../../functions/src/llm/provider/llama_cpp_models/download_model.md)
 - [stream](../../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/stream.md)
 - [streamed_tool_call_reaches_caller](../../../../../functions/src/llm/provider/ollama/streamed_tool_call_reaches_caller.md)
 - [pull_model](../../../../../functions/src/llm/provider/ollama_models/pull_model.md)

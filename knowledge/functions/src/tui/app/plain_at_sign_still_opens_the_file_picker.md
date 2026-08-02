@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: plain_at_sign_still_opens_the_file_picker
-resource: src/tui/app.rs#L3187-L3194
+resource: src/tui/app.rs#L3623-L3630
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

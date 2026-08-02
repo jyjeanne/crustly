@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: open_skills
-resource: src/tui/app.rs#L996-L1000
+resource: src/tui/app.rs#L1261-L1265
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/skill/list_skills

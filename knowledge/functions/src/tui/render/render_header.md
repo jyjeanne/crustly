@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_header
-resource: src/tui/render.rs#L101-L197
+resource: src/tui/render.rs#L105-L201
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/total_tokens

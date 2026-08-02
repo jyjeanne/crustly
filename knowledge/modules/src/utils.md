@@ -3,7 +3,7 @@ type: Rust Module
 title: utils
 resource: src/utils/mod.rs#L1-L45
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/pub-use-retry-retry-retry-with-check-retryconfig-retryableerror

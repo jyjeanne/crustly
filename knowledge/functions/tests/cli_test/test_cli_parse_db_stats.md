@@ -4,7 +4,7 @@ title: test_cli_parse_db_stats
 resource: tests/cli_test.rs#L179-L187
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_model_download_confirm_delete
-resource: src/tui/render.rs#L1908-L1949
+resource: src/tui/render.rs#L1940-L1981
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanTask/block

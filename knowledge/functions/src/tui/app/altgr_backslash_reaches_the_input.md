@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: altgr_backslash_reaches_the_input
-resource: src/tui/app.rs#L3146-L3165
+resource: src/tui/app.rs#L3582-L3601
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/key_mod

@@ -3,7 +3,7 @@ type: Rust Function
 title: looks_like_pdf_path
 resource: src/llm/pdf_context.rs#L28-L49
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/pdf_context/augment_message_with_pdf

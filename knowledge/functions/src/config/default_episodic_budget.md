@@ -4,7 +4,7 @@ title: default_episodic_budget
 resource: src/config/mod.rs#L120-L122
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/config/MemoryConfig/default/default

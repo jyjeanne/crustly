@@ -4,7 +4,7 @@ title: rendered_text
 resource: src/tui/markdown.rs#L270-L281
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/markdown/plain_text_keeps_windows_path_backslashes

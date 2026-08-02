@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: time_remaining
-resource: src/tui/events.rs#L124-L128
+resource: src/tui/events.rs#L152-L156
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/render_approval_header

@@ -3,7 +3,7 @@ type: Rust Module
 title: bash
 resource: src/llm/tools/bash.rs#L1-L735
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

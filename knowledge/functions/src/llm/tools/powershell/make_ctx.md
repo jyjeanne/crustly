@@ -4,7 +4,7 @@ title: make_ctx
 resource: src/llm/tools/powershell.rs#L374-L376
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/trait/ToolExecutionContext/with_auto_approve

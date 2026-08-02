@@ -3,7 +3,7 @@ type: Rust Struct
 title: CrabraceIntegration
 resource: src/config/crabrace.rs#L57-L60
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

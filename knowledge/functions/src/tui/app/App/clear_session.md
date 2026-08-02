@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: clear_session
-resource: src/tui/app.rs#L1248-L1279
+resource: src/tui/app.rs#L1513-L1544
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/message/MessageService/delete_messages_for_session

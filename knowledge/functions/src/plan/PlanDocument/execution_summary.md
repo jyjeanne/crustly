@@ -3,7 +3,7 @@ type: Rust Method
 title: execution_summary
 resource: src/plan/mod.rs#L309-L337
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

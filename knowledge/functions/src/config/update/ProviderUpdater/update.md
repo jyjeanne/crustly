@@ -3,7 +3,7 @@ type: Rust Method
 title: update
 resource: src/config/update.rs#L50-L106
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/crabrace/CrabraceIntegration/health_check

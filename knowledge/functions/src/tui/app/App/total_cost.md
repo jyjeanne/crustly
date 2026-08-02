@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: total_cost
-resource: src/tui/app.rs#L2081-L2083
+resource: src/tui/app.rs#L2346-L2348
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/render_header

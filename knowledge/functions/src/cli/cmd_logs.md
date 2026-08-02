@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_logs
-resource: src/cli/mod.rs#L1231-L1393
+resource: src/cli/mod.rs#L1394-L1556
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

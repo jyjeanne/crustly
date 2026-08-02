@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: auto_mode
-resource: src/tui/app.rs#L495-L500
+resource: src/tui/app.rs#L599-L604
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/render_status_bar

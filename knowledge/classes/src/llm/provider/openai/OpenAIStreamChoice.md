@@ -4,7 +4,7 @@ title: OpenAIStreamChoice
 resource: src/llm/provider/openai.rs#L1093-L1097
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

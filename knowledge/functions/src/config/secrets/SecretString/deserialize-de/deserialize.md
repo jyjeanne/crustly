@@ -4,7 +4,7 @@ title: deserialize
 resource: src/config/secrets.rs#L179-L185
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

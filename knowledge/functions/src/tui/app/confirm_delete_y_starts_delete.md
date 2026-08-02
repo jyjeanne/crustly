@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: confirm_delete_y_starts_delete
-resource: src/tui/app.rs#L2812-L2826
+resource: src/tui/app.rs#L3248-L3262
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/open_model_download

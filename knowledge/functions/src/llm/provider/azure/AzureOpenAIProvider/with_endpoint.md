@@ -3,7 +3,7 @@ type: Rust Method
 title: with_endpoint
 resource: src/llm/provider/azure.rs#L68-L76
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/openai/OpenAIProvider/with_api_key_header

@@ -3,7 +3,7 @@ type: Rust Function
 title: check_path
 resource: src/llm/tools/sandbox.rs#L406-L425
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/execute

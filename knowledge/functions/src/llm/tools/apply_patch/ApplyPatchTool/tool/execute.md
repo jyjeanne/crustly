@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/apply_patch.rs#L343-L518
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/apply_patch/parse_patch

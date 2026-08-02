@@ -4,7 +4,7 @@ title: default_sampling
 resource: src/llm/provider/qwen.rs#L918-L936
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/qwen/QwenProvider/to_qwen_request

@@ -4,7 +4,7 @@ title: test_get_files_with_content
 resource: src/services/file.rs#L423-L454
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/file/FileService/get_files_with_content

@@ -4,7 +4,7 @@ title: AnthropicRequest
 resource: src/llm/provider/anthropic.rs#L431-L448
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: TopicItem
 resource: src/llm/tools/web_search.rs#L67-L72
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

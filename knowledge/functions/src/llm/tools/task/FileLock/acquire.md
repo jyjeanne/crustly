@@ -4,7 +4,7 @@ title: acquire
 resource: src/llm/tools/task.rs#L75-L142
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/db/Database/run_migrations

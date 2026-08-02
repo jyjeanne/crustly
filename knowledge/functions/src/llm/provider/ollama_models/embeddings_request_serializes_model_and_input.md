@@ -4,7 +4,7 @@ title: embeddings_request_serializes_model_and_input
 resource: src/llm/provider/ollama_models.rs#L209-L219
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

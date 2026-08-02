@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: provider_icon
-resource: src/tui/render.rs#L89-L98
+resource: src/tui/render.rs#L92-L102
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

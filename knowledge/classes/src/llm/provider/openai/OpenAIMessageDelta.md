@@ -4,7 +4,7 @@ title: OpenAIMessageDelta
 resource: src/llm/provider/openai.rs#L1101-L1108
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

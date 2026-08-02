@@ -3,7 +3,7 @@ type: Rust Method
 title: update_file
 resource: src/services/file.rs#L78-L91
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

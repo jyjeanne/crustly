@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: execute_plan_tasks
-resource: src/tui/app.rs#L1912-L1915
+resource: src/tui/app.rs#L2177-L2180
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/execute_next_plan_task

@@ -4,7 +4,7 @@ title: test_native_qwen_tools_format
 resource: src/llm/provider/qwen.rs#L2534-L2556
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/QwenProvider/with_tool_parser

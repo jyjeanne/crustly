@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: context_window
-resource: src/tui/render.rs#L2067-L2069
+resource: src/tui/render.rs#L2414-L2416
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

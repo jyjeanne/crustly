@@ -4,7 +4,7 @@ title: from_row
 resource: src/db/models.rs#L340-L363
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: plain_textarea
-resource: src/tui/app.rs#L200-L204
+resource: src/tui/app.rs#L231-L235
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/new

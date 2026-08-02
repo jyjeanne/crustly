@@ -4,7 +4,7 @@ title: mock_server
 resource: src/llm/provider/ollama_models.rs#L237-L273
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/ollama_models/list_models_parses_tags_response

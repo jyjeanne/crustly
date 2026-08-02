@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: chat_home_and_end_move_cursor_to_line_boundaries
-resource: src/tui/app.rs#L3076-L3088
+resource: src/tui/app.rs#L3512-L3524
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

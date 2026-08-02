@@ -3,7 +3,7 @@ type: Rust Module
 title: retry
 resource: src/utils/retry.rs#L1-L424
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/std-future-future

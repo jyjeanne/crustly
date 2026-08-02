@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: LoggingConfig
-resource: src/config/mod.rs#L605-L613
+resource: src/config/mod.rs#L722-L730
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

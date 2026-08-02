@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: to_ollama_request_maps_tool_messages
-resource: src/llm/provider/ollama.rs#L1684-L1717
+resource: src/llm/provider/ollama.rs#L1472-L1505
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

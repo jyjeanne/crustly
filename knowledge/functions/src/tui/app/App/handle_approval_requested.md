@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: handle_approval_requested
-resource: src/tui/app.rs#L2086-L2090
+resource: src/tui/app.rs#L2351-L2355
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/handle_event

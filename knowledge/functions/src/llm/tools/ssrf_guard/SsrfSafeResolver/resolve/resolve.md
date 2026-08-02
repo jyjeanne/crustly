@@ -4,7 +4,7 @@ title: resolve
 resource: src/llm/tools/ssrf_guard.rs#L87-L126
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/ssrf_guard/is_blocked_ip

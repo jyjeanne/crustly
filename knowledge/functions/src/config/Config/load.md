@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: load
-resource: src/config/mod.rs#L658-L690
+resource: src/config/mod.rs#L775-L807
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/Config/system_config_path

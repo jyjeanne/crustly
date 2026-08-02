@@ -3,7 +3,7 @@ type: Rust Method
 title: get_plan_history
 resource: src/services/plan.rs#L242-L244
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

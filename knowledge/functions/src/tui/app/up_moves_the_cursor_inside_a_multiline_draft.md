@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: up_moves_the_cursor_inside_a_multiline_draft
-resource: src/tui/app.rs#L2963-L2980
+resource: src/tui/app.rs#L3399-L3416
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/push_input_history

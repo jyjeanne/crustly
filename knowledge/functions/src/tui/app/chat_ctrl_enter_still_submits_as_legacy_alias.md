@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: chat_ctrl_enter_still_submits_as_legacy_alias
-resource: src/tui/app.rs#L3635-L3644
+resource: src/tui/app.rs#L4071-L4080
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

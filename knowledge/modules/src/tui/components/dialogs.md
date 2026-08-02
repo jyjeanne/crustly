@@ -3,7 +3,7 @@ type: Rust Module
 title: dialogs
 resource: src/tui/components/dialogs/mod.rs#L1-L171
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/crate-plan-autorunmode-planmodestate-plantask-taskstatus

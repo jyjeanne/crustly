@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: help_row
-resource: src/tui/render.rs#L700-L709
+resource: src/tui/render.rs#L704-L713
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/help_global_commands

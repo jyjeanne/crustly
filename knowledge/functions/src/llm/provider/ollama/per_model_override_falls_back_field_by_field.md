@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: per_model_override_falls_back_field_by_field
-resource: src/llm/provider/ollama.rs#L1082-L1097
+resource: src/llm/provider/ollama.rs#L961-L976
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/ModelOverrides/from_config

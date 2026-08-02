@@ -3,7 +3,7 @@ type: Rust Method
 title: find_by_id
 resource: src/db/repository/plan.rs#L31-L47
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/repository/plan/PlanRepository/find_tasks_by_plan_id

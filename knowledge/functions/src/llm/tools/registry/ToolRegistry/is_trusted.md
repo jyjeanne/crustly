@@ -3,7 +3,7 @@ type: Rust Method
 title: is_trusted
 resource: src/llm/tools/registry.rs#L67-L74
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/registry/ToolRegistry/canonical_name

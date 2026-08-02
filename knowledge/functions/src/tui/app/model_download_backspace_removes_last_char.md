@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: model_download_backspace_removes_last_char
-resource: src/tui/app.rs#L2604-L2614
+resource: src/tui/app.rs#L3040-L3050
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/open_model_download

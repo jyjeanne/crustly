@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: ollama_host
-resource: src/cli/mod.rs#L1093-L1100
+resource: src/cli/mod.rs#L1126-L1133
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/cmd_chat

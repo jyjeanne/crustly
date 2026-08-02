@@ -4,7 +4,7 @@ title: estimate_tokens
 resource: src/llm/agent/context.rs#L146-L148
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/context/token_count

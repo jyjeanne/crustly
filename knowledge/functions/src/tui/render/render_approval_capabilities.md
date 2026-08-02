@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_approval_capabilities
-resource: src/tui/render.rs#L1282-L1299
+resource: src/tui/render.rs#L1291-L1308
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

@@ -3,7 +3,7 @@ type: Rust Method
 title: inject_episodic_memories
 resource: src/llm/agent/context.rs#L180-L188
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/repository/memory/EpisodicMemoryRepository/inject_into_context

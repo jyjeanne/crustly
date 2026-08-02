@@ -4,7 +4,7 @@ title: test_service_context_creation
 resource: src/services/mod.rs#L103-L107
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

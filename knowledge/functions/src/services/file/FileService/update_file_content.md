@@ -3,7 +3,7 @@ type: Rust Method
 title: update_file_content
 resource: src/services/file.rs#L94-L106
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/file/FileService/get_file_required

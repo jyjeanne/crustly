@@ -3,7 +3,7 @@ type: Rust Function
 title: parse_plain_text
 resource: src/tui/markdown.rs#L19-L23
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/markdown/plain_text_keeps_windows_path_backslashes

@@ -3,7 +3,7 @@ type: Rust Module
 title: database
 resource: benches/database.rs#L1-L326
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/criterion-black-box-criterion-group-criterion-main-benchmarkid-criterion

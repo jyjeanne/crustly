@@ -3,7 +3,7 @@ type: Rust Method
 title: get_task
 resource: src/db/repository/plan.rs#L558-L586
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/repository/plan/row_to_plan_task

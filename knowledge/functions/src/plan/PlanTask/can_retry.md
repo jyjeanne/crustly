@@ -3,7 +3,7 @@ type: Rust Method
 title: can_retry
 resource: src/plan/mod.rs#L668-L671
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/plan_tool/PlanTool/tool/execute

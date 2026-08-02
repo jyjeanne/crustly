@@ -3,7 +3,7 @@ type: Rust Method
 title: get_task
 resource: src/plan/mod.rs#L148-L150
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

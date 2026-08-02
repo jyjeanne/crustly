@@ -87,6 +87,34 @@ pub enum TuiEvent {
     /// Locally-installed Ollama models were (re)loaded for the Provider
     /// Switch dialog's model list.
     ProviderSwitchModelsListed(Vec<String>),
+
+    /// Local `.gguf` files were (re)scanned for the llama.cpp Local Models
+    /// dialog (Ctrl+G).
+    LlamaCppModelsListed(Vec<super::llama_cpp_download::LlamaCppModelSummary>),
+
+    /// Progress update for an in-flight llama.cpp `.gguf` download.
+    LlamaCppDownloadProgress(super::llama_cpp_download::LlamaCppDownloadProgress),
+
+    /// A llama.cpp `.gguf` download finished (`error` is `None` on success).
+    LlamaCppDownloadFinished {
+        source: String,
+        error: Option<String>,
+    },
+
+    /// A llama.cpp local model delete finished (`error` is `None` on success).
+    LlamaCppDeleteFinished {
+        path: std::path::PathBuf,
+        error: Option<String>,
+    },
+
+    /// A llama.cpp model switch (loading a new `.gguf` as the active
+    /// provider) finished (`error` is `None` on success). The freshly-built
+    /// provider itself, on success, is left in `App`'s pending-provider slot
+    /// rather than carried here - see `llama_cpp_download::PendingProvider`.
+    LlamaCppSwitchFinished {
+        model_path: std::path::PathBuf,
+        error: Option<String>,
+    },
 }
 
 /// Tool approval request details
@@ -176,6 +204,10 @@ pub enum AppMode {
     /// `/mcp` slash command - lists configured MCP servers and their
     /// connection status.
     Mcp,
+    /// llama.cpp Local Models dialog (triggered by Ctrl+G) - pick a
+    /// locally-present `.gguf` file to switch to, or download a new one by
+    /// URL/`hf:org/repo/file.gguf` shorthand.
+    LlamaCppModelPicker,
 }
 
 /// Event handler for the TUI
@@ -312,6 +344,11 @@ pub mod keys {
     /// Ctrl+W - Open the Provider Switch dialog
     pub fn is_provider_switch(event: &KeyEvent) -> bool {
         key_matches(event, KeyCode::Char('w'), KeyModifiers::CONTROL)
+    }
+
+    /// Ctrl+G - Open the llama.cpp Local Models dialog
+    pub fn is_llama_cpp_models(event: &KeyEvent) -> bool {
+        key_matches(event, KeyCode::Char('g'), KeyModifiers::CONTROL)
     }
 
     /// Ctrl+Y - Copy the last assistant response (or its last code block,
@@ -491,6 +528,15 @@ mod tests {
 
         let event = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::empty());
         assert!(!keys::is_provider_switch(&event));
+    }
+
+    #[test]
+    fn test_llama_cpp_models_key() {
+        let event = KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL);
+        assert!(keys::is_llama_cpp_models(&event));
+
+        let event = KeyEvent::new(KeyCode::Char('g'), KeyModifiers::empty());
+        assert!(!keys::is_llama_cpp_models(&event));
     }
 
     #[test]

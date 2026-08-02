@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_log_level
-resource: src/config/mod.rs#L624-L626
+resource: src/config/mod.rs#L741-L743
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/config/LoggingConfig/default/default

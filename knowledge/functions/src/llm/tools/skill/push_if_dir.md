@@ -4,7 +4,7 @@ title: push_if_dir
 resource: src/llm/tools/skill.rs#L205-L209
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/skill/skill_lookup_roots

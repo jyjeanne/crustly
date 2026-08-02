@@ -3,7 +3,7 @@ type: Rust Method
 title: from_keyring
 resource: src/config/secrets.rs#L55-L64
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/error/ErrorInfo/with_context

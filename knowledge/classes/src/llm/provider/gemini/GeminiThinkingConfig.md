@@ -4,7 +4,7 @@ title: GeminiThinkingConfig
 resource: src/llm/provider/gemini.rs#L843-L847
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

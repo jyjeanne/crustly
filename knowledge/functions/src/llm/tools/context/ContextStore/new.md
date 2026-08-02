@@ -4,7 +4,7 @@ title: new
 resource: src/llm/tools/context.rs#L43-L53
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

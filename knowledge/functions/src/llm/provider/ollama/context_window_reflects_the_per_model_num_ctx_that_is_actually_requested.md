@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: context_window_reflects_the_per_model_num_ctx_that_is_actually_requested
-resource: src/llm/provider/ollama.rs#L1114-L1138
+resource: src/llm/provider/ollama.rs#L993-L1017
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/ModelOverrides/from_config

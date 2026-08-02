@@ -3,7 +3,7 @@ type: Rust Method
 title: connect
 resource: src/mcp/client.rs#L85-L126
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/error/ErrorInfo/with_context

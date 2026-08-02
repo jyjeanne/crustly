@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: unrecognized_slash_word_falls_through_instead_of_being_swallowed
-resource: src/tui/app.rs#L3402-L3414
+resource: src/tui/app.rs#L3838-L3850
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/try_handle_slash_command

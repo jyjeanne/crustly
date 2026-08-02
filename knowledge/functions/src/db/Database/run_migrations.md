@@ -3,7 +3,7 @@ type: Rust Method
 title: run_migrations
 resource: src/db/mod.rs#L148-L174
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/task/FileLock/acquire

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: plan_mode_shows_empty_state_without_a_plan
-resource: src/tui/render.rs#L2572-L2578
+resource: src/tui/render.rs#L2981-L2987
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render_to_string

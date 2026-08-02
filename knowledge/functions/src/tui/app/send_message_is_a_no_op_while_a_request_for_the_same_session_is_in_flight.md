@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight
-resource: src/tui/app.rs#L4055-L4073
+resource: src/tui/app.rs#L4711-L4729
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/create_new_session

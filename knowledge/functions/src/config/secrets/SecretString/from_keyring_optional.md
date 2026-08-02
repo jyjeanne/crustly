@@ -3,7 +3,7 @@ type: Rust Method
 title: from_keyring_optional
 resource: src/config/secrets.rs#L67-L72
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/cmd_keyring

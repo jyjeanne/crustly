@@ -3,7 +3,7 @@ type: Rust Module
 title: save_memory
 resource: src/llm/tools/save_memory.rs#L1-L300
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

@@ -4,7 +4,7 @@ title: test_supported_models
 resource: src/llm/provider/qwen.rs#L2333-L2341
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/QwenProvider/dashscope_intl

@@ -4,7 +4,7 @@ title: crash_recovery_resumes_at_correct_task
 resource: tests/plan_crash_recovery_test.rs#L69-L126
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

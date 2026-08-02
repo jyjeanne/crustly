@@ -4,7 +4,7 @@ title: test_secret_string_from_env
 resource: src/config/secrets.rs#L359-L368
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

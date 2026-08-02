@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: handle_model_download_key
-resource: src/tui/app.rs#L2291-L2379
+resource: src/tui/app.rs#L2556-L2644
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/start_model_delete

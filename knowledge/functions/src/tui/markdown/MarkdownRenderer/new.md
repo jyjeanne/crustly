@@ -4,7 +4,7 @@ title: new
 resource: src/tui/markdown.rs#L42-L52
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: handle_chat_key
-resource: src/tui/app.rs#L861-L969
+resource: src/tui/app.rs#L1126-L1234
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/is_submit

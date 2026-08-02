@@ -4,7 +4,7 @@ title: message_has_tool_result
 resource: src/llm/agent/compaction.rs#L126-L131
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/compaction/compact

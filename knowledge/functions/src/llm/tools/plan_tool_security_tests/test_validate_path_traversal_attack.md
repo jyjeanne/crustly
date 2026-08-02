@@ -4,7 +4,7 @@ title: test_validate_path_traversal_attack
 resource: src/llm/tools/plan_tool_security_tests.rs#L41-L52
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/plan_tool/validate_plan_file_path

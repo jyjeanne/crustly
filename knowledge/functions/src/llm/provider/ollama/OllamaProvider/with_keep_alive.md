@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_keep_alive
-resource: src/llm/provider/ollama.rs#L253-L259
+resource: src/llm/provider/ollama.rs#L254-L260
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/parse_keep_alive

@@ -4,7 +4,7 @@ title: llm_response_to_stream_events
 resource: src/llm/provider/qwen.rs#L1624-L1697
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

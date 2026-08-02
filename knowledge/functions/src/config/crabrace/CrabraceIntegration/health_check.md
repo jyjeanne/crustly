@@ -3,7 +3,7 @@ type: Rust Method
 title: health_check
 resource: src/config/crabrace.rs#L79-L84
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/config/crabrace/test_health_check

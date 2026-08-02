@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: configure_qwen_keeps_hermes_default_for_other_models
-resource: src/llm/provider/factory.rs#L1020-L1041
+resource: src/llm/provider/factory.rs#L1125-L1146
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/factory/configure_qwen

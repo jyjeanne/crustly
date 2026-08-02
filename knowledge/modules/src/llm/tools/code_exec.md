@@ -3,7 +3,7 @@ type: Rust Module
 title: code_exec
 resource: src/llm/tools/code_exec.rs#L1-L266
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

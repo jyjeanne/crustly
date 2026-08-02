@@ -3,7 +3,7 @@ type: Rust Module
 title: anthropic
 resource: src/llm/provider/anthropic.rs#L1-L620
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-providererror-result

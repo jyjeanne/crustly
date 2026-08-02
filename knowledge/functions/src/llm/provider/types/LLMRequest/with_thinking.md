@@ -3,7 +3,7 @@ type: Rust Method
 title: with_thinking
 resource: src/llm/provider/types.rs#L179-L188
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

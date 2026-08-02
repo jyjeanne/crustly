@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: key
-resource: src/tui/app.rs#L2567-L2569
+resource: src/tui/app.rs#L3003-L3005
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/logging/LoggerGuard/empty
@@ -49,6 +49,11 @@ relationships:
   - functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias
   - functions/src/tui/app/provider_switch_up_down_navigation_clamps_at_bounds
   - functions/src/tui/app/provider_switch_esc_returns_to_chat
+  - functions/src/tui/app/llama_cpp_up_down_navigation_clamps_at_bounds
+  - functions/src/tui/app/llama_cpp_esc_returns_to_chat
+  - functions/src/tui/app/llama_cpp_typing_fills_the_download_input
+  - functions/src/tui/app/llama_cpp_delete_key_asks_for_confirmation_before_deleting
+  - functions/src/tui/app/llama_cpp_switch_is_a_noop_while_a_delete_is_already_running
 ---
 
 # Signature
@@ -101,3 +106,8 @@ relationships:
 - [chat_ctrl_enter_still_submits_as_legacy_alias](../../../../functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias.md)
 - [provider_switch_up_down_navigation_clamps_at_bounds](../../../../functions/src/tui/app/provider_switch_up_down_navigation_clamps_at_bounds.md)
 - [provider_switch_esc_returns_to_chat](../../../../functions/src/tui/app/provider_switch_esc_returns_to_chat.md)
+- [llama_cpp_up_down_navigation_clamps_at_bounds](../../../../functions/src/tui/app/llama_cpp_up_down_navigation_clamps_at_bounds.md)
+- [llama_cpp_esc_returns_to_chat](../../../../functions/src/tui/app/llama_cpp_esc_returns_to_chat.md)
+- [llama_cpp_typing_fills_the_download_input](../../../../functions/src/tui/app/llama_cpp_typing_fills_the_download_input.md)
+- [llama_cpp_delete_key_asks_for_confirmation_before_deleting](../../../../functions/src/tui/app/llama_cpp_delete_key_asks_for_confirmation_before_deleting.md)
+- [llama_cpp_switch_is_a_noop_while_a_delete_is_already_running](../../../../functions/src/tui/app/llama_cpp_switch_is_a_noop_while_a_delete_is_already_running.md)

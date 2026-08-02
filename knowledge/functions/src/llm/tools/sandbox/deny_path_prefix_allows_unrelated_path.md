@@ -4,7 +4,7 @@ title: deny_path_prefix_allows_unrelated_path
 resource: src/llm/tools/sandbox.rs#L858-L867
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/sandbox/make_root

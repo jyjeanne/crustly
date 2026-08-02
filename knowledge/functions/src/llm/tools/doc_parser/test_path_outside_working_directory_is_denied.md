@@ -4,7 +4,7 @@ title: test_path_outside_working_directory_is_denied
 resource: src/llm/tools/doc_parser.rs#L730-L751
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

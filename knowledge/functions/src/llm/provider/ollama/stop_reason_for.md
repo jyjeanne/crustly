@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: stop_reason_for
-resource: src/llm/provider/ollama.rs#L793-L799
+resource: src/llm/provider/ollama.rs#L794-L800
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

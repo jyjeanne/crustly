@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_approval_input_detailed
-resource: src/tui/render.rs#L1303-L1321
+resource: src/tui/render.rs#L1312-L1330
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/render_approval

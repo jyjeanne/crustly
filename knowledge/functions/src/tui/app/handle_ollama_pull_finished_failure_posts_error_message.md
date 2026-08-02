@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: handle_ollama_pull_finished_failure_posts_error_message
-resource: src/tui/app.rs#L2719-L2734
+resource: src/tui/app.rs#L3155-L3170
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_event

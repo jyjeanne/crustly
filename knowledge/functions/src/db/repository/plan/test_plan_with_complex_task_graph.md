@@ -4,7 +4,7 @@ title: test_plan_with_complex_task_graph
 resource: src/db/repository/plan.rs#L1207-L1269
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanDocument/add_task

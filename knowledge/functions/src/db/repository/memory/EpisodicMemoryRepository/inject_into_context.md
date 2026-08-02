@@ -3,7 +3,7 @@ type: Rust Method
 title: inject_into_context
 resource: src/db/repository/memory.rs#L99-L130
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/repository/memory/EpisodicMemoryRepository/list_recent

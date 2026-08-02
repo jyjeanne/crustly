@@ -3,7 +3,7 @@ type: Rust Function
 title: generate_embeddings
 resource: src/llm/provider/ollama_models.rs#L148-L163
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama_models/client_for

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: handle_key_event
-resource: src/tui/app.rs#L749-L858
+resource: src/tui/app.rs#L1008-L1123
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/is_quit
@@ -24,6 +24,8 @@ relationships:
   - functions/src/tui/events/is_model_info
   - functions/src/tui/events/is_provider_switch
   - functions/src/tui/app/App/open_provider_switch
+  - functions/src/tui/events/is_llama_cpp_models
+  - functions/src/tui/app/App/open_llama_cpp_models
   - functions/src/tui/app/App/handle_chat_key
   - functions/src/tui/app/App/handle_plan_key
   - functions/src/tui/app/App/handle_sessions_key
@@ -31,6 +33,7 @@ relationships:
   - functions/src/tui/app/App/handle_file_picker_key
   - functions/src/tui/app/App/handle_model_download_key
   - functions/src/tui/app/App/handle_provider_switch_key
+  - functions/src/tui/app/App/handle_llama_cpp_models_key
   - functions/src/tui/app/App/handle_skills_key
   - functions/src/tui/app/App/handle_mcp_key
   - functions/src/tui/events/is_cancel
@@ -41,6 +44,7 @@ relationships:
   - functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone
   - functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it
   - functions/src/tui/app/ctrl_w_opens_provider_switch_dialog_in_loading_state
+  - functions/src/tui/app/ctrl_g_opens_llama_cpp_models_dialog_in_loading_state
 ---
 
 # Signature
@@ -66,6 +70,8 @@ relationships:
 - [is_model_info](../../../../../functions/src/tui/events/is_model_info.md)
 - [is_provider_switch](../../../../../functions/src/tui/events/is_provider_switch.md)
 - [open_provider_switch](../../../../../functions/src/tui/app/App/open_provider_switch.md)
+- [is_llama_cpp_models](../../../../../functions/src/tui/events/is_llama_cpp_models.md)
+- [open_llama_cpp_models](../../../../../functions/src/tui/app/App/open_llama_cpp_models.md)
 - [handle_chat_key](../../../../../functions/src/tui/app/App/handle_chat_key.md)
 - [handle_plan_key](../../../../../functions/src/tui/app/App/handle_plan_key.md)
 - [handle_sessions_key](../../../../../functions/src/tui/app/App/handle_sessions_key.md)
@@ -73,6 +79,7 @@ relationships:
 - [handle_file_picker_key](../../../../../functions/src/tui/app/App/handle_file_picker_key.md)
 - [handle_model_download_key](../../../../../functions/src/tui/app/App/handle_model_download_key.md)
 - [handle_provider_switch_key](../../../../../functions/src/tui/app/App/handle_provider_switch_key.md)
+- [handle_llama_cpp_models_key](../../../../../functions/src/tui/app/App/handle_llama_cpp_models_key.md)
 - [handle_skills_key](../../../../../functions/src/tui/app/App/handle_skills_key.md)
 - [handle_mcp_key](../../../../../functions/src/tui/app/App/handle_mcp_key.md)
 - [is_cancel](../../../../../functions/src/tui/events/is_cancel.md)
@@ -85,3 +92,4 @@ relationships:
 - [setting_auto_mode_state_shares_the_same_cell_as_a_clone](../../../../../functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone.md)
 - [ctrl_o_opens_model_info_panel_and_esc_closes_it](../../../../../functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it.md)
 - [ctrl_w_opens_provider_switch_dialog_in_loading_state](../../../../../functions/src/tui/app/ctrl_w_opens_provider_switch_dialog_in_loading_state.md)
+- [ctrl_g_opens_llama_cpp_models_dialog_in_loading_state](../../../../../functions/src/tui/app/ctrl_g_opens_llama_cpp_models_dialog_in_loading_state.md)

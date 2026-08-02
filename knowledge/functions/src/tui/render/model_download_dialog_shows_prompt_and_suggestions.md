@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: model_download_dialog_shows_prompt_and_suggestions
-resource: src/tui/render.rs#L2300-L2308
+resource: src/tui/render.rs#L2647-L2655
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render_to_string

@@ -3,7 +3,7 @@ type: Rust Module
 title: file_read_cache
 resource: src/llm/tools/file_read_cache.rs#L1-L141
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/std-collections-hashmap

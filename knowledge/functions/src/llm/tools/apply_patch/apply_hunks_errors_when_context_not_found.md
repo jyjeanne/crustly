@@ -4,7 +4,7 @@ title: apply_hunks_errors_when_context_not_found
 resource: src/llm/tools/apply_patch.rs#L638-L645
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/apply_patch/apply_hunks

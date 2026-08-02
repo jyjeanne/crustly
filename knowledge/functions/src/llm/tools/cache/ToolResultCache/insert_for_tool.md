@@ -3,7 +3,7 @@ type: Rust Method
 title: insert_for_tool
 resource: src/llm/tools/cache.rs#L114-L117
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/cache/ToolTtlConfig/ttl_for

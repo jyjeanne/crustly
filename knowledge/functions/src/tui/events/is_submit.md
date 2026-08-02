@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_submit
-resource: src/tui/events.rs#L341-L344
+resource: src/tui/events.rs#L378-L381
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

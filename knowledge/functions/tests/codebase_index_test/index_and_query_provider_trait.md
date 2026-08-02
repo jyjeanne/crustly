@@ -4,7 +4,7 @@ title: index_and_query_provider_trait
 resource: tests/codebase_index_test.rs#L30-L56
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/tests/codebase_index_test/create_pool_with_schema

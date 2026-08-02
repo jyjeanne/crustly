@@ -3,7 +3,7 @@ type: Rust Method
 title: default_for_test
 resource: src/llm/provider/router.rs#L90-L99
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/router/all_tiers_resolve_to_non_empty_model

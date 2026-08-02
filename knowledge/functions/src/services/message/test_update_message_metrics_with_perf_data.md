@@ -4,7 +4,7 @@ title: test_update_message_metrics_with_perf_data
 resource: src/services/message.rs#L351-L384
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/message/MessageService/create_message

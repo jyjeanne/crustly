@@ -4,7 +4,7 @@ title: final_text_prefers_visible_text_and_keeps_thinking_separate
 resource: src/llm/agent/service.rs#L2120-L2136
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/service/response_with

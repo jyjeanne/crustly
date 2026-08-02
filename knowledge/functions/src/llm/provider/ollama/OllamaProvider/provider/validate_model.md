@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: validate_model
-resource: src/llm/provider/ollama.rs#L751-L754
+resource: src/llm/provider/ollama.rs#L752-L755
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

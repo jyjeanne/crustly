@@ -4,7 +4,7 @@ title: test_highlight_rust
 resource: src/tui/highlight.rs#L154-L159
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/highlight/highlight_code

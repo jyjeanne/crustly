@@ -3,7 +3,7 @@ type: Rust Method
 title: assistant
 resource: src/llm/provider/types.rs#L39-L44
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/ollama/recovered_tool_call_becomes_a_tool_use_block

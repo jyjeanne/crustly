@@ -4,7 +4,7 @@ title: extract_think_tags_no_tags
 resource: src/llm/provider/types.rs#L592-L596
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/extract_think_tags

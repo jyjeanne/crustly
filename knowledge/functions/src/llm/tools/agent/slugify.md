@@ -4,7 +4,7 @@ title: slugify
 resource: src/llm/tools/agent.rs#L206-L220
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

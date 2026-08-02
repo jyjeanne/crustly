@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: help_plan_mode
-resource: src/tui/render.rs#L842-L862
+resource: src/tui/render.rs#L851-L871
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/help_section_header

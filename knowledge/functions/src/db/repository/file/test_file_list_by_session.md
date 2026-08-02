@@ -4,7 +4,7 @@ title: test_file_list_by_session
 resource: src/db/repository/file.rs#L200-L238
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

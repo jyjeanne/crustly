@@ -3,7 +3,7 @@ type: Rust Module
 title: agent
 resource: src/llm/tools/agent.rs#L1-L258
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

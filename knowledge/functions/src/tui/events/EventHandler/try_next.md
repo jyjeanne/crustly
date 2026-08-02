@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: try_next
-resource: src/tui/events.rs#L207-L209
+resource: src/tui/events.rs#L239-L241
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/try_next_event

@@ -4,7 +4,7 @@ title: test_registry_creation
 resource: src/llm/tools/registry.rs#L352-L355
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

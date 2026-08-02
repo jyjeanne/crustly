@@ -4,7 +4,7 @@ title: test_build_gemini_error_no_body_falls_back_to_unknown
 resource: src/llm/provider/gemini.rs#L1250-L1261
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/gemini/build_gemini_error

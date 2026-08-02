@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: disabled_gemini_is_skipped_in_favour_of_the_next_provider
-resource: src/llm/provider/factory.rs#L815-L841
+resource: src/llm/provider/factory.rs#L861-L887
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/factory/create_provider

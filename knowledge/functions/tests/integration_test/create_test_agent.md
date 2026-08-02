@@ -4,7 +4,7 @@ title: create_test_agent
 resource: tests/integration_test.rs#L114-L130
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/registry/ToolRegistry/register

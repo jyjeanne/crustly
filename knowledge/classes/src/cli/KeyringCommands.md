@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: KeyringCommands
-resource: src/cli/mod.rs#L299-L319
+resource: src/cli/mod.rs#L323-L343
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

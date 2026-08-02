@@ -3,7 +3,7 @@ type: Rust Method
 title: validate_plan
 resource: src/services/plan.rs#L148-L239
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

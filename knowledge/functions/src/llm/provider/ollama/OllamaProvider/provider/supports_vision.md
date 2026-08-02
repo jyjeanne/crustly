@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supports_vision
-resource: src/llm/provider/ollama.rs#L723-L725
+resource: src/llm/provider/ollama.rs#L724-L726
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/model_hints/is_vision_model

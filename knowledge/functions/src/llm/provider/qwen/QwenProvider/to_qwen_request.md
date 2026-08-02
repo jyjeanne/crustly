@@ -4,7 +4,7 @@ title: to_qwen_request
 resource: src/llm/provider/qwen.rs#L623-L896
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

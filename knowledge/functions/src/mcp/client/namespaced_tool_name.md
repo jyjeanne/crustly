@@ -3,7 +3,7 @@ type: Rust Function
 title: namespaced_tool_name
 resource: src/mcp/client.rs#L306-L308
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/mcp/client/McpTool/new

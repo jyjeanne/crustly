@@ -4,7 +4,7 @@ title: test_logo_with_version
 resource: src/tui/components/logo.rs#L80-L83
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/components/logo/get_logo_with_version

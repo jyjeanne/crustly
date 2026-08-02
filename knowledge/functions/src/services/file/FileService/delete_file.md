@@ -3,7 +3,7 @@ type: Rust Method
 title: delete_file
 resource: src/services/file.rs#L109-L115
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/services/file/test_delete_file

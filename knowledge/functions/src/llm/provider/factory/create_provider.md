@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: create_provider
-resource: src/llm/provider/factory.rs#L141-L169
+resource: src/llm/provider/factory.rs#L141-L174
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/factory/try_create_qwen
@@ -24,6 +24,8 @@ relationships:
   - functions/src/llm/provider/factory/disabled_gemini_is_skipped_in_favour_of_the_next_provider
   - functions/src/llm/provider/factory/disabled_openai_is_skipped_in_favour_of_the_next_provider
   - functions/src/llm/provider/factory/disabled_qwen_is_skipped_in_favour_of_the_next_provider
+  - functions/src/llm/provider/factory/disabled_llama_cpp_is_skipped_in_favour_of_the_next_provider
+  - functions/src/llm/provider/factory/absent_llama_cpp_config_does_not_affect_resolution
   - functions/src/llm/provider/factory/disabled_anthropic_fallback_fails_with_a_clear_message
   - functions/src/llm/provider/factory/test_create_provider_with_qwen
   - functions/src/llm/provider/factory/test_create_provider_no_credentials
@@ -55,6 +57,8 @@ relationships:
 - [disabled_gemini_is_skipped_in_favour_of_the_next_provider](../../../../../functions/src/llm/provider/factory/disabled_gemini_is_skipped_in_favour_of_the_next_provider.md)
 - [disabled_openai_is_skipped_in_favour_of_the_next_provider](../../../../../functions/src/llm/provider/factory/disabled_openai_is_skipped_in_favour_of_the_next_provider.md)
 - [disabled_qwen_is_skipped_in_favour_of_the_next_provider](../../../../../functions/src/llm/provider/factory/disabled_qwen_is_skipped_in_favour_of_the_next_provider.md)
+- [disabled_llama_cpp_is_skipped_in_favour_of_the_next_provider](../../../../../functions/src/llm/provider/factory/disabled_llama_cpp_is_skipped_in_favour_of_the_next_provider.md)
+- [absent_llama_cpp_config_does_not_affect_resolution](../../../../../functions/src/llm/provider/factory/absent_llama_cpp_config_does_not_affect_resolution.md)
 - [disabled_anthropic_fallback_fails_with_a_clear_message](../../../../../functions/src/llm/provider/factory/disabled_anthropic_fallback_fails_with_a_clear_message.md)
 - [test_create_provider_with_qwen](../../../../../functions/src/llm/provider/factory/test_create_provider_with_qwen.md)
 - [test_create_provider_no_credentials](../../../../../functions/src/llm/provider/factory/test_create_provider_no_credentials.md)

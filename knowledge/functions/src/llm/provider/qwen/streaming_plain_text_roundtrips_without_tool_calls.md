@@ -4,7 +4,7 @@ title: streaming_plain_text_roundtrips_without_tool_calls
 resource: src/llm/provider/qwen.rs#L1940-L1962
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/stream_events_from_buffered_content

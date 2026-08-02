@@ -4,7 +4,7 @@ title: stream
 resource: tests/streaming_test.rs#L92-L96
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

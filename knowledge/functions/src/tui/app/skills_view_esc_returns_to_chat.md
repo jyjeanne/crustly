@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: skills_view_esc_returns_to_chat
-resource: src/tui/app.rs#L3500-L3507
+resource: src/tui/app.rs#L3936-L3943
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_skills_key

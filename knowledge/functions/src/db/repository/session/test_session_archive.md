@@ -4,7 +4,7 @@ title: test_session_archive
 resource: src/db/repository/session.rs#L302-L333
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

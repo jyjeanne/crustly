@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: model_download_confirm_delete_shows_prompt
-resource: src/tui/render.rs#L2326-L2334
+resource: src/tui/render.rs#L2673-L2681
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render_to_string

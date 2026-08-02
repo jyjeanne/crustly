@@ -4,7 +4,7 @@ title: parse_anthropic_sse_stream
 resource: src/llm/provider/anthropic.rs#L376-L427
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

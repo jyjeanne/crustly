@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: model_download_enter_starts_pull_then_esc_aborts_it
-resource: src/tui/app.rs#L2643-L2660
+resource: src/tui/app.rs#L3079-L3096
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/open_model_download

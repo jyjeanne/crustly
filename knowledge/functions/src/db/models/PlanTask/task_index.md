@@ -3,7 +3,7 @@ type: Rust Method
 title: task_index
 resource: src/db/models.rs#L178-L180
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: save_plan
-resource: src/tui/app.rs#L1872-L1909
+resource: src/tui/app.rs#L2137-L2174
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/plan/PlanService/export_to_json

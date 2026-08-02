@@ -3,7 +3,7 @@ type: Rust Method
 title: count_by_session
 resource: src/db/repository/message.rs#L165-L173
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

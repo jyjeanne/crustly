@@ -4,7 +4,7 @@ title: test_highlight_python
 resource: src/tui/highlight.rs#L162-L166
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/highlight/highlight_code

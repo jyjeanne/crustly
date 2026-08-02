@@ -4,7 +4,7 @@ title: with_inline_data
 resource: src/llm/provider/gemini.rs#L766-L772
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

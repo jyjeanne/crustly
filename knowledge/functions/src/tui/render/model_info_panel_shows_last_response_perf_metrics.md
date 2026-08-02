@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: model_info_panel_shows_last_response_perf_metrics
-resource: src/tui/render.rs#L2370-L2405
+resource: src/tui/render.rs#L2779-L2814
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render_to_string

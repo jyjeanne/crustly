@@ -4,7 +4,7 @@ title: calculate_cost
 resource: src/llm/provider/gemini.rs#L698-L715
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

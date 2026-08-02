@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: to_ollama_tool
-resource: src/llm/provider/ollama.rs#L925-L942
+resource: src/llm/provider/ollama.rs#L804-L821
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/ollama/to_ollama_tool_converts_valid_schema

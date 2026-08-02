@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_cancel
-resource: src/tui/events.rs#L360-L362
+resource: src/tui/events.rs#L397-L399
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/handle_key_event
@@ -16,6 +16,7 @@ relationships:
   - functions/src/tui/app/App/handle_file_picker_key
   - functions/src/tui/app/App/handle_model_download_key
   - functions/src/tui/app/App/handle_provider_switch_key
+  - functions/src/tui/app/App/handle_llama_cpp_models_key
 ---
 
 # Signature
@@ -34,3 +35,4 @@ relationships:
 - [handle_file_picker_key](../../../../functions/src/tui/app/App/handle_file_picker_key.md)
 - [handle_model_download_key](../../../../functions/src/tui/app/App/handle_model_download_key.md)
 - [handle_provider_switch_key](../../../../functions/src/tui/app/App/handle_provider_switch_key.md)
+- [handle_llama_cpp_models_key](../../../../functions/src/tui/app/App/handle_llama_cpp_models_key.md)

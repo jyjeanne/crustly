@@ -4,7 +4,7 @@ title: test_end_to_end_session_management
 resource: tests/integration_test.rs#L222-L276
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/tests/integration_test/create_test_agent

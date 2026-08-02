@@ -3,7 +3,7 @@ type: Rust Method
 title: find_by_session
 resource: src/db/repository/message.rs#L34-L44
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

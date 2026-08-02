@@ -3,7 +3,7 @@ type: Rust Method
 title: get_provider
 resource: src/config/crabrace.rs#L87-L90
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/crabrace/CrabraceIntegration/fetch_providers

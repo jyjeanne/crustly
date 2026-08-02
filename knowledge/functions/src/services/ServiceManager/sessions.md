@@ -3,7 +3,7 @@ type: Rust Method
 title: sessions
 resource: src/services/mod.rs#L64-L66
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/services/test_service_manager_creation

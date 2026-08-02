@@ -3,7 +3,7 @@ type: Rust Module
 title: read
 resource: src/llm/tools/read.rs#L1-L402
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-validate-file-path-result-toolerror

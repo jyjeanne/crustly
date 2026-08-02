@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_failover_all_fail_returns_last_error
-resource: src/llm/provider/factory.rs#L614-L626
+resource: src/llm/provider/factory.rs#L660-L672
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

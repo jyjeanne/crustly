@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: event_belongs_to_current_session
-resource: src/tui/app.rs#L1381-L1385
+resource: src/tui/app.rs#L1646-L1650
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/handle_event

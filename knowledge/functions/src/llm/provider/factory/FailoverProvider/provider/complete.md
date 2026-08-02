@@ -4,7 +4,7 @@ title: complete
 resource: src/llm/provider/factory.rs#L48-L69
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/factory/FailoverProvider/is_failover_error

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: refresh_model_download_suggestions
-resource: src/tui/app.rs#L2250-L2256
+resource: src/tui/app.rs#L2515-L2521
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/ollama_download/filter_suggestions

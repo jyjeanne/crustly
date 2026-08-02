@@ -3,7 +3,7 @@ type: Rust Method
 title: insert
 resource: src/db/repository/memory.rs#L19-L38
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

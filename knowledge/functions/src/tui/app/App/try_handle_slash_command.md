@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: try_handle_slash_command
-resource: src/tui/app.rs#L1046-L1067
+resource: src/tui/app.rs#L1311-L1332
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/EventHandler/next

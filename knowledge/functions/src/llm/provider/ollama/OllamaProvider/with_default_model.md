@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_default_model
-resource: src/llm/provider/ollama.rs#L244-L247
+resource: src/llm/provider/ollama.rs#L245-L248
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: name
-resource: src/llm/provider/factory.rs#L575-L577
+resource: src/llm/provider/factory.rs#L621-L623
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

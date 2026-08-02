@@ -66,6 +66,37 @@ Hardening pass from end-to-end agentic testing against local Ollama models (qwen
 - **`--model` CLI flag** — one-shot default-model override for any command
 - **Fixed:** the "Message not found" crash that broke every `crustly run` (sqlx-sqlite doesn't auto-commit `INSERT ... RETURNING` on a WAL pool — message creation now commits an explicit transaction); the tool-loop detector falsely aborting distinct path-based calls (wrong input key in the signature); `Ctrl+W` rebuilding a bare provider that dropped the entire `[providers.ollama]` config; TUI timestamps rendered in UTC instead of local time; `Ctrl+K` deleting messages out from under an in-flight response; raw-JSON model-not-found errors replaced with actionable guidance; chat input text rendering underlined (textarea cursor-line default style)
 
+### Unreleased — In-Process llama.cpp Provider
+The GGUF-loading backlog item below shipped: `providers.llama_cpp` loads a
+`.gguf` file directly into the Crustly process via `llama-cpp-2`, no Ollama
+daemon or server of any kind. Delivered across 10 phases plus a follow-up
+grammar-constrained tool-calling phase — see
+[`llama-cpp-2-integration-plan.md`](./llama-cpp-2-integration-plan.md) §0.0
+for the phase-by-phase record.
+
+- Worker-thread architecture (one dedicated OS thread per provider instance,
+  per [ADR 0005](docs/architecture/decisions/0005-llama-cpp-in-process-worker-thread.md)),
+  non-streaming and streaming completion, sampling/context/chat-template
+  parity with the other providers
+- Tool calling via the shared `tool_call_recovery` module (same mechanism
+  native Ollama falls back to), optionally upgraded to a syntax guarantee
+  via grammar-constrained decoding (`--features llama-cpp-llguidance`,
+  `llguidance`/`toktrie`) — a mid-stream sampler swap wired directly into
+  the decode loop, hardened through two rounds of code review (false-positive
+  hijack trigger, sampler-state loss on swap, an O(n²) trigger-scan
+  regression)
+- Six optional GPU backend features (`llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`)
+- Local model management: `Ctrl+G` TUI dialog and `crustly llama-cpp list|pull|rm` CLI,
+  `hf:org/repo/file.gguf` shorthand downloads with SHA-256 verification
+- Idle-unload (`providers.llama_cpp.idle_unload_secs`)
+- Full guide (`docs/guides/LLAMA_CPP_GUIDE.md`) and README coverage
+
+**Still open:** end-to-end verification against a real `.gguf` model and
+live terminal session — this sandbox has never had one available. The
+design/safety reasoning (documented in the plan's §0.0 Phase 4b entry) is
+judged sound enough to ship unverified, but a real run is the next step for
+whoever has a model and terminal to try it against.
+
 ---
 
 ## Upcoming Milestones
@@ -100,7 +131,15 @@ are done; the rest are tracked here as they get picked up:
   plainly that Crustly never starts a background server or opens a local port, unlike
   OpenCode's Hono HTTP/SSE server (see `differentiation-strategy-vs-opencode.md` §3.2)
 - [ ] **Integration test suite** — full chat/tool/approval flows with a mock provider (no live API calls required)
-- [ ] **CI/CD pipeline** — GitHub Actions: `cargo test`, `cargo clippy`, `cargo fmt --check`, `cargo audit` on every PR
+- [x] **CI/CD pipeline** — GitHub Actions (`.github/workflows/ci.yml`): `cargo test` (Linux/Windows/macOS × stable/beta),
+  `cargo clippy -D warnings`, `cargo fmt --check`, release `cargo build`, and `cargo tarpaulin` coverage on every PR.
+  `cargo audit` is not yet wired in
+- [x] **Fixed the CI feature matrix** — `--all-features` was unconditionally enabling the six GPU backend features
+  added for llama.cpp (`llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`), each needing a GPU SDK the
+  GitHub-hosted runners don't have (`cmake` failed with "CUDA Toolkit not found"), breaking Clippy/Build/Coverage
+  and one Test matrix leg. Replaced with an explicit `CI_FEATURES` list covering only what a plain C/C++ toolchain
+  builds. `.github/workflows/release.yml` has the same `--all-features` issue in its cross-compiled Unix release
+  step (not yet fixed — needs verification of cross-compiled cmake/C++ toolchain behavior for `llama-cpp`)
 - [ ] **Interactive settings TUI** — configure provider, API keys (masked), model, tool toggles, approval timeout from inside the TUI
 - [ ] **Session search & export** — fuzzy search sessions by content; export to Markdown or JSON
 - [ ] **Git status bar** — current branch, dirty/clean state, uncommitted changes count shown in footer
@@ -151,7 +190,6 @@ are done; the rest are tracked here as they get picked up:
 | Item | Notes |
 |------|-------|
 | RAG / vector store | Semantic search over the codebase; integrate with the existing codebase index. Raw embedding generation is already available via the native Ollama provider (`crustly ollama embed`) — no retrieval layer wired up yet |
-| Direct GGUF model loading (no Ollama) | Evaluated in [`llm-file-gguf-support.md`](./llm-file-gguf-support.md) via the `llama-cpp-2` crate — technically sound (native crate, MIT/Apache-2.0, GGUF-native) but a multi-week embedded-inference-engine effort. **Conditional Go/No-Go**: currently No-Go pending confirmation of either an air-gapped/IT-restricted deployment requirement or a measured local-model tool-calling failure rate; reopen the moment either appears. Would complete Crustly's "zero-daemon" story end-to-end (see `differentiation-strategy-vs-opencode.md` §3.2) |
 | Multi-pane TUI | Chat + file preview split; tabs for multiple conversations |
 | Web interface | Optional `crustly serve` command exposing a browser UI |
 | Multi-user / team | Shared sessions, role-based approval, audit log export |

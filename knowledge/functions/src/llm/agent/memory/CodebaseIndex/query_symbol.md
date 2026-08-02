@@ -3,7 +3,7 @@ type: Rust Method
 title: query_symbol
 resource: src/llm/agent/memory.rs#L92-L102
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/tests/codebase_index_test/index_and_query_provider_trait

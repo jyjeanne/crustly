@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: overrides_for
-resource: src/llm/provider/ollama.rs#L212-L241
+resource: src/llm/provider/ollama.rs#L213-L242
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

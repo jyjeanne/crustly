@@ -4,7 +4,7 @@ title: test_sampling_explicit_request_top_p_wins
 resource: src/llm/provider/qwen.rs#L2444-L2451
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/LLMRequest/with_top_p

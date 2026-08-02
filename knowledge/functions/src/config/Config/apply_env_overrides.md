@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: apply_env_overrides
-resource: src/config/mod.rs#L771-L813
+resource: src/config/mod.rs#L888-L930
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/models/PlanTaskStatus/parse

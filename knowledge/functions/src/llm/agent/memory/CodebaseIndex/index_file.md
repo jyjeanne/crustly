@@ -3,7 +3,7 @@ type: Rust Method
 title: index_file
 resource: src/llm/agent/memory.rs#L61-L89
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/memory/extract_symbols

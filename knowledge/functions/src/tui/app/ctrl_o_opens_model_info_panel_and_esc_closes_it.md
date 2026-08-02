@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: ctrl_o_opens_model_info_panel_and_esc_closes_it
-resource: src/tui/app.rs#L3573-L3584
+resource: src/tui/app.rs#L4009-L4020
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_key_event

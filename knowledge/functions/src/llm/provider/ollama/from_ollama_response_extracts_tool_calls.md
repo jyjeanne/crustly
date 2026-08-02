@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: from_ollama_response_extracts_tool_calls
-resource: src/llm/provider/ollama.rs#L1494-L1515
+resource: src/llm/provider/ollama.rs#L1282-L1303
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supports_streaming
-resource: src/llm/provider/ollama.rs#L715-L717
+resource: src/llm/provider/ollama.rs#L716-L718
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

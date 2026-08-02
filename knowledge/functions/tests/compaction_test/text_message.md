@@ -4,7 +4,7 @@ title: text_message
 resource: tests/compaction_test.rs#L29-L36
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/tests/compaction_test/build_context

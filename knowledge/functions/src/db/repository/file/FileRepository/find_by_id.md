@@ -3,7 +3,7 @@ type: Rust Method
 title: find_by_id
 resource: src/db/repository/file.rs#L24-L32
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

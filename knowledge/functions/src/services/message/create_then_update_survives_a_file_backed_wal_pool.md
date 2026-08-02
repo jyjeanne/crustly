@@ -4,7 +4,7 @@ title: create_then_update_survives_a_file_backed_wal_pool
 resource: src/services/message.rs#L229-L259
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_context_window_default_and_custom
-resource: src/llm/provider/ollama.rs#L1169-L1175
+resource: src/llm/provider/ollama.rs#L1048-L1054
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

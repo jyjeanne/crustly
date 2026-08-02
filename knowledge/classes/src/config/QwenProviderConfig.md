@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: QwenProviderConfig
-resource: src/config/mod.rs#L366-L417
+resource: src/config/mod.rs#L390-L441
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

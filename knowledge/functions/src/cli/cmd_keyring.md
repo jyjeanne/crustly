@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_keyring
-resource: src/cli/mod.rs#L993-L1088
+resource: src/cli/mod.rs#L1026-L1121
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/from_str

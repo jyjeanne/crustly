@@ -3,7 +3,7 @@ type: Rust Module
 title: web_fetch
 resource: src/llm/tools/web_fetch.rs#L1-L312
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

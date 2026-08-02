@@ -3,7 +3,7 @@ type: Rust Method
 title: with_thinking_budget
 resource: src/llm/provider/qwen.rs#L208-L211
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/factory/configure_qwen

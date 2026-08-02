@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: connect_configured_mcp_servers_returns_empty_status_with_no_servers
-resource: src/cli/mod.rs#L1557-L1564
+resource: src/cli/mod.rs#L1769-L1776
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/cli/build_tool_registry

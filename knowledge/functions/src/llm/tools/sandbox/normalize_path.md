@@ -4,7 +4,7 @@ title: normalize_path
 resource: src/llm/tools/sandbox.rs#L430-L442
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/sandbox/DenyPathPrefixRule/permissionpolicy/evaluate

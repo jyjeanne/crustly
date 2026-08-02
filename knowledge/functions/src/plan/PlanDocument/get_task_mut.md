@@ -3,7 +3,7 @@ type: Rust Method
 title: get_task_mut
 resource: src/plan/mod.rs#L153-L156
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/db/repository/plan/test_plan_update_task_status

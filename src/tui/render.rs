@@ -73,6 +73,9 @@ pub fn render(f: &mut Frame, app: &App) {
         AppMode::ProviderSwitch => {
             render_provider_switch(f, app, chunks[1]);
         }
+        AppMode::LlamaCppModelPicker => {
+            render_llama_cpp_models(f, app, chunks[1]);
+        }
         AppMode::Skills => {
             render_skills(f, app, chunks[1]);
         }
@@ -89,6 +92,7 @@ pub fn render(f: &mut Frame, app: &App) {
 fn provider_icon(provider_name: &str) -> &'static str {
     match provider_name {
         "ollama" => "🦙",
+        "llama-cpp" => "⚙️",
         "openai" => "🏠",
         "anthropic" => "🤖",
         "qwen" => "🌀",
@@ -757,6 +761,11 @@ fn help_global_commands() -> Vec<Line<'static>> {
         help_row(
             "  Ctrl+W       ",
             "Switch to a different local Ollama model",
+            Color::Yellow,
+        ),
+        help_row(
+            "  Ctrl+G       ",
+            "Local llama.cpp models: switch, download, or delete",
             Color::Yellow,
         ),
         help_row(
@@ -1583,6 +1592,29 @@ fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
         Span::styled(context_window, Style::default().fg(Color::White)),
     ]));
 
+    if let Some(details) = app.llama_cpp_model_details() {
+        lines.push(Line::from(vec![
+            Span::styled("GPU:      ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                if details.n_gpu_layers > 0 {
+                    format!("{} layers offloaded", details.n_gpu_layers)
+                } else {
+                    "CPU only".to_string()
+                },
+                Style::default().fg(Color::White),
+            ),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("Quant:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                details
+                    .quantization_hint
+                    .unwrap_or_else(|| "unknown".to_string()),
+                Style::default().fg(Color::White),
+            ),
+        ]));
+    }
+
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "Last response performance",
@@ -1974,6 +2006,320 @@ fn render_model_download_deleting(f: &mut Frame, model: &str, area: Rect) {
     f.render_widget(widget, area);
 }
 
+/// Render the llama.cpp Local Models dialog (Ctrl+G): pick a locally-present
+/// `.gguf` file to switch to, or type a URL/`hf:org/repo/file.gguf`
+/// shorthand to download a new one.
+fn render_llama_cpp_models(f: &mut Frame, app: &App, area: Rect) {
+    if let Some(path) = &app.llama_cpp_confirm_delete {
+        render_llama_cpp_confirm_delete(f, path, area);
+        return;
+    }
+    if let Some(path) = &app.llama_cpp_deleting {
+        render_llama_cpp_deleting(f, path, area);
+        return;
+    }
+    if let Some(path) = &app.llama_cpp_switching {
+        render_llama_cpp_switching(f, path, area);
+        return;
+    }
+    if app.llama_cpp_download_running {
+        render_llama_cpp_download_progress(f, app, area);
+        return;
+    }
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(vec![Span::styled(
+        "⚙️ Local llama.cpp models",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("  > ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            if app.llama_cpp_download_input.is_empty() {
+                "type a URL or hf:org/repo/file.gguf to download a new model"
+            } else {
+                app.llama_cpp_download_input.as_str()
+            },
+            if app.llama_cpp_download_input.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            },
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    if app.llama_cpp_loading {
+        lines.push(Line::from(Span::styled(
+            "Scanning for local models…",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else if app.llama_cpp_models.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  No local .gguf models found. Type a URL/hf: shorthand above and press Enter.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, model) in app.llama_cpp_models.iter().enumerate() {
+            let is_selected = idx == app.llama_cpp_selected;
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let prefix = if is_selected { "▶ " } else { "  " };
+            let name = model
+                .path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let size_gb = model.size_bytes as f64 / 1_073_741_824.0;
+            let quant = model.quantization_hint.as_deref().unwrap_or("unknown");
+            lines.push(Line::from(vec![
+                Span::styled(prefix, style),
+                Span::styled(format!("{name}  ({size_gb:.2} GB, {quant})"), style),
+            ]));
+        }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "[↑↓]",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Navigate  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Enter]",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            " Switch (or Download if typing)  ",
+            Style::default().fg(Color::White),
+        ),
+        Span::styled(
+            "[Del]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Delete  ", Style::default().fg(Color::White)),
+        Span::styled(
+            "[Esc]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Cancel", Style::default().fg(Color::White)),
+    ]));
+    lines.push(Line::from(Span::styled(
+        "Note: switching loads the whole model file - this can take a while, unlike Ollama's instant swap.",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " Local Models ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the live progress view of an in-flight `.gguf` download.
+fn render_llama_cpp_download_progress(f: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    lines.push(Line::from(vec![Span::styled(
+        format!("⚙️ Downloading '{}'", app.llama_cpp_download_input),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]));
+    lines.push(Line::from(""));
+
+    let status = app
+        .llama_cpp_download_status
+        .as_deref()
+        .unwrap_or("working…");
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {}", status),
+        Style::default().fg(Color::White),
+    )]));
+
+    if let Some(fraction) = app.llama_cpp_download_fraction {
+        const BAR_WIDTH: usize = 30;
+        let filled = ((fraction * BAR_WIDTH as f64).round() as usize).min(BAR_WIDTH);
+        let bar = format!(
+            "[{}{}] {:>3.0}%",
+            "█".repeat(filled),
+            "░".repeat(BAR_WIDTH - filled),
+            fraction * 100.0
+        );
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {}", bar),
+            Style::default().fg(Color::Green),
+        )]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  (Esc cancels the download)",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(Span::styled(
+                    " Downloading… ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the confirmation step before deleting a local model (Del in the
+/// list).
+fn render_llama_cpp_confirm_delete(f: &mut Frame, path: &std::path::Path, area: Rect) {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    let lines = vec![
+        Line::from(vec![Span::styled(
+            format!("🗑️ Delete '{}'?", name),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  This removes the file from disk. You can re-download it later.",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                "[Y/Enter]",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Confirm delete  ", Style::default().fg(Color::White)),
+            Span::styled(
+                "[N/Esc]",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Cancel", Style::default().fg(Color::White)),
+        ]),
+    ];
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Red))
+                .title(Span::styled(
+                    " Confirm Delete ",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the brief in-flight state while a delete request is running.
+fn render_llama_cpp_deleting(f: &mut Frame, path: &std::path::Path, area: Rect) {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    let lines = vec![Line::from(vec![Span::styled(
+        format!("🗑️ Deleting '{}'…", name),
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    )])];
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(Span::styled(
+                    " Deleting… ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
+/// Render the blocking "Loading model…" state while a picked model is being
+/// loaded as the active provider (`llama-cpp-2-integration-plan.md` §4.5) -
+/// deliberately not instant, unlike Ollama's Ctrl+W swap.
+fn render_llama_cpp_switching(f: &mut Frame, path: &std::path::Path, area: Rect) {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    let lines = vec![
+        Line::from(vec![Span::styled(
+            format!("⏳ Loading '{}'…", name),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  This reads the whole model file into memory - it can take a while for large files.",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(Span::styled(
+                    " Loading Model… ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(widget, area);
+}
+
 /// Render the status bar
 fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let mode_text = match app.mode {
@@ -1988,6 +2334,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::ModelDownload => "MODEL DOWNLOAD",
         AppMode::ModelInfo => "MODEL INFO",
         AppMode::ProviderSwitch => "SWITCH PROVIDER",
+        AppMode::LlamaCppModelPicker => "LOCAL MODELS",
         AppMode::Skills => "/SKILLS",
         AppMode::Mcp => "/MCP",
     };
@@ -2005,7 +2352,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         format!(" [{}] {} │ Processing...", mode_text, auto_mode_label)
     } else {
         format!(
-            " [{}] {} │ Shift+Tab: Auto Mode │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            " [{}] {} │ Shift+Tab: Auto Mode │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+G: Local Models │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
             mode_text, auto_mode_label
         )
     };
@@ -2341,6 +2688,68 @@ mod tests {
 
         let screen = render_to_string(&app, 100, 20);
         assert!(screen.contains("Deleting 'qwen2.5-coder:7b'"));
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_models_dialog_shows_prompt_and_local_models() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_models = vec![super::super::llama_cpp_download::LlamaCppModelSummary {
+            path: std::path::PathBuf::from("/models/qwen2.5-coder-7b-Q4_K_M.gguf"),
+            size_bytes: 4_294_967_296,
+            quantization_hint: Some("Q4_K_M".to_string()),
+        }];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Local llama.cpp models"));
+        assert!(screen.contains("qwen2.5-coder-7b-Q4_K_M.gguf"));
+        assert!(screen.contains("Q4_K_M"));
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_models_dialog_shows_loading_state() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_loading = true;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Scanning for local models"));
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_download_progress_shows_status_and_bar() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_download_input = "hf:org/repo/model.gguf".to_string();
+        app.llama_cpp_download_running = true;
+        app.llama_cpp_download_status = Some("12.0 / 24.0 MB".to_string());
+        app.llama_cpp_download_fraction = Some(0.5);
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Downloading 'hf:org/repo/model.gguf'"));
+        assert!(screen.contains("12.0 / 24.0 MB"));
+        assert!(screen.contains("50%"));
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_confirm_delete_shows_prompt() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_confirm_delete = Some(std::path::PathBuf::from("/models/qwen.gguf"));
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Delete 'qwen.gguf'?"));
+        assert!(screen.contains("Confirm delete"));
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_switching_shows_loading_message() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_switching = Some(std::path::PathBuf::from("/models/qwen.gguf"));
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Loading 'qwen.gguf'"));
     }
 
     #[tokio::test]

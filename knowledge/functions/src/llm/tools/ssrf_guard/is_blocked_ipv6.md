@@ -4,7 +4,7 @@ title: is_blocked_ipv6
 resource: src/llm/tools/ssrf_guard.rs#L56-L77
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/ssrf_guard/is_blocked_ipv4

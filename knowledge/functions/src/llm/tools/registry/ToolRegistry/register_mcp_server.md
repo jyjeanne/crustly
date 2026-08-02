@@ -3,7 +3,7 @@ type: Rust Method
 title: register_mcp_server
 resource: src/llm/tools/registry.rs#L226-L253
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/mcp/client/MCPClient/discover_tools

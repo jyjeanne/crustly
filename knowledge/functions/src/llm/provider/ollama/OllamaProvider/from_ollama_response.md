@@ -1,15 +1,15 @@
 ---
 type: Rust Method
 title: from_ollama_response
-resource: src/llm/provider/ollama.rs#L420-L508
+resource: src/llm/provider/ollama.rs#L421-L509
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty
   - functions/src/llm/provider/types/extract_think_tags
-  - functions/src/llm/provider/ollama/tool_call_from_content
+  - functions/src/llm/provider/tool_call_recovery/tool_call_from_content
   - functions/src/llm/provider/ollama/perf_metrics_from_final_data
   called_by:
   - functions/src/llm/provider/ollama/OllamaProvider/provider/complete
@@ -30,7 +30,7 @@ relationships:
 
 - [is_empty](../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 - [extract_think_tags](../../../../../../functions/src/llm/provider/types/extract_think_tags.md)
-- [tool_call_from_content](../../../../../../functions/src/llm/provider/ollama/tool_call_from_content.md)
+- [tool_call_from_content](../../../../../../functions/src/llm/provider/tool_call_recovery/tool_call_from_content.md)
 - [perf_metrics_from_final_data](../../../../../../functions/src/llm/provider/ollama/perf_metrics_from_final_data.md)
 
 # Called by

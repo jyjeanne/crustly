@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: DbCommands
-resource: src/cli/mod.rs#L285-L296
+resource: src/cli/mod.rs#L309-L320
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

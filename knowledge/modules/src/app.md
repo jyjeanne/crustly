@@ -3,7 +3,7 @@ type: Rust Module
 title: app
 resource: src/app/mod.rs#L1-L106
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/anyhow-result

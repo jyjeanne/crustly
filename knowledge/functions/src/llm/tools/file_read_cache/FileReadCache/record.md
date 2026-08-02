@@ -3,7 +3,7 @@ type: Rust Method
 title: record
 resource: src/llm/tools/file_read_cache.rs#L76-L81
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/execute

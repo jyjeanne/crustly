@@ -4,7 +4,7 @@ title: name
 resource: src/llm/tools/http.rs#L72-L74
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -3,7 +3,7 @@ type: Rust Module
 title: compaction_test
 resource: tests/compaction_test.rs#L1-L171
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/crustly-db-database

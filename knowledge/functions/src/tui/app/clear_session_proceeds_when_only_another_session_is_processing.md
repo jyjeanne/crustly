@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: clear_session_proceeds_when_only_another_session_is_processing
-resource: src/tui/app.rs#L3986-L4019
+resource: src/tui/app.rs#L4642-L4675
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/create_new_session

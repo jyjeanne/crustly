@@ -3,7 +3,7 @@ type: Rust Method
 title: reject
 resource: src/plan/mod.rs#L189-L192
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/plan/plan_tests/test_plan_rejection

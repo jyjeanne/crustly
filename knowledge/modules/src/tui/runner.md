@@ -3,7 +3,7 @@ type: Rust Module
 title: runner
 resource: src/tui/runner.rs#L1-L203
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-app-app

@@ -3,7 +3,7 @@ type: Rust Method
 title: get
 resource: src/llm/tools/cache.rs#L89-L97
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

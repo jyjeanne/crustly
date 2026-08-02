@@ -3,7 +3,7 @@ type: Rust Method
 title: insert
 resource: src/llm/tools/cache.rs#L100-L111
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

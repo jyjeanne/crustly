@@ -4,7 +4,7 @@ title: test_service_get_most_recent_plan
 resource: src/services/plan.rs#L485-L527
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/plan/setup_test_service

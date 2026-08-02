@@ -3,7 +3,7 @@ type: Rust Method
 title: validate_dependencies
 resource: src/plan/mod.rs#L208-L247
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanDocument/tasks_in_order

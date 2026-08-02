@@ -3,7 +3,7 @@ type: Rust Method
 title: create_message
 resource: src/services/message.rs#L24-L60
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/AgentService/send_message

@@ -4,7 +4,7 @@ title: test_nonexistent_file
 resource: src/llm/tools/doc_parser.rs#L707-L721
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -3,7 +3,7 @@ type: Rust Module
 title: src
 resource: src/lib.rs#L1-L61
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/pub-use-error-crustlyerror-errorcode

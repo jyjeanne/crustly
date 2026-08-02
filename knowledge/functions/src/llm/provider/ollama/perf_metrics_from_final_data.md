@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: perf_metrics_from_final_data
-resource: src/llm/provider/ollama.rs#L980-L989
+resource: src/llm/provider/ollama.rs#L859-L868
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/ollama/OllamaProvider/from_ollama_response

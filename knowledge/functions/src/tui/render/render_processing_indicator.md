@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_processing_indicator
-resource: src/tui/render.rs#L397-L420
+resource: src/tui/render.rs#L401-L424
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

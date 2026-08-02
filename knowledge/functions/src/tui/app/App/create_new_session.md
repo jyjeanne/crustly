@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: create_new_session
-resource: src/tui/app.rs#L1171-L1197
+resource: src/tui/app.rs#L1436-L1462
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/session/SessionService/update_session

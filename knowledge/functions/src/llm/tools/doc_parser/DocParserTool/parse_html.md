@@ -4,7 +4,7 @@ title: parse_html
 resource: src/llm/tools/doc_parser.rs#L426-L441
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags

@@ -3,7 +3,7 @@ type: Rust Method
 title: list
 resource: src/db/repository/session.rs#L110-L146
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/services/session/SessionService/list_sessions

@@ -4,7 +4,7 @@ title: mock_sse_server
 resource: src/llm/provider/qwen.rs#L1968-L2004
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/qwen/stream_assembles_openai_style_tool_call_across_sse_chunks

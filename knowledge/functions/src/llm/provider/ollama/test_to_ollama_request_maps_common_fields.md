@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_to_ollama_request_maps_common_fields
-resource: src/llm/provider/ollama.rs#L1257-L1273
+resource: src/llm/provider/ollama.rs#L1136-L1152
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

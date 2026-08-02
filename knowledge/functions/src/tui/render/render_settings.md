@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_settings
-resource: src/tui/render.rs#L1177-L1199
+resource: src/tui/render.rs#L1186-L1208
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanTask/block

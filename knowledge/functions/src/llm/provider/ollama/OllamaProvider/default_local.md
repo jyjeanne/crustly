@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: default_local
-resource: src/llm/provider/ollama.rs#L157-L159
+resource: src/llm/provider/ollama.rs#L158-L160
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/streamed_ollama_tool_call_survives_drain

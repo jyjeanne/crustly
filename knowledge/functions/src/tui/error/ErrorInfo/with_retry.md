@@ -3,7 +3,7 @@ type: Rust Method
 title: with_retry
 resource: src/tui/error.rs#L155-L160
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/error/test_error_info_with_retry

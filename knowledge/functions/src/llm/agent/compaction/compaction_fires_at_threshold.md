@@ -4,7 +4,7 @@ title: compaction_fires_at_threshold
 resource: src/llm/agent/compaction.rs#L181-L215
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/context/AgentContext/add_message

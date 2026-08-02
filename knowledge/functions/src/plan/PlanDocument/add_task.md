@@ -3,7 +3,7 @@ type: Rust Method
 title: add_task
 resource: src/plan/mod.rs#L79-L82
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/db/repository/plan/create_test_plan

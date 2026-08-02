@@ -4,7 +4,7 @@ title: test_streaming_error_handling
 resource: tests/streaming_test.rs#L269-L286
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/tests/streaming_test/StreamingMockProvider/with_error

@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: factory
-resource: src/llm/provider/factory.rs#L1-L1061
+resource: src/llm/provider/factory.rs#L1-L1166
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-anthropic-anthropicprovider-azure-azureopenaiprovider-error-providererror-gemini-geminiprovider-openai-openaiprovider-qwen-qwenprovider-toolcallparser-provider
@@ -38,6 +38,8 @@ relationships:
 - [try_create_ollama](../../../../functions/src/llm/provider/factory/try_create_ollama.md)
 - [ollama_provider_from_config](../../../../functions/src/llm/provider/factory/ollama_provider_from_config.md)
 - [try_create_ollama](../../../../functions/src/llm/provider/factory/try_create_ollama-2.md)
+- [try_create_llama_cpp](../../../../functions/src/llm/provider/factory/try_create_llama_cpp.md)
+- [try_create_llama_cpp](../../../../functions/src/llm/provider/factory/try_create_llama_cpp-2.md)
 - [try_create_qwen](../../../../functions/src/llm/provider/factory/try_create_qwen.md)
 - [configure_qwen](../../../../functions/src/llm/provider/factory/configure_qwen.md)
 - [try_create_openai](../../../../functions/src/llm/provider/factory/try_create_openai.md)
@@ -71,6 +73,8 @@ relationships:
 - [disabled_gemini_is_skipped_in_favour_of_the_next_provider](../../../../functions/src/llm/provider/factory/disabled_gemini_is_skipped_in_favour_of_the_next_provider.md)
 - [disabled_openai_is_skipped_in_favour_of_the_next_provider](../../../../functions/src/llm/provider/factory/disabled_openai_is_skipped_in_favour_of_the_next_provider.md)
 - [disabled_qwen_is_skipped_in_favour_of_the_next_provider](../../../../functions/src/llm/provider/factory/disabled_qwen_is_skipped_in_favour_of_the_next_provider.md)
+- [disabled_llama_cpp_is_skipped_in_favour_of_the_next_provider](../../../../functions/src/llm/provider/factory/disabled_llama_cpp_is_skipped_in_favour_of_the_next_provider.md)
+- [absent_llama_cpp_config_does_not_affect_resolution](../../../../functions/src/llm/provider/factory/absent_llama_cpp_config_does_not_affect_resolution.md)
 - [disabled_anthropic_fallback_fails_with_a_clear_message](../../../../functions/src/llm/provider/factory/disabled_anthropic_fallback_fails_with_a_clear_message.md)
 - [test_create_provider_with_qwen](../../../../functions/src/llm/provider/factory/test_create_provider_with_qwen.md)
 - [configure_qwen_auto_selects_openai_parser_for_coder_next](../../../../functions/src/llm/provider/factory/configure_qwen_auto_selects_openai_parser_for_coder_next.md)

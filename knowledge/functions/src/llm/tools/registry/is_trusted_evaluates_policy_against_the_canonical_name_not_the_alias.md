@@ -4,7 +4,7 @@ title: is_trusted_evaluates_policy_against_the_canonical_name_not_the_alias
 resource: src/llm/tools/registry.rs#L608-L625
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/registry/ToolRegistry/register

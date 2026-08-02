@@ -4,7 +4,7 @@ title: AnthropicError
 resource: src/llm/provider/anthropic.rs#L473-L475
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

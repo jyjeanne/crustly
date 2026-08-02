@@ -4,7 +4,7 @@ title: plan_to_db
 resource: src/db/repository/plan.rs#L323-L349
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/repository/plan/PlanRepository/format_plan_status

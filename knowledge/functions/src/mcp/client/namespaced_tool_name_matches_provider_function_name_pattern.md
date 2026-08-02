@@ -4,7 +4,7 @@ title: namespaced_tool_name_matches_provider_function_name_pattern
 resource: src/mcp/client.rs#L593-L601
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/mcp/client/namespaced_tool_name

@@ -4,7 +4,7 @@ title: start_code_block
 resource: src/tui/markdown.rs#L61-L81
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

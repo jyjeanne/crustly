@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: project_config_path
-resource: src/config/mod.rs#L725-L736
+resource: src/config/mod.rs#L842-L853
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/config/Config/load

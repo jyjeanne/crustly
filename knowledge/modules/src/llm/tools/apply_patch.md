@@ -3,7 +3,7 @@ type: Rust Module
 title: apply_patch
 resource: src/llm/tools/apply_patch.rs#L1-L907
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-validate-file-path-validate-path-safety-result-toolerror

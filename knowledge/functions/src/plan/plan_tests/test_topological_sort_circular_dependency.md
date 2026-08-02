@@ -4,7 +4,7 @@ title: test_topological_sort_circular_dependency
 resource: src/plan/plan_tests.rs#L257-L277
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/plan_tests/create_test_task

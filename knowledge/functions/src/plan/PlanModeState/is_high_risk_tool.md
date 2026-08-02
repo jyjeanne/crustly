@@ -3,7 +3,7 @@ type: Rust Method
 title: is_high_risk_tool
 resource: src/plan/mod.rs#L937-L942
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/auto_mode_bypasses_approval

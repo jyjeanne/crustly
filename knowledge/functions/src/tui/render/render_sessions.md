@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_sessions
-resource: src/tui/render.rs#L524-L574
+resource: src/tui/render.rs#L528-L578
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanTask/block

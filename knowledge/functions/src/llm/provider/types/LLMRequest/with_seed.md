@@ -3,7 +3,7 @@ type: Rust Method
 title: with_seed
 resource: src/llm/provider/types.rs#L216-L219
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/ollama/test_to_ollama_request_maps_common_fields

@@ -3,7 +3,7 @@ type: Rust Method
 title: register
 resource: src/llm/tools/registry.rs#L77-L81
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/build_tool_registry

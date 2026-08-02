@@ -4,7 +4,7 @@ title: description
 resource: src/mcp/client.rs#L326-L328
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

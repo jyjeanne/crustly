@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: copy_last_response_to_clipboard
-resource: src/tui/app.rs#L404-L415
+resource: src/tui/app.rs#L468-L479
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/last_assistant_message

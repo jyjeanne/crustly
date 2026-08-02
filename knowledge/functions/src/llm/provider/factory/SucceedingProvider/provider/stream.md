@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: stream
-resource: src/llm/provider/factory.rs#L570-L574
+resource: src/llm/provider/factory.rs#L616-L620
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

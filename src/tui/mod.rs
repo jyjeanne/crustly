@@ -5,6 +5,7 @@
 pub mod app;
 pub mod error;
 pub mod events;
+pub mod llama_cpp_download;
 pub mod ollama_download;
 pub mod prompt_analyzer;
 pub mod render;

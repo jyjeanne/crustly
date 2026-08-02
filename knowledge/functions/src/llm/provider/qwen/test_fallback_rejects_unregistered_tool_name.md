@@ -4,7 +4,7 @@ title: test_fallback_rejects_unregistered_tool_name
 resource: src/llm/provider/qwen.rs#L2607-L2616
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls

@@ -3,7 +3,7 @@ type: Rust Module
 title: message
 resource: src/services/message.rs#L1-L581
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/crate-db-models-message-repository-messagerepository

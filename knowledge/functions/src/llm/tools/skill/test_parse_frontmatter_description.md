@@ -4,7 +4,7 @@ title: test_parse_frontmatter_description
 resource: src/llm/tools/skill.rs#L309-L315
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

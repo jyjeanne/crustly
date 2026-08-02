@@ -4,7 +4,7 @@ title: find_subsequence
 resource: src/llm/tools/apply_patch.rs#L220-L229
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

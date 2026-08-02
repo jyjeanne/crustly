@@ -3,7 +3,7 @@ type: Rust Method
 title: is_provider_available
 resource: src/config/crabrace.rs#L104-L106
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/crabrace/CrabraceIntegration/get_provider

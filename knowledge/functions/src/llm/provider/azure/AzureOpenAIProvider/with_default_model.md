@@ -3,7 +3,7 @@ type: Rust Method
 title: with_default_model
 resource: src/llm/provider/azure.rs#L79-L82
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

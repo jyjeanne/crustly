@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: last_assistant_message_finds_most_recent_assistant_reply
-resource: src/tui/app.rs#L3587-L3632
+resource: src/tui/app.rs#L4023-L4068
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

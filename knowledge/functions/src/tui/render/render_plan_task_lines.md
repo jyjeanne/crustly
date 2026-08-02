@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_plan_task_lines
-resource: src/tui/render.rs#L1003-L1038
+resource: src/tui/render.rs#L1012-L1047
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

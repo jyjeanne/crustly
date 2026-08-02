@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: ctrl_y_copies_last_code_block_when_present
-resource: src/tui/app.rs#L3253-L3288
+resource: src/tui/app.rs#L3689-L3724
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

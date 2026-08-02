@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_chat
-resource: src/cli/mod.rs#L754-L844
+resource: src/cli/mod.rs#L779-L877
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations
@@ -15,6 +15,9 @@ relationships:
   - functions/src/tui/app/App/set_ollama_host
   - functions/src/cli/ollama_host
   - functions/src/tui/app/App/set_ollama_config
+  - functions/src/tui/app/App/set_llama_cpp_models_dir
+  - functions/src/config/ProviderConfigs/llama_cpp_models_dir
+  - functions/src/tui/app/App/set_llama_cpp_config
   - functions/src/tui/app/App/set_mcp_status
   - functions/src/tui/app/App/event_sender
   - functions/src/tui/app/App/set_auto_mode_state
@@ -42,6 +45,9 @@ relationships:
 - [set_ollama_host](../../../functions/src/tui/app/App/set_ollama_host.md)
 - [ollama_host](../../../functions/src/cli/ollama_host.md)
 - [set_ollama_config](../../../functions/src/tui/app/App/set_ollama_config.md)
+- [set_llama_cpp_models_dir](../../../functions/src/tui/app/App/set_llama_cpp_models_dir.md)
+- [llama_cpp_models_dir](../../../functions/src/config/ProviderConfigs/llama_cpp_models_dir.md)
+- [set_llama_cpp_config](../../../functions/src/tui/app/App/set_llama_cpp_config.md)
 - [set_mcp_status](../../../functions/src/tui/app/App/set_mcp_status.md)
 - [event_sender](../../../functions/src/tui/app/App/event_sender.md)
 - [set_auto_mode_state](../../../functions/src/tui/app/App/set_auto_mode_state.md)

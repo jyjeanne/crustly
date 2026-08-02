@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: new
-resource: src/tui/app.rs#L208-L267
+resource: src/tui/app.rs#L252-L331
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/plain_textarea

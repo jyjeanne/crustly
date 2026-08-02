@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: chat_backspace_deletes_at_cursor_not_always_the_last_char
-resource: src/tui/app.rs#L3060-L3073
+resource: src/tui/app.rs#L3496-L3509
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

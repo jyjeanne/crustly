@@ -4,7 +4,7 @@ title: test_max_plan_file_size_constant
 resource: src/llm/tools/plan_tool_security_tests.rs#L136-L139
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

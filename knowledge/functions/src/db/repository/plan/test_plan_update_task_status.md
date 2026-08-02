@@ -4,7 +4,7 @@ title: test_plan_update_task_status
 resource: src/db/repository/plan.rs#L1168-L1204
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanDocument/get_task_mut

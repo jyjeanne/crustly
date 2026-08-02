@@ -3,7 +3,7 @@ type: Rust Function
 title: fetch_installed_models
 resource: src/tui/ollama_download.rs#L79-L84
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama_models/list_models

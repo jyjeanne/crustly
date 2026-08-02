@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: try_create_qwen
-resource: src/llm/provider/factory.rs#L340-L377
+resource: src/llm/provider/factory.rs#L386-L423
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/factory/configure_qwen

@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_list_sessions
-resource: src/tui/events.rs#L283-L285
+resource: src/tui/events.rs#L315-L317
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/key_matches

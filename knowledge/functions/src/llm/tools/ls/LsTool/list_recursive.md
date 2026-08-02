@@ -4,7 +4,7 @@ title: list_recursive
 resource: src/llm/tools/ls.rs#L215-L258
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/ls/LsTool/tool/execute

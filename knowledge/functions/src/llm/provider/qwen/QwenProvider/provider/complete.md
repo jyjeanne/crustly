@@ -4,7 +4,7 @@ title: complete
 resource: src/llm/provider/qwen.rs#L1274-L1323
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/QwenProvider/to_qwen_request

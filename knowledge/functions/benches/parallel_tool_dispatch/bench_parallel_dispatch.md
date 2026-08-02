@@ -4,7 +4,7 @@ title: bench_parallel_dispatch
 resource: benches/parallel_tool_dispatch.rs#L43-L61
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/benches/parallel_tool_dispatch/make_temp_files

@@ -4,7 +4,7 @@ title: create_test_plan
 resource: src/db/repository/plan.rs#L743-L796
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanDocument/add_task

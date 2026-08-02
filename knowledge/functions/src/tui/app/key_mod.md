@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: key_mod
-resource: src/tui/app.rs#L3014-L3016
+resource: src/tui/app.rs#L3450-L3452
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting
@@ -19,6 +19,7 @@ relationships:
   - functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it
   - functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias
   - functions/src/tui/app/ctrl_w_opens_provider_switch_dialog_in_loading_state
+  - functions/src/tui/app/ctrl_g_opens_llama_cpp_models_dialog_in_loading_state
 ---
 
 # Signature
@@ -39,3 +40,4 @@ relationships:
 - [ctrl_o_opens_model_info_panel_and_esc_closes_it](../../../../functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it.md)
 - [chat_ctrl_enter_still_submits_as_legacy_alias](../../../../functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias.md)
 - [ctrl_w_opens_provider_switch_dialog_in_loading_state](../../../../functions/src/tui/app/ctrl_w_opens_provider_switch_dialog_in_loading_state.md)
+- [ctrl_g_opens_llama_cpp_models_dialog_in_loading_state](../../../../functions/src/tui/app/ctrl_g_opens_llama_cpp_models_dialog_in_loading_state.md)

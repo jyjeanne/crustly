@@ -3,7 +3,7 @@ type: Rust Method
 title: is_file_tracked
 resource: src/services/file.rs#L137-L140
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/file/FileService/find_file_by_path

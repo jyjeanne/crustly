@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_to_string
-resource: src/tui/render.rs#L2085-L2099
+resource: src/tui/render.rs#L2432-L2446
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render
@@ -22,6 +22,11 @@ relationships:
   - functions/src/tui/render/model_download_progress_shows_status_and_bar
   - functions/src/tui/render/model_download_confirm_delete_shows_prompt
   - functions/src/tui/render/model_download_deleting_shows_status
+  - functions/src/tui/render/llama_cpp_models_dialog_shows_prompt_and_local_models
+  - functions/src/tui/render/llama_cpp_models_dialog_shows_loading_state
+  - functions/src/tui/render/llama_cpp_download_progress_shows_status_and_bar
+  - functions/src/tui/render/llama_cpp_confirm_delete_shows_prompt
+  - functions/src/tui/render/llama_cpp_switching_shows_loading_message
   - functions/src/tui/render/chat_input_renders_textarea_contents_and_hint
   - functions/src/tui/render/model_info_panel_shows_provider_model_and_context_window
   - functions/src/tui/render/model_info_panel_shows_last_response_perf_metrics
@@ -60,6 +65,11 @@ relationships:
 - [model_download_progress_shows_status_and_bar](../../../../functions/src/tui/render/model_download_progress_shows_status_and_bar.md)
 - [model_download_confirm_delete_shows_prompt](../../../../functions/src/tui/render/model_download_confirm_delete_shows_prompt.md)
 - [model_download_deleting_shows_status](../../../../functions/src/tui/render/model_download_deleting_shows_status.md)
+- [llama_cpp_models_dialog_shows_prompt_and_local_models](../../../../functions/src/tui/render/llama_cpp_models_dialog_shows_prompt_and_local_models.md)
+- [llama_cpp_models_dialog_shows_loading_state](../../../../functions/src/tui/render/llama_cpp_models_dialog_shows_loading_state.md)
+- [llama_cpp_download_progress_shows_status_and_bar](../../../../functions/src/tui/render/llama_cpp_download_progress_shows_status_and_bar.md)
+- [llama_cpp_confirm_delete_shows_prompt](../../../../functions/src/tui/render/llama_cpp_confirm_delete_shows_prompt.md)
+- [llama_cpp_switching_shows_loading_message](../../../../functions/src/tui/render/llama_cpp_switching_shows_loading_message.md)
 - [chat_input_renders_textarea_contents_and_hint](../../../../functions/src/tui/render/chat_input_renders_textarea_contents_and_hint.md)
 - [model_info_panel_shows_provider_model_and_context_window](../../../../functions/src/tui/render/model_info_panel_shows_provider_model_and_context_window.md)
 - [model_info_panel_shows_last_response_perf_metrics](../../../../functions/src/tui/render/model_info_panel_shows_last_response_perf_metrics.md)

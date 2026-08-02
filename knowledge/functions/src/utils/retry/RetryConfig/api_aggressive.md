@@ -3,7 +3,7 @@ type: Rust Method
 title: api_aggressive
 resource: src/utils/retry.rs#L76-L84
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

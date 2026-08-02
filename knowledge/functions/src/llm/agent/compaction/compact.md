@@ -3,7 +3,7 @@ type: Rust Function
 title: compact
 resource: src/llm/agent/compaction.rs#L27-L124
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

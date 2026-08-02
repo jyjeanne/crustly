@@ -4,7 +4,7 @@ title: system_prompt_with_env
 resource: src/llm/agent/service.rs#L614-L623
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

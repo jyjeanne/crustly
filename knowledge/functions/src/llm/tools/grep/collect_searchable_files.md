@@ -4,7 +4,7 @@ title: collect_searchable_files
 resource: src/llm/tools/grep.rs#L324-L340
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/grep/GrepTool/tool/execute

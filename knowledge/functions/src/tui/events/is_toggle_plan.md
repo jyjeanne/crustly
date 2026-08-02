@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_toggle_plan
-resource: src/tui/events.rs#L298-L300
+resource: src/tui/events.rs#L330-L332
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/key_matches

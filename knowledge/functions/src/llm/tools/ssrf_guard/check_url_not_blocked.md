@@ -3,7 +3,7 @@ type: Rust Function
 title: check_url_not_blocked
 resource: src/llm/tools/ssrf_guard.rs#L132-L147
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/models/PlanTaskStatus/parse

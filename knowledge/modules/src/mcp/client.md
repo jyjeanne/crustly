@@ -3,7 +3,7 @@ type: Rust Module
 title: client
 resource: src/mcp/client.rs#L1-L602
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/anyhow-context-result
