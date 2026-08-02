@@ -147,6 +147,7 @@ impl LlamaCppProvider {
             repeat_penalty: config.repeat_penalty.unwrap_or(1.1),
         };
         let seed = config.seed;
+        let idle_unload_secs = config.idle_unload_secs;
 
         std::thread::spawn(move || {
             worker_loop(WorkerInit {
@@ -157,6 +158,7 @@ impl LlamaCppProvider {
                 chat_template_override,
                 sampling_defaults,
                 seed,
+                idle_unload_secs,
                 job_rx,
                 ready_tx,
             });
@@ -188,14 +190,36 @@ struct WorkerInit {
     chat_template_override: Option<String>,
     sampling_defaults: SamplingDefaults,
     seed: Option<u32>,
+    /// Auto-unload the model after this many idle seconds (§4.5); `None`
+    /// never unloads. Reloaded lazily on the next job after an unload.
+    idle_unload_secs: Option<u64>,
     job_rx: mpsc::UnboundedReceiver<InferenceJob>,
     ready_tx: std::sync::mpsc::Sender<std::result::Result<u32, String>>,
 }
 
-/// The worker thread body: loads the model once, then serially drains
+/// How often the idle-unload poll loop wakes up to check the clock while a
+/// model is loaded and `idle_unload_secs` is configured. A fixed short
+/// sleep rather than a real timeout-capable receive, because
+/// `tokio::sync::mpsc::UnboundedReceiver` has no `blocking_recv` variant
+/// with a timeout - negligible overhead at this interval against a
+/// threshold measured in minutes.
+const IDLE_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// The worker thread body: loads the model, then serially drains
 /// `InferenceJob`s until the sender is dropped. Every `llama.cpp` FFI call
 /// in this provider happens inside this function or the functions it calls
 /// - never on the async caller's thread. See the module doc for why.
+///
+/// Structured as an outer "load, then serve" loop rather than a single
+/// load followed by one serve loop, so an idle-unload can drop
+/// `backend`/`model`/`context` (by simply letting one iteration's locals go
+/// out of scope) and the next iteration can reload them - `LlamaContext`
+/// borrows from `LlamaModel` (see the module doc's Send/Sync note), so the
+/// two can only coexist as sibling locals in the same stack frame, not as
+/// fields of a struct stored across iterations without a self-referential
+/// type. Only the *first* iteration's load result is reported through
+/// `ready_tx` (`new()`'s contract: fail fast on a bad model file at
+/// startup); later reloads after an idle-unload log instead.
 fn worker_loop(init: WorkerInit) {
     let WorkerInit {
         model_path,
@@ -205,99 +229,184 @@ fn worker_loop(init: WorkerInit) {
         chat_template_override,
         sampling_defaults,
         seed,
+        idle_unload_secs,
         mut job_rx,
         ready_tx,
     } = init;
+    let mut ready_tx = Some(ready_tx);
+    // The job that woke us up from a post-idle-unload wait, to be handled
+    // immediately once the reload below completes - `None` on the very
+    // first (eager) load, where nothing has been received yet.
+    let mut carry_over_job: Option<InferenceJob> = None;
 
-    let backend = match LlamaBackend::init() {
-        Ok(b) => b,
-        Err(e) => {
-            let _ = ready_tx.send(Err(format!("failed to init llama.cpp backend: {e:?}")));
-            return;
-        }
-    };
-
-    let model_params = LlamaModelParams::default().with_n_gpu_layers(n_gpu_layers);
-    let model = match LlamaModel::load_from_file(&backend, &model_path, &model_params) {
-        Ok(m) => m,
-        Err(e) => {
-            let _ = ready_tx.send(Err(format!("failed to load GGUF file: {e:?}")));
-            return;
-        }
-    };
-
-    let context_params = LlamaContextParams::default()
-        .with_n_ctx(NonZeroU32::new(n_ctx))
-        .with_n_threads(n_threads as i32)
-        .with_n_threads_batch(n_threads as i32);
-    let mut context = match model.new_context(&backend, context_params) {
-        Ok(c) => c,
-        Err(e) => {
-            let _ = ready_tx.send(Err(format!("failed to create llama.cpp context: {e:?}")));
-            return;
-        }
-    };
-    // The context's *actually resolved* n_ctx - may differ from the
-    // requested `n_ctx` (e.g. `n_ctx = 0` asks llama.cpp for the model's own
-    // trained default). This, not the config value, is what
-    // `Provider::context_window()` must report.
-    let actual_n_ctx = context.n_ctx();
-
-    // Resolve the chat template once: an explicit config override always
-    // wins; otherwise use the model's own embedded GGUF template if
-    // present. A model with neither gets a minimal manual fallback
-    // assembled per-request in `build_prompt` - not stored here since it
-    // isn't a `LlamaChatTemplate`.
-    let chat_template: Option<LlamaChatTemplate> = chat_template_override
-        .as_deref()
-        .and_then(|t| LlamaChatTemplate::new(t).ok())
-        .or_else(|| model.chat_template(None).ok());
-
-    // Loading succeeded - tell `new()` it can return `Ok`.
-    if ready_tx.send(Ok(actual_n_ctx)).is_err() {
-        // The caller gave up waiting (e.g. it timed out or the process is
-        // shutting down) - nothing to serve, exit quietly.
-        return;
-    }
-
-    while let Some(job) = job_rx.blocking_recv() {
-        match job {
-            InferenceJob::Complete {
-                request,
-                respond_to,
-            } => {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    run_complete(
-                        &model,
-                        &mut context,
-                        &chat_template,
-                        &sampling_defaults,
-                        seed,
-                        request,
-                    )
-                }))
-                .unwrap_or_else(|payload| Err(panic_to_provider_error(&payload)));
-                let _ = respond_to.send(result);
-            }
-            InferenceJob::Stream { request, events_tx } => {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    run_stream(
-                        &model,
-                        &mut context,
-                        &chat_template,
-                        &sampling_defaults,
-                        seed,
-                        request,
-                        &events_tx,
-                    )
-                }));
-                if let Err(payload) = result {
-                    // A panic anywhere in run_stream means no terminal event
-                    // (ContentBlockStop/MessageStop) was sent - tell the
-                    // consumer why the stream just stops, rather than
-                    // leaving it hanging with no explanation.
-                    let _ = events_tx.send(Err(panic_to_provider_error(&payload)));
+    loop {
+        let backend = match LlamaBackend::init() {
+            Ok(b) => b,
+            Err(e) => {
+                if let Some(tx) = ready_tx.take() {
+                    let _ = tx.send(Err(format!("failed to init llama.cpp backend: {e:?}")));
                 }
+                return;
+            }
+        };
+
+        let model_params = LlamaModelParams::default().with_n_gpu_layers(n_gpu_layers);
+        let model = match LlamaModel::load_from_file(&backend, &model_path, &model_params) {
+            Ok(m) => m,
+            Err(e) => {
+                if let Some(tx) = ready_tx.take() {
+                    let _ = tx.send(Err(format!("failed to load GGUF file: {e:?}")));
+                }
+                return;
+            }
+        };
+
+        let context_params = LlamaContextParams::default()
+            .with_n_ctx(NonZeroU32::new(n_ctx))
+            .with_n_threads(n_threads as i32)
+            .with_n_threads_batch(n_threads as i32);
+        let mut context = match model.new_context(&backend, context_params) {
+            Ok(c) => c,
+            Err(e) => {
+                if let Some(tx) = ready_tx.take() {
+                    let _ = tx.send(Err(format!("failed to create llama.cpp context: {e:?}")));
+                }
+                return;
+            }
+        };
+        // The context's *actually resolved* n_ctx - may differ from the
+        // requested `n_ctx` (e.g. `n_ctx = 0` asks llama.cpp for the
+        // model's own trained default). This, not the config value, is
+        // what `Provider::context_window()` must report.
+        let actual_n_ctx = context.n_ctx();
+
+        // Resolve the chat template once per load: an explicit config
+        // override always wins; otherwise use the model's own embedded
+        // GGUF template if present. A model with neither gets a minimal
+        // manual fallback assembled per-request in `build_prompt` - not
+        // stored here since it isn't a `LlamaChatTemplate`.
+        let chat_template: Option<LlamaChatTemplate> = chat_template_override
+            .as_deref()
+            .and_then(|t| LlamaChatTemplate::new(t).ok())
+            .or_else(|| model.chat_template(None).ok());
+
+        match ready_tx.take() {
+            Some(tx) => {
+                // First load - tell `new()` it can return `Ok`.
+                if tx.send(Ok(actual_n_ctx)).is_err() {
+                    // The caller gave up waiting (e.g. timed out, or the
+                    // process is shutting down) - nothing to serve.
+                    return;
+                }
+            }
+            None => {
+                tracing::info!(
+                    "llama.cpp: model reloaded after an idle-unload ({})",
+                    model_path.display()
+                );
+            }
+        }
+
+        let mut last_activity = std::time::Instant::now();
+        let mut shutting_down = false;
+
+        // The job that triggered this reload (if any) is handled first,
+        // before entering the wait-for-next-job loop below.
+        if let Some(job) = carry_over_job.take() {
+            dispatch_job(&model, &mut context, &chat_template, &sampling_defaults, seed, job);
+            last_activity = std::time::Instant::now();
+        }
+
+        loop {
+            let job = if let Some(idle_secs) = idle_unload_secs {
+                match job_rx.try_recv() {
+                    Ok(job) => job,
+                    Err(mpsc::error::TryRecvError::Empty) => {
+                        if last_activity.elapsed() >= std::time::Duration::from_secs(idle_secs) {
+                            tracing::info!(
+                                "llama.cpp: unloading idle model after {idle_secs}s ({})",
+                                model_path.display()
+                            );
+                            break;
+                        }
+                        std::thread::sleep(IDLE_POLL_INTERVAL);
+                        continue;
+                    }
+                    Err(mpsc::error::TryRecvError::Disconnected) => {
+                        shutting_down = true;
+                        break;
+                    }
+                }
+            } else {
+                match job_rx.blocking_recv() {
+                    Some(job) => job,
+                    None => {
+                        shutting_down = true;
+                        break;
+                    }
+                }
+            };
+
+            dispatch_job(&model, &mut context, &chat_template, &sampling_defaults, seed, job);
+            last_activity = std::time::Instant::now();
+        }
+
+        if shutting_down {
+            return;
+        }
+
+        // Idle-unload fired (not shutdown): `backend`/`model`/`context`
+        // drop here as this loop iteration ends. Block for real (no
+        // polling, zero CPU) until the next job arrives before paying the
+        // reload cost - reloading speculatively before there's a job to
+        // serve would defeat the point of unloading.
+        match job_rx.blocking_recv() {
+            Some(job) => carry_over_job = Some(job),
+            None => return,
+        }
+    }
+}
+
+/// Dispatch one job against the currently loaded model/context, with panic
+/// isolation so an FFI-adjacent panic can't take the worker thread (and
+/// therefore every future request) down with it.
+fn dispatch_job(
+    model: &LlamaModel,
+    context: &mut LlamaContext<'_>,
+    chat_template: &Option<LlamaChatTemplate>,
+    sampling_defaults: &SamplingDefaults,
+    seed: Option<u32>,
+    job: InferenceJob,
+) {
+    match job {
+        InferenceJob::Complete {
+            request,
+            respond_to,
+        } => {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                run_complete(model, context, chat_template, sampling_defaults, seed, request)
+            }))
+            .unwrap_or_else(|payload| Err(panic_to_provider_error(&payload)));
+            let _ = respond_to.send(result);
+        }
+        InferenceJob::Stream { request, events_tx } => {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                run_stream(
+                    model,
+                    context,
+                    chat_template,
+                    sampling_defaults,
+                    seed,
+                    request,
+                    &events_tx,
+                )
+            }));
+            if let Err(payload) = result {
+                // A panic anywhere in run_stream means no terminal event
+                // (ContentBlockStop/MessageStop) was sent - tell the
+                // consumer why the stream just stops, rather than leaving
+                // it hanging with no explanation.
+                let _ = events_tx.send(Err(panic_to_provider_error(&payload)));
             }
         }
     }
