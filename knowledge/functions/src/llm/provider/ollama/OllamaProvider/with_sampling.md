@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_sampling
-resource: src/llm/provider/ollama.rs#L268-L278
+resource: src/llm/provider/ollama.rs#L269-L279
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

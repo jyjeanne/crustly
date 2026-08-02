@@ -4,7 +4,7 @@ title: is_read_only_command
 resource: src/llm/tools/bash.rs#L123-L239
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/sandbox/find_active_shell_operator

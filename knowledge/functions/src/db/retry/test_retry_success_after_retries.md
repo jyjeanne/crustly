@@ -4,7 +4,7 @@ title: test_retry_success_after_retries
 resource: src/db/retry.rs#L317-L344
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/retry/retry_db_operation

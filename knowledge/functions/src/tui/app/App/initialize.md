@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: initialize
-resource: src/tui/app.rs#L432-L445
+resource: src/tui/app.rs#L496-L509
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/session/SessionService/get_most_recent_session

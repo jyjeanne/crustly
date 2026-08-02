@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: ollama_provider_from_config
-resource: src/llm/provider/factory.rs#L272-L323
+resource: src/llm/provider/factory.rs#L277-L328
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/with_keep_alive

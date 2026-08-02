@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: app
-resource: src/tui/app.rs#L1-L4099
+resource: src/tui/app.rs#L1-L4755
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-events-appmode-eventhandler-toolapprovalrequest-toolapprovalresponse-tuievent
@@ -36,6 +36,8 @@ relationships:
 - [from](../../../functions/src/tui/app/DisplayMessage/from-message/from.md)
 - [App](../../../classes/src/tui/app/App.md)
 - [plain_textarea](../../../functions/src/tui/app/plain_textarea.md)
+- [quantization_hint_for_path](../../../functions/src/tui/app/quantization_hint_for_path.md)
+- [quantization_hint_for_path](../../../functions/src/tui/app/quantization_hint_for_path-2.md)
 - [new](../../../functions/src/tui/app/App/new.md)
 - [provider_name](../../../functions/src/tui/app/App/provider_name.md)
 - [provider_model](../../../functions/src/tui/app/App/provider_model.md)
@@ -60,6 +62,9 @@ relationships:
 - [set_agent_service](../../../functions/src/tui/app/App/set_agent_service.md)
 - [set_ollama_host](../../../functions/src/tui/app/App/set_ollama_host.md)
 - [set_ollama_config](../../../functions/src/tui/app/App/set_ollama_config.md)
+- [set_llama_cpp_models_dir](../../../functions/src/tui/app/App/set_llama_cpp_models_dir.md)
+- [set_llama_cpp_config](../../../functions/src/tui/app/App/set_llama_cpp_config.md)
+- [llama_cpp_model_details](../../../functions/src/tui/app/App/llama_cpp_model_details.md)
 - [set_kitty_keyboard_protocol_active](../../../functions/src/tui/app/App/set_kitty_keyboard_protocol_active.md)
 - [set_auto_mode_state](../../../functions/src/tui/app/App/set_auto_mode_state.md)
 - [auto_mode](../../../functions/src/tui/app/App/auto_mode.md)
@@ -110,6 +115,11 @@ relationships:
 - [open_provider_switch](../../../functions/src/tui/app/App/open_provider_switch.md)
 - [handle_provider_switch_key](../../../functions/src/tui/app/App/handle_provider_switch_key.md)
 - [switch_provider_to_ollama_model](../../../functions/src/tui/app/App/switch_provider_to_ollama_model.md)
+- [open_llama_cpp_models](../../../functions/src/tui/app/App/open_llama_cpp_models.md)
+- [start_llama_cpp_download](../../../functions/src/tui/app/App/start_llama_cpp_download.md)
+- [start_llama_cpp_delete](../../../functions/src/tui/app/App/start_llama_cpp_delete.md)
+- [start_llama_cpp_switch](../../../functions/src/tui/app/App/start_llama_cpp_switch.md)
+- [handle_llama_cpp_models_key](../../../functions/src/tui/app/App/handle_llama_cpp_models_key.md)
 - [test_display_message_from_db_message](../../../functions/src/tui/app/test_display_message_from_db_message.md)
 - [DummyProvider](../../../classes/src/tui/app/DummyProvider.md)
 - [complete](../../../functions/src/tui/app/DummyProvider/provider/complete.md)
@@ -188,6 +198,16 @@ relationships:
 - [provider_switch_esc_returns_to_chat](../../../functions/src/tui/app/provider_switch_esc_returns_to_chat.md)
 - [switch_provider_without_ollama_feature_shows_clear_error](../../../functions/src/tui/app/switch_provider_without_ollama_feature_shows_clear_error.md)
 - [switch_provider_with_ollama_feature_swaps_provider_in_place](../../../functions/src/tui/app/switch_provider_with_ollama_feature_swaps_provider_in_place.md)
+- [ctrl_g_opens_llama_cpp_models_dialog_in_loading_state](../../../functions/src/tui/app/ctrl_g_opens_llama_cpp_models_dialog_in_loading_state.md)
+- [llama_cpp_models_listed_clears_loading_state](../../../functions/src/tui/app/llama_cpp_models_listed_clears_loading_state.md)
+- [llama_cpp_up_down_navigation_clamps_at_bounds](../../../functions/src/tui/app/llama_cpp_up_down_navigation_clamps_at_bounds.md)
+- [llama_cpp_esc_returns_to_chat](../../../functions/src/tui/app/llama_cpp_esc_returns_to_chat.md)
+- [llama_cpp_typing_fills_the_download_input](../../../functions/src/tui/app/llama_cpp_typing_fills_the_download_input.md)
+- [llama_cpp_delete_key_asks_for_confirmation_before_deleting](../../../functions/src/tui/app/llama_cpp_delete_key_asks_for_confirmation_before_deleting.md)
+- [llama_cpp_delete_finished_removes_model_from_list](../../../functions/src/tui/app/llama_cpp_delete_finished_removes_model_from_list.md)
+- [llama_cpp_switch_finished_swaps_provider_in_place](../../../functions/src/tui/app/llama_cpp_switch_finished_swaps_provider_in_place.md)
+- [llama_cpp_switch_finished_with_error_reports_failure_without_swapping](../../../functions/src/tui/app/llama_cpp_switch_finished_with_error_reports_failure_without_swapping.md)
+- [llama_cpp_switch_is_a_noop_while_a_delete_is_already_running](../../../functions/src/tui/app/llama_cpp_switch_is_a_noop_while_a_delete_is_already_running.md)
 - [stale_session_response_chunk_is_dropped_after_switching_sessions](../../../functions/src/tui/app/stale_session_response_chunk_is_dropped_after_switching_sessions.md)
 - [plan_task_error_marks_task_failed_and_stops_auto_execution](../../../functions/src/tui/app/plan_task_error_marks_task_failed_and_stops_auto_execution.md)
 - [stale_session_response_complete_is_dropped_after_switching_sessions](../../../functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions.md)

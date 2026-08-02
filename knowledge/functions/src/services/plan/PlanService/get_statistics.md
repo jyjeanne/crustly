@@ -3,7 +3,7 @@ type: Rust Method
 title: get_statistics
 resource: src/services/plan.rs#L270-L326
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

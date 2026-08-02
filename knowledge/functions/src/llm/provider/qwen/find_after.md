@@ -4,7 +4,7 @@ title: find_after
 resource: src/llm/provider/qwen.rs#L105-L107
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/qwen/QwenProvider/parse_hermes_tool_calls

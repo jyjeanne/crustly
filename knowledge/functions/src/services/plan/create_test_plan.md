@@ -4,7 +4,7 @@ title: create_test_plan
 resource: src/services/plan.rs#L365-L396
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanDocument/add_task

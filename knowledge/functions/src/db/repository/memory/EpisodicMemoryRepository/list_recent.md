@@ -3,7 +3,7 @@ type: Rust Method
 title: list_recent
 resource: src/db/repository/memory.rs#L41-L96
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

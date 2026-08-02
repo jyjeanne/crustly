@@ -4,7 +4,7 @@ title: handle_error
 resource: src/llm/provider/qwen.rs#L1219-L1269
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

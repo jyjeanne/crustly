@@ -4,7 +4,7 @@ title: execute_denies_cloud_metadata_endpoint
 resource: src/llm/tools/http.rs#L338-L348
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/trait/ToolExecutionContext/with_auto_approve

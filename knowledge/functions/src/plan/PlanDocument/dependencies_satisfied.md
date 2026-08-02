@@ -3,7 +3,7 @@ type: Rust Method
 title: dependencies_satisfied
 resource: src/plan/mod.rs#L300-L306
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/plan_tool/PlanTool/tool/execute

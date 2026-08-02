@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: event_sender
-resource: src/tui/app.rs#L458-L460
+resource: src/tui/app.rs#L522-L524
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/EventHandler/sender
@@ -16,6 +16,10 @@ relationships:
   - functions/src/tui/app/App/start_model_pull
   - functions/src/tui/app/App/start_model_delete
   - functions/src/tui/app/App/open_provider_switch
+  - functions/src/tui/app/App/open_llama_cpp_models
+  - functions/src/tui/app/App/start_llama_cpp_download
+  - functions/src/tui/app/App/start_llama_cpp_delete
+  - functions/src/tui/app/App/start_llama_cpp_switch
   - functions/src/tui/runner/run_inner
 ---
 
@@ -37,4 +41,8 @@ relationships:
 - [start_model_pull](../../../../../functions/src/tui/app/App/start_model_pull.md)
 - [start_model_delete](../../../../../functions/src/tui/app/App/start_model_delete.md)
 - [open_provider_switch](../../../../../functions/src/tui/app/App/open_provider_switch.md)
+- [open_llama_cpp_models](../../../../../functions/src/tui/app/App/open_llama_cpp_models.md)
+- [start_llama_cpp_download](../../../../../functions/src/tui/app/App/start_llama_cpp_download.md)
+- [start_llama_cpp_delete](../../../../../functions/src/tui/app/App/start_llama_cpp_delete.md)
+- [start_llama_cpp_switch](../../../../../functions/src/tui/app/App/start_llama_cpp_switch.md)
 - [run_inner](../../../../../functions/src/tui/runner/run_inner.md)

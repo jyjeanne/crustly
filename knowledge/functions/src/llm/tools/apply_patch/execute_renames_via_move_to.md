@@ -4,7 +4,7 @@ title: execute_renames_via_move_to
 resource: src/llm/tools/apply_patch.rs#L727-L750
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

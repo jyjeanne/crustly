@@ -4,7 +4,7 @@ title: stream_events_from_buffered_content
 resource: src/llm/provider/qwen.rs#L1882-L1907
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response

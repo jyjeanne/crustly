@@ -4,7 +4,7 @@ title: compaction_never_splits_a_tool_use_result_pair
 resource: src/llm/agent/compaction.rs#L327-L400
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/context/AgentContext/add_message

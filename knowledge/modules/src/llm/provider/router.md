@@ -3,7 +3,7 @@ type: Rust Module
 title: router
 resource: src/llm/provider/router.rs#L1-L144
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/serde-deserialize-serialize

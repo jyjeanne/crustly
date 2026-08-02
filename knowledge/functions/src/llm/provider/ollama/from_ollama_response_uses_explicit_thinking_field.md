@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: from_ollama_response_uses_explicit_thinking_field
-resource: src/llm/provider/ollama.rs#L1596-L1612
+resource: src/llm/provider/ollama.rs#L1384-L1400
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

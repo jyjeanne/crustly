@@ -4,7 +4,7 @@ title: minimal_task
 resource: tests/plan_crash_recovery_test.rs#L45-L63
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/tests/plan_crash_recovery_test/crash_recovery_resumes_at_correct_task

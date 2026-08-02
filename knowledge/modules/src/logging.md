@@ -3,7 +3,7 @@ type: Rust Module
 title: logging
 resource: src/logging.rs#L1-L393
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/std-path-pathbuf

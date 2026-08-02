@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: handle_event
-resource: src/tui/app.rs#L529-L746
+resource: src/tui/app.rs#L633-L1005
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_key_event
@@ -19,6 +19,9 @@ relationships:
   - functions/src/tui/app/App/event_sender
   - functions/src/tui/app/App/handle_approval_requested
   - functions/src/tui/app/App/refresh_model_download_suggestions
+  - functions/src/config/secrets/SecretString/len
+  - functions/src/llm/agent/service/AgentService/set_provider
+  - functions/src/services/session/SessionService/update_session
   called_by:
   - functions/src/tui/app/handle_ollama_models_listed_updates_installed_list
   - functions/src/tui/app/handle_ollama_pull_progress_updates_status_and_fraction
@@ -32,6 +35,10 @@ relationships:
   - functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end
   - functions/src/tui/app/paste_with_embedded_newline_produces_multiple_lines
   - functions/src/tui/app/provider_switch_models_listed_clears_loading_state
+  - functions/src/tui/app/llama_cpp_models_listed_clears_loading_state
+  - functions/src/tui/app/llama_cpp_delete_finished_removes_model_from_list
+  - functions/src/tui/app/llama_cpp_switch_finished_swaps_provider_in_place
+  - functions/src/tui/app/llama_cpp_switch_finished_with_error_reports_failure_without_swapping
   - functions/src/tui/app/stale_session_response_chunk_is_dropped_after_switching_sessions
   - functions/src/tui/app/plan_task_error_marks_task_failed_and_stops_auto_execution
   - functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions
@@ -57,6 +64,9 @@ relationships:
 - [event_sender](../../../../../functions/src/tui/app/App/event_sender.md)
 - [handle_approval_requested](../../../../../functions/src/tui/app/App/handle_approval_requested.md)
 - [refresh_model_download_suggestions](../../../../../functions/src/tui/app/App/refresh_model_download_suggestions.md)
+- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
+- [set_provider](../../../../../functions/src/llm/agent/service/AgentService/set_provider.md)
+- [update_session](../../../../../functions/src/services/session/SessionService/update_session.md)
 
 # Called by
 
@@ -72,6 +82,10 @@ relationships:
 - [paste_inserts_at_cursor_not_always_appended_at_the_end](../../../../../functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end.md)
 - [paste_with_embedded_newline_produces_multiple_lines](../../../../../functions/src/tui/app/paste_with_embedded_newline_produces_multiple_lines.md)
 - [provider_switch_models_listed_clears_loading_state](../../../../../functions/src/tui/app/provider_switch_models_listed_clears_loading_state.md)
+- [llama_cpp_models_listed_clears_loading_state](../../../../../functions/src/tui/app/llama_cpp_models_listed_clears_loading_state.md)
+- [llama_cpp_delete_finished_removes_model_from_list](../../../../../functions/src/tui/app/llama_cpp_delete_finished_removes_model_from_list.md)
+- [llama_cpp_switch_finished_swaps_provider_in_place](../../../../../functions/src/tui/app/llama_cpp_switch_finished_swaps_provider_in_place.md)
+- [llama_cpp_switch_finished_with_error_reports_failure_without_swapping](../../../../../functions/src/tui/app/llama_cpp_switch_finished_with_error_reports_failure_without_swapping.md)
 - [stale_session_response_chunk_is_dropped_after_switching_sessions](../../../../../functions/src/tui/app/stale_session_response_chunk_is_dropped_after_switching_sessions.md)
 - [plan_task_error_marks_task_failed_and_stops_auto_execution](../../../../../functions/src/tui/app/plan_task_error_marks_task_failed_and_stops_auto_execution.md)
 - [stale_session_response_complete_is_dropped_after_switching_sessions](../../../../../functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions.md)

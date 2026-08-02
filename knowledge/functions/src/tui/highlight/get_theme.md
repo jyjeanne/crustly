@@ -4,7 +4,7 @@ title: get_theme
 resource: src/tui/highlight.rs#L24-L26
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/highlight/highlight_code

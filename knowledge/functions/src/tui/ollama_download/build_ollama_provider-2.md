@@ -3,7 +3,7 @@ type: Rust Function
 title: build_ollama_provider
 resource: src/tui/ollama_download.rs#L126-L136
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: mcp_view_up_down_navigation_clamps_at_bounds
-resource: src/tui/app.rs#L3510-L3536
+resource: src/tui/app.rs#L3946-L3972
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_mcp_key

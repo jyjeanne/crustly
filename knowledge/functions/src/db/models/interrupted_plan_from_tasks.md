@@ -3,7 +3,7 @@ type: Rust Function
 title: interrupted_plan_from_tasks
 resource: src/db/models.rs#L195-L216
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/models/PlanTask/exec_status

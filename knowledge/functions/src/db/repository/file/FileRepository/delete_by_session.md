@@ -3,7 +3,7 @@ type: Rust Method
 title: delete_by_session
 resource: src/db/repository/file.rs#L137-L146
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

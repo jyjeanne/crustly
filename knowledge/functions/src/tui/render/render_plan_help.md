@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_plan_help
-resource: src/tui/render.rs#L945-L997
+resource: src/tui/render.rs#L954-L1006
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanTask/block

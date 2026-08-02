@@ -3,7 +3,7 @@ type: Rust Method
 title: classify_tier
 resource: src/tui/prompt_analyzer.rs#L252-L278
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

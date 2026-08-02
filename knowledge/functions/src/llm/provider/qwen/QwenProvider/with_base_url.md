@@ -3,7 +3,7 @@ type: Rust Method
 title: with_base_url
 resource: src/llm/provider/qwen.rs#L148-L160
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/QwenProvider/build_client

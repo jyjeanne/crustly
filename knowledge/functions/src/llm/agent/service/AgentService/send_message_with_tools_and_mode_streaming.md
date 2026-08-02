@@ -3,7 +3,7 @@ type: Rust Method
 title: send_message_with_tools_and_mode_streaming
 resource: src/llm/agent/service.rs#L801-L817
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

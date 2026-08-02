@@ -4,7 +4,7 @@ title: create_test_plan
 resource: src/plan/plan_tests.rs#L11-L17
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

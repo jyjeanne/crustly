@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/bash.rs#L309-L426
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/bash/is_read_only_command

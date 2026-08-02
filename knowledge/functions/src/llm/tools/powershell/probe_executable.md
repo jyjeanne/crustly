@@ -4,7 +4,7 @@ title: probe_executable
 resource: src/llm/tools/powershell.rs#L31-L46
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

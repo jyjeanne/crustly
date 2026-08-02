@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: connect_configured_mcp_servers
-resource: src/cli/mod.rs#L646-L684
+resource: src/cli/mod.rs#L671-L709
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/registry/ToolRegistry/register_mcp_server

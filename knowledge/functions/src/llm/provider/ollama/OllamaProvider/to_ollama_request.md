@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: to_ollama_request
-resource: src/llm/provider/ollama.rs#L281-L415
+resource: src/llm/provider/ollama.rs#L282-L416
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/Message/system

@@ -4,7 +4,7 @@ title: drain_stream_assembles_anthropic_tool_input_from_json_deltas
 resource: src/llm/agent/service.rs#L2561-L2624
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/service/drain_stream_to_response

@@ -3,7 +3,7 @@ type: Rust Module
 title: markdown
 resource: src/tui/markdown.rs#L1-L401
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/pulldown-cmark-codeblockkind-event-parser-tag-tagend

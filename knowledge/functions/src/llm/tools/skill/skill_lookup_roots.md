@@ -4,7 +4,7 @@ title: skill_lookup_roots
 resource: src/llm/tools/skill.rs#L177-L203
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/skill/push_if_dir

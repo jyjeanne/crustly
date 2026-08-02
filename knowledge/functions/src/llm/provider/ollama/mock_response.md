@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: mock_response
-resource: src/llm/provider/ollama.rs#L1275-L1284
+resource: src/llm/provider/ollama.rs#L1154-L1163
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/ollama/recovered_tool_call_becomes_a_tool_use_block

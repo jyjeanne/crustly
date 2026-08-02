@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: configure_qwen_explicit_tool_parser_overrides_coder_next_auto_selection
-resource: src/llm/provider/factory.rs#L994-L1015
+resource: src/llm/provider/factory.rs#L1099-L1120
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/factory/configure_qwen

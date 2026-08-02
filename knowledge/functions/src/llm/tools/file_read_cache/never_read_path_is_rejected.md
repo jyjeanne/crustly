@@ -4,7 +4,7 @@ title: never_read_path_is_rejected
 resource: src/llm/tools/file_read_cache.rs#L107-L110
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

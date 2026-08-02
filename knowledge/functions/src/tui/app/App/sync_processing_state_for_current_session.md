@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: sync_processing_state_for_current_session
-resource: src/tui/app.rs#L1406-L1412
+resource: src/tui/app.rs#L1671-L1677
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/create_new_session

@@ -3,7 +3,7 @@ type: Rust Method
 title: from_str
 resource: src/config/secrets.rs#L33-L37
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/cmd_keyring
@@ -20,11 +20,11 @@ relationships:
   - functions/src/db/repository/plan/PlanRepository/plan_from_db
   - functions/src/db/repository/plan/PlanRepository/task_from_db
   - functions/src/llm/agent/service/apply_streamed_tool_input
-  - functions/src/llm/provider/ollama/parse_tool_call_object
   - functions/src/llm/provider/openai/OpenAIProvider/from_openai_response
   - functions/src/llm/provider/openai/OpenAIProvider/provider/stream
   - functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls
   - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+  - functions/src/llm/provider/tool_call_recovery/parse_tool_call_object
   - functions/src/llm/tools/context/ContextStore/load
   - functions/src/llm/tools/doc_parser/DocParserTool/extract_text_from_docx_xml
   - functions/src/llm/tools/doc_parser/DocParserTool/extract_metadata_from_core_xml
@@ -61,11 +61,11 @@ relationships:
 - [plan_from_db](../../../../../functions/src/db/repository/plan/PlanRepository/plan_from_db.md)
 - [task_from_db](../../../../../functions/src/db/repository/plan/PlanRepository/task_from_db.md)
 - [apply_streamed_tool_input](../../../../../functions/src/llm/agent/service/apply_streamed_tool_input.md)
-- [parse_tool_call_object](../../../../../functions/src/llm/provider/ollama/parse_tool_call_object.md)
 - [from_openai_response](../../../../../functions/src/llm/provider/openai/OpenAIProvider/from_openai_response.md)
 - [stream](../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/stream.md)
 - [parse_fallback_tool_calls](../../../../../functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls.md)
 - [from_qwen_response](../../../../../functions/src/llm/provider/qwen/QwenProvider/from_qwen_response.md)
+- [parse_tool_call_object](../../../../../functions/src/llm/provider/tool_call_recovery/parse_tool_call_object.md)
 - [load](../../../../../functions/src/llm/tools/context/ContextStore/load.md)
 - [extract_text_from_docx_xml](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/extract_text_from_docx_xml.md)
 - [extract_metadata_from_core_xml](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/extract_metadata_from_core_xml.md)

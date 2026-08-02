@@ -3,7 +3,7 @@ type: Rust Method
 title: unarchive
 resource: src/db/repository/session.rs#L189-L201
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/db/repository/session/test_session_archive

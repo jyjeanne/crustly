@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/app/mod.rs#L17-L19
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

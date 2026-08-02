@@ -3,7 +3,7 @@ type: Rust Method
 title: connect
 resource: src/db/mod.rs#L34-L90
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/error/ErrorInfo/with_context

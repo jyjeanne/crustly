@@ -3,7 +3,7 @@ type: Rust Module
 title: tools
 resource: src/llm/tools/mod.rs#L1-L50
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/pub-use-error-result-toolerror

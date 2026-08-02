@@ -4,7 +4,7 @@ title: test_secret_string_from_env_optional
 resource: src/config/secrets.rs#L371-L384
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/from_env_optional

@@ -4,7 +4,7 @@ title: read_only_mode_rejects_git_config
 resource: src/llm/tools/bash.rs#L730-L734
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

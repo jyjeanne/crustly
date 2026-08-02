@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: configure_openai
-resource: src/llm/provider/factory.rs#L466-L473
+resource: src/llm/provider/factory.rs#L512-L519
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/factory/try_create_openai

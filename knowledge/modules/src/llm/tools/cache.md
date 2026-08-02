@@ -3,7 +3,7 @@ type: Rust Module
 title: cache
 resource: src/llm/tools/cache.rs#L1-L198
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/dashmap-dashmap

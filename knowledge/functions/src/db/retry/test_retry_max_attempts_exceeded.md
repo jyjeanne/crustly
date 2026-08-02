@@ -4,7 +4,7 @@ title: test_retry_max_attempts_exceeded
 resource: src/db/retry.rs#L347-L369
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/retry/retry_db_operation

@@ -4,7 +4,7 @@ title: matching_fingerprint_after_record_is_ok
 resource: src/llm/tools/file_read_cache.rs#L113-L117
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/file_read_cache/FileReadCache/record

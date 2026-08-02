@@ -3,7 +3,7 @@ type: Rust Method
 title: count
 resource: src/db/repository/session.rs#L228-L241
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

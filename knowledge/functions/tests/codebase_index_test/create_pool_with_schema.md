@@ -4,7 +4,7 @@ title: create_pool_with_schema
 resource: tests/codebase_index_test.rs#L8-L24
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/tests/codebase_index_test/index_and_query_provider_trait

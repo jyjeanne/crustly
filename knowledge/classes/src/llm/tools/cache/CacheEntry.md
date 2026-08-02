@@ -4,7 +4,7 @@ title: CacheEntry
 resource: src/llm/tools/cache.rs#L28-L31
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

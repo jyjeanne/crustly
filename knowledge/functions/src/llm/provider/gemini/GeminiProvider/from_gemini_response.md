@@ -4,7 +4,7 @@ title: from_gemini_response
 resource: src/llm/provider/gemini.rs#L265-L337
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/EventHandler/next

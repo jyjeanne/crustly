@@ -3,7 +3,7 @@ type: Rust Function
 title: retry_with_backoff
 resource: src/llm/provider/retry.rs#L112-L166
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete

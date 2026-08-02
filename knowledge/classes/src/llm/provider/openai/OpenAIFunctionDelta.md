@@ -4,7 +4,7 @@ title: OpenAIFunctionDelta
 resource: src/llm/provider/openai.rs#L1127-L1132
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

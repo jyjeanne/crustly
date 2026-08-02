@@ -4,7 +4,7 @@ title: html_to_text
 resource: src/llm/tools/web_fetch.rs#L56-L78
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/web_fetch/WebFetchTool/tool/execute

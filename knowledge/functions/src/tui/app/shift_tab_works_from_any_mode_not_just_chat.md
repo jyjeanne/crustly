@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: shift_tab_works_from_any_mode_not_just_chat
-resource: src/tui/app.rs#L3334-L3343
+resource: src/tui/app.rs#L3770-L3779
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_key_event

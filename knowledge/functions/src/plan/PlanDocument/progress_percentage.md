@@ -3,7 +3,7 @@ type: Rust Method
 title: progress_percentage
 resource: src/plan/mod.rs#L164-L170
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

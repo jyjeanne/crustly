@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_message_lines
-resource: src/tui/render.rs#L319-L374
+resource: src/tui/render.rs#L323-L378
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render_thinking_block

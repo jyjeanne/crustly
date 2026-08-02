@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_file_picker
-resource: src/tui/render.rs#L1436-L1553
+resource: src/tui/render.rs#L1445-L1562
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

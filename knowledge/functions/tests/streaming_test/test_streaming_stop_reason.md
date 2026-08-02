@@ -4,7 +4,7 @@ title: test_streaming_stop_reason
 resource: tests/streaming_test.rs#L251-L266
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/LLMRequest/with_streaming

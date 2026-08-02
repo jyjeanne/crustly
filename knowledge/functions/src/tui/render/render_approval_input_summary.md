@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_approval_input_summary
-resource: src/tui/render.rs#L1325-L1364
+resource: src/tui/render.rs#L1334-L1373
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

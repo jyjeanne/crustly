@@ -3,7 +3,7 @@ type: Rust Method
 title: complexity_stars
 resource: src/plan/mod.rs#L705-L709
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

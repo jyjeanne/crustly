@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_mcp
-resource: src/tui/render.rs#L636-L697
+resource: src/tui/render.rs#L640-L701
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

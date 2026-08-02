@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_model_download_deleting
-resource: src/tui/render.rs#L1952-L1975
+resource: src/tui/render.rs#L1984-L2007
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanTask/block

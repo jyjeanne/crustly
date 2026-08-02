@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: next_event
-resource: src/tui/app.rs#L519-L521
+resource: src/tui/app.rs#L623-L625
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/EventHandler/next

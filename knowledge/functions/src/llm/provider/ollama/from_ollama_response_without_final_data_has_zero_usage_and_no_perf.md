@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: from_ollama_response_without_final_data_has_zero_usage_and_no_perf
-resource: src/llm/provider/ollama.rs#L1481-L1491
+resource: src/llm/provider/ollama.rs#L1269-L1279
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

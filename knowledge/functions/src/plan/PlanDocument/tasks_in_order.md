@@ -3,7 +3,7 @@ type: Rust Method
 title: tasks_in_order
 resource: src/plan/mod.rs#L86-L145
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

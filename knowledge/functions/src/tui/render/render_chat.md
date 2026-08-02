@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_chat
-resource: src/tui/render.rs#L431-L471
+resource: src/tui/render.rs#L435-L475
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render_pending_plan_banner

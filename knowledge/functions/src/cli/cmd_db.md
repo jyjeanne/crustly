@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_db
-resource: src/cli/mod.rs#L490-L591
+resource: src/cli/mod.rs#L515-L616
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

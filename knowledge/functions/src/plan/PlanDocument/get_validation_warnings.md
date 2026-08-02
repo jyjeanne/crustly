@@ -3,7 +3,7 @@ type: Rust Method
 title: get_validation_warnings
 resource: src/plan/mod.rs#L355-L412
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

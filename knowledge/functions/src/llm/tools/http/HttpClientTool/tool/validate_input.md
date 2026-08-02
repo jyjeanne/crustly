@@ -4,7 +4,7 @@ title: validate_input
 resource: src/llm/tools/http.rs#L137-L169
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/http/parse_method

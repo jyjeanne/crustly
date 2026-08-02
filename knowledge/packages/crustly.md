@@ -3,7 +3,7 @@ type: Rust Package
 title: crustly
 resource: Cargo.toml#L1
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Contains
@@ -43,6 +43,9 @@ generated:
 - [error](../modules/src/llm/provider/error.md)
 - [factory](../modules/src/llm/provider/factory.md)
 - [gemini](../modules/src/llm/provider/gemini.md)
+- [llama_cpp](../modules/src/llm/provider/llama_cpp.md)
+- [llama_cpp_grammar](../modules/src/llm/provider/llama_cpp_grammar.md)
+- [llama_cpp_models](../modules/src/llm/provider/llama_cpp_models.md)
 - [provider](../modules/src/llm/provider.md)
 - [model_hints](../modules/src/llm/provider/model_hints.md)
 - [ollama](../modules/src/llm/provider/ollama.md)
@@ -51,6 +54,7 @@ generated:
 - [qwen](../modules/src/llm/provider/qwen.md)
 - [retry](../modules/src/llm/provider/retry.md)
 - [router](../modules/src/llm/provider/router.md)
+- [tool_call_recovery](../modules/src/llm/provider/tool_call_recovery.md)
 - [trait](../modules/src/llm/provider/trait.md)
 - [types](../modules/src/llm/provider/types.md)
 - [agent](../modules/src/llm/tools/agent.md)
@@ -110,6 +114,7 @@ generated:
 - [error](../modules/src/tui/error.md)
 - [events](../modules/src/tui/events.md)
 - [highlight](../modules/src/tui/highlight.md)
+- [llama_cpp_download](../modules/src/tui/llama_cpp_download.md)
 - [markdown](../modules/src/tui/markdown.md)
 - [tui](../modules/src/tui.md)
 - [ollama_download](../modules/src/tui/ollama_download.md)

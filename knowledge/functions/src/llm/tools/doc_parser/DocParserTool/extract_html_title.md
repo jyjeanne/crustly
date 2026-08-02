@@ -4,7 +4,7 @@ title: extract_html_title
 resource: src/llm/tools/doc_parser.rs#L488-L497
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/doc_parser/DocParserTool/parse_html

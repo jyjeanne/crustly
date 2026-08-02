@@ -3,7 +3,7 @@ type: Rust Function
 title: validate_path_safety
 resource: src/llm/tools/error.rs#L58-L110
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/execute

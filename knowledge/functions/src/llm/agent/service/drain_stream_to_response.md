@@ -4,7 +4,7 @@ title: drain_stream_to_response
 resource: src/llm/agent/service.rs#L406-L532
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/EventHandler/next

@@ -4,7 +4,7 @@ title: create_test_task
 resource: src/plan/plan_tests.rs#L20-L27
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/plan/plan_tests/test_add_task

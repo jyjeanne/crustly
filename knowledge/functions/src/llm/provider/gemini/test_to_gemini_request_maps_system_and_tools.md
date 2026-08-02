@@ -4,7 +4,7 @@ title: test_to_gemini_request_maps_system_and_tools
 resource: src/llm/provider/gemini.rs#L951-L968
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/LLMRequest/with_system

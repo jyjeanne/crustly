@@ -3,7 +3,7 @@ type: Rust Method
 title: list_for_session
 resource: src/db/repository/compaction.rs#L38-L64
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/models/PlanTaskStatus/parse

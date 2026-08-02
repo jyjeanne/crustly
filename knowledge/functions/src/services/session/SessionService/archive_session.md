@@ -3,7 +3,7 @@ type: Rust Method
 title: archive_session
 resource: src/services/session.rs#L124-L132
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/repository/session/SessionRepository/archive

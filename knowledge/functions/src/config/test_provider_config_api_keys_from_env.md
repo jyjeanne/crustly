@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_provider_config_api_keys_from_env
-resource: src/config/mod.rs#L1353-L1381
+resource: src/config/mod.rs#L1470-L1498
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/Config/apply_env_overrides

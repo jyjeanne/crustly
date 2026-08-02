@@ -3,7 +3,7 @@ type: Rust Method
 title: with_response_format
 resource: src/llm/provider/types.rs#L241-L244
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/gemini/test_json_mode_sets_response_mime_type

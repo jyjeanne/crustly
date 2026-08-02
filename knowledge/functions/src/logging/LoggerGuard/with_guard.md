@@ -4,7 +4,7 @@ title: with_guard
 resource: src/logging.rs#L94-L98
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/logging/init_debug_logging

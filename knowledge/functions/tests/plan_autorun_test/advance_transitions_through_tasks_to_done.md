@@ -4,7 +4,7 @@ title: advance_transitions_through_tasks_to_done
 resource: tests/plan_autorun_test.rs#L114-L141
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanModeState/advance

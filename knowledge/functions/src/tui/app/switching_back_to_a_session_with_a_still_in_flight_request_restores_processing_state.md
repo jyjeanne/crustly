@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state
-resource: src/tui/app.rs#L4025-L4047
+resource: src/tui/app.rs#L4681-L4703
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/create_new_session

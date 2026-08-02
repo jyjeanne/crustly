@@ -3,7 +3,7 @@ type: Rust Method
 title: is_success
 resource: src/llm/provider/ollama_models.rs#L42-L44
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete

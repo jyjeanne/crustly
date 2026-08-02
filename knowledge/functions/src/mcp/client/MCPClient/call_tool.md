@@ -3,7 +3,7 @@ type: Rust Method
 title: call_tool
 resource: src/mcp/client.rs#L139-L175
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/mcp/client/MCPClient/send_request

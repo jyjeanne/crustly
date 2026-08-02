@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: set_ollama_config
-resource: src/tui/app.rs#L476-L478
+resource: src/tui/app.rs#L540-L542
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/cmd_chat

@@ -4,7 +4,7 @@ title: test_from_qwen_response_openai_parser_still_detects_fallback_json
 resource: src/llm/provider/qwen.rs#L2728-L2763
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/QwenProvider/with_tool_parser

@@ -4,7 +4,7 @@ title: test_full_json_schema_sets_response_schema
 resource: src/llm/provider/gemini.rs#L1098-L1110
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/LLMRequest/with_response_format

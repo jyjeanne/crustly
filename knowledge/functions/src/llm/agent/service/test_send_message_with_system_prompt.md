@@ -4,7 +4,7 @@ title: test_send_message_with_system_prompt
 resource: src/llm/agent/service.rs#L2190-L2202
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

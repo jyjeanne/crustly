@@ -4,7 +4,7 @@ title: append_fact
 resource: src/llm/tools/save_memory.rs#L44-L65
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

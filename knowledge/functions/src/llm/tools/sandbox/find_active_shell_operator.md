@@ -3,7 +3,7 @@ type: Rust Function
 title: find_active_shell_operator
 resource: src/llm/tools/sandbox.rs#L296-L328
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/EventHandler/next

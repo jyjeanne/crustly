@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_approve
-resource: src/tui/events.rs#L390-L395
+resource: src/tui/events.rs#L427-L432
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

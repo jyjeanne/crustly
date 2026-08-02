@@ -3,7 +3,7 @@ type: Rust Method
 title: next_executable_task
 resource: src/plan/mod.rs#L251-L267
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/plan_tool/PlanTool/tool/execute

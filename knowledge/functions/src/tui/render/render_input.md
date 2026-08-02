@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_input
-resource: src/tui/render.rs#L478-L521
+resource: src/tui/render.rs#L482-L525
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/render

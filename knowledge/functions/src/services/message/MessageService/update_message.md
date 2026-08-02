@@ -3,7 +3,7 @@ type: Rust Method
 title: update_message
 resource: src/services/message.rs#L84-L92
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: open_model_download_switches_mode_and_seeds_suggestions
-resource: src/tui/app.rs#L2572-L2582
+resource: src/tui/app.rs#L3008-L3018
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/open_model_download

@@ -3,7 +3,7 @@ type: Rust Struct
 title: Message
 resource: src/llm/provider/types.rs#L22-L27
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

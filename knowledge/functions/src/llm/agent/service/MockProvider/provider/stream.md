@@ -4,7 +4,7 @@ title: stream
 resource: src/llm/agent/service.rs#L1910-L1915
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -3,7 +3,7 @@ type: Rust Module
 title: splash
 resource: src/tui/splash.rs#L1-L170
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/ratatui-layout-alignment-constraint-direction-layout-rect-style-color-modifier-style-text-line-span-widgets-block-borders-paragraph-frame

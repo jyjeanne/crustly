@@ -4,7 +4,7 @@ title: init_debug_logging
 resource: src/logging.rs#L128-L203
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/models/PlanTaskStatus/parse

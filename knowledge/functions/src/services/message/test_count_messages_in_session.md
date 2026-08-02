@@ -4,7 +4,7 @@ title: test_count_messages_in_session
 resource: src/services/message.rs#L460-L481
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/message/MessageService/create_message

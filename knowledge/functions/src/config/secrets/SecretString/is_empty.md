@@ -3,10 +3,11 @@ type: Rust Method
 title: is_empty
 resource: src/config/secrets.rs#L144-L146
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/cli/cmd_ollama
+  - functions/src/cli/cmd_llama_cpp
   - functions/src/cli/cmd_logs
   - functions/src/config/SecurityConfig/to_policy
   - functions/src/config/Config/validate
@@ -29,12 +30,18 @@ relationships:
   - functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request
   - functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response
   - functions/src/llm/provider/gemini/parse_gemini_sse
+  - functions/src/llm/provider/llama_cpp/run_complete
+  - functions/src/llm/provider/llama_cpp/run_stream
+  - functions/src/llm/provider/llama_cpp/drain_valid_utf8
+  - functions/src/llm/provider/llama_cpp/merged_system_prompt
+  - functions/src/llm/provider/llama_cpp/build_prompt
+  - functions/src/llm/provider/llama_cpp_models/parse_hf_shorthand
+  - functions/src/llm/provider/llama_cpp_models/download_model
   - functions/src/llm/provider/ollama/OllamaProvider/overrides_for
   - functions/src/llm/provider/ollama/OllamaProvider/to_ollama_request
   - functions/src/llm/provider/ollama/OllamaProvider/from_ollama_response
   - functions/src/llm/provider/ollama/OllamaProvider/provider/stream
   - functions/src/llm/provider/ollama/stop_reason_for
-  - functions/src/llm/provider/ollama/maybe_tool_call_json
   - functions/src/llm/provider/openai/OpenAIProvider/to_openai_request
   - functions/src/llm/provider/openai/OpenAIProvider/from_openai_response
   - functions/src/llm/provider/openai/OpenAIProvider/provider/stream
@@ -45,6 +52,7 @@ relationships:
   - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
   - functions/src/llm/provider/qwen/QwenProvider/provider/stream
   - functions/src/llm/provider/qwen/llm_response_to_stream_events
+  - functions/src/llm/provider/tool_call_recovery/maybe_tool_call_json
   - functions/src/llm/provider/types/extract_think_tags
   - functions/src/llm/tools/agent/AgentTool/tool/validate_input
   - functions/src/llm/tools/agent/AgentTool/tool/execute
@@ -101,6 +109,8 @@ relationships:
   - functions/src/tui/app/App/start_model_pull
   - functions/src/tui/app/App/handle_model_download_key
   - functions/src/tui/app/App/handle_provider_switch_key
+  - functions/src/tui/app/App/start_llama_cpp_download
+  - functions/src/tui/app/App/handle_llama_cpp_models_key
   - functions/src/tui/events/is_submit
   - functions/src/tui/events/is_enter
   - functions/src/tui/events/is_up
@@ -108,6 +118,7 @@ relationships:
   - functions/src/tui/events/is_approve
   - functions/src/tui/events/is_deny
   - functions/src/tui/events/is_view_details
+  - functions/src/tui/llama_cpp_download/filter_local
   - functions/src/tui/markdown/MarkdownRenderer/flush_current_line
   - functions/src/tui/markdown/MarkdownRenderer/start_code_block
   - functions/src/tui/markdown/MarkdownRenderer/end_heading
@@ -123,6 +134,7 @@ relationships:
   - functions/src/tui/render/render_approval_input_summary
   - functions/src/tui/render/render_provider_switch
   - functions/src/tui/render/render_model_download
+  - functions/src/tui/render/render_llama_cpp_models
 ---
 
 # Signature
@@ -132,6 +144,7 @@ relationships:
 # Called by
 
 - [cmd_ollama](../../../../../functions/src/cli/cmd_ollama.md)
+- [cmd_llama_cpp](../../../../../functions/src/cli/cmd_llama_cpp.md)
 - [cmd_logs](../../../../../functions/src/cli/cmd_logs.md)
 - [to_policy](../../../../../functions/src/config/SecurityConfig/to_policy.md)
 - [validate](../../../../../functions/src/config/Config/validate.md)
@@ -154,12 +167,18 @@ relationships:
 - [to_gemini_request](../../../../../functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request.md)
 - [from_gemini_response](../../../../../functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response.md)
 - [parse_gemini_sse](../../../../../functions/src/llm/provider/gemini/parse_gemini_sse.md)
+- [run_complete](../../../../../functions/src/llm/provider/llama_cpp/run_complete.md)
+- [run_stream](../../../../../functions/src/llm/provider/llama_cpp/run_stream.md)
+- [drain_valid_utf8](../../../../../functions/src/llm/provider/llama_cpp/drain_valid_utf8.md)
+- [merged_system_prompt](../../../../../functions/src/llm/provider/llama_cpp/merged_system_prompt.md)
+- [build_prompt](../../../../../functions/src/llm/provider/llama_cpp/build_prompt.md)
+- [parse_hf_shorthand](../../../../../functions/src/llm/provider/llama_cpp_models/parse_hf_shorthand.md)
+- [download_model](../../../../../functions/src/llm/provider/llama_cpp_models/download_model.md)
 - [overrides_for](../../../../../functions/src/llm/provider/ollama/OllamaProvider/overrides_for.md)
 - [to_ollama_request](../../../../../functions/src/llm/provider/ollama/OllamaProvider/to_ollama_request.md)
 - [from_ollama_response](../../../../../functions/src/llm/provider/ollama/OllamaProvider/from_ollama_response.md)
 - [stream](../../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/stream.md)
 - [stop_reason_for](../../../../../functions/src/llm/provider/ollama/stop_reason_for.md)
-- [maybe_tool_call_json](../../../../../functions/src/llm/provider/ollama/maybe_tool_call_json.md)
 - [to_openai_request](../../../../../functions/src/llm/provider/openai/OpenAIProvider/to_openai_request.md)
 - [from_openai_response](../../../../../functions/src/llm/provider/openai/OpenAIProvider/from_openai_response.md)
 - [stream](../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/stream.md)
@@ -170,6 +189,7 @@ relationships:
 - [from_qwen_response](../../../../../functions/src/llm/provider/qwen/QwenProvider/from_qwen_response.md)
 - [stream](../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/stream.md)
 - [llm_response_to_stream_events](../../../../../functions/src/llm/provider/qwen/llm_response_to_stream_events.md)
+- [maybe_tool_call_json](../../../../../functions/src/llm/provider/tool_call_recovery/maybe_tool_call_json.md)
 - [extract_think_tags](../../../../../functions/src/llm/provider/types/extract_think_tags.md)
 - [validate_input](../../../../../functions/src/llm/tools/agent/AgentTool/tool/validate_input.md)
 - [execute](../../../../../functions/src/llm/tools/agent/AgentTool/tool/execute.md)
@@ -226,6 +246,8 @@ relationships:
 - [start_model_pull](../../../../../functions/src/tui/app/App/start_model_pull.md)
 - [handle_model_download_key](../../../../../functions/src/tui/app/App/handle_model_download_key.md)
 - [handle_provider_switch_key](../../../../../functions/src/tui/app/App/handle_provider_switch_key.md)
+- [start_llama_cpp_download](../../../../../functions/src/tui/app/App/start_llama_cpp_download.md)
+- [handle_llama_cpp_models_key](../../../../../functions/src/tui/app/App/handle_llama_cpp_models_key.md)
 - [is_submit](../../../../../functions/src/tui/events/is_submit.md)
 - [is_enter](../../../../../functions/src/tui/events/is_enter.md)
 - [is_up](../../../../../functions/src/tui/events/is_up.md)
@@ -233,6 +255,7 @@ relationships:
 - [is_approve](../../../../../functions/src/tui/events/is_approve.md)
 - [is_deny](../../../../../functions/src/tui/events/is_deny.md)
 - [is_view_details](../../../../../functions/src/tui/events/is_view_details.md)
+- [filter_local](../../../../../functions/src/tui/llama_cpp_download/filter_local.md)
 - [flush_current_line](../../../../../functions/src/tui/markdown/MarkdownRenderer/flush_current_line.md)
 - [start_code_block](../../../../../functions/src/tui/markdown/MarkdownRenderer/start_code_block.md)
 - [end_heading](../../../../../functions/src/tui/markdown/MarkdownRenderer/end_heading.md)
@@ -248,3 +271,4 @@ relationships:
 - [render_approval_input_summary](../../../../../functions/src/tui/render/render_approval_input_summary.md)
 - [render_provider_switch](../../../../../functions/src/tui/render/render_provider_switch.md)
 - [render_model_download](../../../../../functions/src/tui/render/render_model_download.md)
+- [render_llama_cpp_models](../../../../../functions/src/tui/render/render_llama_cpp_models.md)

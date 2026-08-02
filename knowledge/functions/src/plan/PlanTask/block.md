@@ -3,7 +3,7 @@ type: Rust Method
 title: block
 resource: src/plan/mod.rs#L692-L694
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/plan/plan_tests/test_task_blocking
@@ -24,6 +24,11 @@ relationships:
   - functions/src/tui/render/render_model_download_progress
   - functions/src/tui/render/render_model_download_confirm_delete
   - functions/src/tui/render/render_model_download_deleting
+  - functions/src/tui/render/render_llama_cpp_models
+  - functions/src/tui/render/render_llama_cpp_download_progress
+  - functions/src/tui/render/render_llama_cpp_confirm_delete
+  - functions/src/tui/render/render_llama_cpp_deleting
+  - functions/src/tui/render/render_llama_cpp_switching
   - functions/src/tui/splash/render_splash_content
 ---
 
@@ -51,4 +56,9 @@ relationships:
 - [render_model_download_progress](../../../../functions/src/tui/render/render_model_download_progress.md)
 - [render_model_download_confirm_delete](../../../../functions/src/tui/render/render_model_download_confirm_delete.md)
 - [render_model_download_deleting](../../../../functions/src/tui/render/render_model_download_deleting.md)
+- [render_llama_cpp_models](../../../../functions/src/tui/render/render_llama_cpp_models.md)
+- [render_llama_cpp_download_progress](../../../../functions/src/tui/render/render_llama_cpp_download_progress.md)
+- [render_llama_cpp_confirm_delete](../../../../functions/src/tui/render/render_llama_cpp_confirm_delete.md)
+- [render_llama_cpp_deleting](../../../../functions/src/tui/render/render_llama_cpp_deleting.md)
+- [render_llama_cpp_switching](../../../../functions/src/tui/render/render_llama_cpp_switching.md)
 - [render_splash_content](../../../../functions/src/tui/splash/render_splash_content.md)

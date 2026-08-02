@@ -4,7 +4,7 @@ title: test_end_to_end_multi_turn_conversation
 resource: tests/integration_test.rs#L172-L219
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/tests/integration_test/create_test_agent

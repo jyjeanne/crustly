@@ -4,7 +4,7 @@ title: test_to_gemini_request_tool_result_uses_function_name
 resource: src/llm/provider/gemini.rs#L971-L1000
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request

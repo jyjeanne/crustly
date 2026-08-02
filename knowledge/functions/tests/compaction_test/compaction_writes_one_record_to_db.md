@@ -4,7 +4,7 @@ title: compaction_writes_one_record_to_db
 resource: tests/compaction_test.rs#L156-L171
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

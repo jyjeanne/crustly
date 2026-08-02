@@ -3,7 +3,7 @@ type: Rust Module
 title: streaming_test
 resource: tests/streaming_test.rs#L1-L341
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/anyhow-result

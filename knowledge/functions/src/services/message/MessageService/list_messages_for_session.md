@@ -3,7 +3,7 @@ type: Rust Method
 title: list_messages_for_session
 resource: src/services/message.rs#L76-L81
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

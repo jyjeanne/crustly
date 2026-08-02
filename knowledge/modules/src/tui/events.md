@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: events
-resource: src/tui/events.rs#L1-L548
+resource: src/tui/events.rs#L1-L594
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/crate-llm-agent-agentresponse
@@ -42,6 +42,7 @@ relationships:
 - [is_model_download](../../../functions/src/tui/events/is_model_download.md)
 - [is_model_info](../../../functions/src/tui/events/is_model_info.md)
 - [is_provider_switch](../../../functions/src/tui/events/is_provider_switch.md)
+- [is_llama_cpp_models](../../../functions/src/tui/events/is_llama_cpp_models.md)
 - [is_copy_response](../../../functions/src/tui/events/is_copy_response.md)
 - [is_paste_clipboard](../../../functions/src/tui/events/is_paste_clipboard.md)
 - [is_toggle_auto_mode](../../../functions/src/tui/events/is_toggle_auto_mode.md)
@@ -62,6 +63,7 @@ relationships:
 - [test_submit_key](../../../functions/src/tui/events/test_submit_key.md)
 - [test_model_info_key](../../../functions/src/tui/events/test_model_info_key.md)
 - [test_provider_switch_key](../../../functions/src/tui/events/test_provider_switch_key.md)
+- [test_llama_cpp_models_key](../../../functions/src/tui/events/test_llama_cpp_models_key.md)
 - [test_copy_response_key](../../../functions/src/tui/events/test_copy_response_key.md)
 - [test_paste_clipboard_key](../../../functions/src/tui/events/test_paste_clipboard_key.md)
 - [test_toggle_auto_mode_key](../../../functions/src/tui/events/test_toggle_auto_mode_key.md)

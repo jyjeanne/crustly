@@ -4,7 +4,7 @@ title: system_prompt_tells_the_model_the_working_directory
 resource: src/llm/agent/service.rs#L2210-L2230
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/service/AgentService/system_prompt_with_env

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: per_model_override_wins_over_provider_default_for_that_model
-resource: src/llm/provider/ollama.rs#L1057-L1079
+resource: src/llm/provider/ollama.rs#L936-L958
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/ModelOverrides/from_config

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: ctrl_w_opens_provider_switch_dialog_in_loading_state
-resource: src/tui/app.rs#L3647-L3658
+resource: src/tui/app.rs#L4083-L4094
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_key_event

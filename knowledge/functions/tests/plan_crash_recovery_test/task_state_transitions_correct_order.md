@@ -4,7 +4,7 @@ title: task_state_transitions_correct_order
 resource: tests/plan_crash_recovery_test.rs#L130-L171
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

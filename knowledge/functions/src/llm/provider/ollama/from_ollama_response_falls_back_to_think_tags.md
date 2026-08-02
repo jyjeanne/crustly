@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: from_ollama_response_falls_back_to_think_tags
-resource: src/llm/provider/ollama.rs#L1615-L1632
+resource: src/llm/provider/ollama.rs#L1403-L1420
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

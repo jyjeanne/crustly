@@ -4,7 +4,7 @@ title: tilde_in_the_database_path_is_expanded_to_home
 resource: src/db/mod.rs#L239-L264
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/task/FileLock/drop/drop

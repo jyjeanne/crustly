@@ -3,7 +3,7 @@ type: Rust Module
 title: ollama_models
 resource: src/llm/provider/ollama_models.rs#L1-L349
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/anyhow-context-result

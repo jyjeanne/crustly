@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: consecutive_duplicate_submissions_are_stored_once
-resource: src/tui/app.rs#L2996-L3012
+resource: src/tui/app.rs#L3432-L3448
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/push_input_history

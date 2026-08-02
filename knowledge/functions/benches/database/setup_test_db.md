@@ -4,7 +4,7 @@ title: setup_test_db
 resource: benches/database.rs#L16-L24
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

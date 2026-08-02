@@ -4,7 +4,7 @@ title: validate_string
 resource: src/llm/tools/plan_tool.rs#L175-L193
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

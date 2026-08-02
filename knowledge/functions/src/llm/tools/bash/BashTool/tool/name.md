@@ -4,7 +4,7 @@ title: name
 resource: src/llm/tools/bash.rs#L243-L245
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

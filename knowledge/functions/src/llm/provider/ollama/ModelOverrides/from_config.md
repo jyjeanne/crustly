@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: from_config
-resource: src/llm/provider/ollama.rs#L84-L107
+resource: src/llm/provider/ollama.rs#L85-L108
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/parse_keep_alive

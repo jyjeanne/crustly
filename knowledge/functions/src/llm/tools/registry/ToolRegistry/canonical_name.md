@@ -4,7 +4,7 @@ title: canonical_name
 resource: src/llm/tools/registry.rs#L93-L101
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/registry/ToolRegistry/is_trusted

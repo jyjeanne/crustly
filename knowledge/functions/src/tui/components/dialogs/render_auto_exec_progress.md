@@ -3,7 +3,7 @@ type: Rust Function
 title: render_auto_exec_progress
 resource: src/tui/components/dialogs/mod.rs#L20-L71
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_model_info_key
-resource: src/tui/events.rs#L479-L485
+resource: src/tui/events.rs#L516-L522
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/logging/LoggerGuard/empty

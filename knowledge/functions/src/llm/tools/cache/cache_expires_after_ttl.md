@@ -4,7 +4,7 @@ title: cache_expires_after_ttl
 resource: src/llm/tools/cache.rs#L154-L164
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/cache/CacheKey/from_tool

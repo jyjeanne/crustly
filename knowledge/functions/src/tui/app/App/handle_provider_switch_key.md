@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: handle_provider_switch_key
-resource: src/tui/app.rs#L2400-L2435
+resource: src/tui/app.rs#L2665-L2700
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/is_cancel

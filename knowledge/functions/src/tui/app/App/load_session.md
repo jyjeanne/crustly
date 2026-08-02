@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: load_session
-resource: src/tui/app.rs#L1200-L1229
+resource: src/tui/app.rs#L1465-L1494
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/session/SessionService/get_session

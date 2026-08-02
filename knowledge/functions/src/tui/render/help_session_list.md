@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: help_session_list
-resource: src/tui/render.rs#L826-L840
+resource: src/tui/render.rs#L835-L849
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/help_section_header

@@ -4,7 +4,7 @@ title: fts_search_finds_symbol_by_partial_name
 resource: tests/codebase_index_test.rs#L81-L101
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/tests/codebase_index_test/create_pool_with_schema

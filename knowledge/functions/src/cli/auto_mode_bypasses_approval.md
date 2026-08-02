@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: auto_mode_bypasses_approval
-resource: src/cli/mod.rs#L863-L872
+resource: src/cli/mod.rs#L896-L905
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanModeState/is_high_risk_tool

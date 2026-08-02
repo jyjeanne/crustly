@@ -4,7 +4,7 @@ title: is_read_only_powershell
 resource: src/llm/tools/powershell.rs#L128-L134
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/powershell/PowerShellTool/tool/execute

@@ -3,7 +3,7 @@ type: Rust Method
 title: exec_status
 resource: src/db/models.rs#L183-L185
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/models/PlanTaskStatus/parse

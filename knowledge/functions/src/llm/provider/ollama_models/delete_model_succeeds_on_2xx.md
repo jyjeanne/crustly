@@ -4,11 +4,10 @@ title: delete_model_succeeds_on_2xx
 resource: src/llm/provider/ollama_models.rs#L305-L310
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama_models/mock_server
-  - functions/src/llm/provider/ollama_models/delete_model
 ---
 
 # Signature
@@ -18,4 +17,3 @@ relationships:
 # Calls
 
 - [mock_server](../../../../../functions/src/llm/provider/ollama_models/mock_server.md)
-- [delete_model](../../../../../functions/src/llm/provider/ollama_models/delete_model.md)

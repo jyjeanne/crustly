@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_skills
-resource: src/tui/render.rs#L577-L633
+resource: src/tui/render.rs#L581-L637
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

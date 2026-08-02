@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/llm/provider/router.rs#L26-L39
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

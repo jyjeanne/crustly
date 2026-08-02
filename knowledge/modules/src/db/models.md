@@ -3,7 +3,7 @@ type: Rust Module
 title: models
 resource: src/db/models.rs#L1-L446
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/chrono-datetime-utc

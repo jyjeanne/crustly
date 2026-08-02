@@ -3,7 +3,7 @@ type: Rust Function
 title: is_vision_model
 resource: src/llm/provider/model_hints.rs#L10-L28
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/ollama/OllamaProvider/provider/supports_vision

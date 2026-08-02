@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_page_down
-resource: src/tui/events.rs#L385-L387
+resource: src/tui/events.rs#L422-L424
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/handle_chat_key

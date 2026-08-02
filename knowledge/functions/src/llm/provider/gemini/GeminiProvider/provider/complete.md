@@ -4,7 +4,7 @@ title: complete
 resource: src/llm/provider/gemini.rs#L542-L591
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request

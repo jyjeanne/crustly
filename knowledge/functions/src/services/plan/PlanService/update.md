@@ -3,7 +3,7 @@ type: Rust Method
 title: update
 resource: src/services/plan.rs#L113-L115
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

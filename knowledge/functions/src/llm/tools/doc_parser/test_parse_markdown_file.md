@@ -4,7 +4,7 @@ title: test_parse_markdown_file
 resource: src/llm/tools/doc_parser.rs#L605-L618
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/doc_parser/context_with_file

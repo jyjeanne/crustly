@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_deny
-resource: src/tui/events.rs#L398-L403
+resource: src/tui/events.rs#L435-L440
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

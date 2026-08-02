@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: execute_next_plan_task
-resource: src/tui/app.rs#L1918-L2018
+resource: src/tui/app.rs#L2183-L2283
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/plan/PlanDocument/tasks_in_order

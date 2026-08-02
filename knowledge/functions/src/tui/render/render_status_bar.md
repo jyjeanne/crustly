@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_status_bar
-resource: src/tui/render.rs#L1978-L2029
+resource: src/tui/render.rs#L2324-L2376
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/auto_mode

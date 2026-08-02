@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: total_tokens
-resource: src/tui/app.rs#L2076-L2078
+resource: src/tui/app.rs#L2341-L2343
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/render_header

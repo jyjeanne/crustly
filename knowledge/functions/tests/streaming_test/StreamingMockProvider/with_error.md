@@ -4,7 +4,7 @@ title: with_error
 resource: tests/streaming_test.rs#L76-L82
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/tests/streaming_test/test_streaming_error_handling

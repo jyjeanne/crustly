@@ -4,7 +4,7 @@ title: from_openai_response
 resource: src/llm/provider/openai.rs#L348-L470
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/EventHandler/next

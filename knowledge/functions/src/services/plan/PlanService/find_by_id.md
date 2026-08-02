@@ -3,7 +3,7 @@ type: Rust Method
 title: find_by_id
 resource: src/services/plan.rs#L91-L93
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

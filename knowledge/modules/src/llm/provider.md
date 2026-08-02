@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: provider
-resource: src/llm/provider/mod.rs#L1-L39
+resource: src/llm/provider/mod.rs#L1-L48
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/pub-use-error-providererror-result
@@ -14,6 +14,7 @@ relationships:
   - external/pub-use-factory-create-provider
   - external/pub-use-factory-ollama-provider-from-config
   - external/pub-use-gemini-geminiprovider
+  - external/pub-use-llama-cpp-llamacppprovider
   - external/pub-use-ollama-ollamaprovider
   - external/pub-use-openai-openaiprovider
   - external/pub-use-qwen-qwenprovider-thinkingconfig-toolcallparser
@@ -31,6 +32,7 @@ relationships:
 - `pub use factory::create_provider`
 - `pub use factory::ollama_provider_from_config`
 - `pub use gemini::GeminiProvider`
+- `pub use llama_cpp::LlamaCppProvider`
 - `pub use ollama::OllamaProvider`
 - `pub use openai::OpenAIProvider`
 - `pub use qwen::{QwenProvider, ThinkingConfig, ToolCallParser}`

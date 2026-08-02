@@ -3,7 +3,7 @@ type: Rust Module
 title: codebase_index_test
 resource: tests/codebase_index_test.rs#L1-L114
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/crustly-llm-agent-memory-codebaseindex-symbolkind

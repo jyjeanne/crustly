@@ -3,7 +3,7 @@ type: Rust Method
 title: get_active_plans
 resource: src/services/plan.rs#L256-L267
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

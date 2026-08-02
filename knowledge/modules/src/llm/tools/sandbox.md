@@ -3,7 +3,7 @@ type: Rust Module
 title: sandbox
 resource: src/llm/tools/sandbox.rs#L1-L885
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/serde-json-value

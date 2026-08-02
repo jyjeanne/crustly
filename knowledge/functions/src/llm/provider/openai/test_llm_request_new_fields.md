@@ -4,7 +4,7 @@ title: test_llm_request_new_fields
 resource: src/llm/provider/openai.rs#L1248-L1264
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/LLMRequest/with_top_p

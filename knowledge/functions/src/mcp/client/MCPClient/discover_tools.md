@@ -3,7 +3,7 @@ type: Rust Method
 title: discover_tools
 resource: src/mcp/client.rs#L129-L136
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/mcp/client/MCPClient/send_request

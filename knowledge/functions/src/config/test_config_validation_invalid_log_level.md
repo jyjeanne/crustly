@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_config_validation_invalid_log_level
-resource: src/config/mod.rs#L1272-L1276
+resource: src/config/mod.rs#L1389-L1393
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

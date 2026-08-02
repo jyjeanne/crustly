@@ -4,7 +4,7 @@ title: test_code_with_special_characters
 resource: src/tui/highlight.rs#L209-L213
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/highlight/highlight_code

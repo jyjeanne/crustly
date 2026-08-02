@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_config_from_toml
-resource: src/config/mod.rs#L1286-L1311
+resource: src/config/mod.rs#L1403-L1428
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/from_str

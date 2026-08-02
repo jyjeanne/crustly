@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_view_details
-resource: src/tui/events.rs#L406-L408
+resource: src/tui/events.rs#L443-L445
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

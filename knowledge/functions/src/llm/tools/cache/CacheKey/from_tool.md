@@ -3,7 +3,7 @@ type: Rust Method
 title: from_tool
 resource: src/llm/tools/cache.rs#L17-L25
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/markdown/MarkdownRenderer/finish

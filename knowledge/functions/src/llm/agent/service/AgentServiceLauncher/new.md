@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/llm/agent/service.rs#L1808-L1822
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

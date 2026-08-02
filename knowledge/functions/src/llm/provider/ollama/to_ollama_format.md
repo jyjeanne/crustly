@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: to_ollama_format
-resource: src/llm/provider/ollama.rs#L946-L953
+resource: src/llm/provider/ollama.rs#L825-L832
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

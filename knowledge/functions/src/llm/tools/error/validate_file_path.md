@@ -3,7 +3,7 @@ type: Rust Function
 title: validate_file_path
 resource: src/llm/tools/error.rs#L120-L149
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/error/validate_path_safety

@@ -3,10 +3,11 @@ type: Rust Method
 title: len
 resource: src/config/secrets.rs#L149-L151
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/benches/parallel_tool_dispatch/read_sequential
+  - functions/src/cli/cmd_llama_cpp
   - functions/src/cli/cmd_logs
   - functions/src/db/models/interrupted_plan_from_tasks
   - functions/src/db/repository/memory/EpisodicMemoryRepository/list_recent
@@ -19,6 +20,12 @@ relationships:
   - functions/src/llm/pdf_context/augment_message_with_pdf
   - functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete
   - functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream
+  - functions/src/llm/provider/llama_cpp/prepare_generation
+  - functions/src/llm/provider/llama_cpp/drain_valid_utf8
+  - functions/src/llm/provider/llama_cpp/try_build_constrained_sampler
+  - functions/src/llm/provider/llama_cpp/drain_valid_utf8_holds_back_an_incomplete_multibyte_sequence
+  - functions/src/llm/provider/llama_cpp_models/list_local_models
+  - functions/src/llm/provider/llama_cpp_models/download_model
   - functions/src/llm/provider/ollama/parse_keep_alive
   - functions/src/llm/provider/openai/OpenAIProvider/provider/complete
   - functions/src/llm/provider/openai/OpenAIProvider/provider/stream
@@ -29,6 +36,8 @@ relationships:
   - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
   - functions/src/llm/provider/qwen/QwenProvider/provider/complete
   - functions/src/llm/provider/qwen/QwenProvider/provider/stream
+  - functions/src/llm/provider/tool_call_recovery/leading_window
+  - functions/src/llm/provider/tool_call_recovery/top_level_name_key_matches
   - functions/src/llm/provider/types/extract_think_tags
   - functions/src/llm/tools/apply_patch/parse_patch
   - functions/src/llm/tools/apply_patch/find_subsequence
@@ -68,6 +77,7 @@ relationships:
   - functions/src/tui/app/App/cursor_on_last_line
   - functions/src/tui/app/App/history_prev
   - functions/src/tui/app/App/history_next
+  - functions/src/tui/app/App/handle_event
   - functions/src/tui/app/App/handle_sessions_key
   - functions/src/tui/app/App/handle_skills_key
   - functions/src/tui/app/App/handle_mcp_key
@@ -77,6 +87,7 @@ relationships:
   - functions/src/tui/app/App/handle_file_picker_key
   - functions/src/tui/app/App/handle_model_download_key
   - functions/src/tui/app/App/handle_provider_switch_key
+  - functions/src/tui/app/App/handle_llama_cpp_models_key
   - functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions
   - functions/src/tui/app/send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight
   - functions/src/tui/app/send_message_still_works_for_a_different_session_than_the_one_processing
@@ -97,6 +108,7 @@ relationships:
 # Called by
 
 - [read_sequential](../../../../../functions/benches/parallel_tool_dispatch/read_sequential.md)
+- [cmd_llama_cpp](../../../../../functions/src/cli/cmd_llama_cpp.md)
 - [cmd_logs](../../../../../functions/src/cli/cmd_logs.md)
 - [interrupted_plan_from_tasks](../../../../../functions/src/db/models/interrupted_plan_from_tasks.md)
 - [list_recent](../../../../../functions/src/db/repository/memory/EpisodicMemoryRepository/list_recent.md)
@@ -109,6 +121,12 @@ relationships:
 - [augment_message_with_pdf](../../../../../functions/src/llm/pdf_context/augment_message_with_pdf.md)
 - [complete](../../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete.md)
 - [stream](../../../../../functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream.md)
+- [prepare_generation](../../../../../functions/src/llm/provider/llama_cpp/prepare_generation.md)
+- [drain_valid_utf8](../../../../../functions/src/llm/provider/llama_cpp/drain_valid_utf8.md)
+- [try_build_constrained_sampler](../../../../../functions/src/llm/provider/llama_cpp/try_build_constrained_sampler.md)
+- [drain_valid_utf8_holds_back_an_incomplete_multibyte_sequence](../../../../../functions/src/llm/provider/llama_cpp/drain_valid_utf8_holds_back_an_incomplete_multibyte_sequence.md)
+- [list_local_models](../../../../../functions/src/llm/provider/llama_cpp_models/list_local_models.md)
+- [download_model](../../../../../functions/src/llm/provider/llama_cpp_models/download_model.md)
 - [parse_keep_alive](../../../../../functions/src/llm/provider/ollama/parse_keep_alive.md)
 - [complete](../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/complete.md)
 - [stream](../../../../../functions/src/llm/provider/openai/OpenAIProvider/provider/stream.md)
@@ -119,6 +137,8 @@ relationships:
 - [from_qwen_response](../../../../../functions/src/llm/provider/qwen/QwenProvider/from_qwen_response.md)
 - [complete](../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/complete.md)
 - [stream](../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/stream.md)
+- [leading_window](../../../../../functions/src/llm/provider/tool_call_recovery/leading_window.md)
+- [top_level_name_key_matches](../../../../../functions/src/llm/provider/tool_call_recovery/top_level_name_key_matches.md)
 - [extract_think_tags](../../../../../functions/src/llm/provider/types/extract_think_tags.md)
 - [parse_patch](../../../../../functions/src/llm/tools/apply_patch/parse_patch.md)
 - [find_subsequence](../../../../../functions/src/llm/tools/apply_patch/find_subsequence.md)
@@ -158,6 +178,7 @@ relationships:
 - [cursor_on_last_line](../../../../../functions/src/tui/app/App/cursor_on_last_line.md)
 - [history_prev](../../../../../functions/src/tui/app/App/history_prev.md)
 - [history_next](../../../../../functions/src/tui/app/App/history_next.md)
+- [handle_event](../../../../../functions/src/tui/app/App/handle_event.md)
 - [handle_sessions_key](../../../../../functions/src/tui/app/App/handle_sessions_key.md)
 - [handle_skills_key](../../../../../functions/src/tui/app/App/handle_skills_key.md)
 - [handle_mcp_key](../../../../../functions/src/tui/app/App/handle_mcp_key.md)
@@ -167,6 +188,7 @@ relationships:
 - [handle_file_picker_key](../../../../../functions/src/tui/app/App/handle_file_picker_key.md)
 - [handle_model_download_key](../../../../../functions/src/tui/app/App/handle_model_download_key.md)
 - [handle_provider_switch_key](../../../../../functions/src/tui/app/App/handle_provider_switch_key.md)
+- [handle_llama_cpp_models_key](../../../../../functions/src/tui/app/App/handle_llama_cpp_models_key.md)
 - [stale_session_response_complete_is_dropped_after_switching_sessions](../../../../../functions/src/tui/app/stale_session_response_complete_is_dropped_after_switching_sessions.md)
 - [send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight](../../../../../functions/src/tui/app/send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight.md)
 - [send_message_still_works_for_a_different_session_than_the_one_processing](../../../../../functions/src/tui/app/send_message_still_works_for_a_different_session_than_the_one_processing.md)

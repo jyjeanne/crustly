@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: handle_plan_key
-resource: src/tui/app.rs#L1070-L1168
+resource: src/tui/app.rs#L1335-L1433
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/is_cancel

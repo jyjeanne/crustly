@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: complete_response
-resource: src/tui/app.rs#L1426-L1515
+resource: src/tui/app.rs#L1691-L1780
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/check_task_completion

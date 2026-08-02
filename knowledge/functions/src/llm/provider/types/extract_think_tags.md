@@ -3,7 +3,7 @@ type: Rust Function
 title: extract_think_tags
 resource: src/llm/provider/types.rs#L439-L472
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

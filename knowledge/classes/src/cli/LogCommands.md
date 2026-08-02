@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: LogCommands
-resource: src/cli/mod.rs#L263-L282
+resource: src/cli/mod.rs#L287-L306
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

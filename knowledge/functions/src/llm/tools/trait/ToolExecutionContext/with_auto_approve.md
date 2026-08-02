@@ -3,7 +3,7 @@ type: Rust Method
 title: with_auto_approve
 resource: src/llm/tools/trait.rs#L88-L91
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

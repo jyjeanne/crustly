@@ -4,7 +4,7 @@ title: test_error_recovery_after_failure
 resource: tests/error_scenarios_test.rs#L290-L315
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/tests/error_scenarios_test/create_error_agent

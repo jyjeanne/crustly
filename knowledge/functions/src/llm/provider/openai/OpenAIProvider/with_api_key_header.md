@@ -3,7 +3,7 @@ type: Rust Method
 title: with_api_key_header
 resource: src/llm/provider/openai.rs#L138-L141
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/azure/AzureOpenAIProvider/new

@@ -4,7 +4,7 @@ title: match_response_line
 resource: src/mcp/client.rs#L48-L60
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/from_str

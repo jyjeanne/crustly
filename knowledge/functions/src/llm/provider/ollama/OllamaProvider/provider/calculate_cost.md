@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: calculate_cost
-resource: src/llm/provider/ollama.rs#L774-L777
+resource: src/llm/provider/ollama.rs#L775-L778
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

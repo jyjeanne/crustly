@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/save_memory.rs#L111-L153
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

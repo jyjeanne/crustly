@@ -4,7 +4,7 @@ title: plain_text_keeps_windows_path_backslashes
 resource: src/tui/markdown.rs#L293-L304
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/markdown/rendered_text

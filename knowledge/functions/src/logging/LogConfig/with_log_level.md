@@ -3,7 +3,7 @@ type: Rust Method
 title: with_log_level
 resource: src/logging.rs#L68-L71
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/logging/test_log_config_builder

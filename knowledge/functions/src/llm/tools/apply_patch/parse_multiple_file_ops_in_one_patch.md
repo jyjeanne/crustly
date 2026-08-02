@@ -4,7 +4,7 @@ title: parse_multiple_file_ops_in_one_patch
 resource: src/llm/tools/apply_patch.rs#L572-L583
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/apply_patch/parse_patch

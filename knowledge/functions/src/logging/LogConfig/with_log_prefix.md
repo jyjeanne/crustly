@@ -3,7 +3,7 @@ type: Rust Method
 title: with_log_prefix
 resource: src/logging.rs#L80-L83
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/logging/test_log_config_builder

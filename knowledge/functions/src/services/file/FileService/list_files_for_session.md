@@ -3,7 +3,7 @@ type: Rust Method
 title: list_files_for_session
 resource: src/services/file.rs#L62-L67
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/services/file/FileService/get_files_with_content

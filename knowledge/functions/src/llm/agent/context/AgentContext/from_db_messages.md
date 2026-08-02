@@ -3,7 +3,7 @@ type: Rust Method
 title: from_db_messages
 resource: src/llm/agent/context.rs#L76-L102
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/context/AgentContext/add_message

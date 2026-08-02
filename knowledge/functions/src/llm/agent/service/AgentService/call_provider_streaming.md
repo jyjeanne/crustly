@@ -4,7 +4,7 @@ title: call_provider_streaming
 resource: src/llm/agent/service.rs#L1579-L1591
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/LLMRequest/with_streaming

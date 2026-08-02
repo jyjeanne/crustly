@@ -3,7 +3,7 @@ type: Rust Module
 title: ls
 resource: src/llm/tools/ls.rs#L1-L259
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

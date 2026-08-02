@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: input_text
-resource: src/tui/app.rs#L292-L294
+resource: src/tui/app.rs#L356-L358
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/history_prev

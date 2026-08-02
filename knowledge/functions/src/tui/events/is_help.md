@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_help
-resource: src/tui/events.rs#L288-L290
+resource: src/tui/events.rs#L320-L322
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/key_matches

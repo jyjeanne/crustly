@@ -3,7 +3,7 @@ type: Rust Module
 title: plan_tool
 resource: src/llm/tools/plan_tool.rs#L1-L1168
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

@@ -3,7 +3,7 @@ type: Rust Method
 title: update_session_title
 resource: src/services/session.rs#L88-L100
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/session/SessionService/get_session_required

@@ -4,7 +4,7 @@ title: failed_task_stores_error_without_completion_timestamp
 resource: tests/plan_crash_recovery_test.rs#L175-L208
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

@@ -4,7 +4,7 @@ title: test_multiple_native_qwen_tool_calls
 resource: src/llm/provider/qwen.rs#L2518-L2531
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/qwen/QwenProvider/with_tool_parser

@@ -3,7 +3,7 @@ type: Rust Method
 title: load_with_fallback
 resource: src/config/secrets.rs#L110-L132
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/from_keyring_optional

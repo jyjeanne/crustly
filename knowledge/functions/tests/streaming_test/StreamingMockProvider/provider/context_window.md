@@ -4,7 +4,7 @@ title: context_window
 resource: tests/streaming_test.rs#L110-L112
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: provider_context_window
-resource: src/tui/app.rs#L281-L283
+resource: src/tui/app.rs#L345-L347
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: context_with_file
 resource: src/llm/tools/doc_parser.rs#L574-L584
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/doc_parser/test_parse_text_file

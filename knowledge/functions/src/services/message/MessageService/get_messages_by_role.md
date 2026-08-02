@@ -3,7 +3,7 @@ type: Rust Method
 title: get_messages_by_role
 resource: src/services/message.rs#L179-L182
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/message/MessageService/list_messages_for_session

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: open_mcp
-resource: src/tui/app.rs#L1021-L1024
+resource: src/tui/app.rs#L1286-L1289
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/switch_mode

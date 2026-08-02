@@ -3,7 +3,7 @@ type: Rust Function
 title: run
 resource: src/tui/runner.rs#L27-L79
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/set_kitty_keyboard_protocol_active

@@ -37,6 +37,9 @@
 - [error](../modules/src/llm/provider/error.md) — Rust Module
 - [factory](../modules/src/llm/provider/factory.md) — Rust Module
 - [gemini](../modules/src/llm/provider/gemini.md) — Rust Module
+- [llama_cpp](../modules/src/llm/provider/llama_cpp.md) — Rust Module
+- [llama_cpp_grammar](../modules/src/llm/provider/llama_cpp_grammar.md) — Rust Module
+- [llama_cpp_models](../modules/src/llm/provider/llama_cpp_models.md) — Rust Module
 - [model_hints](../modules/src/llm/provider/model_hints.md) — Rust Module
 - [ollama](../modules/src/llm/provider/ollama.md) — Rust Module
 - [ollama_models](../modules/src/llm/provider/ollama_models.md) — Rust Module
@@ -44,6 +47,7 @@
 - [qwen](../modules/src/llm/provider/qwen.md) — Rust Module
 - [retry](../modules/src/llm/provider/retry.md) — Rust Module
 - [router](../modules/src/llm/provider/router.md) — Rust Module
+- [tool_call_recovery](../modules/src/llm/provider/tool_call_recovery.md) — Rust Module
 - [trait](../modules/src/llm/provider/trait.md) — Rust Module
 - [types](../modules/src/llm/provider/types.md) — Rust Module
 - [tools](../modules/src/llm/tools.md) — Rust Module
@@ -103,6 +107,7 @@
 - [error](../modules/src/tui/error.md) — Rust Module
 - [events](../modules/src/tui/events.md) — Rust Module
 - [highlight](../modules/src/tui/highlight.md) — Rust Module
+- [llama_cpp_download](../modules/src/tui/llama_cpp_download.md) — Rust Module
 - [markdown](../modules/src/tui/markdown.md) — Rust Module
 - [ollama_download](../modules/src/tui/ollama_download.md) — Rust Module
 - [pages](../modules/src/tui/pages.md) — Rust Module

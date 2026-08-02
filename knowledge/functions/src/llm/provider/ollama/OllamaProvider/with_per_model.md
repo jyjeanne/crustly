@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_per_model
-resource: src/llm/provider/ollama.rs#L192-L198
+resource: src/llm/provider/ollama.rs#L193-L199
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/factory/ollama_provider_from_config

@@ -4,7 +4,7 @@ title: truncate_ascii_at_exact_boundary
 resource: src/utils/mod.rs#L26-L29
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

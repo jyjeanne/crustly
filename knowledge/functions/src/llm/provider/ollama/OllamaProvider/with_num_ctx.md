@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_num_ctx
-resource: src/llm/provider/ollama.rs#L262-L265
+resource: src/llm/provider/ollama.rs#L263-L266
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/factory/ollama_provider_from_config

@@ -4,7 +4,7 @@ title: fmt
 resource: src/plan/mod.rs#L772-L781
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

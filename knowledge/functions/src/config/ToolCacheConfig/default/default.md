@@ -4,7 +4,7 @@ title: default
 resource: src/config/mod.rs#L170-L177
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/default_read_file_ttl

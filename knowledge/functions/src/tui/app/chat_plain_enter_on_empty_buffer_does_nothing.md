@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: chat_plain_enter_on_empty_buffer_does_nothing
-resource: src/tui/app.rs#L3563-L3570
+resource: src/tui/app.rs#L3999-L4006
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

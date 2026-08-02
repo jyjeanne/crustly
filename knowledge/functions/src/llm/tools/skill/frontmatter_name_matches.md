@@ -4,7 +4,7 @@ title: frontmatter_name_matches
 resource: src/llm/tools/skill.rs#L272-L277
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/skill/parse_skill_frontmatter_value

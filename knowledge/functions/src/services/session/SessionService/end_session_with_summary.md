@@ -3,7 +3,7 @@ type: Rust Method
 title: end_session_with_summary
 resource: src/services/session.rs#L186-L233
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/utils/truncate_at_char_boundary

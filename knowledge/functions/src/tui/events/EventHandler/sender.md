@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: sender
-resource: src/tui/events.rs#L198-L200
+resource: src/tui/events.rs#L230-L232
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/event_sender

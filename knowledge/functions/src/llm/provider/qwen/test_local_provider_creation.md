@@ -4,7 +4,7 @@ title: test_local_provider_creation
 resource: src/llm/provider/qwen.rs#L2100-L2104
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

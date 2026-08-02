@@ -3,7 +3,7 @@ type: Rust Module
 title: glob
 resource: src/llm/tools/glob.rs#L1-L294
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

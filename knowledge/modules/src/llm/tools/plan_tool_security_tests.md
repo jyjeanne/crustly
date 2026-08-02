@@ -3,7 +3,7 @@ type: Rust Module
 title: plan_tool_security_tests
 resource: src/llm/tools/plan_tool_security_tests.rs#L1-L223
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-super

@@ -4,7 +4,7 @@ title: invalidate_matching_drops_selected_tools_and_keeps_others
 resource: src/llm/tools/cache.rs#L175-L189
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/cache/CacheKey/from_tool

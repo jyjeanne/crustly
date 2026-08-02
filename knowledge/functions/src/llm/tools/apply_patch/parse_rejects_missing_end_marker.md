@@ -4,7 +4,7 @@ title: parse_rejects_missing_end_marker
 resource: src/llm/tools/apply_patch.rs#L553-L556
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/apply_patch/parse_patch

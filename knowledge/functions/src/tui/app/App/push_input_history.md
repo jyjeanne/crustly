@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: push_input_history
-resource: src/tui/app.rs#L323-L330
+resource: src/tui/app.rs#L387-L394
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/app/App/handle_chat_key

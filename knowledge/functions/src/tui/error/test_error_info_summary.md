@@ -4,7 +4,7 @@ title: test_error_info_summary
 resource: src/tui/error.rs#L278-L289
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/error/ErrorInfo/warning

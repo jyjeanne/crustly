@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: switch_provider_to_ollama_model
-resource: src/tui/app.rs#L2447-L2497
+resource: src/tui/app.rs#L2712-L2762
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/service/AgentService/set_provider

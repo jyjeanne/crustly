@@ -4,7 +4,7 @@ title: skips_an_id_less_notification
 resource: src/mcp/client.rs#L398-L401
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

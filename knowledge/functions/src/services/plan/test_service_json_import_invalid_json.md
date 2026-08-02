@@ -4,7 +4,7 @@ title: test_service_json_import_invalid_json
 resource: src/services/plan.rs#L649-L657
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/plan/setup_test_service

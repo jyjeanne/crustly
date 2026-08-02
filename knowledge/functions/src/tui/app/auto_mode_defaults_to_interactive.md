@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: auto_mode_defaults_to_interactive
-resource: src/tui/app.rs#L3313-L3316
+resource: src/tui/app.rs#L3749-L3752
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

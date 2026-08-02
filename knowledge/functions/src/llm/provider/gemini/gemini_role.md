@@ -4,7 +4,7 @@ title: gemini_role
 resource: src/llm/provider/gemini.rs#L399-L404
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request

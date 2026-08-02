@@ -3,7 +3,7 @@ type: Rust Module
 title: llm
 resource: src/llm/mod.rs#L1-L18
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/pub-use-provider-anthropicprovider-contentblock-llmrequest-llmresponse-message-provider-providererror-providerstream-role-stopreason-streamevent-tokenusage-tool

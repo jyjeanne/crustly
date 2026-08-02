@@ -3,7 +3,7 @@ type: Rust Module
 title: error
 resource: src/llm/provider/error.rs#L1-L128
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/thiserror-error

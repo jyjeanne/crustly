@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard
-resource: src/tui/app.rs#L3238-L3250
+resource: src/tui/app.rs#L3674-L3686
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

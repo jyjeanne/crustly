@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: from_ollama_response_plain_text_with_final_data
-resource: src/llm/provider/ollama.rs#L1455-L1478
+resource: src/llm/provider/ollama.rs#L1243-L1266
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/OllamaProvider/default_local

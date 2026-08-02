@@ -4,7 +4,7 @@ title: test_auto_approve_returns_placeholder
 resource: src/llm/tools/ask_user.rs#L163-L176
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/trait/ToolExecutionContext/with_auto_approve

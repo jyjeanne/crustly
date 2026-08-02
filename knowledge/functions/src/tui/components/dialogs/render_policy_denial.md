@@ -3,7 +3,7 @@ type: Rust Function
 title: render_policy_denial
 resource: src/tui/components/dialogs/mod.rs#L125-L150
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/components/dialogs/centered_rect

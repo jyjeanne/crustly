@@ -3,7 +3,7 @@ type: Rust Method
 title: send_message_streaming
 resource: src/llm/agent/service.rs#L741-L768
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/service/AgentService/prepare_message_context

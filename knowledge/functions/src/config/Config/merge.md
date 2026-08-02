@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: merge
-resource: src/config/mod.rs#L755-L768
+resource: src/config/mod.rs#L872-L885
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/config/Config/merge_from_file

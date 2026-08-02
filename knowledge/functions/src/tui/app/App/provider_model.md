@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: provider_model
-resource: src/tui/app.rs#L275-L277
+resource: src/tui/app.rs#L339-L341
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

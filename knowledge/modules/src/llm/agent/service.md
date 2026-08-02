@@ -3,7 +3,7 @@ type: Rust Module
 title: service
 resource: src/llm/agent/service.rs#L1-L2625
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-context-agentcontext

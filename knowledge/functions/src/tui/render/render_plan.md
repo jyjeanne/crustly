@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_plan
-resource: src/tui/render.rs#L1152-L1174
+resource: src/tui/render.rs#L1161-L1183
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render_plan_document

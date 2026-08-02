@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_paste_clipboard
-resource: src/tui/events.rs#L326-L328
+resource: src/tui/events.rs#L363-L365
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/key_matches

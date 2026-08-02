@@ -4,7 +4,7 @@ title: setup_test_env
 resource: tests/plan_mode_integration_test.rs#L18-L41
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

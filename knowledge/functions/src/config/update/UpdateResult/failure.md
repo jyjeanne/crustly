@@ -3,7 +3,7 @@ type: Rust Method
 title: failure
 resource: src/config/update.rs#L213-L219
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/config/update/test_update_result_failure

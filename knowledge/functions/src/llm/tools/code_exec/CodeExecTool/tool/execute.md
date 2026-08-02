@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/code_exec.rs#L128-L265
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/error/CrustlyError/code

@@ -3,7 +3,7 @@ type: Rust Function
 title: resolve
 resource: src/llm/tools/aliases.rs#L83-L88
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

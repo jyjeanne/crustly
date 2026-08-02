@@ -4,7 +4,7 @@ title: test_would_exceed_limit
 resource: src/llm/agent/context.rs#L256-L265
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/Message/user

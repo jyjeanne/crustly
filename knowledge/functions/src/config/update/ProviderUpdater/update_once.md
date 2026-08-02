@@ -3,7 +3,7 @@ type: Rust Method
 title: update_once
 resource: src/config/update.rs#L184-L188
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

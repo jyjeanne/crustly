@@ -4,7 +4,7 @@ title: supported_models
 resource: src/llm/provider/qwen.rs#L1525-L1549
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: is_new_session
-resource: src/tui/events.rs#L278-L280
+resource: src/tui/events.rs#L310-L312
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/key_matches

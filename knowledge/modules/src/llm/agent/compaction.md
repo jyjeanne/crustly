@@ -3,7 +3,7 @@ type: Rust Module
 title: compaction
 resource: src/llm/agent/compaction.rs#L1-L401
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/crate-llm-agent-context-agentcontext

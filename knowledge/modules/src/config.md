@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: config
-resource: src/config/mod.rs#L1-L1476
+resource: src/config/mod.rs#L1-L1593
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/pub-use-crabrace-crabraceconfig-crabraceintegration
@@ -47,6 +47,7 @@ relationships:
 - [DebugConfig](../../classes/src/config/DebugConfig.md)
 - [ProviderConfigs](../../classes/src/config/ProviderConfigs.md)
 - [override_default_model](../../functions/src/config/ProviderConfigs/override_default_model.md)
+- [llama_cpp_models_dir](../../functions/src/config/ProviderConfigs/llama_cpp_models_dir.md)
 - [ProviderConfig](../../classes/src/config/ProviderConfig.md)
 - [QwenProviderConfig](../../classes/src/config/QwenProviderConfig.md)
 - [default](../../functions/src/config/QwenProviderConfig/default/default.md)
@@ -54,6 +55,9 @@ relationships:
 - [OllamaModelConfig](../../classes/src/config/OllamaModelConfig.md)
 - [ThinkSetting](../../classes/src/config/ThinkSetting.md)
 - [as_str](../../functions/src/config/ThinkSetting/as_str.md)
+- [LlamaCppProviderConfig](../../classes/src/config/LlamaCppProviderConfig.md)
+- [default](../../functions/src/config/LlamaCppProviderConfig/default/default.md)
+- [default_llama_cpp_n_ctx](../../functions/src/config/default_llama_cpp_n_ctx.md)
 - [default](../../functions/src/config/OllamaProviderConfig/default/default.md)
 - [default_ollama_host](../../functions/src/config/default_ollama_host.md)
 - [default_enabled](../../functions/src/config/default_enabled.md)

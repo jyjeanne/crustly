@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: handle_sessions_key
-resource: src/tui/app.rs#L972-L990
+resource: src/tui/app.rs#L1237-L1255
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/events/is_cancel

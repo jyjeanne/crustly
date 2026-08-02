@@ -3,7 +3,7 @@ type: Rust Function
 title: parse_markdown
 resource: src/tui/markdown.rs#L216-L232
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/markdown/MarkdownRenderer/handle_start_tag

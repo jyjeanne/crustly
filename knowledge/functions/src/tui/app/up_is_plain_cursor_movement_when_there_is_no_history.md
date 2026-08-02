@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: up_is_plain_cursor_movement_when_there_is_no_history
-resource: src/tui/app.rs#L2984-L2992
+resource: src/tui/app.rs#L3420-L3428
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/set_input_text

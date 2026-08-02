@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: typed_backslashes_reach_the_input
-resource: src/tui/app.rs#L3197-L3207
+resource: src/tui/app.rs#L3633-L3643
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

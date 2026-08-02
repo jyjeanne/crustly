@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: collect_tool_calls
-resource: src/llm/provider/ollama.rs#L785-L790
+resource: src/llm/provider/ollama.rs#L786-L791
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/ollama/OllamaProvider/provider/stream

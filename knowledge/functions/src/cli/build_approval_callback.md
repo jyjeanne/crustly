@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: build_approval_callback
-resource: src/cli/mod.rs#L696-L751
+resource: src/cli/mod.rs#L721-L776
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/cli/auto_mode_bypasses_approval

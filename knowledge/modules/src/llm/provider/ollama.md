@@ -1,13 +1,14 @@
 ---
 type: Rust Module
 title: ollama
-resource: src/llm/provider/ollama.rs#L1-L1804
+resource: src/llm/provider/ollama.rs#L1-L1592
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-providererror-result
   - external/super-r-trait-provider-providerstream
+  - external/super-tool-call-recovery-maybe-tool-call-json-tool-call-from-content
   - external/super-types
   - external/async-trait-async-trait
   - external/ollama-rs-error-ollamaerror-generation-chat-request-chatmessagerequest-chatmessage-chatmessagefinalresponsedata-chatmessageresponse-messagerole-generation-images-image-generation-parameters-formattype-jsonstructure-keepalive-thinktype-timeunit-generation-tools-toolcall-toolcallfunction-toolfunctioninfo-toolinfo-tooltype-models-modeloptions-ollama
@@ -47,10 +48,6 @@ relationships:
 - [calculate_cost](../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/calculate_cost.md)
 - [collect_tool_calls](../../../../functions/src/llm/provider/ollama/collect_tool_calls.md)
 - [stop_reason_for](../../../../functions/src/llm/provider/ollama/stop_reason_for.md)
-- [maybe_tool_call_json](../../../../functions/src/llm/provider/ollama/maybe_tool_call_json.md)
-- [tool_call_from_content](../../../../functions/src/llm/provider/ollama/tool_call_from_content.md)
-- [fenced_json_blocks](../../../../functions/src/llm/provider/ollama/fenced_json_blocks.md)
-- [parse_tool_call_object](../../../../functions/src/llm/provider/ollama/parse_tool_call_object.md)
 - [to_ollama_tool](../../../../functions/src/llm/provider/ollama/to_ollama_tool.md)
 - [to_ollama_format](../../../../functions/src/llm/provider/ollama/to_ollama_format.md)
 - [parse_keep_alive](../../../../functions/src/llm/provider/ollama/parse_keep_alive.md)
@@ -76,13 +73,6 @@ relationships:
 - [test_to_ollama_request_maps_common_fields](../../../../functions/src/llm/provider/ollama/test_to_ollama_request_maps_common_fields.md)
 - [mock_response](../../../../functions/src/llm/provider/ollama/mock_response.md)
 - [bash_tool](../../../../functions/src/llm/provider/ollama/bash_tool.md)
-- [tool_call_printed_as_content_is_recovered](../../../../functions/src/llm/provider/ollama/tool_call_printed_as_content_is_recovered.md)
-- [tool_call_in_a_json_fence_is_recovered](../../../../functions/src/llm/provider/ollama/tool_call_in_a_json_fence_is_recovered.md)
-- [tool_call_in_a_fence_embedded_in_prose_is_recovered](../../../../functions/src/llm/provider/ollama/tool_call_in_a_fence_embedded_in_prose_is_recovered.md)
-- [first_of_several_fenced_calls_is_recovered](../../../../functions/src/llm/provider/ollama/first_of_several_fenced_calls_is_recovered.md)
-- [fenced_non_tool_json_is_not_recovered](../../../../functions/src/llm/provider/ollama/fenced_non_tool_json_is_not_recovered.md)
-- [prose_is_never_mistaken_for_a_tool_call](../../../../functions/src/llm/provider/ollama/prose_is_never_mistaken_for_a_tool_call.md)
-- [only_json_like_content_is_withheld_from_streaming](../../../../functions/src/llm/provider/ollama/only_json_like_content_is_withheld_from_streaming.md)
 - [recovered_tool_call_becomes_a_tool_use_block](../../../../functions/src/llm/provider/ollama/recovered_tool_call_becomes_a_tool_use_block.md)
 - [fenced_call_in_prose_becomes_a_tool_use_block](../../../../functions/src/llm/provider/ollama/fenced_call_in_prose_becomes_a_tool_use_block.md)
 - [from_ollama_response_plain_text_with_final_data](../../../../functions/src/llm/provider/ollama/from_ollama_response_plain_text_with_final_data.md)
@@ -108,6 +98,7 @@ relationships:
 
 - `super::error::{ProviderError, Result}`
 - `super::r#trait::{Provider, ProviderStream}`
+- `super::tool_call_recovery::{maybe_tool_call_json, tool_call_from_content}`
 - `super::types::*`
 - `async_trait::async_trait`
 - `ollama_rs::{

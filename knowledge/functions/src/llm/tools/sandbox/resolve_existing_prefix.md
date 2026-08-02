@@ -4,7 +4,7 @@ title: resolve_existing_prefix
 resource: src/llm/tools/sandbox.rs#L455-L480
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/sandbox/normalize_path

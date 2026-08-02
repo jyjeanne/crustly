@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_approval_request
-resource: src/tui/render.rs#L2580-L2594
+resource: src/tui/render.rs#L2989-L3003
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/tui/render/approval_dialog_shows_tool_name_capabilities_and_summarized_params

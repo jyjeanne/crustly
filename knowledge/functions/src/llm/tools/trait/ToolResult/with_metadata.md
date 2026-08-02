@@ -3,7 +3,7 @@ type: Rust Method
 title: with_metadata
 resource: src/llm/tools/trait.rs#L158-L161
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/agent/AgentTool/tool/execute

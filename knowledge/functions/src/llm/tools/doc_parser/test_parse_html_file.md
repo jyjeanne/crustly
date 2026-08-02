@@ -4,7 +4,7 @@ title: test_parse_html_file
 resource: src/llm/tools/doc_parser.rs#L637-L653
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/doc_parser/context_with_file

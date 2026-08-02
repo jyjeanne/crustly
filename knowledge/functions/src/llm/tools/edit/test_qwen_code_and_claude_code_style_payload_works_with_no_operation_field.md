@@ -4,7 +4,7 @@ title: test_qwen_code_and_claude_code_style_payload_works_with_no_operation_fiel
 resource: src/llm/tools/edit.rs#L471-L489
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

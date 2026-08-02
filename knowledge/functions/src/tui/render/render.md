@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: render
-resource: src/tui/render.rs#L19-L85
+resource: src/tui/render.rs#L19-L88
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/splash/render_splash
@@ -20,6 +20,7 @@ relationships:
   - functions/src/tui/render/render_model_download
   - functions/src/tui/render/render_model_info
   - functions/src/tui/render/render_provider_switch
+  - functions/src/tui/render/render_llama_cpp_models
   - functions/src/tui/render/render_skills
   - functions/src/tui/render/render_mcp
   - functions/src/tui/render/render_status_bar
@@ -48,6 +49,7 @@ relationships:
 - [render_model_download](../../../../functions/src/tui/render/render_model_download.md)
 - [render_model_info](../../../../functions/src/tui/render/render_model_info.md)
 - [render_provider_switch](../../../../functions/src/tui/render/render_provider_switch.md)
+- [render_llama_cpp_models](../../../../functions/src/tui/render/render_llama_cpp_models.md)
 - [render_skills](../../../../functions/src/tui/render/render_skills.md)
 - [render_mcp](../../../../functions/src/tui/render/render_mcp.md)
 - [render_status_bar](../../../../functions/src/tui/render/render_status_bar.md)

@@ -4,7 +4,7 @@ title: from_anthropic_response
 resource: src/llm/provider/anthropic.rs#L102-L126
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete

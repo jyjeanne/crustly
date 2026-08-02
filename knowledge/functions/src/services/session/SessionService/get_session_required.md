@@ -3,7 +3,7 @@ type: Rust Method
 title: get_session_required
 resource: src/services/session.rs#L59-L63
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/services/session/SessionService/get_session

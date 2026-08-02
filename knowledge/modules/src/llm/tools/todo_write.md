@@ -3,7 +3,7 @@ type: Rust Module
 title: todo_write
 resource: src/llm/tools/todo_write.rs#L1-L329
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-result-toolerror

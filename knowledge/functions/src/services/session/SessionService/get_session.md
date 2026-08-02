@@ -3,7 +3,7 @@ type: Rust Method
 title: get_session
 resource: src/services/session.rs#L53-L56
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

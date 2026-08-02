@@ -3,7 +3,7 @@ type: Rust Method
 title: is_permitted
 resource: src/llm/tools/sandbox.rs#L30-L32
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/sandbox/OrPolicy/permissionpolicy/evaluate

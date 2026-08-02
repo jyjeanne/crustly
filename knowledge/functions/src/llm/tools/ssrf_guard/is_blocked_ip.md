@@ -3,7 +3,7 @@ type: Rust Function
 title: is_blocked_ip
 resource: src/llm/tools/ssrf_guard.rs#L29-L34
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/ssrf_guard/is_blocked_ipv4

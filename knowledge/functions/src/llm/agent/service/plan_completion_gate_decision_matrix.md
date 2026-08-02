@@ -4,7 +4,7 @@ title: plan_completion_gate_decision_matrix
 resource: src/llm/agent/service.rs#L1991-L2056
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/service/plan_completion_rejection

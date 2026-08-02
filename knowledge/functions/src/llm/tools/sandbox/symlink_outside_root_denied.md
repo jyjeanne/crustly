@@ -4,7 +4,7 @@ title: symlink_outside_root_denied
 resource: src/llm/tools/sandbox.rs#L871-L884
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/sandbox/make_root

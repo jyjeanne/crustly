@@ -4,7 +4,7 @@ title: show_model_parses_minimal_response
 resource: src/llm/provider/ollama_models.rs#L290-L302
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama_models/mock_server

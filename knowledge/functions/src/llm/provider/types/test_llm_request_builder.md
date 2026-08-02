@@ -4,7 +4,7 @@ title: test_llm_request_builder
 resource: src/llm/provider/types.rs#L489-L501
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/types/LLMRequest/with_system

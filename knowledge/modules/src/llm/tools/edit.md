@@ -3,7 +3,7 @@ type: Rust Module
 title: edit
 resource: src/llm/tools/edit.rs#L1-L752
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-error-validate-file-path-result-toolerror

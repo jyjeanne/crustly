@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: chat_message_thinking_block_toggles_between_collapsed_and_expanded
-resource: src/tui/render.rs#L2460-L2486
+resource: src/tui/render.rs#L2869-L2895
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/render/render_to_string

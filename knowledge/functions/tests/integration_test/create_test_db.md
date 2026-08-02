@@ -4,7 +4,7 @@ title: create_test_db
 resource: tests/integration_test.rs#L107-L111
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

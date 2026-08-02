@@ -3,7 +3,7 @@ type: Rust Method
 title: import_from_json
 resource: src/services/plan.rs#L141-L145
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/from_str

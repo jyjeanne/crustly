@@ -4,7 +4,7 @@ title: capabilities
 resource: src/llm/tools/skill.rs#L69-L71
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: minimal_notebook_json
 resource: src/llm/tools/notebook.rs#L344-L346
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/notebook/test_add_cell_within_working_directory_succeeds

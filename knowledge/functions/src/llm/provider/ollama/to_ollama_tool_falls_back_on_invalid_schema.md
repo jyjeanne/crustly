@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: to_ollama_tool_falls_back_on_invalid_schema
-resource: src/llm/provider/ollama.rs#L1651-L1663
+resource: src/llm/provider/ollama.rs#L1439-L1451
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/ollama/to_ollama_tool

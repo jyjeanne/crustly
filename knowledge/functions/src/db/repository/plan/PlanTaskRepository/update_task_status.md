@@ -3,7 +3,7 @@ type: Rust Method
 title: update_task_status
 resource: src/db/repository/plan.rs#L519-L555
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/services/plan/PlanService/begin_task

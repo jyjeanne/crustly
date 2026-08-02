@@ -4,7 +4,7 @@ title: test_validate_empty_skill_name
 resource: src/llm/tools/skill.rs#L330-L334
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

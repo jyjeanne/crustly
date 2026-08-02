@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: test_ollama_provider_config_default
-resource: src/config/mod.rs#L1422-L1429
+resource: src/config/mod.rs#L1539-L1546
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

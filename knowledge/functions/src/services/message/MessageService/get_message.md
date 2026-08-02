@@ -3,7 +3,7 @@ type: Rust Method
 title: get_message
 resource: src/services/message.rs#L63-L66
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/services/message/MessageService/get_message_required

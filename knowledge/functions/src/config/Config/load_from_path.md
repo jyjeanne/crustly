@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: load_from_path
-resource: src/config/mod.rs#L698-L717
+resource: src/config/mod.rs#L815-L834
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/Config/merge_from_file

@@ -3,7 +3,7 @@ type: Rust Module
 title: session
 resource: src/services/session.rs#L1-L440
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/crate-db-models-session-repository-episodicmemoryrepository-sessionlistoptions-sessionrepository

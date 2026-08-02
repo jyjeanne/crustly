@@ -4,7 +4,7 @@ title: test_system_prompt
 resource: src/llm/agent/context.rs#L239-L246
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

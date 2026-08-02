@@ -3,7 +3,7 @@ type: Rust Method
 title: user
 resource: src/llm/provider/types.rs#L31-L36
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/agent/context/test_add_message

@@ -3,7 +3,7 @@ type: Rust Method
 title: fail_task
 resource: src/services/plan.rs#L76-L80
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/repository/plan/PlanTaskRepository/update_task_status

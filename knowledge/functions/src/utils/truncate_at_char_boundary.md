@@ -3,7 +3,7 @@ type: Rust Function
 title: truncate_at_char_boundary
 resource: src/utils/mod.rs#L10-L19
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

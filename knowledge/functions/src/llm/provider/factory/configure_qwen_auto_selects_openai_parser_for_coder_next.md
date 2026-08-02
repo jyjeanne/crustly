@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: configure_qwen_auto_selects_openai_parser_for_coder_next
-resource: src/llm/provider/factory.rs#L968-L989
+resource: src/llm/provider/factory.rs#L1073-L1094
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/factory/configure_qwen

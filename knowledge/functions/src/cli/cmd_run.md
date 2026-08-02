@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_run
-resource: src/cli/mod.rs#L875-L990
+resource: src/cli/mod.rs#L908-L1023
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/Database/run_migrations

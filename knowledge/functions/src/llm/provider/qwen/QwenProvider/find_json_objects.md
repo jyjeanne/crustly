@@ -4,7 +4,7 @@ title: find_json_objects
 resource: src/llm/provider/qwen.rs#L350-L405
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/len

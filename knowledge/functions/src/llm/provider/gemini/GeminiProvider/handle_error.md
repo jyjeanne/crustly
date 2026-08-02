@@ -4,7 +4,7 @@ title: handle_error
 resource: src/llm/provider/gemini.rs#L339-L348
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/provider/gemini/build_gemini_error

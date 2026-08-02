@@ -4,7 +4,7 @@ title: compaction_integration_preserves_last_10_turns
 resource: src/llm/agent/compaction.rs#L258-L316
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/context/AgentContext/add_message

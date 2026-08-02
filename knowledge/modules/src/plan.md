@@ -3,7 +3,7 @@ type: Rust Module
 title: plan
 resource: src/plan/mod.rs#L1-L960
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/chrono-datetime-utc

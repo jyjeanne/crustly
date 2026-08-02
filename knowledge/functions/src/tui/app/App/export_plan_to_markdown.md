@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: export_plan_to_markdown
-resource: src/tui/app.rs#L1793-L1870
+resource: src/tui/app.rs#L2058-L2135
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

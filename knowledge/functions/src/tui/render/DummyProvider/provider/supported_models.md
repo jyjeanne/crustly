@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supported_models
-resource: src/tui/render.rs#L2064-L2066
+resource: src/tui/render.rs#L2411-L2413
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

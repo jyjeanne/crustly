@@ -4,7 +4,7 @@ title: make_root
 resource: src/llm/tools/sandbox.rs#L487-L491
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/llm/tools/sandbox/absolute_path_outside_root_denied

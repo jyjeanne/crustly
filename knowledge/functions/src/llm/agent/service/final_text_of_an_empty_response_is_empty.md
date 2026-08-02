@@ -4,7 +4,7 @@ title: final_text_of_an_empty_response_is_empty
 resource: src/llm/agent/service.rs#L2141-L2147
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/agent/service/response_with

@@ -3,7 +3,7 @@ type: Rust Module
 title: ollama_download
 resource: src/tui/ollama_download.rs#L1-L304
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/super-events-tuievent

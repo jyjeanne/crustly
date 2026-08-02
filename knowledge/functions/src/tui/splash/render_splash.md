@@ -3,7 +3,7 @@ type: Rust Function
 title: render_splash
 resource: src/tui/splash.rs#L14-L35
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/splash/render_splash_content

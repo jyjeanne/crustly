@@ -4,7 +4,7 @@ title: execute_allows_read_only_command_in_plan_mode
 resource: src/llm/tools/powershell.rs#L498-L511
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/powershell/make_ctx

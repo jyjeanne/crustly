@@ -4,7 +4,7 @@ title: summarise_turns
 resource: src/llm/agent/compaction.rs#L133-L157
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

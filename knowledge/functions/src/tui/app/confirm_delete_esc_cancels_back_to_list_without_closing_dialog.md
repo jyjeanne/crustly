@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: confirm_delete_esc_cancels_back_to_list_without_closing_dialog
-resource: src/tui/app.rs#L2794-L2809
+resource: src/tui/app.rs#L3230-L3245
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/open_model_download

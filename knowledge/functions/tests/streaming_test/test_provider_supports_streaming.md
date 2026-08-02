@@ -4,7 +4,7 @@ title: test_provider_supports_streaming
 resource: tests/streaming_test.rs#L338-L341
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 ---
 
 # Signature

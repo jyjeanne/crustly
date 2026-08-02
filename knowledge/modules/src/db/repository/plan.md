@@ -3,7 +3,7 @@ type: Rust Module
 title: plan
 resource: src/db/repository/plan.rs#L1-L1317
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/crate-db-models-plan-plantask-plantaskstatus

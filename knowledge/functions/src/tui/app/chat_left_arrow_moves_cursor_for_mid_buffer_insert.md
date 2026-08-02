@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: chat_left_arrow_moves_cursor_for_mid_buffer_insert
-resource: src/tui/app.rs#L3045-L3057
+resource: src/tui/app.rs#L3481-L3493
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/tui/app/App/handle_chat_key

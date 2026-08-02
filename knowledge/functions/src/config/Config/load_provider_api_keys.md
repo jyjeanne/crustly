@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: load_provider_api_keys
-resource: src/config/mod.rs#L816-L958
+resource: src/config/mod.rs#L933-L1075
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/db/models/PlanTaskStatus/parse

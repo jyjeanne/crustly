@@ -3,7 +3,7 @@ type: Rust Method
 title: delete_messages_for_session
 resource: src/services/message.rs#L154-L162
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   called_by:
   - functions/src/services/message/test_delete_messages_for_session

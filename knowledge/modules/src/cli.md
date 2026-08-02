@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: cli
-resource: src/cli/mod.rs#L1-L1583
+resource: src/cli/mod.rs#L1-L1795
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/anyhow-context-result
@@ -22,6 +22,7 @@ relationships:
   - external/crate-config-secrets-secretstring
   - external/crate-llm-provider-ollama-models
   - external/std-io-write-as
+  - external/crate-llm-provider-llama-cpp-models
   - external/crate-logging
   - external/std-io-bufread-bufreader
   - external/super
@@ -35,6 +36,7 @@ relationships:
 - [Cli](../../classes/src/cli/Cli.md)
 - [Commands](../../classes/src/cli/Commands.md)
 - [OllamaCommands](../../classes/src/cli/OllamaCommands.md)
+- [LlamaCppCommands](../../classes/src/cli/LlamaCppCommands.md)
 - [LogCommands](../../classes/src/cli/LogCommands.md)
 - [DbCommands](../../classes/src/cli/DbCommands.md)
 - [KeyringCommands](../../classes/src/cli/KeyringCommands.md)
@@ -54,6 +56,9 @@ relationships:
 - [ollama_host](../../functions/src/cli/ollama_host.md)
 - [cmd_ollama](../../functions/src/cli/cmd_ollama.md)
 - [cmd_ollama](../../functions/src/cli/cmd_ollama-2.md)
+- [resolve_llama_cpp_model_path](../../functions/src/cli/resolve_llama_cpp_model_path.md)
+- [cmd_llama_cpp](../../functions/src/cli/cmd_llama_cpp.md)
+- [cmd_llama_cpp](../../functions/src/cli/cmd_llama_cpp-2.md)
 - [cmd_autoplan](../../functions/src/cli/cmd_autoplan.md)
 - [cmd_logs](../../functions/src/cli/cmd_logs.md)
 - [test_cli_parse](../../functions/src/cli/test_cli_parse.md)
@@ -64,6 +69,9 @@ relationships:
 - [known_gap_powershell_is_not_classified_as_high_risk](../../functions/src/cli/known_gap_powershell_is_not_classified_as_high_risk.md)
 - [auto_mode_bypasses_approval_fullauto_bypasses_everything](../../functions/src/cli/auto_mode_bypasses_approval_fullauto_bypasses_everything.md)
 - [test_ollama_command_parses](../../functions/src/cli/test_ollama_command_parses.md)
+- [test_llama_cpp_command_parses](../../functions/src/cli/test_llama_cpp_command_parses.md)
+- [test_llama_cpp_list_and_rm_parse](../../functions/src/cli/test_llama_cpp_list_and_rm_parse.md)
+- [resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir](../../functions/src/cli/resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir.md)
 - [build_tool_registry_registers_every_built_in_tool](../../functions/src/cli/build_tool_registry_registers_every_built_in_tool.md)
 - [connect_configured_mcp_servers_returns_empty_status_with_no_servers](../../functions/src/cli/connect_configured_mcp_servers_returns_empty_status_with_no_servers.md)
 - [connect_configured_mcp_servers_records_failure_for_unreachable_server](../../functions/src/cli/connect_configured_mcp_servers_records_failure_for_unreachable_server.md)
@@ -98,6 +106,7 @@ relationships:
 - `crate::config::secrets::SecretString`
 - `crate::llm::provider::ollama_models`
 - `std::io::Write as _`
+- `crate::llm::provider::llama_cpp_models`
 - `crate::logging`
 - `std::io::{BufRead, BufReader}`
 - `super::*`

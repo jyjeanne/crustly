@@ -3,7 +3,7 @@ type: Rust Module
 title: agent
 resource: src/llm/agent/mod.rs#L1-L17
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   imports:
   - external/pub-use-context-agentcontext

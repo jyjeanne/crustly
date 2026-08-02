@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: render_provider_switch
-resource: src/tui/render.rs#L1670-L1721
+resource: src/tui/render.rs#L1702-L1753
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/config/secrets/SecretString/is_empty

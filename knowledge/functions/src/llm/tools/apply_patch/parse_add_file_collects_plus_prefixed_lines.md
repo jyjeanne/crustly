@@ -4,7 +4,7 @@ title: parse_add_file_collects_plus_prefixed_lines
 resource: src/llm/tools/apply_patch.rs#L559-L569
 visibility: private
 generated:
-  by: okf-rs/0.2.0
+  by: okf-rs/0.3.0
 relationships:
   calls:
   - functions/src/llm/tools/apply_patch/parse_patch
