@@ -69,7 +69,7 @@ schemars = { version = "1.2", optional = true, features = ["preserve_order"] }
 llama-cpp-2 = { version = "0.1.153", optional = true, default-features = false }
 # Checksum verification for downloaded .gguf files (llama_cpp_models.rs) -
 # see llama-cpp-2-integration-plan.md §4.11/§8.
-sha2 = { version = "0.10", optional = true }
+sha2 = { version = "0.11", optional = true }
 # Grammar-constrained decoding for tool calls (Phase 4b, `llama-cpp-llguidance`
 # feature only) - builds the JSON-Schema-union grammar and the constrained
 # sampler in src/llm/provider/llama_cpp_grammar.rs. Neither is re-exported
