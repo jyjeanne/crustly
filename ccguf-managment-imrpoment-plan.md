@@ -13,6 +13,12 @@ Date: 2026-08-06. Two review passes so far:
   and added an explicit maturity caveat (§1) plus an explicit deferred item
   (MTP speculative-decoding detection, §3) that the first pass omitted
   without saying so.
+- **Update 3** (scope addition, user-requested): promoted local hardware
+  detection/display and hardware-fit model selection out of the "deferred"
+  bucket (M10) into concrete phases (M11/M12), grounded in llamastash's
+  actual detection subsystem (`docs/architecture.md`'s per-vendor subprocess
+  probe chain and VRAM-fit filter, not a re-guess) — see §1's expanded
+  "Hardware awareness" bullet and the new M11/M12 sections in §5.
 Scope: improve how Crustly discovers, inspects, downloads, and manages local
 `.gguf` model files, informed by a feature analysis of
 [`llamastash`](https://github.com/llamastash/llamastash) — a Rust TUI/CLI
@@ -69,9 +75,27 @@ tree, and `config.example.yaml` reference (not a paraphrase of a paraphrase):
   (◉) vs. audio (♪) in the TUI.
 - **Download**: `pull <hf-repo>` with disk-space prechecks, SHA-256
   verification, and `--revision <sha>` pinning for reproducible pulls.
-- **Hardware awareness**: filters/ranks discovered and recommendable models
-  against detected VRAM/RAM; context auto-fit picks the largest context that
-  fits instead of failing at load time.
+- **Hardware awareness**: detection is a per-vendor subprocess probe chain
+  run at startup and on a slow hotplug timer, documented in llamastash's own
+  `docs/architecture.md` — `nvidia-smi --query-gpu=…` (NVIDIA, Linux/Windows),
+  `rocm-smi --showmeminfo vram gtt --json` (AMD, Linux), the Win32 DXGI API
+  (`IDXGIFactory1::EnumAdapters1`, AMD/Intel on Windows — a native API call,
+  not a subprocess), `system_profiler SPDisplaysDataType -json` (Apple
+  Metal/unified memory), and `vulkaninfo --summary` as a cross-vendor
+  fallback that only recovers an adapter name, no VRAM figure; the first
+  probe to return non-empty data wins, and anything that returns nothing
+  falls through to a `CpuOnly` classification rather than erroring. The
+  result feeds three things: (1) a **VRAM-fit hard filter** that prunes any
+  candidate model too large to load before any ranking happens, (2) a TUI
+  host-info pane showing GPU name/VRAM/live utilization where available, and
+  (3) **context auto-fit** — reading the GGUF's own attention geometry
+  (`block_count`, `head_count_kv`, `head_dim`) plus the tensor table's weight
+  bytes and the live free-memory snapshot to solve for the largest context
+  that actually fits, rather than failing at load time or relying on
+  `llama.cpp`'s own `--fit` (which llamastash's docs note misreads unified
+  memory on some AMD iGPUs). Only the VRAM-fit filter and the detection
+  layer itself are relevant to a *management* plan — the composite
+  benchmark-score ranking on top of the filter (§3 item 5) is not.
 - **Agent-facing CLI contract**: stable `--json` output, byte-stable TSV when
   piped, and a documented exit-code table (64–74 per failure class) so a
   calling agent can branch on the exit code instead of parsing text —
@@ -153,11 +177,16 @@ Crustly:
    architectural decision (ADR 0005), not something this plan reopens.
 4. **No second theming/keybinding system.** Any TUI work here extends
    Crustly's existing dialogs and render pipeline, not a parallel UI stack.
-5. **No CI-refreshed community benchmark table.** llamastash's `recommend`
-   ranks against externally-maintained benchmark data; replicating that
-   maintenance burden is disproportionate to the value for Crustly. A
-   lighter, purely local hardware-fit heuristic (Phase M10) covers the
-   useful part without the ongoing-data-pipeline cost.
+5. **No CI-refreshed community benchmark table, and no catalog of models the
+   user doesn't have yet.** llamastash's `recommend` composite-ranks
+   candidates by `benchmark score × tok/s × params × recency` after its
+   VRAM-fit filter; replicating that externally-maintained benchmark
+   pipeline is disproportionate to the value for Crustly. **Narrowed by
+   this plan's Update 3**: the VRAM-fit filter itself needs no benchmark
+   data — it's a local calculation over already-discovered models (Phase
+   M2's memory estimate) against detected hardware (Phase M11) — so that
+   part is no longer deferred; see M12. What stays deferred (Phase M10) is
+   specifically the benchmark-ranked, not-yet-downloaded-model catalog.
 6. **No MTP (speculative-decoding-capable) GGUF detection, for now.** Added
    in this review pass — the first draft omitted this llamastash feature
    without saying why. llamastash flags MTP-capable GGUFs at discovery time
@@ -187,7 +216,9 @@ Crustly:
 | KV-cache memory estimate / context auto-fit | Yes | No | **Medium** |
 | Agent-facing `--json` + documented exit codes | Yes | No | **Medium** (Crustly is itself agent-facing — see AGENTS.md — so this is more relevant to Crustly than a generic nice-to-have) |
 | `doctor`-style diagnostics | Yes | No | **Low** |
-| Hardware-aware recommend | Yes (CI benchmark data) | No | **Low** (deferred, see §3 item 5) |
+| Hardware detection & display (GPU vendor/VRAM, RAM) | Yes (subprocess probe chain) | No | **Medium** — new, see M11 |
+| Local hardware-fit filtering ("will this model I already have fit?") | Yes (VRAM-fit hard filter) | No | **Medium** — new, see M12 |
+| Catalog-based, benchmark-ranked recommend (models not yet downloaded) | Yes (CI benchmark data) | No | **Low** (deferred, see §3 item 5, M10) |
 | MTP/speculative-decoding-capable GGUF detection | Yes (TUI badge) | No | **N/A — explicitly deferred, see §3 item 6** (no consumer without a speculative-decoding engine, which Crustly doesn't have) |
 
 ---
@@ -321,10 +352,20 @@ transformer KV-cache formula, and surface it:
 - In `crustly llama-cpp list` / the TUI info panel, so a user can see
   "~4.9 GB at this context length" before loading.
 - As a warning (not a hard block) when `n_gpu_layers`/`n_ctx` in
-  `LlamaCppProviderConfig` looks likely to exceed detected system RAM —
-  advisory only, since Crustly (correctly, per `llama-cpp-2-integration-plan.md`
-  §4.11) doesn't do hardware detection today and shouldn't overreach here
-  either; this is a same-order-of-magnitude estimate, not a guarantee.
+  `LlamaCppProviderConfig` looks likely to exceed available memory — this is
+  a same-order-of-magnitude estimate, not a guarantee.
+
+At the time this phase was first drafted, "available memory" meant only
+whatever the user's own OS-level tools reported, since
+`llama-cpp-2-integration-plan.md` §4.11 correctly kept Crustly out of the
+hardware-detection business for the *inference engine itself* (no
+auto-guessed `n_gpu_layers`). **Update 3 note**: Phase M11 below adds actual
+hardware detection, but strictly on the management/display side — it never
+feeds back into `LlamaCppProviderConfig` or auto-sets `n_gpu_layers`/`n_ctx`.
+That keeps faith with §4.11's original reasoning (a config knob stays a
+config knob, not a guess) while still answering "what can my hardware
+run" as an advisory question, which is what this update's request is
+actually asking for.
 
 **Effort**: Medium.
 
@@ -468,21 +509,99 @@ Phase 7's corrected-assumptions note).
 A diagnostics subcommand, always exiting 0, reporting (as structured findings,
 not just log lines): whether the binary was built with `llama-cpp`/a GPU
 feature, whether `models_dir` exists and is writable, available disk space,
-and (once M2 lands) a rough "largest model your detected RAM can hold at
-default settings" line. Lower priority than M0–M7 since it's diagnostic
-sugar rather than filling a functional gap, but cheap once the underlying
-data (M1/M2) exists.
+and (once M2 and M11 land) the actually-detected hardware plus a rough
+"largest model your detected RAM/VRAM can hold at default settings" line —
+this is the natural place to surface M11's detection output as text, not a
+reason to duplicate detection logic here. Lower priority than M0–M7 since
+it's diagnostic sugar rather than filling a functional gap, but cheap once
+the underlying data (M1/M2, and later M11) exists.
 
 **Effort**: Small.
 
-### Phase M10 — Hardware-aware `recommend` (deferred)
+### Phase M10 — Catalog-based, benchmark-ranked `recommend` (deferred)
 
 Explicitly **deferred**, not scheduled. llamastash's version depends on an
-externally maintained, CI-refreshed benchmark dataset — replicating that
-maintenance burden isn't justified by this plan's scope. If pursued later,
-scope it down to a purely local heuristic (detected RAM/VRAM vs. M2's memory
-estimate for already-discovered models), not a ranked catalog of models the
-user doesn't have yet.
+externally maintained, CI-refreshed benchmark dataset to rank models the
+user does **not** yet have (`benchmark score × tok/s × params × recency`);
+replicating that maintenance burden isn't justified by this plan's scope.
+**Narrowed by Update 3**: the local, no-benchmark-data half of what
+"hardware-aware recommend" means is no longer part of this deferred item —
+see M12 below. If this phase is ever picked back up, it's specifically about
+suggesting *new* models to download, not about ranking ones already on disk.
+
+### Phase M11 — Hardware detection & display
+
+**Depends on**: nothing functionally (can ship independently of M1-M9), but
+most useful once M2 exists to interpret it against.
+
+**Problem**: Crustly has no notion of what GPU/VRAM/RAM the machine it's
+running on actually has. A user deciding which local `.gguf` file to load,
+or what `n_gpu_layers`/`n_ctx` to set, currently has to know their own
+hardware and do the arithmetic by hand.
+
+**Change**: add a best-effort hardware probe, grounded in llamastash's own
+documented approach (§1) rather than inventing a detection strategy from
+scratch — deliberately **subprocess-based, not SDK-linked**, so this stays
+consistent with M0's whole point (management-side code shouldn't need a
+build-time C/C++ toolchain):
+
+- **NVIDIA** (Linux/Windows): shell out to `nvidia-smi --query-gpu=name,memory.total,memory.used --format=csv,noheader`.
+- **AMD** (Linux): shell out to `rocm-smi --showmeminfo vram gtt --json`.
+- **AMD/Intel** (Windows): the Win32 DXGI API (`IDXGIFactory1::EnumAdapters1`)
+  — a native API call via the `windows`/`windows-sys` crate, not a
+  subprocess; no VRAM live-utilization data available this way, matching
+  llamastash's own documented limitation for this path.
+- **Apple** (macOS): shell out to `system_profiler SPDisplaysDataType -json`
+  for unified-memory total.
+- **Cross-vendor fallback**: shell out to `vulkaninfo --summary` for an
+  adapter name when none of the above resolve anything.
+- **CPU-only**: whatever of the above ran found nothing → report `CpuOnly`,
+  not an error. System RAM total (relevant on the CPU-only and Apple-unified
+  paths) comes from a small, already-common cross-platform crate rather than
+  reimplementing per-OS `/proc/meminfo`/`sysctl`/WMI parsing — see §6.
+- **Degrade cleanly everywhere**: a missing binary, a non-zero exit, a
+  timeout (cap subprocess wait — a hung driver tool must not hang `doctor`
+  or `list`), or unparseable output all fall through to "unknown," the same
+  posture this plan already requires of the GGUF parser (M1) and the
+  filename-based quantization fallback. Detection failure is never fatal to
+  `crustly llama-cpp list`/`doctor`.
+
+**Display**: surface the result in `crustly llama-cpp doctor` (extends M9)
+and a new host-info line/panel in the Ctrl+G TUI dialog (extends M8) — name,
+VRAM total (where available), system RAM total. Read-only and advisory, as
+established in M2's note above: this never writes back into
+`LlamaCppProviderConfig`.
+
+**Effort**: Medium — mostly plumbing (subprocess spawn + parse per vendor,
+each independently testable against captured sample output) plus the
+degradation-path testing the "clean fallback" requirement above demands.
+
+### Phase M12 — Local hardware-fit filtering (the part of `recommend` that doesn't need benchmark data)
+
+**Depends on**: M1, M2, M11.
+
+This is the promoted subset of what was originally deferred as part of
+Phase M10 (see §3 item 5's Update-3 note) — the part llamastash's own VRAM-
+fit hard filter does *before* its benchmark-ranking step, which needs no
+external dataset because it only compares two numbers Crustly can already
+compute locally: M2's per-model memory estimate and M11's detected
+VRAM/RAM.
+
+- Annotate each entry in `crustly llama-cpp list` / the TUI dialog with a
+  fit indicator against the detected hardware at a sensible default context
+  length — e.g. **Fits** (comfortably under budget), **Tight** (fits but
+  leaves little headroom), **Won't fit** (exceeds detected VRAM+RAM) —
+  three states, not a false-precision percentage.
+- `crustly llama-cpp list --best-fit` (or equivalent flag): sort
+  already-discovered local models by fit instead of name/date, so "which of
+  the models I already have should I actually run" has a direct answer
+  without the user doing the arithmetic themselves.
+- Explicitly **not** a HuggingFace catalog search and **not** benchmark-
+  ranked — both stay in deferred Phase M10. This phase only ever ranks
+  models the user has already downloaded.
+
+**Effort**: Small–Medium, once M2/M11 exist — this phase is mostly a
+comparison and a sort, not new detection or parsing logic.
 
 ---
 
@@ -492,13 +611,19 @@ user doesn't have yet.
 |---|---|---|
 | None required for M0 | — | Feature-flag reorganization only |
 | None required for M1 | — | Hand-rolled parser over `std::io`, consistent with keeping the management path toolchain-light (the whole point of M0) |
-| None required for M2–M9 | — | Built on M1's output plus existing `reqwest`/`sha2`/`tokio::fs` already in the dependency tree |
+| None required for M2, M3, M4, M5, M6, M7, M8, M9, M12 | — | Built on M1's output plus existing `reqwest`/`sha2`/`tokio::fs` already in the dependency tree |
+| A small cross-platform system-info crate (e.g. `sysinfo`), optional, `gguf-management`-gated | M11 (system RAM total, CPU-only fallback path) | Reimplementing per-OS `/proc/meminfo`/`sysctl`/WMI parsing by hand is exactly the kind of low-value hand-rolling this plan otherwise avoids doing (contrast with M1's parser, which *is* worth hand-rolling because no lightweight crate does GGUF header parsing specifically). A RAM-total query is commodity functionality a well-maintained pure-Rust crate already solves portably. |
+| `windows`/`windows-sys` (Windows-only, already optional-by-target) | M11 (DXGI adapter enumeration on Windows, AMD/Intel GPUs) | Native Win32 API binding, not a subprocess — matches llamastash's own documented approach for this specific path; no SDK/toolchain install required beyond what any Windows dev machine already has. |
+| None (GPU vendor tools) | M11 (NVIDIA/AMD/Apple/Vulkan detection) | Subprocess calls to already-installed vendor tools (`nvidia-smi`, `rocm-smi`, `system_profiler`, `vulkaninfo`) via `std::process::Command` — no new Cargo dependency, and no dependency on the tool being present (degrades to "unknown" per M11's clean-degradation requirement). |
 
 Deliberately **not** proposing a general-purpose GGUF/tensor crate (e.g. via
 `candle`) for header parsing — that would reintroduce exactly the kind of
 heavy, ML-framework-shaped dependency this plan is trying to keep *out* of
 the management path, for a job (reading a few KB of typed KV pairs) that
-doesn't need one.
+doesn't need one. Likewise, deliberately **not** proposing NVML/ROCm SDK
+bindings for M11 — that would reintroduce the same build-toolchain problem
+M0 exists to remove, for detection that's fully served by subprocess calls
+to tools GPU owners already have installed.
 
 ---
 
@@ -515,18 +640,22 @@ doesn't need one.
 | M6 — Download hardening | M0 | M | Medium |
 | M7 — Agent-facing `--json`/exit codes | M1 | S–M | Medium |
 | M8 — TUI enhancements | M1, M2, M4, M5 | M | Medium |
-| M9 — `doctor` diagnostics | M0 (M1/M2 for full value) | S | Low |
-| M10 — Hardware-aware recommend | M2 | — | Deferred |
+| M9 — `doctor` diagnostics | M0 (M1/M2/M11 for full value) | S | Low |
+| M10 — Catalog-based, benchmark-ranked recommend | M2, M12 | — | Deferred |
+| M11 — Hardware detection & display | — (M2 to interpret against) | M | Medium |
+| M12 — Local hardware-fit filtering | M1, M2, M11 | S–M | Medium |
 
-Recommended starting sequence: **M0 → M1**, then M2/M3/M6/M7 in any order
-(all independent once M1 lands), M4/M5/M8 last since they consume the others,
-M9 whenever convenient, M10 revisited only if a concrete need for it shows up.
+Recommended starting sequence: **M0 → M1**, then M2/M3/M6/M7/M11 in any order
+(all independent once M1 lands; M11 has no dependency on M1 at all and can
+start even earlier), M4/M5/M8/M12 last since they consume the others, M9
+whenever convenient, M10 revisited only if a concrete need for a
+not-yet-downloaded-model catalog shows up.
 
 ---
 
 ## 8. Development phases (execution roadmap)
 
-§5 defines *what* changes in capability terms (M0–M10); this section groups
+§5 defines *what* changes in capability terms (M0–M12); this section groups
 those into shippable milestones a team can actually schedule against, each
 with concrete files, acceptance criteria, and effort in developer-days
 (one dev-day ≈ focused implementation + tests + review for that scope, not
@@ -592,10 +721,26 @@ there's a stable feature set to describe).
 | | |
 |---|---|
 | Files | New `crustly llama-cpp doctor` subcommand in `src/cli/mod.rs`; `README.md` (`gguf-management`/new config keys); `config.toml.example` (`extra_model_paths`, Ollama-blob opt-in, revision-pinned `hf:` examples); `docs/guides/LLAMA_CPP_GUIDE.md` (management section, following the precedent `llama-cpp-2-integration-plan.md` Phase 10 already set for this same guide) |
-| Tasks | `doctor` checks: build-feature detection (`gguf-management` vs `llama-cpp` vs neither), `models_dir` existence/writability, available disk space, and (using DP3's estimator) a rough max-model-size-for-detected-RAM line; update all three docs to describe the shipped feature set — capability by capability, not aspirationally |
+| Tasks | `doctor` checks: build-feature detection (`gguf-management` vs `llama-cpp` vs neither), `models_dir` existence/writability, available disk space, and — once DP6 lands — the actually-detected hardware plus a "largest model your hardware can hold" line (before DP6, this line is simply omitted rather than guessed); update all three docs to describe the shipped feature set — capability by capability, not aspirationally |
 | Acceptance criteria | `doctor` always exits 0 and produces structured (not free-text-only) findings, matching this plan's own §5 M9 description; docs describe only what has actually shipped by this point, cross-referencing this plan the way `llama-cpp-2-integration-plan.md`'s own Phase 10 cross-references `llm-file-gguf-support.md` rather than restating it |
 | Effort | ~1.5 dev-days (M9) + ~1 dev-day (docs) ≈ **2.5 dev-days** |
 | Exit gate | A new user with no prior context can run `crustly llama-cpp doctor` and the shipped guide section to get from zero to a listed, inspectable local model |
+
+### DP6 — Hardware-aware local recommendations
+**Covers**: M11, M12. **Depends on**: DP1 (M1, for M12's memory-estimate
+input) and DP3 (M2, the estimator itself). Independent of DP2/DP4/DP5 —
+can be built in parallel with any of them once DP1+DP3 land. This milestone
+exists because a user reviewing llamastash directly asked for the "detect my
+hardware and tell me which of my models fit" experience specifically, not
+just the memory-estimate math DP3 already covers in isolation.
+
+| | |
+|---|---|
+| Files | New `src/llm/provider/hardware_detect.rs` (or similar — probe chain + parsing per vendor); `Cargo.toml` (`sysinfo`, `windows`/`windows-sys` on Windows, both `gguf-management`-gated); `src/llm/provider/llama_cpp_models.rs` (fit annotation/sort on `list`); `src/cli/mod.rs` (`--best-fit` flag); `src/tui/llama_cpp_download.rs` and `src/cli/mod.rs`'s `doctor` (host-info display, extending M8/M9) |
+| Tasks | One detection function per vendor path (NVIDIA/AMD/Windows-DXGI/Apple/Vulkan-fallback/CPU-only), each independently unit-testable against captured sample subprocess output (not a live GPU) so CI doesn't need real hardware; a timeout wrapper around every subprocess call; the `CpuOnly`/"unknown" fallback path; the fit-comparison function (M2 estimate vs. M11 detected budget → `Fits`/`Tight`/`Won't fit`); the `--best-fit` sort |
+| Acceptance criteria | Detection degrades to `CpuOnly`/unknown (never panics, never hangs past the timeout) when a vendor tool is absent — tested by pointing the subprocess call at a nonexistent binary path, not by requiring the test runner to lack a GPU; parsing tests use captured real `nvidia-smi`/`rocm-smi`/`system_profiler` sample output (checked into the test fixtures, not generated live); fit-annotation tests cover all three states plus the "detection found nothing, fit is unknown" fourth state (must render as "unknown," never silently as "won't fit," which would be actively misleading) |
+| Effort | ~3 dev-days (M11 — four-plus detection paths, each simple but independently testable) + ~2 dev-days (M12 — comparison, annotation, sort, TUI/CLI wiring) ≈ **5 dev-days** |
+| Exit gate | `crustly llama-cpp doctor` shows real detected GPU/VRAM/RAM on a machine that has `nvidia-smi`/`rocm-smi`/etc. installed, "CPU-only" cleanly on one that doesn't, and `crustly llama-cpp list --best-fit` sorts already-downloaded models with a correct Fits/Tight/Won't-fit label on each |
 
 ### Roadmap summary
 
@@ -606,12 +751,14 @@ there's a stable feature set to describe).
 | DP3 — Intelligence | M2, M4, M5 | DP1, DP2 | 6 dev-days |
 | DP4 — Interfaces | M7, M8 | DP1 (fully: DP1–DP3) | 5.5 dev-days |
 | DP5 — Polish | M9 + docs | DP1–DP4 | 2.5 dev-days |
-| **Total** | M0–M9 (M10 deferred, §5) | | **~24 dev-days** |
+| DP6 — Hardware-aware local recommendations | M11, M12 | DP1, DP3 (parallel to DP2/DP4/DP5) | 5 dev-days |
+| **Total** | M0–M9, M11–M12 (M10 deferred, §5) | | **~29 dev-days** |
 
 These are sequential dependency-order estimates, not a claim that one
-person spends 24 consecutive days on this — DP2/DP3's sub-items (M3/M6,
-and M2/M4/M5 respectively) are each parallelizable across contributors
-once DP1 lands, same as §7's dependency graph already implies.
+person spends 29 consecutive days on this — DP2/DP3's sub-items (M3/M6, and
+M2/M4/M5 respectively) are each parallelizable across contributors once DP1
+lands, and DP6 as a whole is parallelizable against DP2/DP4/DP5 once DP1+DP3
+land, same as §7's dependency graph already implies.
 
 ## 9. Risks
 
@@ -632,6 +779,16 @@ once DP1 lands, same as §7's dependency graph already implies.
   but adds parsing complexity. Acceptable to ship M1 with "unknown" as a
   valid, honest output rather than a guess, same posture as today's
   `quantization_hint_from_filename` returning `None`.
+- **Subprocess-based hardware detection (M11) hanging or misbehaving**: a
+  vendor tool that hangs (a wedged driver, a broken `nvidia-smi`) must not
+  hang `crustly llama-cpp doctor`/`list` — mitigated by the timeout
+  requirement stated as part of M11's own acceptance criteria (DP6), not
+  left implicit. Spawning `$PATH`-resolved binaries is also a mild trust
+  surface (a malicious entry earlier in `$PATH` than the real tool) — no
+  different in kind from any other tool Crustly already shells out to
+  today, but worth the same care: don't elevate privileges around these
+  calls, and treat their output as untrusted text to parse defensively
+  (same posture as M1's GGUF parser), not as trusted structured data.
 - **Scope creep back toward llamastash's full feature set.** §3 and §6 exist
   specifically to keep this plan bounded; any future addition should be
   checked against "does this manage GGUF files Crustly already has/wants,
