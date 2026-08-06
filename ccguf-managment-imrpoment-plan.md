@@ -1,11 +1,18 @@
 # GGUF Model Management Improvement Plan (informed by `llamastash`)
 
 Status: **Proposal — analysis only, no implementation started.**
-Date: 2026-08-06 (revised same day after a self-review pass — see the
-"Development phases" section for the resulting execution roadmap; the
-review corrected two inaccuracies in the original draft (§5, M3/M4) and
-added the defensive-parsing, caching, and documentation items now folded
-into M0/M1/M3 and the new §8)
+Date: 2026-08-06. Two review passes so far:
+- **Review 1** (self-review against the Crustly codebase): added the
+  "Development phases" execution roadmap (§8) and corrected two
+  inaccuracies in the original draft (§5, M3/M4), plus the
+  defensive-parsing, caching, and documentation items folded into M0/M1/M3.
+- **Review 2** (re-comparison against llamastash's actual README/docs/config
+  reference, not just a summary of it): corrected the Ollama-discovery
+  design in M3/M4 from "scan the blob store and reverse-resolve names" to
+  "read Ollama's manifests directly," added concrete LM Studio scan paths,
+  and added an explicit maturity caveat (§1) plus an explicit deferred item
+  (MTP speculative-decoding detection, §3) that the first pass omitted
+  without saying so.
 Scope: improve how Crustly discovers, inspects, downloads, and manages local
 `.gguf` model files, informed by a feature analysis of
 [`llamastash`](https://github.com/llamastash/llamastash) — a Rust TUI/CLI
@@ -24,28 +31,42 @@ model.
 
 ## 1. What was analyzed
 
-`llamastash` (MIT, "The Software shall be used for Good, not Evil" clause) is
-a terminal-native launcher for local LLMs: a bearer-token-authenticated
-loopback daemon that spawns `llama-server` processes on demand, backed by a
-TUI and a scriptable CLI. Its full scope (multi-model concurrency, port
-allocation, an OpenAI/Ollama/Anthropic-compatible proxy, five TUI themes,
-hardware-aware launch presets) is out of scope for this document — see §6.
-The part analyzed in depth here is its **GGUF discovery and management
-subsystem**, summarized from its README/docs:
+`llamastash` (MIT © Deepu K Sasidharan, "Software for Good only, not for
+military or intelligence use" clause) is a terminal-native launcher for
+local LLMs: a bearer-token-authenticated loopback daemon that spawns
+`llama-server` processes on demand, backed by a TUI and a scriptable CLI.
+Its full scope (multi-model concurrency, port allocation, an
+OpenAI/Ollama/Anthropic-compatible proxy, five TUI themes, hardware-aware
+launch presets, experimental Lemonade/ds4 backends) is out of scope for this
+document — see §3. The part analyzed in depth here is its **GGUF discovery
+and management subsystem**, verified against its actual README, `docs/`
+tree, and `config.example.yaml` reference (not a paraphrase of a paraphrase):
 
-- **Discovery**: auto-scans HuggingFace cache, Ollama's blob store, and LM
-  Studio's cache directory, plus user-configured extra paths; live filesystem
-  watching picks up new files without a restart.
+- **Discovery**: auto-scans three default "buckets" — HuggingFace's cache
+  (`~/.cache/huggingface/hub` on Linux, `~/Library/Caches/huggingface/hub`
+  on macOS), Ollama's model directory (`~/.ollama/models` on both), and LM
+  Studio's cache (`~/.lmstudio/models` and `~/.cache/lm-studio/models` on
+  Linux; `~/Library/Caches/LMStudio/models` and `~/.lmstudio/models` on
+  macOS) — plus user-configured `model_paths`, each bucket independently
+  toggleable via `disable_default_cache_paths`. Live filesystem watching
+  picks up new files without a restart.
 - **Metadata parsing**: reads GGUF header key-value metadata directly —
   architecture, parameter count, quantization level, native context window,
   embedded chat template, and KV-cache-aware memory estimates. Not a
-  filename-convention guess.
+  filename-convention guess. Also flags MTP (multi-token-prediction /
+  speculative-decoding-capable) GGUFs with a dedicated TUI badge — see the
+  explicit non-goal on this in §3, added in this review pass.
 - **Deduplication**: collapses symlinks, unifies split multi-part GGUFs
-  (`-00001-of-00005.gguf` style) into one logical model, and names
-  content-addressed Ollama blobs intelligibly instead of showing raw SHA
-  digests.
+  (`-00001-of-00005.gguf` style) into one logical model, and — for Ollama —
+  reads the **manifest files** under `~/.ollama/models/manifests/` (which map
+  a human-readable name/tag to one or more content-addressed blob hashes in
+  `~/.ollama/models/blobs/`) to show the model's real name instead of a raw
+  SHA digest. This is manifest-first name resolution, not blob-store
+  scanning with after-the-fact guessing — a distinction this plan's first
+  draft got slightly wrong (see the correction in M3/M4 below).
 - **Multimodal pairing**: auto-detects and pairs vision/audio projector
-  (`mmproj`) files with their base model.
+  (`mmproj`) files with their base model, with distinct glyphs for vision
+  (◉) vs. audio (♪) in the TUI.
 - **Download**: `pull <hf-repo>` with disk-space prechecks, SHA-256
   verification, and `--revision <sha>` pinning for reproducible pulls.
 - **Hardware awareness**: filters/ranks discovered and recommendable models
@@ -53,10 +74,27 @@ subsystem**, summarized from its README/docs:
   fits instead of failing at load time.
 - **Agent-facing CLI contract**: stable `--json` output, byte-stable TSV when
   piped, and a documented exit-code table (64–74 per failure class) so a
-  calling agent can branch on the exit code instead of parsing text.
+  calling agent can branch on the exit code instead of parsing text —
+  reinforced by a published Agent Skills manifest (`npx skills add
+  llamastash/llamastash`) that explicitly teaches calling agents to prefer
+  `--json` and branch on exit codes rather than parse text output. Directly
+  relevant to Phase M7 below, since Crustly is itself an agent-facing tool
+  (`AGENTS.md`).
 - **Diagnostics**: a `doctor` subcommand that always exits 0 and reports
   typed, actionable problems (missing binary, wrong `llama-server` build,
   unwritable cache dir, etc.).
+
+**Project-maturity caveat**, added in this review pass: llamastash is a
+single-maintainer project (119 stars, 12 forks, 4 open issues at analysis
+time) with an active but still-open roadmap of its own (its `TODO.md`
+lists, among other things, "llama.cpp version pinning to prevent silent
+drift" and NVML-based VRAM attribution as *unfinished* work). That doesn't
+undercut the specific design patterns cited above — the GGUF-format facts
+(header layout, split-file convention, manifest structure) are independent
+of llamastash's own maturity — but it's a reason to treat llamastash as a
+useful *reference design*, not a battle-tested implementation to copy
+uncritically. This plan already reflects that by hand-rolling Crustly's own
+parser (M1) rather than depending on llamastash's code directly.
 
 ---
 
@@ -120,6 +158,16 @@ Crustly:
    maintenance burden is disproportionate to the value for Crustly. A
    lighter, purely local hardware-fit heuristic (Phase M10) covers the
    useful part without the ongoing-data-pipeline cost.
+6. **No MTP (speculative-decoding-capable) GGUF detection, for now.** Added
+   in this review pass — the first draft omitted this llamastash feature
+   without saying why. llamastash flags MTP-capable GGUFs at discovery time
+   because it can *act* on that flag (auto-enabling speculative decoding in
+   its launcher). Crustly's `LlamaCppProvider` has no speculative-decoding
+   implementation at all today, so detecting the flag with nothing to
+   consume it is metadata for its own sake. Revisit this only alongside a
+   future speculative-decoding phase in `llama-cpp-2-integration-plan.md`,
+   not as a standalone management-side addition — at that point it's a
+   small extra field on the M1 parser output, not a new subsystem.
 
 ---
 
@@ -139,7 +187,8 @@ Crustly:
 | KV-cache memory estimate / context auto-fit | Yes | No | **Medium** |
 | Agent-facing `--json` + documented exit codes | Yes | No | **Medium** (Crustly is itself agent-facing — see AGENTS.md — so this is more relevant to Crustly than a generic nice-to-have) |
 | `doctor`-style diagnostics | Yes | No | **Low** |
-| Hardware-aware recommend | Yes (CI benchmark data) | No | **Low** (deferred, see §3.5) |
+| Hardware-aware recommend | Yes (CI benchmark data) | No | **Low** (deferred, see §3 item 5) |
+| MTP/speculative-decoding-capable GGUF detection | Yes (TUI badge) | No | **N/A — explicitly deferred, see §3 item 6** (no consumer without a speculative-decoding engine, which Crustly doesn't have) |
 
 ---
 
@@ -286,22 +335,41 @@ transformer KV-cache formula, and surface it:
 Extend `list_local_models` to scan, in addition to
 `providers.llama_cpp.models_dir`:
 - A new `providers.llama_cpp.extra_model_paths: Vec<PathBuf>` config list.
-- Ollama's local blob store (`~/.ollama/models/blobs`) — read-only awareness
-  so a model already pulled via Ollama shows up for llama.cpp management
-  too, without duplicating storage. **Gate this on an explicit config
-  opt-in and the path's actual presence on disk, not on Crustly's own
-  `ollama` Cargo feature/config** — whether an Ollama *daemon* has left
-  blobs on this machine is unrelated to whether this particular Crustly
-  build was compiled with the `ollama` feature (which only governs talking
-  to an Ollama HTTP server); conflating the two would hide real local
-  files on a build that happens not to include `ollama`, and is the wrong
-  signal even on one that does.
-- Optionally, well-known cache locations (HuggingFace's `~/.cache/huggingface/hub`,
-  LM Studio's model directory) behind an opt-in config flag — auto-scanning
-  directories a user didn't explicitly point Crustly at is a bigger default-
-  behavior change than the rest of this plan, so this sub-item should ship
-  disabled by default with a config toggle, not on by default the way
-  llamastash does it.
+- **Ollama, via its manifests — not its blob store.** Correction from this
+  review's re-read of llamastash's actual behavior: the first draft
+  proposed scanning `~/.ollama/models/blobs` directly and "resolving back"
+  a content-addressed blob to a name afterward. llamastash instead reads
+  `~/.ollama/models/manifests/**` (JSON files mapping a human-readable
+  `name:tag` to the blob hash(es) that make it up) and resolves the name
+  *at discovery time*, which is both simpler and gives a correct name
+  unconditionally rather than a best-effort reverse lookup. Crustly should
+  do the same: walk `~/.ollama/models/manifests/`, parse each manifest,
+  and resolve straight to `~/.ollama/models/blobs/sha256-<hash>` with the
+  manifest's own name attached — no separate "resolve blob to name" step
+  needed later in M4. **Gate this on an explicit config opt-in and the
+  path's actual presence on disk, not on Crustly's own `ollama` Cargo
+  feature/config** — whether an Ollama *daemon* has left models on this
+  machine is unrelated to whether this particular Crustly build was
+  compiled with the `ollama` feature (which only governs talking to an
+  Ollama HTTP server); conflating the two would hide real local files on a
+  build that happens not to include `ollama`, and is the wrong signal even
+  on one that does.
+- Optionally, well-known cache locations behind an opt-in config flag —
+  auto-scanning directories a user didn't explicitly point Crustly at is a
+  bigger default-behavior change than the rest of this plan, so this
+  sub-item should ship disabled by default with a config toggle, not on by
+  default the way llamastash does it. Concrete paths (matching llamastash's
+  own default buckets, confirmed against its README's path table):
+
+  | Bucket | Linux | macOS |
+  |---|---|---|
+  | HuggingFace | `~/.cache/huggingface/hub` | `~/Library/Caches/huggingface/hub` |
+  | LM Studio | `~/.lmstudio/models`, `~/.cache/lm-studio/models` | `~/Library/Caches/LMStudio/models`, `~/.lmstudio/models` |
+
+  (Windows paths intentionally left unresolved here — worth confirming
+  against Crustly's own existing Windows path conventions, e.g.
+  `%APPDATA%`-relative, rather than assuming llamastash's Windows layout
+  transfers unchanged.)
 
 Filesystem watching (llamastash's live-update behavior) is explicitly
 **deferred, not dropped** — it's a nice-to-have once multi-source scanning
@@ -309,7 +377,7 @@ exists, lower priority than getting the scan itself right.
 
 **Effort**: Medium.
 
-### Phase M4 — Deduplication (symlinks, split GGUFs, Ollama blob naming)
+### Phase M4 — Deduplication (symlinks, split GGUFs)
 
 **Depends on**: M1, M3.
 
@@ -319,9 +387,15 @@ exists, lower priority than getting the scan itself right.
   zero-padded to the same width) and unify each group into one logical
   `LocalGgufModel` entry (report the summed size, the base name, first-part
   path as the canonical reference).
-- When a discovered file is an Ollama content-addressed blob (Phase M3),
-  resolve it back to Ollama's manifest name where possible instead of
-  showing a raw digest.
+
+Note: Ollama blob→name resolution is **not** this phase's job anymore —
+per M3's correction above, manifest-based name resolution happens at
+discovery time, so an Ollama-sourced entry already carries its real name by
+the time M4 runs. What M4 still needs to handle for Ollama specifically:
+the same underlying blob can be referenced by more than one manifest (e.g.
+two tags pointing at identical weights) — dedup-key on the blob hash so
+that case collapses to one entry with both names shown, rather than two
+listings of the same file.
 
 **Effort**: Medium.
 
@@ -478,7 +552,7 @@ M3/M6 themselves don't depend on each other and can be built in parallel).
 | | |
 |---|---|
 | Files | `src/config/mod.rs` (`extra_model_paths` on `LlamaCppProviderConfig`, default-off Ollama-blob-store opt-in flag); `src/llm/provider/llama_cpp_models.rs` (multi-path scan, disk-space precheck, `Range`-header resume, `@revision` parsing in the `hf:` shorthand) |
-| Tasks | Extend `list_local_models` to accept multiple directories; add the Ollama blob-store path check gated as corrected in M3 above (config opt-in + on-disk presence, independent of the `ollama` Cargo feature); `HEAD`-request disk-space precheck before `download_model` starts streaming; extend `parse_hf_shorthand` to accept an optional `@revision` suffix; attempt `Range`-header resume when a matching `.part` file already exists, falling back to a full restart on a non-206 response |
+| Tasks | Extend `list_local_models` to accept multiple directories; add Ollama manifest-based discovery per M3's correction (walk `~/.ollama/models/manifests/`, resolve each to its blob(s) and real name, gated on config opt-in + on-disk presence, independent of the `ollama` Cargo feature — not a raw blob-store scan); `HEAD`-request disk-space precheck before `download_model` starts streaming; extend `parse_hf_shorthand` to accept an optional `@revision` suffix; attempt `Range`-header resume when a matching `.part` file already exists, falling back to a full restart on a non-206 response |
 | Acceptance criteria | New unit tests for: multi-directory scan de-duplicating nothing yet (dedup is DP3) but merging listings correctly; disk-space precheck rejecting a download when free space is (mock-)reported below the target size; `@revision` shorthand parsing (valid and malformed cases, mirroring the existing `parse_hf_shorthand_none_for_malformed_shorthand` test shape); resume producing an identical final file to a non-interrupted download in the existing `mock_http_server`-based test harness |
 | Effort | ~2.5 dev-days (M3) + ~2.5 dev-days (M6) ≈ **5 dev-days** |
 | Exit gate | A file interrupted mid-download resumes instead of restarting; a model pulled via `ollama pull` (with the opt-in flag set) appears in `crustly llama-cpp list` without being re-downloaded |
@@ -491,7 +565,7 @@ produces the same model twice).
 | | |
 |---|---|
 | Files | `src/llm/provider/gguf_metadata.rs` (memory estimator); `src/llm/provider/llama_cpp_models.rs` (symlink resolution, split-group unification, mmproj pairing) |
-| Tasks | KV-cache-aware memory estimate function taking parsed architecture/params/quantization + requested `n_ctx`; symlink canonicalization before dedup-keying; `-NNNNN-of-NNNNN.gguf` group detection and merge; mmproj filename/header-hint detection and pairing into the base model's entry |
+| Tasks | KV-cache-aware memory estimate function taking parsed architecture/params/quantization + requested `n_ctx`; symlink canonicalization before dedup-keying; `-NNNNN-of-NNNNN.gguf` group detection and merge; blob-hash dedup for Ollama entries so two manifest tags pointing at identical weights collapse to one listing with both names shown; mmproj filename/header-hint detection and pairing into the base model's entry |
 | Acceptance criteria | Memory estimate within a documented order-of-magnitude tolerance against a couple of known real model/quantization combinations (recorded as a comment, not asserted exactly — hardware/build variance makes exact assertions brittle); a synthetic 3-part split group collapses to one listing entry with the summed size; a synthetic mmproj-pattern file pairs with its base-name match and stands alone (with a clear label, not silently dropped) when no match exists |
 | Effort | ~2 dev-days (M2) + ~2.5 dev-days (M4) + ~1.5 dev-days (M5) ≈ **6 dev-days** |
 | Exit gate | `crustly llama-cpp list` shows one entry per logical model (split parts merged, vision projector paired) with an estimated memory figure |
