@@ -1,7 +1,11 @@
 # GGUF Model Management Improvement Plan (informed by `llamastash`)
 
 Status: **Proposal — analysis only, no implementation started.**
-Date: 2026-08-06
+Date: 2026-08-06 (revised same day after a self-review pass — see the
+"Development phases" section for the resulting execution roadmap; the
+review corrected two inaccuracies in the original draft (§5, M3/M4) and
+added the defensive-parsing, caching, and documentation items now folded
+into M0/M1/M3 and the new §8)
 Scope: improve how Crustly discovers, inspects, downloads, and manages local
 `.gguf` model files, informed by a feature analysis of
 [`llamastash`](https://github.com/llamastash/llamastash) — a Rust TUI/CLI
@@ -152,19 +156,39 @@ no C++ toolchain, but is currently only compiled under `feature = "llama-cpp"`.
 
 **Change**: introduce a lightweight `gguf-management` feature (or fold this
 functionality into the crate's default build — it has no heavy dependencies:
-`reqwest`, `sha2`, filesystem calls, all of which are already used
-elsewhere in the default build) that compiles `llama_cpp_models.rs` and the
-`crustly llama-cpp {list,pull,rm}` CLI subcommand independently of
-`feature = "llama-cpp"`. `LlamaCppProvider` itself (the FFI-backed inference
-path) stays exactly as gated as it is today. This is the one prerequisite
-change every later phase benefits from: it makes "manage my GGUF files" a
-zero-toolchain operation, matching llamastash's actual value proposition,
-without touching the inference feature-gating decision made in
-`llama-cpp-2-integration-plan.md` §3.4.
+`reqwest` is already an unconditional dependency (`Cargo.toml:53`, not
+`optional = true`), and `sha2` only needs to move from `llama-cpp`-gated to
+`gguf-management`-gated) that compiles independently of `feature = "llama-cpp"`:
 
-**Effort**: Small. Mostly moving `#[cfg(...)]` boundaries and updating
-`Cargo.toml` feature declarations; `sha2` becomes an unconditional (or
-`gguf-management`-gated) dependency instead of `llama-cpp`-gated.
+- `src/llm/provider/llama_cpp_models.rs` (currently
+  `#[cfg(feature = "llama-cpp")]` at `src/llm/provider/mod.rs:28-29`).
+- `cmd_llama_cpp`'s **real** body in `src/cli/mod.rs` (currently split into
+  a `#[cfg(feature = "llama-cpp")]` implementation at `src/cli/mod.rs:1250`
+  and a `#[cfg(not(feature = "llama-cpp"))]` "rebuild with..." stub at
+  `:1356` — only the `#[cfg]` target changes, the `Commands::LlamaCpp`/
+  `LlamaCppCommands` enum definitions are already unconditional and need no
+  change).
+
+`LlamaCppProvider` itself (the FFI-backed inference path, `llama_cpp.rs`)
+stays exactly as gated as it is today — this phase touches management code
+only. Because `gguf-management` carries none of the cmake/C++ toolchain cost
+that is the *specific, documented* reason `llama-cpp` is excluded from
+`all-llm` (`Cargo.toml:161-164,180`: "unlike every other provider feature,
+this one compiles native C++"), that reasoning does not apply here — add
+`gguf-management` to `all-llm`, and consider it a candidate for `default`
+outright, subject to confirming `reqwest`+`sha2`'s combined footprint is
+acceptable in a default build.
+
+This is the one prerequisite change every later phase benefits from: it
+makes "manage my GGUF files" a zero-toolchain operation, matching
+llamastash's actual value proposition, without touching the inference
+feature-gating decision made in `llama-cpp-2-integration-plan.md` §3.4.
+
+**Effort**: Small. Moving `#[cfg(...)]` boundaries across the two files
+above and updating `Cargo.toml` feature declarations (new `gguf-management`
+feature, `sha2` re-gated, `all-llm` extended). No logic changes — should be
+a behavior-preserving refactor verifiable by running the existing test
+suite unmodified under the new feature flag.
 
 ### Phase M1 — Pure-Rust GGUF header metadata parser
 
@@ -180,8 +204,34 @@ walk typed KV pairs) rather than pull in a general-purpose GGUF/ML crate.
 This keeps the dependency footprint aligned with Crustly's stated
 "performance, memory efficiency, reduced resource consumption" positioning —
 the same reasoning `llm-file-gguf-support.md` already applied when weighing
-`llama-cpp-2` itself. Read only the header (a few KB), never the tensor data,
-so this stays fast and memory-light even for a 40GB model file.
+`llama-cpp-2` itself. Read only the header and KV/tensor-info section, never
+the tensor data itself, so this stays fast and memory-light even for a
+40GB model file — note this section's actual size varies (typically well
+under a few MB, but large embedded tokenizer vocabularies can push it
+higher), so size it dynamically from the header's own declared counts
+rather than assuming a fixed small constant.
+
+**Hardening requirement, not optional**: this parser runs over files that
+may be corrupted, truncated, or actively adversarial (any `.gguf` a user
+points Crustly at, including ones downloaded from an arbitrary URL via
+Phase M6). It must reject rather than trust declared sizes: cap KV-pair
+count, string length, and array length against sane upper bounds before
+allocating, bail out cleanly on truncation instead of panicking on an
+out-of-bounds read, and never `unwrap()` on attacker-influenced values.
+This is the same class of defense llamastash documents for its own
+downloads ("archive-bomb defenses: entry/size/ratio caps") applied to
+parsing instead of extraction. Malformed input must degrade to "metadata
+unavailable" (same posture as today's `quantization_hint_from_filename`
+returning `None`), never a crash — this is a hard acceptance criterion
+for M1, not a stretch goal.
+
+**Caching**: once Phase M3 scans multiple directories, a `list` call can
+mean re-parsing headers of many large files on every invocation. Cache
+parsed metadata keyed by `(path, size, modified_at)` (already available
+from the existing directory scan, no new stat calls) so an unchanged file
+is never re-parsed — an in-memory cache is enough for M1; a persisted
+cache (e.g. alongside Crustly's existing SQLite database) is worth
+revisiting only if profiling after M3 shows it's needed.
 
 Extract at minimum:
 - `general.architecture`, `general.name`
@@ -193,14 +243,24 @@ Extract at minimum:
 - `*.context_length` (the model's trained/native context window)
 - Whether an embedded chat template (`tokenizer.chat_template`) is present
 
-This becomes the foundation `LocalGgufModel` builds on (replacing the
-filename-only `quantization_hint`), and is what Phases M2/M4/M5/M8 consume.
+This becomes the foundation `LocalGgufModel` builds on (demoting the
+filename-only `quantization_hint` to an explicit fallback, not removing
+it — it stays the answer when a header can't be read), and is what Phases
+M2/M4/M5/M8 consume. Adding fields to `LocalGgufModel` has a known blast
+radius that should be scoped into this phase rather than discovered during
+M8: its two TUI mirrors, `LlamaCppModelSummary` and `LlamaCppModelDetails`
+(`src/tui/llama_cpp_download.rs`), currently copy a subset of its fields
+field-by-field and will need the same fields added; the existing 11
+`llama_cpp_models` unit tests (`quantization_hint_recognizes_common_tags`
+and siblings) must keep passing unmodified since the filename fallback
+path doesn't change behavior, only priority.
 
 **Effort**: Medium. New module (e.g. `src/llm/provider/gguf_metadata.rs`),
 pure functions over `&[u8]`/`Read`, straightforward to unit test against
 small hand-crafted or truncated real GGUF headers (mirroring the existing
 `mock_http_server` pattern of not depending on a real multi-GB model file
-in tests).
+in tests) — truncated/malformed fixtures double as the hardening tests
+required above.
 
 ### Phase M2 — Memory/VRAM footprint estimate & context auto-fit hint
 
@@ -226,10 +286,16 @@ transformer KV-cache formula, and surface it:
 Extend `list_local_models` to scan, in addition to
 `providers.llama_cpp.models_dir`:
 - A new `providers.llama_cpp.extra_model_paths: Vec<PathBuf>` config list.
-- Ollama's local blob store (`~/.ollama/models/blobs`, when the `ollama`
-  feature/config is present) — read-only awareness so a model already
-  pulled via Ollama shows up for llama.cpp management too, without
-  duplicating storage.
+- Ollama's local blob store (`~/.ollama/models/blobs`) — read-only awareness
+  so a model already pulled via Ollama shows up for llama.cpp management
+  too, without duplicating storage. **Gate this on an explicit config
+  opt-in and the path's actual presence on disk, not on Crustly's own
+  `ollama` Cargo feature/config** — whether an Ollama *daemon* has left
+  blobs on this machine is unrelated to whether this particular Crustly
+  build was compiled with the `ollama` feature (which only governs talking
+  to an Ollama HTTP server); conflating the two would hide real local
+  files on a build that happens not to include `ollama`, and is the wrong
+  signal even on one that does.
 - Optionally, well-known cache locations (HuggingFace's `~/.cache/huggingface/hub`,
   LM Studio's model directory) behind an opt-in config flag — auto-scanning
   directories a user didn't explicitly point Crustly at is a bigger default-
@@ -249,9 +315,10 @@ exists, lower priority than getting the scan itself right.
 
 - Resolve symlinks before dedup-keying so the same file reached two ways
   doesn't list twice.
-- Detect the `-00001-of-000NN.gguf` split-file convention and unify each
-  group into one logical `LocalGgufModel` entry (report the summed size,
-  the base name, first-part path as the canonical reference).
+- Detect the `-00001-of-00005.gguf` split-file convention (both numbers
+  zero-padded to the same width) and unify each group into one logical
+  `LocalGgufModel` entry (report the summed size, the base name, first-part
+  path as the canonical reference).
 - When a discovered file is an Ollama content-addressed blob (Phase M3),
   resolve it back to Ollama's manifest name where possible instead of
   showing a raw digest.
@@ -383,8 +450,104 @@ M9 whenever convenient, M10 revisited only if a concrete need for it shows up.
 
 ---
 
-## 8. Risks
+## 8. Development phases (execution roadmap)
 
+§5 defines *what* changes in capability terms (M0–M10); this section groups
+those into shippable milestones a team can actually schedule against, each
+with concrete files, acceptance criteria, and effort in developer-days
+(one dev-day ≈ focused implementation + tests + review for that scope, not
+wall-clock calendar time). Each milestone is independently releasable —
+none blocks shipping the ones before it.
+
+### DP1 — Foundation: unlock management without the build toolchain
+**Covers**: M0, M1. **Depends on**: nothing (first milestone).
+
+| | |
+|---|---|
+| Files | `Cargo.toml` (new `gguf-management` feature, `sha2` re-gate, `all-llm` extension); `src/llm/provider/mod.rs` (`#[cfg]` on `llama_cpp_models`); `src/cli/mod.rs` (`#[cfg]` on `cmd_llama_cpp`, both bodies); new `src/llm/provider/gguf_metadata.rs` |
+| Tasks | Move the two `#[cfg(feature = "llama-cpp")]` boundaries to `gguf-management`; write the GGUF header parser (magic/version validation, typed KV walk, tensor-info walk for parameter-count derivation) with the bounds-checking required in M1; wire real quantization/architecture/param-count/context-length/chat-template-presence into `LocalGgufModel`, demoting the filename guess to fallback; add the in-memory metadata cache keyed by `(path, size, modified_at)`; update `LlamaCppModelSummary`/`LlamaCppModelDetails` (`src/tui/llama_cpp_download.rs`) to carry the new fields |
+| Acceptance criteria | `cargo build --features gguf-management` succeeds with **no C/C++ toolchain present** (the whole point of M0) and links no `llama-cpp-2`/`llama-cpp-sys-2`; `cargo test --features gguf-management` passes, including the 11 pre-existing `llama_cpp_models` tests unmodified plus new parser tests covering a valid minimal header, a truncated file, and at least one adversarial fixture (oversized declared string/array length) that must return an error, not panic or OOM; `cargo build`/`test` with no features and with `--features llama-cpp`/`all-llm` remain green (behavior-preserving refactor + additive fields) |
+| Effort | ~1 dev-day (M0) + ~4 dev-days (M1, parser + hardening + caching + downstream struct updates) ≈ **5 dev-days** |
+| Exit gate | `crustly llama-cpp list` shows real architecture/quantization/context-length for a locally-present `.gguf` file, on a build with no C++ toolchain installed |
+
+### DP2 — Reach and safety: find more files, download them more safely
+**Covers**: M3, M6. **Depends on**: DP1 (M3's dedup-ready listing and M6's
+integrity messaging both assume the richer `LocalGgufModel` from M1;
+M3/M6 themselves don't depend on each other and can be built in parallel).
+
+| | |
+|---|---|
+| Files | `src/config/mod.rs` (`extra_model_paths` on `LlamaCppProviderConfig`, default-off Ollama-blob-store opt-in flag); `src/llm/provider/llama_cpp_models.rs` (multi-path scan, disk-space precheck, `Range`-header resume, `@revision` parsing in the `hf:` shorthand) |
+| Tasks | Extend `list_local_models` to accept multiple directories; add the Ollama blob-store path check gated as corrected in M3 above (config opt-in + on-disk presence, independent of the `ollama` Cargo feature); `HEAD`-request disk-space precheck before `download_model` starts streaming; extend `parse_hf_shorthand` to accept an optional `@revision` suffix; attempt `Range`-header resume when a matching `.part` file already exists, falling back to a full restart on a non-206 response |
+| Acceptance criteria | New unit tests for: multi-directory scan de-duplicating nothing yet (dedup is DP3) but merging listings correctly; disk-space precheck rejecting a download when free space is (mock-)reported below the target size; `@revision` shorthand parsing (valid and malformed cases, mirroring the existing `parse_hf_shorthand_none_for_malformed_shorthand` test shape); resume producing an identical final file to a non-interrupted download in the existing `mock_http_server`-based test harness |
+| Effort | ~2.5 dev-days (M3) + ~2.5 dev-days (M6) ≈ **5 dev-days** |
+| Exit gate | A file interrupted mid-download resumes instead of restarting; a model pulled via `ollama pull` (with the opt-in flag set) appears in `crustly llama-cpp list` without being re-downloaded |
+
+### DP3 — Intelligence: fewer duplicate/confusing entries, useful estimates
+**Covers**: M2, M4, M5. **Depends on**: DP1 (metadata), DP2 (multi-source
+listing is what makes dedup non-trivial — a single-directory scan rarely
+produces the same model twice).
+
+| | |
+|---|---|
+| Files | `src/llm/provider/gguf_metadata.rs` (memory estimator); `src/llm/provider/llama_cpp_models.rs` (symlink resolution, split-group unification, mmproj pairing) |
+| Tasks | KV-cache-aware memory estimate function taking parsed architecture/params/quantization + requested `n_ctx`; symlink canonicalization before dedup-keying; `-NNNNN-of-NNNNN.gguf` group detection and merge; mmproj filename/header-hint detection and pairing into the base model's entry |
+| Acceptance criteria | Memory estimate within a documented order-of-magnitude tolerance against a couple of known real model/quantization combinations (recorded as a comment, not asserted exactly — hardware/build variance makes exact assertions brittle); a synthetic 3-part split group collapses to one listing entry with the summed size; a synthetic mmproj-pattern file pairs with its base-name match and stands alone (with a clear label, not silently dropped) when no match exists |
+| Effort | ~2 dev-days (M2) + ~2.5 dev-days (M4) + ~1.5 dev-days (M5) ≈ **6 dev-days** |
+| Exit gate | `crustly llama-cpp list` shows one entry per logical model (split parts merged, vision projector paired) with an estimated memory figure |
+
+### DP4 — Interfaces: agents and humans both get the new data
+**Covers**: M7, M8. **Depends on**: DP1–DP3 (surfaces their combined output;
+gains progressively more to show as earlier milestones land, but only
+strictly *requires* DP1).
+
+| | |
+|---|---|
+| Files | `src/cli/mod.rs` (`--json` flag on `list`, documented exit codes); new integration test fixture for the JSON schema; `src/tui/llama_cpp_download.rs` and its `render_llama_cpp_models`-family functions (`src/tui/render.rs`) |
+| Tasks | `crustly llama-cpp list --json` with a versioned, documented schema (include a `schema_version` field from the start — cheaper to add now than to retrofit once agents depend on the shape); document and stabilize exit codes for `list`/`pull`/`rm` failure modes; extend the Ctrl+G dialog with the new metadata columns and split/mmproj grouped rows; extend the Ctrl+O info panel with header-parsed quantization/context-length/chat-template indicators |
+| Acceptance criteria | `--json` output round-trips through `serde_json` in a test with a fixed expected shape; a snapshot test per new TUI row/column (following the existing `render` snapshot-test pattern noted in `llama-cpp-2-integration-plan.md` Phase 7); exit codes documented in the CLI's own `--help` text or a docs table, not only in this plan |
+| Effort | ~2.5 dev-days (M7) + ~3 dev-days (M8) ≈ **5.5 dev-days** |
+| Exit gate | An external script can call `crustly llama-cpp list --json`, parse a stable schema, and branch on a documented exit code without reading Crustly's source |
+
+### DP5 — Polish: diagnostics and documentation
+**Covers**: M9, plus documentation/config-example updates that earlier
+milestones intentionally deferred rather than scattering piecemeal.
+**Depends on**: DP1–DP4 (a `doctor` command and docs are most useful once
+there's a stable feature set to describe).
+
+| | |
+|---|---|
+| Files | New `crustly llama-cpp doctor` subcommand in `src/cli/mod.rs`; `README.md` (`gguf-management`/new config keys); `config.toml.example` (`extra_model_paths`, Ollama-blob opt-in, revision-pinned `hf:` examples); `docs/guides/LLAMA_CPP_GUIDE.md` (management section, following the precedent `llama-cpp-2-integration-plan.md` Phase 10 already set for this same guide) |
+| Tasks | `doctor` checks: build-feature detection (`gguf-management` vs `llama-cpp` vs neither), `models_dir` existence/writability, available disk space, and (using DP3's estimator) a rough max-model-size-for-detected-RAM line; update all three docs to describe the shipped feature set — capability by capability, not aspirationally |
+| Acceptance criteria | `doctor` always exits 0 and produces structured (not free-text-only) findings, matching this plan's own §5 M9 description; docs describe only what has actually shipped by this point, cross-referencing this plan the way `llama-cpp-2-integration-plan.md`'s own Phase 10 cross-references `llm-file-gguf-support.md` rather than restating it |
+| Effort | ~1.5 dev-days (M9) + ~1 dev-day (docs) ≈ **2.5 dev-days** |
+| Exit gate | A new user with no prior context can run `crustly llama-cpp doctor` and the shipped guide section to get from zero to a listed, inspectable local model |
+
+### Roadmap summary
+
+| Milestone | Covers | Depends on | Effort | 
+|---|---|---|---|
+| DP1 — Foundation | M0, M1 | — | 5 dev-days |
+| DP2 — Reach & safety | M3, M6 | DP1 | 5 dev-days |
+| DP3 — Intelligence | M2, M4, M5 | DP1, DP2 | 6 dev-days |
+| DP4 — Interfaces | M7, M8 | DP1 (fully: DP1–DP3) | 5.5 dev-days |
+| DP5 — Polish | M9 + docs | DP1–DP4 | 2.5 dev-days |
+| **Total** | M0–M9 (M10 deferred, §5) | | **~24 dev-days** |
+
+These are sequential dependency-order estimates, not a claim that one
+person spends 24 consecutive days on this — DP2/DP3's sub-items (M3/M6,
+and M2/M4/M5 respectively) are each parallelizable across contributors
+once DP1 lands, same as §7's dependency graph already implies.
+
+## 9. Risks
+
+- **Malformed/adversarial GGUF headers** (M1): a hand-rolled binary parser
+  running over files sourced from arbitrary URLs (M6) or arbitrary
+  filesystem locations (M3) is a real attack surface — a crafted header
+  with huge declared lengths could otherwise cause an out-of-memory
+  allocation or an out-of-bounds panic. Mitigated by the bounds-checking
+  and clean-degradation requirement stated as a hard acceptance criterion
+  in M1, not left as a follow-up.
 - **GGUF format drift**: the header format is stable and versioned, but new
   architectures periodically introduce new KV keys. Mitigate by parsing
   defensively (unknown keys are skipped, not errors) — same posture
@@ -402,7 +565,7 @@ M9 whenever convenient, M10 revisited only if a concrete need for it shows up.
 
 ---
 
-## 9. Relationship to existing docs
+## 10. Relationship to existing docs
 
 - `llama-cpp-2-integration-plan.md` — the in-process inference engine this
   plan's management layer feeds model files to. Phase 6 of that plan is the
