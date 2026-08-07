@@ -3,7 +3,7 @@
 **Current Version:** 0.5.2 — July 2026
 **Author:** Jeremy JEANNE
 
-**Related strategy docs:** [`differentiation-strategy-vs-opencode.md`](./differentiation-strategy-vs-opencode.md) (competitive positioning — depth over breadth), [`docs/guides/SECURITY_MODEL.md`](./docs/guides/SECURITY_MODEL.md) (permission engine, compared to OpenCode's), [`llm-file-gguf-support.md`](./llm-file-gguf-support.md) (direct GGUF loading evaluation, conditional Go/No-Go)
+**Related strategy docs:** [`differentiation-strategy-vs-opencode.md`](./differentiation-strategy-vs-opencode.md) (competitive positioning — depth over breadth), [`docs/guides/SECURITY_MODEL.md`](./docs/guides/SECURITY_MODEL.md) (permission engine, compared to OpenCode's), [`llm-file-gguf-support.md`](./llm-file-gguf-support.md) (direct GGUF loading evaluation, conditional Go/No-Go), [`ccguf-managment-imrpoment-plan.md`](./ccguf-managment-imrpoment-plan.md) (GGUF model-management improvement plan, informed by a `llamastash` feature analysis — full design/rationale for the v0.5.3 milestone below)
 
 ---
 
@@ -101,6 +101,57 @@ whoever has a model and terminal to try it against.
 
 ## Upcoming Milestones
 
+### v0.5.3 — GGUF Model Management
+**Target:** Q3 2026
+
+**Full design/rationale:** [`ccguf-managment-imrpoment-plan.md`](./ccguf-managment-imrpoment-plan.md)
+— informed by a feature analysis of [`llamastash`](https://github.com/llamastash/llamastash),
+scoped to what's portable without adopting its daemon/launcher/proxy architecture (Crustly
+already runs inference in-process, see the "Unreleased" entry above). Follows the same
+point-release pattern as v0.4.2 (Native Ollama Integration) and v0.5.2 (Local-Model
+Reliability): focused follow-up hardening on a subsystem that just shipped, ahead of v0.6's
+unrelated stability/DX work. Items below are ordered by the plan's own priority (§4 gap
+analysis), not by phase number — highest-value/most-blocking first. Six execution milestones
+(DP1–DP6, ~29 dev-days total) map onto the groupings below; see the plan's §8 for file-level
+tasks and acceptance criteria per item.
+
+**Foundation — unblocks everything else below (DP1):**
+- [ ] **Decouple GGUF file management from the `llama-cpp` build feature** — `list`/`pull`/`rm`
+  today require the full cmake/C++ toolchain even though they do no FFI; new `gguf-management`
+  feature fixes this and folds into `all-llm`
+- [ ] **Pure-Rust GGUF header metadata parser** — real architecture/parameter-count/quantization/
+  context-length/chat-template-presence, replacing today's filename-only quantization guess;
+  hardened against malformed/truncated/adversarial files (never panics/OOMs on a crafted header)
+
+**Core management (DP2–DP4):**
+- [ ] **Memory/VRAM footprint estimate** — "~4.9 GB at this context length" in `list`/TUI, advisory only
+- [ ] **Multi-source discovery** — Ollama (via its manifests, not raw blob scanning), HuggingFace/LM
+  Studio caches, extra configured paths — beyond today's single-directory scan
+- [ ] **Deduplication** — symlink collapsing, split-GGUF (`-00001-of-00005.gguf`) unification
+- [ ] **`mmproj` pairing** — vision/audio projector files shown attached to their base model
+- [ ] **Download hardening** — disk-space precheck, `--revision` pinning, resumable downloads
+- [ ] **Agent-facing `--json` CLI contract** — stable schema + documented exit codes on `crustly
+  llama-cpp list/pull/rm`, extending Crustly's existing agent-facing positioning (`AGENTS.md`)
+- [ ] **TUI enhancements** — Ctrl+G/Ctrl+O dialogs show real header-parsed metadata instead of the
+  filename guess
+
+**Hardware-aware local model selection (DP6 — new since the plan's Update 3):**
+- [ ] **Hardware detection & display** — best-effort GPU vendor/VRAM + system RAM probe
+  (`nvidia-smi`/`rocm-smi`/DXGI/`system_profiler`/`vulkaninfo`, subprocess-based, no SDK linkage),
+  surfaced in `doctor` and the TUI host-info panel; display/advisory only, never auto-mutates
+  `providers.llama_cpp` config
+- [ ] **Local hardware-fit filtering** — `Fits`/`Tight`/`Won't fit` labels and a `crustly llama-cpp
+  list --best-fit` sort over models already on disk, using the memory estimate above against
+  detected hardware; explicitly not a HuggingFace catalog search
+
+**Diagnostics (DP5, lowest priority — cheap once the above exists):**
+- [ ] **`crustly llama-cpp doctor`** — structured diagnostics (build feature, `models_dir`
+  writability, disk space, detected hardware), always exits 0
+
+**Deferred — tracked in Backlog below, not this milestone:** catalog-based, benchmark-ranked
+`recommend` for models not yet downloaded (needs an external CI-maintained benchmark dataset;
+disproportionate maintenance burden for now — see the plan's §3 item 5 and Phase M10).
+
 ### v0.6 — Stability & Developer Experience
 **Target:** Q4 2026
 
@@ -196,6 +247,7 @@ are done; the rest are tracked here as they get picked up:
 | Telemetry (opt-in) | Anonymous usage stats; cost analytics charts in TUI |
 | Azure OpenAI provider | Azure-specific auth and endpoint routing |
 | `crustly run` pipelines | Chain multiple prompts with conditional logic in a YAML file |
+| Catalog-based, benchmark-ranked GGUF recommend | Rank models *not yet downloaded* against a benchmark dataset (llamastash's `recommend`, minus the VRAM-fit-only subset already covered by v0.5.3's hardware-aware local selection). Needs an external, CI-refreshed benchmark pipeline — deferred until a concrete need shows up; see `ccguf-managment-imrpoment-plan.md` Phase M10 |
 
 ---
 

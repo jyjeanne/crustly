@@ -19,6 +19,15 @@ Date: 2026-08-06. Two review passes so far:
   actual detection subsystem (`docs/architecture.md`'s per-vendor subprocess
   probe chain and VRAM-fit filter, not a re-guess) — see §1's expanded
   "Hardware awareness" bullet and the new M11/M12 sections in §5.
+- **Review 3** (self-review of Update 3's new material): fixed two
+  underspecified points in M11/M12 that would otherwise have been decided
+  differently by whoever implemented them — when hardware detection
+  actually runs (never as a side effect of a plain `list`; cached
+  per-invocation, not re-probed) and what default context length M12's fit
+  comparison uses (the model's own native length, capped, not an unstated
+  constant). Also folded this plan's priorities into `ROADMAP.md` as the
+  next milestone — see that file for the ordered, ship-ready checklist;
+  this document remains the detailed design/rationale it links back to.
 Scope: improve how Crustly discovers, inspects, downloads, and manages local
 `.gguf` model files, informed by a feature analysis of
 [`llamastash`](https://github.com/llamastash/llamastash) — a Rust TUI/CLI
@@ -539,7 +548,8 @@ running on actually has. A user deciding which local `.gguf` file to load,
 or what `n_gpu_layers`/`n_ctx` to set, currently has to know their own
 hardware and do the arithmetic by hand.
 
-**Change**: add a best-effort hardware probe, grounded in llamastash's own
+**Change**: add a best-effort hardware probe (new
+`src/llm/provider/hardware_detect.rs`), grounded in llamastash's own
 documented approach (§1) rather than inventing a detection strategy from
 scratch — deliberately **subprocess-based, not SDK-linked**, so this stays
 consistent with M0's whole point (management-side code shouldn't need a
@@ -572,6 +582,18 @@ VRAM total (where available), system RAM total. Read-only and advisory, as
 established in M2's note above: this never writes back into
 `LlamaCppProviderConfig`.
 
+**When this runs — added in this review pass, previously unspecified**:
+detection is real subprocess spawning, not free, so it must never be a
+side effect of a plain `crustly llama-cpp list` or of simply opening the
+Ctrl+G dialog. It runs only when explicitly needed: `doctor`, `list
+--best-fit` (M12), and the TUI host-info panel's *first* render per dialog
+session — cached for the lifetime of that CLI invocation / TUI session
+(a static `OnceLock`/`OnceCell` is enough; GPU hotplug mid-session is not a
+case this plan tries to handle, unlike llamastash's persistent-daemon
+hotplug timer, which doesn't have an equivalent in a one-shot CLI/TUI
+process). This keeps the "clean fallback, never fatal" requirement above
+from also becoming a "never slows down the common path" regression.
+
 **Effort**: Medium — mostly plumbing (subprocess spawn + parse per vendor,
 each independently testable against captured sample output) plus the
 degradation-path testing the "clean fallback" requirement above demands.
@@ -587,11 +609,20 @@ external dataset because it only compares two numbers Crustly can already
 compute locally: M2's per-model memory estimate and M11's detected
 VRAM/RAM.
 
-- Annotate each entry in `crustly llama-cpp list` / the TUI dialog with a
-  fit indicator against the detected hardware at a sensible default context
-  length — e.g. **Fits** (comfortably under budget), **Tight** (fits but
-  leaves little headroom), **Won't fit** (exceeds detected VRAM+RAM) —
-  three states, not a false-precision percentage.
+- Annotate each entry in `crustly llama-cpp list --best-fit` / the TUI
+  dialog with a fit indicator against the detected hardware — e.g. **Fits**
+  (comfortably under budget), **Tight** (fits but leaves little headroom),
+  **Won't fit** (exceeds detected VRAM+RAM) — three states, not a
+  false-precision percentage. **Default context length for this
+  comparison, unspecified until this review pass**: use the model's own
+  parsed native context length (M1's `*.context_length`) capped at a fixed
+  ceiling (e.g. 8192) so a model advertising a 1M-token native context
+  doesn't get flagged "Won't fit" against a KV-cache estimate nobody would
+  actually configure by default; fall back to Crustly's existing
+  `default_llama_cpp_n_ctx()` (`src/config/mod.rs`) when a model's native
+  length can't be parsed. Surface the context length actually used for the
+  estimate next to the fit label, not just the label alone — otherwise
+  "Tight" is a number a user can't sanity-check.
 - `crustly llama-cpp list --best-fit` (or equivalent flag): sort
   already-discovered local models by fit instead of name/date, so "which of
   the models I already have should I actually run" has a direct answer
@@ -737,8 +768,8 @@ just the memory-estimate math DP3 already covers in isolation.
 | | |
 |---|---|
 | Files | New `src/llm/provider/hardware_detect.rs` (or similar — probe chain + parsing per vendor); `Cargo.toml` (`sysinfo`, `windows`/`windows-sys` on Windows, both `gguf-management`-gated); `src/llm/provider/llama_cpp_models.rs` (fit annotation/sort on `list`); `src/cli/mod.rs` (`--best-fit` flag); `src/tui/llama_cpp_download.rs` and `src/cli/mod.rs`'s `doctor` (host-info display, extending M8/M9) |
-| Tasks | One detection function per vendor path (NVIDIA/AMD/Windows-DXGI/Apple/Vulkan-fallback/CPU-only), each independently unit-testable against captured sample subprocess output (not a live GPU) so CI doesn't need real hardware; a timeout wrapper around every subprocess call; the `CpuOnly`/"unknown" fallback path; the fit-comparison function (M2 estimate vs. M11 detected budget → `Fits`/`Tight`/`Won't fit`); the `--best-fit` sort |
-| Acceptance criteria | Detection degrades to `CpuOnly`/unknown (never panics, never hangs past the timeout) when a vendor tool is absent — tested by pointing the subprocess call at a nonexistent binary path, not by requiring the test runner to lack a GPU; parsing tests use captured real `nvidia-smi`/`rocm-smi`/`system_profiler` sample output (checked into the test fixtures, not generated live); fit-annotation tests cover all three states plus the "detection found nothing, fit is unknown" fourth state (must render as "unknown," never silently as "won't fit," which would be actively misleading) |
+| Tasks | One detection function per vendor path (NVIDIA/AMD/Windows-DXGI/Apple/Vulkan-fallback/CPU-only), each independently unit-testable against captured sample subprocess output (not a live GPU) so CI doesn't need real hardware; a timeout wrapper around every subprocess call; the `CpuOnly`/"unknown" fallback path; a once-per-invocation cache so detection never re-runs within one CLI call or TUI session; the fit-comparison function (M2 estimate, using the capped native-context-length default, vs. M11 detected budget → `Fits`/`Tight`/`Won't fit`); the `--best-fit` sort |
+| Acceptance criteria | Detection degrades to `CpuOnly`/unknown (never panics, never hangs past the timeout) when a vendor tool is absent — tested by pointing the subprocess call at a nonexistent binary path, not by requiring the test runner to lack a GPU; parsing tests use captured real `nvidia-smi`/`rocm-smi`/`system_profiler` sample output (checked into the test fixtures, not generated live); fit-annotation tests cover all three states plus the "detection found nothing, fit is unknown" fourth state (must render as "unknown," never silently as "won't fit," which would be actively misleading); a plain `crustly llama-cpp list` (no `--best-fit`) spawns zero hardware-probe subprocesses — asserted directly, not just implied by the flag design |
 | Effort | ~3 dev-days (M11 — four-plus detection paths, each simple but independently testable) + ~2 dev-days (M12 — comparison, annotation, sort, TUI/CLI wiring) ≈ **5 dev-days** |
 | Exit gate | `crustly llama-cpp doctor` shows real detected GPU/VRAM/RAM on a machine that has `nvidia-smi`/`rocm-smi`/etc. installed, "CPU-only" cleanly on one that doesn't, and `crustly llama-cpp list --best-fit` sorts already-downloaded models with a correct Fits/Tight/Won't-fit label on each |
 
