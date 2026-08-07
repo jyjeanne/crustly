@@ -7,10 +7,20 @@
 
 use anyhow::{Context, Result};
 use futures::StreamExt as _;
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt as _;
 use tokio::sync::mpsc::UnboundedSender;
+
+/// Context length used for `list_local_models`'s memory estimate when a
+/// model's own header doesn't set one (or sets an implausibly large one) -
+/// matches `default_llama_cpp_n_ctx()` (`src/config/mod.rs`), so the
+/// estimate reflects what a freshly-configured provider would actually
+/// allocate, not the model's full trained context (which for some modern
+/// models is far larger than anyone would default to in practice).
+const ESTIMATE_DEFAULT_CONTEXT_LENGTH: u64 = 8_192;
 
 /// A locally-present `.gguf` file - the llama.cpp equivalent of
 /// `ollama_models::LocalModelInfo` (which reports installed models via
@@ -45,6 +55,27 @@ pub struct LocalGgufModel {
     /// found" - this field is advisory display data, not something callers
     /// branch safety-critical behavior on.
     pub has_chat_template: bool,
+    /// A name to display instead of `path`'s filename, when the filename
+    /// itself isn't meaningful - e.g. an Ollama-sourced entry's real path
+    /// is a content-addressed blob (`sha256-<hex>`), so this carries the
+    /// manifest's own `name:tag`. Comma-joined when more than one manifest
+    /// tag resolves to the identical blob. `None` for ordinary
+    /// filesystem-scanned entries, where the filename already is the
+    /// name; callers fall back to `path`'s filename in that case, exactly
+    /// as they did before this field existed.
+    pub display_name: Option<String>,
+    /// Estimated resident memory (weights + KV cache when the header has
+    /// enough geometry) at `ESTIMATE_DEFAULT_CONTEXT_LENGTH` tokens, or the
+    /// header's own native context length if smaller. `None` if
+    /// `parameter_count`/`quantization_hint` weren't determined - see
+    /// `gguf_metadata::estimate_memory_bytes`'s doc comment for the
+    /// "order-of-magnitude, not a guarantee" framing.
+    pub estimated_memory_bytes: Option<u64>,
+    /// Whether `estimated_memory_bytes` includes the KV-cache term.
+    /// `false` when the header lacked the attention geometry to compute
+    /// it, in which case the estimate covers weights only - meaningless
+    /// when `estimated_memory_bytes` is `None`.
+    pub estimated_memory_includes_kv_cache: bool,
 }
 
 /// One progress update from an in-flight `download_model` transfer. The
@@ -130,6 +161,14 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
                     .and_then(quantization_hint_from_filename)
             });
 
+        let estimate = header.as_ref().and_then(|h| {
+            let ctx = h
+                .context_length
+                .map(|native| native.min(ESTIMATE_DEFAULT_CONTEXT_LENGTH))
+                .unwrap_or(ESTIMATE_DEFAULT_CONTEXT_LENGTH);
+            super::gguf_metadata::estimate_memory_bytes(h, ctx)
+        });
+
         models.push(LocalGgufModel {
             path,
             size_bytes: fs_metadata.len(),
@@ -139,11 +178,371 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
             parameter_count: header.as_ref().and_then(|h| h.parameter_count),
             context_length: header.as_ref().and_then(|h| h.context_length),
             has_chat_template: header.as_ref().is_some_and(|h| h.has_chat_template),
+            display_name: None,
+            estimated_memory_bytes: estimate.map(|e| e.total_bytes),
+            estimated_memory_includes_kv_cache: estimate.is_some_and(|e| e.includes_kv_cache),
         });
     }
 
     models.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(models)
+}
+
+/// Scan every configured source and merge the results: `models_dir`,
+/// `extra_model_paths`, and (when `ollama_models_dir` is `Some` -
+/// `Config::providers::llama_cpp_ollama_models_dir()` already gates this on
+/// the `scan_ollama_models` opt-in) Ollama's manifest tree. This is the
+/// entry point the CLI and TUI should use instead of `list_local_models`
+/// directly; `list_local_models` itself is unchanged (still a single
+/// directory, still what this function calls per source).
+///
+/// A failure scanning one `extra_model_paths` entry fails the whole call
+/// (same "surface real errors" posture `list_local_models` already has for
+/// its one directory) - but the Ollama scan is best-effort and never fails
+/// the call, since a missing/unreadable manifest tree just means "nothing
+/// found there," not a problem with the directories the user explicitly
+/// configured.
+pub fn list_all_local_models(
+    models_dir: &Path,
+    extra_model_paths: &[PathBuf],
+    ollama_models_dir: Option<&Path>,
+) -> Result<Vec<LocalGgufModel>> {
+    let mut models = list_local_models(models_dir)?;
+    for extra in extra_model_paths {
+        models.extend(list_local_models(extra)?);
+    }
+    if let Some(ollama_dir) = ollama_models_dir {
+        models.extend(list_ollama_models(ollama_dir));
+    }
+
+    let mut models = deduplicate_and_merge(models);
+    models.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(models)
+}
+
+/// One layer entry in an Ollama manifest's `layers` array.
+#[derive(Debug, Deserialize)]
+struct OllamaManifestLayer {
+    #[serde(rename = "mediaType")]
+    media_type: String,
+    digest: String,
+}
+
+/// The subset of an Ollama manifest's JSON this module reads. Verified
+/// against Ollama's own source (`server/manifest.go`/`server/images.go`,
+/// `types/model/name.go`) rather than assumed - see
+/// `ccguf-managment-imrpoment-plan.md` Phase M3.
+#[derive(Debug, Deserialize)]
+struct OllamaManifest {
+    layers: Vec<OllamaManifestLayer>,
+}
+
+/// The GGUF model-weights layer's media type - distinct from
+/// `application/vnd.ollama.image.projector` (mmproj, out of scope until
+/// Phase M5), `.../adapter`, `.../template`, `.../license`, etc.
+const OLLAMA_MODEL_LAYER_MEDIA_TYPE: &str = "application/vnd.ollama.image.model";
+
+/// Discover models Ollama has already pulled by reading its manifest tree
+/// at `<ollama_models_dir>/manifests/{host}/{namespace}/{model}/{tag}` -
+/// always exactly 4 path components deep (verified against Ollama's
+/// `Filepath()` layout), so a fixed 4-level `read_dir` nest finds every
+/// manifest without a general recursive walker. Each manifest resolves to
+/// its model-weights blob (`<ollama_models_dir>/blobs/sha256-<hex>`, colon
+/// replaced with a dash - verified against Ollama's own blob-naming code)
+/// and a human-readable `display_name` reconstructed from the manifest's
+/// own path, not guessed from the blob's content-addressed filename.
+///
+/// Best-effort: a missing `manifests/` directory returns an empty list (not
+/// an error - this is likely just "Ollama isn't installed" or "opted in
+/// without Ollama ever having pulled anything"); an individual unreadable
+/// or malformed manifest, or one whose blob is missing (pruned since the
+/// manifest was written), is skipped rather than failing the whole scan.
+fn list_ollama_models(ollama_models_dir: &Path) -> Vec<LocalGgufModel> {
+    let manifests_root = ollama_models_dir.join("manifests");
+    let blobs_root = ollama_models_dir.join("blobs");
+
+    walk_ollama_manifest_files(&manifests_root)
+        .into_iter()
+        .filter_map(|manifest_path| {
+            parse_ollama_manifest(&manifest_path, &manifests_root, &blobs_root)
+        })
+        .collect()
+}
+
+/// Fixed 4-level directory walk (`host/namespace/model/tag`) - deliberately
+/// not a general recursive walker: Ollama's manifest layout is always
+/// exactly this deep, so this is both simpler and immune to the
+/// symlink-loop/unbounded-depth concerns a generic walker would need to
+/// guard against.
+fn walk_ollama_manifest_files(manifests_root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let Ok(hosts) = std::fs::read_dir(manifests_root) else {
+        return files;
+    };
+    for host in hosts.flatten() {
+        let Ok(namespaces) = std::fs::read_dir(host.path()) else {
+            continue;
+        };
+        for namespace in namespaces.flatten() {
+            let Ok(models) = std::fs::read_dir(namespace.path()) else {
+                continue;
+            };
+            for model in models.flatten() {
+                let Ok(tags) = std::fs::read_dir(model.path()) else {
+                    continue;
+                };
+                for tag in tags.flatten() {
+                    let path = tag.path();
+                    if path.is_file() {
+                        files.push(path);
+                    }
+                }
+            }
+        }
+    }
+    files
+}
+
+/// Parse one manifest file into a `LocalGgufModel`. `None` on any problem
+/// (unreadable, malformed JSON, no model layer, unresolvable digest,
+/// missing blob, or a path that isn't the expected 4 components deep under
+/// `manifests_root`) - the caller (`list_ollama_models`) treats that as
+/// "skip this one," not a hard failure.
+fn parse_ollama_manifest(
+    manifest_path: &Path,
+    manifests_root: &Path,
+    blobs_root: &Path,
+) -> Option<LocalGgufModel> {
+    let bytes = std::fs::read(manifest_path).ok()?;
+    let manifest: OllamaManifest = serde_json::from_slice(&bytes).ok()?;
+    let model_layer = manifest
+        .layers
+        .iter()
+        .find(|l| l.media_type == OLLAMA_MODEL_LAYER_MEDIA_TYPE)?;
+
+    let hex_digest = model_layer.digest.strip_prefix("sha256:")?;
+    if hex_digest.is_empty() || !hex_digest.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let blob_path = blobs_root.join(format!("sha256-{hex_digest}"));
+    let fs_metadata = std::fs::metadata(&blob_path).ok()?; // also confirms the blob exists
+
+    let rel = manifest_path.strip_prefix(manifests_root).ok()?;
+    let parts: Vec<&str> = rel
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .collect();
+    let [_host, namespace, model, tag] = parts[..] else {
+        return None;
+    };
+    let display_name = if namespace == "library" {
+        format!("{model}:{tag}")
+    } else {
+        format!("{namespace}/{model}:{tag}")
+    };
+
+    let modified_at = fs_metadata
+        .modified()
+        .ok()
+        .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339())
+        .unwrap_or_default();
+
+    // An Ollama blob's own bytes are a plain GGUF file - the same header
+    // parser applies directly, no Ollama-specific decoding needed for the
+    // model's own contents.
+    let header = super::gguf_metadata::read_gguf_metadata(&blob_path);
+    let quantization_hint = header.as_ref().and_then(|h| h.quantization.clone());
+    let estimate = header.as_ref().and_then(|h| {
+        let ctx = h
+            .context_length
+            .map(|native| native.min(ESTIMATE_DEFAULT_CONTEXT_LENGTH))
+            .unwrap_or(ESTIMATE_DEFAULT_CONTEXT_LENGTH);
+        super::gguf_metadata::estimate_memory_bytes(h, ctx)
+    });
+
+    Some(LocalGgufModel {
+        path: blob_path,
+        size_bytes: fs_metadata.len(),
+        modified_at,
+        quantization_hint,
+        architecture: header.as_ref().and_then(|h| h.architecture.clone()),
+        parameter_count: header.as_ref().and_then(|h| h.parameter_count),
+        context_length: header.as_ref().and_then(|h| h.context_length),
+        has_chat_template: header.as_ref().is_some_and(|h| h.has_chat_template),
+        display_name: Some(display_name),
+        estimated_memory_bytes: estimate.map(|e| e.total_bytes),
+        estimated_memory_includes_kv_cache: estimate.is_some_and(|e| e.includes_kv_cache),
+    })
+}
+
+/// Detects the `<base>-00001-of-00005.gguf` split-file naming convention
+/// (both numbers zero-padded to the same width, per
+/// `ccguf-managment-imrpoment-plan.md` Phase M4). Pure string parsing, no
+/// regex dependency needed. Returns `(base, part_index, total_parts)` -
+/// `part_index` is 1-based, matching the filename's own convention. `None`
+/// if `filename` doesn't match (including a width mismatch between the two
+/// numbers, which the convention requires).
+fn parse_split_gguf_filename(filename: &str) -> Option<(&str, u32, u32)> {
+    let stem = filename.strip_suffix(".gguf")?;
+    let of_pos = stem.rfind("-of-")?;
+    let (before_of, total_str) = (&stem[..of_pos], &stem[of_pos + 4..]);
+    if total_str.is_empty() || !total_str.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let dash_pos = before_of.rfind('-')?;
+    let (base, part_str) = (&before_of[..dash_pos], &before_of[dash_pos + 1..]);
+    if part_str.len() != total_str.len() || !part_str.bytes().all(|b| b.is_ascii_digit()) {
+        return None; // widths must match - that's the whole convention
+    }
+
+    let part: u32 = part_str.parse().ok()?;
+    let total: u32 = total_str.parse().ok()?;
+    if part == 0 || part > total {
+        return None;
+    }
+    Some((base, part, total))
+}
+
+/// Post-process a merged listing from `list_all_local_models`'s sources:
+///
+/// 1. **Canonical-path dedup** - the same underlying file reached two ways
+///    (a symlink in one scanned directory pointing at a file already found
+///    via another, or two Ollama manifest tags pointing at the identical
+///    blob) collapses to one entry. `display_name`s combine
+///    (comma-joined) rather than one being silently dropped; the entry
+///    with the richer header (`architecture.is_some()`, first-seen as a
+///    tiebreak) "wins" for the other fields. Sizes are **not** summed here
+///    - it's the same file counted once, not two files.
+/// 2. **Split-GGUF grouping** - `-00001-of-00005.gguf`-convention parts
+///    collapse into one logical entry: canonical `path` is the
+///    lowest-found part index (GGUF's split convention puts the real
+///    header/metadata in part 1; later shards carry only bookkeeping
+///    keys), `size_bytes` is **summed** (these are genuinely separate
+///    files), `display_name` is the base name, and metadata comes from
+///    whichever found part has it (same "richest wins" rule) - a partial
+///    download (not all parts present yet) is handled honestly rather
+///    than requiring completeness.
+///
+/// `O(n²)` over the input - the expected entry count (tens, not thousands
+/// of models on one machine) doesn't justify a hash-based grouping
+/// implementation's added complexity here.
+fn deduplicate_and_merge(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
+    let by_canonical_path = merge_by_canonical_path(models);
+    merge_split_gguf_groups(by_canonical_path)
+}
+
+/// True if `richer` has more identifying header data than `current` -
+/// the tiebreak `deduplicate_and_merge`'s two passes both use to decide
+/// which of two entries for "the same logical model" supplies the
+/// metadata fields on the merged result.
+fn is_richer(candidate: &LocalGgufModel, current: &LocalGgufModel) -> bool {
+    candidate.architecture.is_some() && current.architecture.is_none()
+}
+
+fn merge_by_canonical_path(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
+    let mut by_path: HashMap<PathBuf, LocalGgufModel> = HashMap::new();
+    let mut order: Vec<PathBuf> = Vec::new();
+
+    for model in models {
+        let key = std::fs::canonicalize(&model.path).unwrap_or_else(|_| model.path.clone());
+        match by_path.get_mut(&key) {
+            None => {
+                order.push(key.clone());
+                by_path.insert(key, model);
+            }
+            Some(existing) => {
+                let merged_display_name = match (&existing.display_name, &model.display_name) {
+                    (Some(a), Some(b)) if a != b => Some(format!("{a}, {b}")),
+                    (Some(a), _) => Some(a.clone()),
+                    (None, Some(b)) => Some(b.clone()),
+                    (None, None) => None,
+                };
+                if is_richer(&model, existing) {
+                    let display_name = merged_display_name;
+                    *existing = LocalGgufModel {
+                        display_name,
+                        ..model
+                    };
+                } else {
+                    existing.display_name = merged_display_name;
+                }
+            }
+        }
+    }
+
+    order
+        .into_iter()
+        .filter_map(|key| by_path.remove(&key))
+        .collect()
+}
+
+fn merge_split_gguf_groups(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
+    let mut groups: HashMap<(PathBuf, String, u32), Vec<LocalGgufModel>> = HashMap::new();
+    let mut order: Vec<(PathBuf, String, u32)> = Vec::new();
+    let mut passthrough: Vec<LocalGgufModel> = Vec::new();
+
+    for model in models {
+        let filename = model
+            .path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(str::to_string);
+        let parent = model
+            .path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default();
+        let split = filename
+            .as_deref()
+            .and_then(parse_split_gguf_filename)
+            .map(|(base, part, total)| (base.to_string(), part, total));
+
+        match split {
+            None => passthrough.push(model),
+            Some((base, _part, total)) => {
+                let key = (parent, base, total);
+                if !groups.contains_key(&key) {
+                    order.push(key.clone());
+                }
+                groups.entry(key).or_default().push(model);
+            }
+        }
+    }
+
+    let mut result = passthrough;
+    for key in order {
+        let Some(mut parts) = groups.remove(&key) else {
+            continue;
+        };
+        parts.sort_by_key(|m| {
+            m.path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(parse_split_gguf_filename)
+                .map(|(_, part, _)| part)
+                .unwrap_or(u32::MAX)
+        });
+
+        let (_parent, base, _total) = key;
+        let summed_size = parts.iter().map(|p| p.size_bytes).sum();
+        let template_index = parts
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, m)| m.architecture.is_some())
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        let canonical_path = parts[0].path.clone();
+        let modified_at = parts[0].modified_at.clone();
+        let mut merged = parts[template_index].clone();
+        merged.path = canonical_path;
+        merged.modified_at = modified_at;
+        merged.size_bytes = summed_size;
+        merged.display_name = Some(format!("{base}.gguf"));
+
+        result.push(merged);
+    }
+
+    result
 }
 
 /// Parse an `hf:org/repo/file.gguf` shorthand into its parts. Pure
@@ -477,5 +876,320 @@ mod tests {
         });
 
         format!("http://{addr}")
+    }
+
+    // --- M3: multi-source discovery ---
+
+    #[test]
+    fn list_all_local_models_merges_models_dir_and_extra_paths() {
+        let primary = tempfile::tempdir().expect("tempdir");
+        let extra = tempfile::tempdir().expect("tempdir");
+        std::fs::write(primary.path().join("a.gguf"), b"gguf a").expect("write a");
+        std::fs::write(extra.path().join("b.gguf"), b"gguf b").expect("write b");
+
+        let models = list_all_local_models(primary.path(), &[extra.path().to_path_buf()], None)
+            .expect("list");
+
+        let names: Vec<_> = models
+            .iter()
+            .map(|m| m.path.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(models.len(), 2);
+        assert!(names.contains(&"a.gguf".to_string()));
+        assert!(names.contains(&"b.gguf".to_string()));
+    }
+
+    #[test]
+    fn list_all_local_models_with_no_ollama_dir_does_not_scan_ollama() {
+        let primary = tempfile::tempdir().expect("tempdir");
+        std::fs::write(primary.path().join("a.gguf"), b"gguf a").expect("write a");
+
+        let models = list_all_local_models(primary.path(), &[], None).expect("list");
+        assert_eq!(models.len(), 1);
+    }
+
+    // --- M3: Ollama manifest discovery ---
+
+    /// Builds a fake `<root>/manifests/<host>/<namespace>/<model>/<tag>`
+    /// manifest file naming `hex_digest` as its model layer, plus the
+    /// matching `<root>/blobs/sha256-<hex_digest>` blob file with
+    /// `blob_body` as its content.
+    fn write_fake_ollama_model(
+        root: &Path,
+        host: &str,
+        namespace: &str,
+        model: &str,
+        tag: &str,
+        hex_digest: &str,
+        blob_body: &[u8],
+    ) {
+        let manifest_dir = root
+            .join("manifests")
+            .join(host)
+            .join(namespace)
+            .join(model);
+        std::fs::create_dir_all(&manifest_dir).expect("create manifest dir");
+        let manifest_json = format!(
+            r#"{{"schemaVersion":2,"layers":[
+                {{"mediaType":"application/vnd.ollama.image.model","digest":"sha256:{hex_digest}","size":{size}}},
+                {{"mediaType":"application/vnd.ollama.image.template","digest":"sha256:{hex_digest}","size":1}}
+            ]}}"#,
+            size = blob_body.len()
+        );
+        std::fs::write(manifest_dir.join(tag), manifest_json).expect("write manifest");
+
+        let blobs_dir = root.join("blobs");
+        std::fs::create_dir_all(&blobs_dir).expect("create blobs dir");
+        std::fs::write(blobs_dir.join(format!("sha256-{hex_digest}")), blob_body)
+            .expect("write blob");
+    }
+
+    const FAKE_DIGEST_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    #[test]
+    fn list_ollama_models_resolves_library_namespace_display_name() {
+        let root = tempfile::tempdir().expect("tempdir");
+        write_fake_ollama_model(
+            root.path(),
+            "registry.ollama.ai",
+            "library",
+            "qwen2.5-coder",
+            "7b",
+            FAKE_DIGEST_A,
+            b"fake gguf blob content",
+        );
+
+        let models = list_ollama_models(root.path());
+        assert_eq!(models.len(), 1);
+        assert_eq!(
+            models[0].display_name.as_deref(),
+            Some("qwen2.5-coder:7b"),
+            "the default 'library' namespace is omitted, matching Ollama's own display convention"
+        );
+        assert_eq!(models[0].size_bytes, "fake gguf blob content".len() as u64);
+    }
+
+    #[test]
+    fn list_ollama_models_keeps_non_library_namespace_in_display_name() {
+        let root = tempfile::tempdir().expect("tempdir");
+        write_fake_ollama_model(
+            root.path(),
+            "registry.ollama.ai",
+            "myorg",
+            "custom-model",
+            "v1",
+            FAKE_DIGEST_A,
+            b"fake gguf blob content",
+        );
+
+        let models = list_ollama_models(root.path());
+        assert_eq!(models.len(), 1);
+        assert_eq!(
+            models[0].display_name.as_deref(),
+            Some("myorg/custom-model:v1")
+        );
+    }
+
+    #[test]
+    fn list_ollama_models_on_missing_manifests_dir_returns_empty_not_error() {
+        let root = tempfile::tempdir().expect("tempdir");
+        assert!(list_ollama_models(root.path()).is_empty());
+    }
+
+    #[test]
+    fn list_ollama_models_skips_a_manifest_whose_blob_is_missing() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let manifest_dir = root
+            .path()
+            .join("manifests")
+            .join("registry.ollama.ai")
+            .join("library")
+            .join("pruned-model");
+        std::fs::create_dir_all(&manifest_dir).expect("create manifest dir");
+        std::fs::write(
+            manifest_dir.join("latest"),
+            format!(
+                r#"{{"layers":[{{"mediaType":"application/vnd.ollama.image.model","digest":"sha256:{FAKE_DIGEST_A}","size":1}}]}}"#
+            ),
+        )
+        .expect("write manifest");
+        // Deliberately no matching blob file written.
+
+        assert!(list_ollama_models(root.path()).is_empty());
+    }
+
+    #[test]
+    fn list_all_local_models_merges_two_manifest_tags_sharing_one_blob() {
+        let root = tempfile::tempdir().expect("tempdir");
+        write_fake_ollama_model(
+            root.path(),
+            "registry.ollama.ai",
+            "library",
+            "qwen2.5-coder",
+            "7b",
+            FAKE_DIGEST_A,
+            b"shared blob content",
+        );
+        write_fake_ollama_model(
+            root.path(),
+            "registry.ollama.ai",
+            "library",
+            "qwen2.5-coder",
+            "latest",
+            FAKE_DIGEST_A, // same digest as above - the identical blob, two tags
+            b"shared blob content",
+        );
+
+        let empty_dir = tempfile::tempdir().expect("tempdir");
+        let models = list_all_local_models(empty_dir.path(), &[], Some(root.path())).expect("list");
+
+        assert_eq!(
+            models.len(),
+            1,
+            "two tags pointing at the identical blob must collapse to one entry"
+        );
+        let name = models[0].display_name.as_deref().unwrap_or_default();
+        assert!(name.contains("qwen2.5-coder:7b"));
+        assert!(name.contains("qwen2.5-coder:latest"));
+        assert_eq!(
+            models[0].size_bytes,
+            "shared blob content".len() as u64,
+            "size must not be double-counted for the same underlying blob"
+        );
+    }
+
+    // --- M4: symlink dedup ---
+
+    #[cfg(unix)]
+    #[test]
+    fn list_all_local_models_collapses_a_symlink_to_an_already_found_file() {
+        let primary = tempfile::tempdir().expect("tempdir");
+        let extra = tempfile::tempdir().expect("tempdir");
+        let real_path = primary.path().join("real-model.gguf");
+        std::fs::write(&real_path, b"gguf content").expect("write real file");
+        std::os::unix::fs::symlink(&real_path, extra.path().join("real-model.gguf"))
+            .expect("create symlink");
+
+        let models = list_all_local_models(primary.path(), &[extra.path().to_path_buf()], None)
+            .expect("list");
+
+        assert_eq!(
+            models.len(),
+            1,
+            "a symlink to an already-discovered file must not double-count it"
+        );
+        assert_eq!(models[0].size_bytes, "gguf content".len() as u64);
+    }
+
+    // --- M4: split-GGUF filename parsing and grouping ---
+
+    #[test]
+    fn parse_split_gguf_filename_matches_the_convention() {
+        assert_eq!(
+            parse_split_gguf_filename("model-00001-of-00005.gguf"),
+            Some(("model", 1, 5))
+        );
+        assert_eq!(
+            parse_split_gguf_filename("Qwen-235B-00012-of-00030.gguf"),
+            Some(("Qwen-235B", 12, 30))
+        );
+    }
+
+    #[test]
+    fn parse_split_gguf_filename_rejects_mismatched_widths() {
+        // "1" (1 digit) vs "00005" (5 digits) - the convention requires
+        // equal-width zero-padding on both sides.
+        assert_eq!(parse_split_gguf_filename("model-1-of-00005.gguf"), None);
+    }
+
+    #[test]
+    fn parse_split_gguf_filename_rejects_non_split_names_and_out_of_range_parts() {
+        for name in [
+            "model.gguf",
+            "model-Q4_K_M.gguf",
+            "model-of-00005.gguf",       // no part number before "-of-"
+            "model-00000-of-00005.gguf", // part 0 is out of range (1-based)
+            "model-00006-of-00005.gguf", // part exceeds total
+        ] {
+            assert_eq!(
+                parse_split_gguf_filename(name),
+                None,
+                "should reject: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn list_all_local_models_collapses_a_split_gguf_group() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("big-model-00001-of-00003.gguf"),
+            b"part one",
+        )
+        .expect("write part 1");
+        std::fs::write(
+            dir.path().join("big-model-00002-of-00003.gguf"),
+            b"part two!",
+        )
+        .expect("write part 2");
+        std::fs::write(
+            dir.path().join("big-model-00003-of-00003.gguf"),
+            b"part three!!",
+        )
+        .expect("write part 3");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(models.len(), 1, "three parts must collapse to one entry");
+        assert_eq!(models[0].display_name.as_deref(), Some("big-model.gguf"));
+        assert_eq!(
+            models[0].size_bytes,
+            b"part one".len() as u64 + b"part two!".len() as u64 + b"part three!!".len() as u64
+        );
+        assert!(
+            models[0]
+                .path
+                .to_string_lossy()
+                .ends_with("big-model-00001-of-00003.gguf"),
+            "the canonical path should be the lowest-found part"
+        );
+    }
+
+    #[test]
+    fn list_all_local_models_handles_a_partial_split_group_honestly() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        // Only part 2 of 3 is present - e.g. an interrupted multi-part
+        // download.
+        std::fs::write(
+            dir.path().join("big-model-00002-of-00003.gguf"),
+            b"part two!",
+        )
+        .expect("write part 2");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].size_bytes, b"part two!".len() as u64);
+        assert!(
+            models[0]
+                .path
+                .to_string_lossy()
+                .ends_with("big-model-00002-of-00003.gguf"),
+            "with only one part found, it is its own canonical path"
+        );
+    }
+
+    #[test]
+    fn list_all_local_models_does_not_group_unrelated_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("model-a.gguf"), b"a").expect("write a");
+        std::fs::write(dir.path().join("model-b.gguf"), b"b").expect("write b");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+        assert_eq!(
+            models.len(),
+            2,
+            "ordinary unrelated files must stay separate"
+        );
     }
 }

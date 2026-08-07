@@ -46,6 +46,9 @@ pub struct LlamaCppModelSummary {
     pub parameter_count: Option<u64>,
     pub context_length: Option<u64>,
     pub has_chat_template: bool,
+    pub display_name: Option<String>,
+    pub estimated_memory_bytes: Option<u64>,
+    pub estimated_memory_includes_kv_cache: bool,
 }
 
 /// One progress update from an in-flight download, decoupled from the
@@ -79,31 +82,48 @@ pub struct LlamaCppModelDetails {
 /// the slot", the provider crosses the thread boundary through this instead.
 pub type PendingProvider = Arc<Mutex<Option<Arc<dyn crate::llm::provider::Provider>>>>;
 
-/// List `.gguf` files already present in `models_dir`. Returns an empty
-/// list (never an error) when the feature isn't compiled in or the
-/// directory can't be read - the dialog just shows "no local models" rather
-/// than surfacing a scan failure the user can't act on.
+/// List `.gguf` files from `models_dir`, `extra_model_paths`, and (when
+/// `Some`) Ollama's manifest tree - see
+/// `llama_cpp_models::list_all_local_models` for the merge/dedup behavior.
+/// Returns an empty list (never an error) when the feature isn't compiled
+/// in or nothing could be scanned - the dialog just shows "no local
+/// models" rather than surfacing a scan failure the user can't act on.
 #[cfg(feature = "gguf-management")]
-pub async fn list_local(models_dir: PathBuf) -> Vec<LlamaCppModelSummary> {
+pub async fn list_local(
+    models_dir: PathBuf,
+    extra_model_paths: Vec<PathBuf>,
+    ollama_models_dir: Option<PathBuf>,
+) -> Vec<LlamaCppModelSummary> {
     use crate::llm::provider::llama_cpp_models;
 
-    llama_cpp_models::list_local_models(&models_dir)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|m| LlamaCppModelSummary {
-            path: m.path,
-            size_bytes: m.size_bytes,
-            quantization_hint: m.quantization_hint,
-            architecture: m.architecture,
-            parameter_count: m.parameter_count,
-            context_length: m.context_length,
-            has_chat_template: m.has_chat_template,
-        })
-        .collect()
+    llama_cpp_models::list_all_local_models(
+        &models_dir,
+        &extra_model_paths,
+        ollama_models_dir.as_deref(),
+    )
+    .unwrap_or_default()
+    .into_iter()
+    .map(|m| LlamaCppModelSummary {
+        path: m.path,
+        size_bytes: m.size_bytes,
+        quantization_hint: m.quantization_hint,
+        architecture: m.architecture,
+        parameter_count: m.parameter_count,
+        context_length: m.context_length,
+        has_chat_template: m.has_chat_template,
+        display_name: m.display_name,
+        estimated_memory_bytes: m.estimated_memory_bytes,
+        estimated_memory_includes_kv_cache: m.estimated_memory_includes_kv_cache,
+    })
+    .collect()
 }
 
 #[cfg(not(feature = "gguf-management"))]
-pub async fn list_local(_models_dir: PathBuf) -> Vec<LlamaCppModelSummary> {
+pub async fn list_local(
+    _models_dir: PathBuf,
+    _extra_model_paths: Vec<PathBuf>,
+    _ollama_models_dir: Option<PathBuf>,
+) -> Vec<LlamaCppModelSummary> {
     Vec::new()
 }
 
@@ -312,6 +332,9 @@ mod tests {
             parameter_count: None,
             context_length: None,
             has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
         }
     }
 
@@ -359,7 +382,9 @@ mod tests {
     #[cfg(not(feature = "gguf-management"))]
     #[tokio::test]
     async fn list_local_without_feature_is_empty() {
-        assert!(list_local(PathBuf::from("/tmp/anything")).await.is_empty());
+        assert!(list_local(PathBuf::from("/tmp/anything"), Vec::new(), None)
+            .await
+            .is_empty());
     }
 
     #[cfg(not(feature = "llama-cpp"))]

@@ -2702,6 +2702,9 @@ mod tests {
             parameter_count: None,
             context_length: None,
             has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
         }];
 
         let screen = render_to_string(&app, 100, 20);

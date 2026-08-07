@@ -387,7 +387,23 @@ small hand-crafted or truncated real GGUF headers (mirroring the existing
 in tests) — truncated/malformed fixtures double as the hardening tests
 required above.
 
-### Phase M2 — Memory/VRAM footprint estimate & context auto-fit hint
+### Phase M2 — Memory/VRAM footprint estimate & context auto-fit hint ✅ Done
+
+Implemented as planned: `GgufMetadata` gained `block_count`/`attention_head_count`/
+`attention_head_count_kv`/`embedding_length` (extracted the same suffix-matched way
+as `context_length`, kept internal to the parser rather than exposed on
+`LocalGgufModel` directly); `estimate_memory_bytes` returns weights-only when the
+attention geometry is missing, with `includes_kv_cache` saying so explicitly rather
+than under-counting silently. `bits_per_weight` is a documented-approximate lookup
+table covering every quantization label this module's own tables and the filename
+fallback can produce, including the IQ family. Context length used for the estimate
+is `min(header's native context, 8192)`, matching `default_llama_cpp_n_ctx()`. Wired
+into `LocalGgufModel`/`crustly llama-cpp list`, which now prints
+`"~4.9 GB"`/`"~4.9 GB (weights only)"`. "Context auto-fit hint" (feeding this back as
+an `n_gpu_layers`/`n_ctx` warning) was scoped as advisory-only per the plan's own
+Update-3 note — not implemented as a separate warning path this round, since M9/M11
+(doctor, hardware detection) are the more natural place for an "exceeds your hardware"
+warning than the memory-estimate phase itself; revisit there.
 
 **Depends on**: M1.
 
@@ -414,7 +430,29 @@ actually asking for.
 
 **Effort**: Medium.
 
-### Phase M3 — Multi-source discovery
+### Phase M3 — Multi-source discovery ✅ Done (HF/LM Studio auto-scan explicitly deferred)
+
+Implemented `extra_model_paths` and Ollama manifest-based discovery as planned, both
+verified against ground truth before writing code: Ollama's actual manifest storage
+layout (`server/manifest.go`/`server/images.go`, `types/model/name.go` on
+`github.com/ollama/ollama`) confirmed the `{host}/{namespace}/{model}/{tag}` path
+depth (fixed, so a 4-level `read_dir` nest suffices - no general recursive walker
+needed), the `sha256:` → `sha256-` blob-filename mapping, and the
+`application/vnd.ollama.image.model` media type distinguishing the weights layer from
+`.../projector`/`.../template`/etc. `scan_ollama_models` defaults `false` and is gated
+independently of the `ollama` Cargo feature, per the plan's own correction on that
+exact point. `$OLLAMA_MODELS` env var respected (Ollama's own override), falling back
+to `~/.ollama/models`.
+
+**Scope decision made during implementation, not in the original draft**: the
+HuggingFace/LM Studio well-known-cache auto-scan sub-item was deferred rather than
+attempted. Both caches nest `.gguf` files several directories deep (HF via
+content-addressed symlinks under `models--org--repo/snapshots/<hash>/`; LM Studio
+under `<publisher>/<repo>/`) - reusing the flat single-directory scan
+`extra_model_paths` correctly uses would silently find zero files there, which is
+worse than not implementing it (it would look like a working feature that quietly
+never finds anything). Left for a follow-up once a properly bounded/symlink-safe
+recursive walker is designed - same treatment already given to filesystem watching.
 
 **Depends on**: M0.
 
@@ -463,7 +501,19 @@ exists, lower priority than getting the scan itself right.
 
 **Effort**: Medium.
 
-### Phase M4 — Deduplication (symlinks, split GGUFs)
+### Phase M4 — Deduplication (symlinks, split GGUFs) ✅ Done
+
+Implemented as planned: canonical-path dedup (`std::fs::canonicalize`, falling back to
+the raw path on failure) merges symlink duplicates and same-blob Ollama entries alike
+through the same code path, combining `display_name`s (comma-joined) rather than
+dropping one; split-GGUF grouping (`-00001-of-00005.gguf`, equal-width validated) sums
+size across genuinely separate files and handles a partial group (not all parts
+downloaded yet) honestly rather than requiring completeness. Both passes use a
+"richest metadata wins" tiebreak (`architecture.is_some()`) to decide which entry's
+header-derived fields the merged result keeps. `crustly llama-cpp rm` was
+deliberately left unextended - it still only resolves bare names against the primary
+`models_dir`, so it can't accidentally delete an Ollama-managed blob out from under
+Ollama's own manifest bookkeeping (a safety property, not a gap).
 
 **Depends on**: M1, M3.
 

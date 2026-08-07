@@ -825,6 +825,10 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         app.set_ollama_config(ollama_cfg.clone());
     }
     app.set_llama_cpp_models_dir(config.providers.llama_cpp_models_dir());
+    app.set_llama_cpp_discovery_sources(
+        config.providers.llama_cpp_extra_model_paths(),
+        config.providers.llama_cpp_ollama_models_dir(),
+    );
     // Hand the [providers.llama_cpp] section to the TUI for the same reason
     // as ollama_config above: the Ctrl+G model switch needs the same
     // n_gpu_layers/n_ctx/sampling settings as the one built at startup, and
@@ -1255,8 +1259,14 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
 
     match operation {
         LlamaCppCommands::List => {
-            println!("🦙 Models in {}\n", models_dir.display());
-            let models = llama_cpp_models::list_local_models(&models_dir)?;
+            println!("🦙 Local .gguf models\n");
+            let extra_model_paths = config.providers.llama_cpp_extra_model_paths();
+            let ollama_models_dir = config.providers.llama_cpp_ollama_models_dir();
+            let models = llama_cpp_models::list_all_local_models(
+                &models_dir,
+                &extra_model_paths,
+                ollama_models_dir.as_deref(),
+            )?;
 
             if models.is_empty() {
                 println!("  (none) - pull one with: crustly llama-cpp pull <source>");
@@ -1264,14 +1274,26 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
                 for m in models {
                     let size_gb = m.size_bytes as f64 / 1_073_741_824.0;
                     let quant = m.quantization_hint.as_deref().unwrap_or("unknown");
-                    let name = m
-                        .path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_default();
+                    let name = m.display_name.clone().unwrap_or_else(|| {
+                        m.path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default()
+                    });
+                    let memory = match m.estimated_memory_bytes {
+                        Some(bytes) => {
+                            let gb = bytes as f64 / 1_073_741_824.0;
+                            if m.estimated_memory_includes_kv_cache {
+                                format!("~{gb:.1} GB")
+                            } else {
+                                format!("~{gb:.1} GB (weights only)")
+                            }
+                        }
+                        None => "-".to_string(),
+                    };
                     println!(
-                        "  {:<45} {:>7.2} GB   {:<10} {}",
-                        name, size_gb, quant, m.modified_at
+                        "  {:<45} {:>7.2} GB   {:<10} {:<22} {}",
+                        name, size_gb, quant, memory, m.modified_at
                     );
                 }
             }

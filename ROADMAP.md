@@ -133,10 +133,20 @@ tasks and acceptance criteria per item.
   than a panic or partial/corrupt result. 13 new tests, 847/847 total under `gguf-management`
 
 **Core management (DP2–DP4):**
-- [ ] **Memory/VRAM footprint estimate** — "~4.9 GB at this context length" in `list`/TUI, advisory only
-- [ ] **Multi-source discovery** — Ollama (via its manifests, not raw blob scanning), HuggingFace/LM
-  Studio caches, extra configured paths — beyond today's single-directory scan
-- [ ] **Deduplication** — symlink collapsing, split-GGUF (`-00001-of-00005.gguf`) unification
+- [x] **Memory/VRAM footprint estimate** (`gguf_metadata::estimate_memory_bytes`) — weights + KV-cache
+  term when the header has enough attention geometry, weights-only (explicitly labeled) otherwise;
+  shown in `crustly llama-cpp list` as `"~4.9 GB"`/`"~4.9 GB (weights only)"`, advisory only
+- [x] **Multi-source discovery** — `providers.llama_cpp.extra_model_paths` (extra scanned
+  directories) and `scan_ollama_models` (reads Ollama's manifest tree —
+  `<dir>/manifests/{host}/{namespace}/{model}/{tag}` — verified against Ollama's own source rather
+  than assumed, resolving each manifest's model-weights layer to its blob and a real `name:tag`
+  display name, not a raw blob-store scan). HuggingFace/LM Studio well-known-cache auto-scan
+  explicitly deferred (both need a properly bounded recursive walker a flat scan can't provide —
+  see `ccguf-managment-imrpoment-plan.md` M3's scope note)
+- [x] **Deduplication** — canonical-path collapsing (symlinks, and two Ollama manifest tags sharing
+  one blob — names combine rather than one being dropped) and split-GGUF
+  (`-00001-of-00005.gguf`) unification with summed size, handling a partial/incomplete group
+  honestly
 - [ ] **`mmproj` pairing** — vision/audio projector files shown attached to their base model
 - [ ] **Download hardening** — disk-space precheck, `--revision` pinning, resumable downloads
 - [ ] **Agent-facing `--json` CLI contract** — stable schema + documented exit codes on `crustly

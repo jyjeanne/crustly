@@ -190,6 +190,16 @@ pub struct App {
     llama_cpp_switch_task: Option<tokio::task::JoinHandle<()>>,
     llama_cpp_pending_provider: super::llama_cpp_download::PendingProvider,
     llama_cpp_models_dir: std::path::PathBuf,
+    /// `providers.llama_cpp.extra_model_paths` - additional directories the
+    /// Ctrl+G dialog also scans, beyond `llama_cpp_models_dir`. Empty
+    /// unless configured - see `ccguf-managment-imrpoment-plan.md` M3.
+    llama_cpp_extra_model_paths: Vec<std::path::PathBuf>,
+    /// Ollama's models directory, only `Some` when
+    /// `providers.llama_cpp.scan_ollama_models` opted in
+    /// (`ProviderConfigs::llama_cpp_ollama_models_dir()` already applies
+    /// that gate) - `None` means the Ctrl+G dialog doesn't scan Ollama at
+    /// all, same as before this field existed.
+    llama_cpp_ollama_models_dir: Option<std::path::PathBuf>,
     /// The `[providers.llama_cpp]` config section, applied (minus
     /// `model_path`, which is always the picked file) when Ctrl+G switches
     /// models - mirrors `ollama_config`'s rationale exactly.
@@ -326,6 +336,8 @@ impl App {
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
                 .join("crustly")
                 .join("models"),
+            llama_cpp_extra_model_paths: Vec::new(),
+            llama_cpp_ollama_models_dir: None,
             llama_cpp_config: None,
             llama_cpp_active_model_path: None,
             skills_list: Vec::new(),
@@ -557,6 +569,22 @@ impl App {
     /// and downloads into.
     pub fn set_llama_cpp_models_dir(&mut self, dir: std::path::PathBuf) {
         self.llama_cpp_models_dir = dir;
+    }
+
+    /// Record the extra discovery sources
+    /// (`ProviderConfigs::llama_cpp_extra_model_paths()`/
+    /// `llama_cpp_ollama_models_dir()`) the Ctrl+G dialog also scans,
+    /// beyond `llama_cpp_models_dir`. Separate from
+    /// `set_llama_cpp_models_dir` since the primary directory is also used
+    /// as the download target (`start_llama_cpp_download`), which these
+    /// extra sources are not.
+    pub fn set_llama_cpp_discovery_sources(
+        &mut self,
+        extra_model_paths: Vec<std::path::PathBuf>,
+        ollama_models_dir: Option<std::path::PathBuf>,
+    ) {
+        self.llama_cpp_extra_model_paths = extra_model_paths;
+        self.llama_cpp_ollama_models_dir = ollama_models_dir;
     }
 
     /// Record the `[providers.llama_cpp]` config (and, if the active
@@ -901,9 +929,16 @@ impl App {
                 // Refresh the local model list in the background so a
                 // successful download shows up next time the dialog opens.
                 let models_dir = self.llama_cpp_models_dir.clone();
+                let extra_model_paths = self.llama_cpp_extra_model_paths.clone();
+                let ollama_models_dir = self.llama_cpp_ollama_models_dir.clone();
                 let sender = self.event_sender();
                 tokio::spawn(async move {
-                    let models = super::llama_cpp_download::list_local(models_dir).await;
+                    let models = super::llama_cpp_download::list_local(
+                        models_dir,
+                        extra_model_paths,
+                        ollama_models_dir,
+                    )
+                    .await;
                     let _ = sender.send(TuiEvent::LlamaCppModelsListed(models));
                 });
             }
@@ -2786,9 +2821,16 @@ impl App {
         self.llama_cpp_loading = true;
 
         let models_dir = self.llama_cpp_models_dir.clone();
+        let extra_model_paths = self.llama_cpp_extra_model_paths.clone();
+        let ollama_models_dir = self.llama_cpp_ollama_models_dir.clone();
         let sender = self.event_sender();
         tokio::spawn(async move {
-            let models = super::llama_cpp_download::list_local(models_dir).await;
+            let models = super::llama_cpp_download::list_local(
+                models_dir,
+                extra_model_paths,
+                ollama_models_dir,
+            )
+            .await;
             let _ = sender.send(TuiEvent::LlamaCppModelsListed(models));
         });
 
@@ -4230,6 +4272,9 @@ mod tests {
                 parameter_count: None,
                 context_length: None,
                 has_chat_template: false,
+                display_name: None,
+                estimated_memory_bytes: None,
+                estimated_memory_includes_kv_cache: false,
             },
             super::super::llama_cpp_download::LlamaCppModelSummary {
                 path: std::path::PathBuf::from("/models/b.gguf"),
@@ -4239,6 +4284,9 @@ mod tests {
                 parameter_count: None,
                 context_length: None,
                 has_chat_template: false,
+                display_name: None,
+                estimated_memory_bytes: None,
+                estimated_memory_includes_kv_cache: false,
             },
         ]))
         .await
@@ -4263,6 +4311,9 @@ mod tests {
                 parameter_count: None,
                 context_length: None,
                 has_chat_template: false,
+                display_name: None,
+                estimated_memory_bytes: None,
+                estimated_memory_includes_kv_cache: false,
             },
             super::super::llama_cpp_download::LlamaCppModelSummary {
                 path: std::path::PathBuf::from("/models/b.gguf"),
@@ -4272,6 +4323,9 @@ mod tests {
                 parameter_count: None,
                 context_length: None,
                 has_chat_template: false,
+                display_name: None,
+                estimated_memory_bytes: None,
+                estimated_memory_includes_kv_cache: false,
             },
         ];
 
@@ -4330,6 +4384,9 @@ mod tests {
             parameter_count: None,
             context_length: None,
             has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
         }];
 
         app.handle_llama_cpp_models_key(key(KeyCode::Delete))
@@ -4355,6 +4412,9 @@ mod tests {
             parameter_count: None,
             context_length: None,
             has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
         }];
         app.llama_cpp_deleting = Some(std::path::PathBuf::from("/models/a.gguf"));
 
@@ -4440,6 +4500,9 @@ mod tests {
             parameter_count: None,
             context_length: None,
             has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
         }];
 
         // Enter would normally start a switch to the highlighted model.

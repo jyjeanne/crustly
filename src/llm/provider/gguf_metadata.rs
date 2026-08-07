@@ -64,6 +64,23 @@ pub struct GgufMetadata {
     pub quantization: Option<String>,
     pub context_length: Option<u64>,
     pub has_chat_template: bool,
+    /// Number of transformer blocks/layers (`<arch>.block_count`). Used
+    /// only by `estimate_memory_bytes`'s KV-cache term - not otherwise
+    /// user-facing, so `LocalGgufModel` doesn't carry this or the three
+    /// fields below directly, only the derived estimate.
+    pub block_count: Option<u64>,
+    /// `<arch>.attention.head_count` - the plain (non-KV) attention head
+    /// count, used to derive per-head dimension.
+    pub attention_head_count: Option<u64>,
+    /// `<arch>.attention.head_count_kv` - distinct from
+    /// `attention_head_count` on GQA/MQA architectures (fewer KV heads
+    /// than query heads); `None` on architectures that don't set it
+    /// separately, in which case `attention_head_count` is the right
+    /// fallback (no GQA reduction).
+    pub attention_head_count_kv: Option<u64>,
+    /// `<arch>.embedding_length` - divided by `attention_head_count` to
+    /// get the per-head dimension.
+    pub embedding_length: Option<u64>,
 }
 
 /// Read `path`'s GGUF header/metadata. `None` on any structural problem —
@@ -274,6 +291,22 @@ fn parse(reader: &mut BoundedReader<impl Read>) -> Option<GgufMetadata> {
             (k, DecodedValue::UInt(n)) if k.ends_with(".context_length") => {
                 metadata.context_length = Some(n);
             }
+            (k, DecodedValue::UInt(n)) if k.ends_with(".block_count") => {
+                metadata.block_count = Some(n);
+            }
+            // Checked before the plain "...head_count" arm below - a key
+            // ending in "_kv" can never also match the non-"_kv" suffix,
+            // but ordering these explicitly documents that intent rather
+            // than relying on it silently.
+            (k, DecodedValue::UInt(n)) if k.ends_with(".attention.head_count_kv") => {
+                metadata.attention_head_count_kv = Some(n);
+            }
+            (k, DecodedValue::UInt(n)) if k.ends_with(".attention.head_count") => {
+                metadata.attention_head_count = Some(n);
+            }
+            (k, DecodedValue::UInt(n)) if k.ends_with(".embedding_length") => {
+                metadata.embedding_length = Some(n);
+            }
             _ => {}
         }
     }
@@ -376,6 +409,99 @@ fn ggml_type_to_string(code: u32) -> Option<String> {
         _ => return None,
     };
     Some(name.to_string())
+}
+
+/// A resident-memory estimate for loading a model at a given context length.
+/// See `estimate_memory_bytes`'s doc comment for what's included and the
+/// accuracy this is meant to convey (order-of-magnitude, not exact).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MemoryEstimate {
+    pub total_bytes: u64,
+    /// `false` when the header didn't have enough attention geometry
+    /// (`block_count`/`attention.head_count[_kv]`/`embedding_length`) to
+    /// compute the KV-cache term - `total_bytes` then covers weights only,
+    /// and callers should say so rather than presenting it as complete.
+    pub includes_kv_cache: bool,
+}
+
+/// Approximate bits-per-weight for quantization labels this module's own
+/// lookup tables (`ftype_to_string`, `ggml_type_to_string`) and
+/// `quantization_hint_from_filename`'s filename-convention fallback can
+/// produce. These are published, widely-cited community figures from the
+/// llama.cpp/GGUF ecosystem, not exact - real bpw varies slightly by the
+/// specific per-tensor mix within a "mostly X" preset. Good enough for an
+/// order-of-magnitude estimate, which is all `estimate_memory_bytes` claims
+/// to give; `None` for a label this table doesn't cover degrades to "can't
+/// estimate," not a guess.
+fn bits_per_weight(quantization: &str) -> Option<f64> {
+    Some(match quantization {
+        "F32" => 32.0,
+        "F16" | "BF16" => 16.0,
+        "Q8_0" | "Q8_1" | "Q8_K" => 8.5,
+        "Q6_K" => 6.6,
+        "Q5_0" | "Q5_1" => 5.5,
+        "Q5_K" | "Q5_K_S" => 5.5,
+        "Q5_K_M" => 5.7,
+        "Q4_0" | "Q4_1" => 4.5,
+        "Q4_K" | "Q4_K_S" => 4.5,
+        "Q4_K_M" => 4.85,
+        "IQ4_NL" => 4.5,
+        "IQ4_XS" => 4.25,
+        "Q3_K" | "Q3_K_S" => 3.5,
+        "Q3_K_M" => 3.75,
+        "Q3_K_L" => 4.1,
+        "IQ3_M" => 3.66,
+        "IQ3_S" | "IQ3_XXS" => 3.44,
+        "Q2_K" => 2.56,
+        "IQ2_M" => 2.7,
+        "IQ2_S" => 2.5,
+        "IQ2_XS" => 2.31,
+        "IQ2_XXS" => 2.06,
+        _ => return None,
+    })
+}
+
+/// Estimate resident memory (weights + KV cache, when the header has
+/// enough geometry to compute it) for loading `metadata` at
+/// `context_length` tokens. `None` - not a fallback guess - when
+/// `parameter_count`/`quantization` themselves are unavailable, same
+/// "honest unknown" posture as the rest of this module.
+pub fn estimate_memory_bytes(
+    metadata: &GgufMetadata,
+    context_length: u64,
+) -> Option<MemoryEstimate> {
+    let params = metadata.parameter_count?;
+    let bpw = bits_per_weight(metadata.quantization.as_deref()?)?;
+    let weight_bytes = (params as f64 * bpw / 8.0) as u64;
+
+    let kv_bytes = (|| -> Option<u64> {
+        let blocks = metadata.block_count?;
+        let head_count = metadata.attention_head_count?;
+        let heads_kv = metadata.attention_head_count_kv.unwrap_or(head_count);
+        let embedding_length = metadata.embedding_length?;
+        if head_count == 0 {
+            return None;
+        }
+        let head_dim = embedding_length / head_count;
+        // 2 (K and V) * blocks * kv-heads * head_dim * 2 bytes/element
+        // (f16 KV cache) * context_length.
+        2u64.checked_mul(blocks)?
+            .checked_mul(heads_kv)?
+            .checked_mul(head_dim)?
+            .checked_mul(2)?
+            .checked_mul(context_length)
+    })();
+
+    Some(match kv_bytes {
+        Some(kv) => MemoryEstimate {
+            total_bytes: weight_bytes.saturating_add(kv),
+            includes_kv_cache: true,
+        },
+        None => MemoryEstimate {
+            total_bytes: weight_bytes,
+            includes_kv_cache: false,
+        },
+    })
 }
 
 #[cfg(test)]
@@ -609,5 +735,77 @@ mod tests {
     fn nonexistent_file_returns_none() {
         let path = std::path::Path::new("/definitely/does/not/exist/crustly-gguf-test.gguf");
         assert!(read_gguf_metadata(path).is_none());
+    }
+
+    #[test]
+    fn estimate_memory_bytes_is_none_without_parameter_count_or_quantization() {
+        let missing_params = GgufMetadata {
+            quantization: Some("Q4_K_M".to_string()),
+            ..Default::default()
+        };
+        assert!(estimate_memory_bytes(&missing_params, 8192).is_none());
+
+        let missing_quant = GgufMetadata {
+            parameter_count: Some(7_000_000_000),
+            ..Default::default()
+        };
+        assert!(estimate_memory_bytes(&missing_quant, 8192).is_none());
+    }
+
+    #[test]
+    fn estimate_memory_bytes_covers_weights_only_when_geometry_is_missing() {
+        let metadata = GgufMetadata {
+            parameter_count: Some(7_000_000_000),
+            quantization: Some("Q4_K_M".to_string()),
+            ..Default::default()
+        };
+        let estimate = estimate_memory_bytes(&metadata, 8192).expect("must estimate");
+        assert!(!estimate.includes_kv_cache);
+        // ~7B params at ~4.85 bits/weight -> roughly 4.2 GB of weights alone.
+        assert!(estimate.total_bytes > 3_500_000_000 && estimate.total_bytes < 5_000_000_000);
+    }
+
+    #[test]
+    fn estimate_memory_bytes_includes_kv_cache_when_geometry_is_present() {
+        let metadata = GgufMetadata {
+            parameter_count: Some(7_000_000_000),
+            quantization: Some("Q4_K_M".to_string()),
+            block_count: Some(32),
+            attention_head_count: Some(32),
+            attention_head_count_kv: Some(8), // GQA - fewer KV heads than query heads
+            embedding_length: Some(4096),
+            ..Default::default()
+        };
+        let weights_only = estimate_memory_bytes(
+            &GgufMetadata {
+                parameter_count: metadata.parameter_count,
+                quantization: metadata.quantization.clone(),
+                ..Default::default()
+            },
+            8192,
+        )
+        .expect("weights-only estimate");
+        let with_kv = estimate_memory_bytes(&metadata, 8192).expect("must estimate");
+
+        assert!(with_kv.includes_kv_cache);
+        assert!(
+            with_kv.total_bytes > weights_only.total_bytes,
+            "the KV-cache term should add to the weights-only baseline"
+        );
+    }
+
+    #[test]
+    fn estimate_memory_bytes_falls_back_to_head_count_without_gqa_kv_heads() {
+        let metadata = GgufMetadata {
+            parameter_count: Some(1_000_000_000),
+            quantization: Some("F16".to_string()),
+            block_count: Some(16),
+            attention_head_count: Some(16),
+            attention_head_count_kv: None, // no GQA - falls back to attention_head_count
+            embedding_length: Some(2048),
+            ..Default::default()
+        };
+        let estimate = estimate_memory_bytes(&metadata, 4096).expect("must estimate");
+        assert!(estimate.includes_kv_cache);
     }
 }
