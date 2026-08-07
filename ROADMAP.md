@@ -173,10 +173,13 @@ tasks and acceptance criteria per item.
   each spawn/parse split so the parse half is unit-tested against captured sample output),
   surfaced in `doctor` and a new host-info row on the Ctrl+G dialog (fetched once per TUI
   session, cached process-wide in a `OnceLock`); display/advisory only, never auto-mutates
-  `providers.llama_cpp` config. **Scope note**: the Windows AMD/Intel DXGI path is a
-  documented stub returning `None` (falls through to CPU-only), not a real Win32 FFI binding
-  — this development environment has no Windows target to build/verify it against; degrades
-  cleanly per this item's own design, and NVIDIA-on-Windows (a subprocess call) is unaffected
+  `providers.llama_cpp` config, including a real Windows AMD/Intel GPU probe via the Win32
+  DXGI API (`windows` crate, Windows-only target dependency) — cross-compile verified
+  (`cargo check`/`build --target x86_64-pc-windows-gnu`, producing a real linked PE32+
+  binary) since no Windows machine is available in this development environment to run it
+  against actual hardware/drivers; degrades cleanly to CPU-only if that's ever wrong. Its two
+  pure logic pieces (PCI vendor ID → vendor, UTF-16 description trimming) are unit-tested on
+  Linux directly. NVIDIA-on-Windows goes through the ordinary `nvidia-smi` subprocess path
 - [x] **Local hardware-fit filtering** — `Fits`/`Tight`/`Won't fit` labels (plus the context
   length the estimate used, shown alongside) and a `crustly llama-cpp list --best-fit` sort
   over models already on disk, using the memory estimate above against detected hardware;
@@ -291,7 +294,7 @@ are done; the rest are tracked here as they get picked up:
 | `crustly run` pipelines | Chain multiple prompts with conditional logic in a YAML file |
 | Catalog-based, benchmark-ranked GGUF recommend | Rank models *not yet downloaded* against a benchmark dataset (llamastash's `recommend`, minus the VRAM-fit-only subset already covered by v0.5.3's hardware-aware local selection). Needs an external, CI-refreshed benchmark pipeline — deferred until a concrete need shows up; see `ccguf-managment-imrpoment-plan.md` Phase M10 |
 | Fix `crustly ollama rm`'s arg-parsing bug | `OllamaCommands::Rm`'s positional field is named `model`, identical to the top-level `global = true` `--model` flag's ident — clap silently routes the value into the wrong field (confirmed against the real binary while fixing the identical bug in `LlamaCppCommands::Rm` during v0.5.3 M7, which renamed its own field to `name`). Same one-line fix, deliberately left untouched here since it's Ollama's CLI, not `llama-cpp`'s — outside that phase's scope |
-| Real Windows AMD/Intel GPU detection (DXGI) | `hardware_detect::detect_windows_dxgi` (v0.5.3 M11) is a stub returning `None` — this project's development environment has no Windows target to build/verify a real `windows`/`windows-sys` DXGI FFI binding against. Falls through to the CPU-only/system-RAM path cleanly (not a regression, no dependency added), but a real Windows dev machine could implement `IDXGIFactory1::EnumAdapters1` as originally scoped in `ccguf-managment-imrpoment-plan.md` Phase M11 |
+| Runtime-verify Windows AMD/Intel GPU detection (DXGI) on real hardware | `hardware_detect::detect_windows_dxgi` (v0.5.3 M11) is implemented against the real Win32 DXGI API and cross-compile verified (`cargo check`/`build --target x86_64-pc-windows-gnu`, produces a real linked Windows binary), but has never run against actual Windows hardware/drivers — this project's development environment has no Windows machine. If it misbehaves on a real machine (wrong adapter picked, vendor ID mismatch, description string garbled), that's the first thing to check; the two pure logic pieces are unit-tested but the live `CreateDXGIFactory1`/`EnumAdapters1`/`GetDesc1` call chain itself isn't |
 
 ---
 

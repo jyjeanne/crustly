@@ -728,17 +728,39 @@ suggesting *new* models to download, not about ranking ones already on disk.
 
 ### Phase M11 — Hardware detection & display ✅ Done
 
-Implemented largely as planned, with one deliberate scope reduction disclosed
-up front rather than discovered mid-implementation: **the Windows AMD/Intel
-DXGI path is a documented stub returning `None`**, not a real Win32 FFI
-binding. This development environment is Linux-only with no Windows target to
-build or test against; writing `unsafe` COM interface calls with zero ability
-to verify they even compile is worse than being explicit about the gap - it
-falls through cleanly to the CPU-only/system-RAM path, which is this phase's
-own designed-in degrade-cleanly outcome, not a crash. NVIDIA-on-Windows is
-unaffected (`nvidia-smi` is a portable subprocess call). No new
-`windows`/`windows-sys` dependency was added as a result - if a future pass
-picks this up on a real Windows dev machine, add it then.
+Implemented as planned, including the Windows AMD/Intel DXGI path -
+**upgraded from a documented stub to a real implementation in a follow-up
+pass**, once it turned out this development environment could install a
+Windows cross-compilation toolchain (`rustup target add x86_64-pc-windows-gnu`
++ `apt-get install gcc-mingw-w64-x86-64`) that hadn't been tried during the
+initial implementation. `detect_windows_dxgi` (`#[cfg(target_os = "windows")]`)
+now calls the real Win32 DXGI API via the official `windows` crate
+(`CreateDXGIFactory1` → `EnumAdapters1` → `GetDesc1`, skipping the software/
+"Microsoft Basic Render Driver" adapter DXGI always reports alongside real
+hardware) - added as a Windows-only target dependency
+(`[target.'cfg(target_os = "windows")'.dependencies]` in `Cargo.toml`),
+`optional = true` and wired into `gguf-management`'s feature list exactly like
+`sha2`/`sysinfo`, so it costs nothing on any non-Windows target or on a
+Windows build with zero Cargo features either.
+
+**What was actually verified, stated precisely rather than overclaimed**: no
+Windows machine exists in this environment to run the DXGI calls against real
+hardware/drivers. What *was* verified: `cargo check --target
+x86_64-pc-windows-gnu --features gguf-management` (confirms the FFI call
+shapes, struct field names/types, and safety comments all type-check against
+the real `windows` 0.58 crate bindings) **and** `cargo build` for the same
+target, which fully linked into a genuine `PE32+ executable (console) x86-64,
+for MS Windows` binary - meaningfully stronger assurance than an unverified
+stub, but still not a runtime test. The two small pieces of real logic
+(`gpu_vendor_from_pci_id`, PCI vendor ID → `GpuVendor`; `trim_dxgi_description`,
+the NUL-padded UTF-16 description buffer → `String`) were deliberately
+extracted as pure, portable functions specifically so they *are* unit-tested
+on this crate's actual host target (Linux), isolating as much of the real
+logic as possible from the one part that genuinely can't be tested here. This
+distinction (compiled+linked vs. run against hardware) is documented in the
+module's own doc comment, not just here, so it stays visible to whoever next
+touches this code. NVIDIA-on-Windows is unaffected either way (`nvidia-smi` is
+a portable subprocess call, tried first, identical to Linux).
 
 Every other detection path shipped as designed: `src/llm/provider/hardware_detect.rs`
 (new, `gguf-management`-gated) with `detect_nvidia`/`detect_amd_rocm`/

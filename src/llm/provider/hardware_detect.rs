@@ -8,17 +8,30 @@
 //! Deliberately subprocess-based for every vendor path except one (rather
 //! than SDK/FFI bindings) - consistent with Phase M0's whole point that the
 //! management surface shouldn't need a build-time C/C++ toolchain. The one
-//! exception the plan calls for, Windows AMD/Intel via the Win32 DXGI API,
-//! is a native FFI binding, not a subprocess, and this development
-//! environment has no Windows target to build or test it against; writing
-//! `unsafe` COM interface calls with zero ability to verify they even
-//! compile for their own target is worse than being explicit about the
-//! gap. `detect_windows_dxgi` below is a documented stub returning `None`
-//! for this phase - it falls through to the CPU-only/system-RAM path,
-//! which is this module's own designed-in "clean degradation," not a
-//! crash. NVIDIA-on-Windows is unaffected (`nvidia-smi` is a subprocess,
-//! fully portable). See `ccguf-managment-imrpoment-plan.md` Phase M11 for
-//! the full writeup of this scope decision.
+//! exception the plan calls for, Windows AMD/Intel via the Win32 DXGI API
+//! (`detect_windows_dxgi`, `#[cfg(target_os = "windows")]`), is a native FFI
+//! binding via the official `windows` crate, not a subprocess - matches
+//! llamastash's own documented approach for this specific path.
+//!
+//! **Verification note**: this development environment has no Windows
+//! machine to run the DXGI path against real hardware. It has been
+//! cross-compile type-checked instead (`cargo check --target
+//! x86_64-pc-windows-gnu --features gguf-management`, with `mingw-w64`
+//! installed for the C-linked dependencies elsewhere in the tree that also
+//! need to compile for that target) - the FFI call shapes, struct field
+//! names/types, and safety comments are all verified to type-check against
+//! the real `windows` crate bindings for the real DXGI API, which is
+//! meaningfully more assurance than an unverified stub, but it is still not
+//! a runtime test against actual hardware/drivers. If this ever misbehaves
+//! on a real Windows machine, that's the first thing to check - not
+//! something this module's own test suite can catch, since `cargo test`
+//! only runs on this crate's host target (Linux). The two small pure
+//! helpers this function delegates to (`gpu_vendor_from_pci_id`,
+//! `trim_dxgi_description`) *are* portable and unit-tested on every
+//! platform, isolating as much of the real logic as possible from the
+//! untestable FFI call itself. NVIDIA-on-Windows does not go through this
+//! path at all (`nvidia-smi` is a subprocess, handled identically to
+//! Linux, and tried first).
 //!
 //! Detection runs at most once per process: [`detect_hardware`] caches its
 //! result in a `OnceLock`. Callers that don't need hardware data (a plain
@@ -47,6 +60,10 @@ pub enum GpuVendor {
     Nvidia,
     Amd,
     Apple,
+    /// Only ever produced by the Windows DXGI path (`detect_windows_dxgi`) -
+    /// none of this module's other sources (subprocess-based, per-vendor
+    /// tools) need a separate Intel case.
+    Intel,
     Other(String),
 }
 
@@ -245,11 +262,88 @@ fn parse_rocm_smi_json(stdout: &str) -> Option<GpuInfo> {
 }
 
 // ---------------------------------------------------------------------
-// AMD/Intel (Windows) - Win32 DXGI. See the module doc: a documented stub
-// for this phase, not a real implementation - no Windows target available
-// in this development environment to build or verify FFI bindings against.
+// AMD/Intel (Windows) - Win32 DXGI adapter enumeration. Only reached when
+// nvidia-smi/rocm-smi already found nothing - on Windows that's normally
+// "no NVIDIA GPU/driver present", so this path exists specifically for
+// AMD/Intel, which have no equivalent always-installed CLI tool the way
+// NVIDIA does. See the module doc for how this was verified (cross-compile
+// type-checked, not run against real hardware - no Windows machine in this
+// development environment).
 // ---------------------------------------------------------------------
 
+/// Maps a PCI vendor ID (`DXGI_ADAPTER_DESC1::VendorId`) to a `GpuVendor`.
+/// Pure and portable (no `windows` crate types) - only ever called from
+/// `detect_windows_dxgi` below, but kept compiled on every platform (not
+/// `#[cfg(target_os = "windows")]`) specifically so it's unit-testable from
+/// this crate's actual host target (Linux), not just type-checked via
+/// cross-compilation like the FFI call itself. IDs are the standard,
+/// long-stable PCI-SIG values for these three vendors; `Other` for anything
+/// else (a rarer GPU vendor a user might still have, or a virtualization/
+/// software adapter that slipped through the `DXGI_ADAPTER_FLAG_SOFTWARE`
+/// filter).
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn gpu_vendor_from_pci_id(vendor_id: u32) -> GpuVendor {
+    match vendor_id {
+        0x10DE => GpuVendor::Nvidia,
+        0x1002 | 0x1022 => GpuVendor::Amd,
+        0x8086 => GpuVendor::Intel,
+        _ => GpuVendor::Other(format!("pci:{vendor_id:04x}")),
+    }
+}
+
+/// Trims a DXGI adapter description's fixed-size, NUL-padded UTF-16 buffer
+/// (`DXGI_ADAPTER_DESC1::Description: [u16; 128]`) down to its actual text.
+/// Pure and portable for the same reason as `gpu_vendor_from_pci_id` above.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn trim_dxgi_description(raw: &[u16]) -> String {
+    let end = raw.iter().position(|&c| c == 0).unwrap_or(raw.len());
+    String::from_utf16_lossy(&raw[..end])
+}
+
+#[cfg(target_os = "windows")]
+fn detect_windows_dxgi() -> Option<GpuInfo> {
+    use windows::Win32::Graphics::Dxgi::{
+        CreateDXGIFactory1, IDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE,
+    };
+
+    // Safety: `CreateDXGIFactory1`/`EnumAdapters1`/`GetDesc1` are ordinary
+    // COM calls with no preconditions beyond "DXGI is available" - failure
+    // (missing DXGI, no adapters, enumeration exhausted) is reported via
+    // `Result`/`HRESULT`, not UB, and is handled below as "detection found
+    // nothing" rather than a crash, same posture as every subprocess-based
+    // path in this module.
+    let factory: IDXGIFactory1 = unsafe { CreateDXGIFactory1() }.ok()?;
+
+    let mut index = 0u32;
+    loop {
+        let adapter = unsafe { factory.EnumAdapters1(index) }.ok()?;
+        index += 1;
+
+        let Ok(desc) = (unsafe { adapter.GetDesc1() }) else {
+            continue;
+        };
+        // Skip the software/"Microsoft Basic Render Driver" adapter DXGI
+        // always reports alongside real hardware - never what a user means
+        // by "my GPU".
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32) != 0 {
+            continue;
+        }
+
+        return Some(GpuInfo {
+            vendor: gpu_vendor_from_pci_id(desc.VendorId),
+            name: Some(trim_dxgi_description(&desc.Description)),
+            vram_total_bytes: Some(desc.DedicatedVideoMemory as u64),
+            // DXGI's static adapter description has no live utilization
+            // figure (matches nvidia-smi's own documented limitation for
+            // this path, per this phase's spec) - `vram_available_bytes`
+            // falls back to the full total, same as every other non-NVIDIA
+            // source in this module.
+            vram_used_bytes: None,
+        });
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
 fn detect_windows_dxgi() -> Option<GpuInfo> {
     None
 }
@@ -584,6 +678,41 @@ mod tests {
             assert!(out.status.success());
             assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "hello");
         }
+    }
+
+    // -- Windows DXGI helpers (portable, run on every platform's test suite
+    // even though `detect_windows_dxgi` itself only compiles for real on
+    // Windows - see the module doc's verification note) ---------------------
+
+    #[test]
+    fn gpu_vendor_from_pci_id_recognizes_the_three_named_vendors() {
+        assert_eq!(gpu_vendor_from_pci_id(0x10DE), GpuVendor::Nvidia);
+        assert_eq!(gpu_vendor_from_pci_id(0x1002), GpuVendor::Amd);
+        assert_eq!(gpu_vendor_from_pci_id(0x1022), GpuVendor::Amd);
+        assert_eq!(gpu_vendor_from_pci_id(0x8086), GpuVendor::Intel);
+    }
+
+    #[test]
+    fn gpu_vendor_from_pci_id_falls_back_to_other_for_an_unrecognized_id() {
+        assert_eq!(
+            gpu_vendor_from_pci_id(0xDEAD),
+            GpuVendor::Other("pci:dead".to_string())
+        );
+    }
+
+    #[test]
+    fn trim_dxgi_description_stops_at_the_first_nul() {
+        let mut raw = [0u16; 128];
+        for (i, c) in "AMD Radeon RX 7900 XTX".encode_utf16().enumerate() {
+            raw[i] = c;
+        }
+        assert_eq!(trim_dxgi_description(&raw), "AMD Radeon RX 7900 XTX");
+    }
+
+    #[test]
+    fn trim_dxgi_description_handles_a_buffer_with_no_nul_terminator() {
+        let raw: Vec<u16> = "no terminator".encode_utf16().collect();
+        assert_eq!(trim_dxgi_description(&raw), "no terminator");
     }
 
     // -- detect_hardware caching -------------------------------------------

@@ -203,14 +203,20 @@ sorts the list so the most-capable model that still fits comes first.
 Combine with `--json` to get `fit`/`estimated_memory_context_length` fields
 in the machine-readable output instead.
 
-Hardware detection is a real subprocess spawn, so it's only ever triggered
-by `--best-fit`, `crustly llama-cpp doctor`, or the TUI's Local Models
-dialog (Ctrl+G) — never by a plain `crustly llama-cpp list`. It's cached for
-the lifetime of the process (or the TUI session), and degrades cleanly to
-"unknown"/CPU-only when no supported vendor tool is installed — never an
-error. **Windows AMD/Intel GPUs are not yet detected** (no VRAM figure) —
-NVIDIA works on Windows via `nvidia-smi`; see the DXGI note in
-`ROADMAP.md`'s Backlog if you want to pick that up.
+Hardware detection is a real subprocess spawn (or, on Windows for AMD/Intel
+GPUs, a native Win32 DXGI call — see below), so it's only ever triggered by
+`--best-fit`, `crustly llama-cpp doctor`, or the TUI's Local Models dialog
+(Ctrl+G) — never by a plain `crustly llama-cpp list`. It's cached for the
+lifetime of the process (or the TUI session), and degrades cleanly to
+"unknown"/CPU-only when nothing can be detected — never an error.
+
+On Windows, NVIDIA GPUs are detected via `nvidia-smi` (identical to Linux);
+AMD/Intel GPUs are detected via the Win32 DXGI API directly (no VRAM
+live-utilization figure that way, only the total). **Note on this specific
+path's testing**: it was built and cross-compile verified from a Linux
+development environment with no Windows machine available — see
+`ROADMAP.md`'s Backlog if you're running on Windows and it doesn't detect
+your AMD/Intel GPU correctly, and please file what you saw.
 
 #### `crustly llama-cpp doctor`
 

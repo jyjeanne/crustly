@@ -165,6 +165,23 @@ tokio-test = "0.4"
 # Profiling (Unix-only - not supported on Windows)
 pprof = { version = "0.15", features = ["flamegraph", "frame-pointer"], optional = true }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# Win32 DXGI adapter enumeration for AMD/Intel GPU detection on Windows
+# (src/llm/provider/hardware_detect.rs, Phase M11) - a native API call, not
+# a subprocess, since no vendor CLI tool is a reliable cross-vendor default
+# on Windows the way nvidia-smi/rocm-smi/system_profiler are on their
+# platforms. `optional = true` + gated via `gguf-management`'s `dep:windows`
+# below (same wiring as `sha2`/`sysinfo`) so a Windows build with zero
+# Cargo features doesn't pay this compile cost either - target-specific
+# dependency tables and Cargo features compose independently, so this has
+# no effect at all on non-Windows targets regardless of which features are
+# enabled.
+windows = { version = "0.58", optional = true, features = [
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Foundation",
+] }
+
 [features]
 default = ["gguf-management"]
 # Profiling feature enables pprof on Unix only (no-op on Windows)
@@ -172,13 +189,15 @@ profiling = []
 openai = ["async-openai"]
 aws-bedrock = ["aws-sdk-bedrockruntime"]
 ollama = ["dep:ollama-rs", "dep:schemars"]
-# Local `.gguf` file management (list/pull/rm - directory scan + plain HTTP,
-# no FFI) - see ccguf-managment-imrpoment-plan.md Phase M0. Unlike
-# `llama-cpp` below, this carries no C/C++ toolchain cost (only `sha2`, a
-# small pure-Rust dependency), so it's part of `default` and `all-llm`:
-# managing `.gguf` files shouldn't require building the in-process inference
-# engine just to list what's on disk.
-gguf-management = ["dep:sha2", "dep:sysinfo"]
+# Local `.gguf` file management (list/pull/rm - directory scan + plain HTTP)
+# plus hardware detection - see ccguf-managment-imrpoment-plan.md Phases M0
+# and M11. Unlike `llama-cpp` below, this carries no C/C++ toolchain cost on
+# any platform (`sha2`/`sysinfo` are small pure-Rust deps; `windows` is
+# Microsoft's own metadata-only FFI bindings crate, Windows-only per the
+# target table above, no C compiler needed to build it), so it's part of
+# `default` and `all-llm`: managing `.gguf` files shouldn't require building
+# the in-process inference engine just to list what's on disk.
+gguf-management = ["dep:sha2", "dep:sysinfo", "dep:windows"]
 # Deliberately NOT part of `all-llm`/`default`: unlike every other provider
 # feature (and unlike `gguf-management` above), this one compiles native
 # C++ (cmake + a C/C++ toolchain required) - see
