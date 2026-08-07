@@ -294,7 +294,28 @@ feature, `sha2` re-gated, `all-llm` extended). No logic changes — should be
 a behavior-preserving refactor verifiable by running the existing test
 suite unmodified under the new feature flag.
 
-### Phase M1 — Pure-Rust GGUF header metadata parser
+### Phase M1 — Pure-Rust GGUF header metadata parser ✅ Done
+
+Implemented as planned, with the caching sub-task deferred: the source
+plan bundled an in-memory `(path, size, modified_at)`-keyed cache into
+this phase, motivated by repeated re-parsing "once M3 scans multiple
+directories." M3 hasn't landed yet — today's single-directory scan only
+reads a small, bounded header prefix per file (never the whole model), so
+building cache infrastructure now, before the multi-directory/repeated-
+call scenario that motivates it exists, would be speculative. Revisit
+alongside M3. Everything else landed: the layered quantization result
+(`general.file_type` precise → tensor-type mode coarser → filename guess
+last resort), the hardening requirement (every declared length capped
+before allocation, 256 MiB cumulative budget, structural problems → `None`
+for the whole file), and the `LocalGgufModel`/TUI-mirror field additions.
+`quantization_hint_for_path` (Ctrl+O panel) was upgraded too, matching M0's
+own precedent of picking up directly-justified small scope beyond the
+phase's original file list. Verified: 847/847 tests under
+`--features gguf-management` (13 new, zero new dependencies), 864/864
+under `--features llama-cpp` and 896/896 under `all-llm` confirm no
+regression; an end-to-end smoke test against a synthetic `.gguf` file
+confirmed `crustly llama-cpp list` prints the precise header-parsed
+quantization, not a filename guess, on a build with no FFI compiled in.
 
 **Problem**: no code anywhere in Crustly reads GGUF header key-value
 metadata; quantization is a filename guess and everything else (architecture,

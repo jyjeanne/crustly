@@ -124,9 +124,13 @@ tasks and acceptance criteria per item.
   but turned out to need the same fix. Verified: zero `llama-cpp-2`/`-sys-2` in the dependency
   tree under `--features gguf-management`; 834/834 tests pass there, 851/851 under
   `--features llama-cpp`, 883/883 under `all-llm` — no regressions
-- [ ] **Pure-Rust GGUF header metadata parser** — real architecture/parameter-count/quantization/
-  context-length/chat-template-presence, replacing today's filename-only quantization guess;
-  hardened against malformed/truncated/adversarial files (never panics/OOMs on a crafted header)
+- [x] **Pure-Rust GGUF header metadata parser** (`src/llm/provider/gguf_metadata.rs`, zero new
+  dependencies) — real architecture/parameter-count/quantization (layered: precise
+  `general.file_type` → coarser tensor-type mode → filename guess as last resort)/context-length/
+  chat-template-presence, wired into `LocalGgufModel` and its TUI mirror. Hardened: every declared
+  string/array length validated against a cap before any allocation, a 256 MiB cumulative budget
+  backstops the per-value caps, any structural problem returns `None` for the whole file rather
+  than a panic or partial/corrupt result. 13 new tests, 847/847 total under `gguf-management`
 
 **Core management (DP2–DP4):**
 - [ ] **Memory/VRAM footprint estimate** — "~4.9 GB at this context length" in `list`/TUI, advisory only
