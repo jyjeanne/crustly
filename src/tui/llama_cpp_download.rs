@@ -49,6 +49,10 @@ pub struct LlamaCppModelSummary {
     pub display_name: Option<String>,
     pub estimated_memory_bytes: Option<u64>,
     pub estimated_memory_includes_kv_cache: bool,
+    /// The context length `estimated_memory_bytes` was actually computed
+    /// at - see `LocalGgufModel::estimated_memory_context_length`. Used by
+    /// Phase M12's per-row fit tag.
+    pub estimated_memory_context_length: Option<u64>,
     pub is_mmproj: bool,
     pub mmproj_path: Option<PathBuf>,
 }
@@ -88,6 +92,63 @@ pub struct LlamaCppModelDetails {
 /// the slot", the provider crosses the thread boundary through this instead.
 pub type PendingProvider = Arc<Mutex<Option<Arc<dyn crate::llm::provider::Provider>>>>;
 
+/// The Local Models dialog's (Ctrl+G) host-info row - the TUI equivalent of
+/// `hardware_detect::HardwareInfo`, decoupled from the `gguf-management`
+/// feature the same way `LlamaCppModelSummary` is decoupled from
+/// `LocalGgufModel` (Phase M11).
+#[derive(Debug, Clone)]
+pub struct HardwareSummary {
+    pub gpu_name: Option<String>,
+    pub vram_available_bytes: Option<u64>,
+    pub system_ram_total_bytes: Option<u64>,
+}
+
+impl HardwareSummary {
+    /// Mirrors `hardware_detect::HardwareInfo::budget_bytes` - kept here
+    /// too (not just called through to it) since the not-compiled-in
+    /// variant of `detect_hardware_summary` below has no `HardwareInfo` to
+    /// call through to at all.
+    pub fn budget_bytes(&self) -> Option<u64> {
+        match (self.vram_available_bytes, self.system_ram_total_bytes) {
+            (None, None) => None,
+            (vram, ram) => Some(vram.unwrap_or(0) + ram.unwrap_or(0)),
+        }
+    }
+}
+
+/// Detects this machine's hardware for the dialog's host-info row - see
+/// `hardware_detect`'s own module doc for the "when this runs" rule this
+/// respects (only called once, the first time the dialog opens - see
+/// `App::open_llama_cpp_models`). Blocking (subprocess spawns), so this
+/// wraps the real detection in `spawn_blocking` rather than calling it
+/// directly on the async runtime.
+#[cfg(feature = "gguf-management")]
+pub async fn detect_hardware_summary() -> HardwareSummary {
+    tokio::task::spawn_blocking(|| {
+        let info = crate::llm::provider::hardware_detect::detect_hardware();
+        HardwareSummary {
+            gpu_name: info.gpu.as_ref().and_then(|g| g.name.clone()),
+            vram_available_bytes: info.gpu.as_ref().and_then(|g| g.vram_available_bytes()),
+            system_ram_total_bytes: info.system_ram_total_bytes,
+        }
+    })
+    .await
+    .unwrap_or(HardwareSummary {
+        gpu_name: None,
+        vram_available_bytes: None,
+        system_ram_total_bytes: None,
+    })
+}
+
+#[cfg(not(feature = "gguf-management"))]
+pub async fn detect_hardware_summary() -> HardwareSummary {
+    HardwareSummary {
+        gpu_name: None,
+        vram_available_bytes: None,
+        system_ram_total_bytes: None,
+    }
+}
+
 /// List `.gguf` files from `models_dir`, `extra_model_paths`, and (when
 /// `Some`) Ollama's manifest tree - see
 /// `llama_cpp_models::list_all_local_models` for the merge/dedup behavior.
@@ -120,6 +181,7 @@ pub async fn list_local(
         display_name: m.display_name,
         estimated_memory_bytes: m.estimated_memory_bytes,
         estimated_memory_includes_kv_cache: m.estimated_memory_includes_kv_cache,
+        estimated_memory_context_length: m.estimated_memory_context_length,
         is_mmproj: m.is_mmproj,
         mmproj_path: m.mmproj_path,
     })
@@ -343,6 +405,7 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
             is_mmproj: false,
             mmproj_path: None,
         }

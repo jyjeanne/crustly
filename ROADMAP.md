@@ -168,19 +168,27 @@ tasks and acceptance criteria per item.
   header-parsed value as of M1)
 
 **Hardware-aware local model selection (DP6 — new since the plan's Update 3):**
-- [ ] **Hardware detection & display** — best-effort GPU vendor/VRAM + system RAM probe
-  (`nvidia-smi`/`rocm-smi`/DXGI/`system_profiler`/`vulkaninfo`, subprocess-based, no SDK linkage),
-  surfaced in `doctor` and the TUI host-info panel; display/advisory only, never auto-mutates
-  `providers.llama_cpp` config
-- [ ] **Local hardware-fit filtering** — `Fits`/`Tight`/`Won't fit` labels and a `crustly llama-cpp
-  list --best-fit` sort over models already on disk, using the memory estimate above against
-  detected hardware; explicitly not a HuggingFace catalog search
+- [x] **Hardware detection & display** — best-effort GPU vendor/VRAM + system RAM probe
+  (`nvidia-smi`/`rocm-smi`/`system_profiler`/`vulkaninfo`, subprocess-based, no SDK linkage;
+  each spawn/parse split so the parse half is unit-tested against captured sample output),
+  surfaced in `doctor` and a new host-info row on the Ctrl+G dialog (fetched once per TUI
+  session, cached process-wide in a `OnceLock`); display/advisory only, never auto-mutates
+  `providers.llama_cpp` config. **Scope note**: the Windows AMD/Intel DXGI path is a
+  documented stub returning `None` (falls through to CPU-only), not a real Win32 FFI binding
+  — this development environment has no Windows target to build/verify it against; degrades
+  cleanly per this item's own design, and NVIDIA-on-Windows (a subprocess call) is unaffected
+- [x] **Local hardware-fit filtering** — `Fits`/`Tight`/`Won't fit` labels (plus the context
+  length the estimate used, shown alongside) and a `crustly llama-cpp list --best-fit` sort
+  over models already on disk, using the memory estimate above against detected hardware;
+  same labels shown as a per-row tag in the Ctrl+G dialog. `doctor` gained a finding naming
+  the largest already-downloaded model the detected hardware can hold. Explicitly not a
+  HuggingFace catalog search
 
 **Diagnostics (DP5, lowest priority — cheap once the above exists):**
 - [x] **`crustly llama-cpp doctor`** — structured diagnostics (build feature/GPU backend, `models_dir`
-  existence/writability, disk space, `extra_model_paths`/`scan_ollama_models` sanity), always exits
-  0 regardless of findings. Detected-hardware line deferred with M11/M12 below — this command
-  surfaces that data once it exists, not a reason to duplicate detection logic here
+  existence/writability, disk space, `extra_model_paths`/`scan_ollama_models` sanity, and now
+  the detected-hardware + largest-fitting-model lines from the two items above), always exits
+  0 regardless of findings
 
 **Deferred — tracked in Backlog below, not this milestone:** catalog-based, benchmark-ranked
 `recommend` for models not yet downloaded (needs an external CI-maintained benchmark dataset;
@@ -283,6 +291,7 @@ are done; the rest are tracked here as they get picked up:
 | `crustly run` pipelines | Chain multiple prompts with conditional logic in a YAML file |
 | Catalog-based, benchmark-ranked GGUF recommend | Rank models *not yet downloaded* against a benchmark dataset (llamastash's `recommend`, minus the VRAM-fit-only subset already covered by v0.5.3's hardware-aware local selection). Needs an external, CI-refreshed benchmark pipeline — deferred until a concrete need shows up; see `ccguf-managment-imrpoment-plan.md` Phase M10 |
 | Fix `crustly ollama rm`'s arg-parsing bug | `OllamaCommands::Rm`'s positional field is named `model`, identical to the top-level `global = true` `--model` flag's ident — clap silently routes the value into the wrong field (confirmed against the real binary while fixing the identical bug in `LlamaCppCommands::Rm` during v0.5.3 M7, which renamed its own field to `name`). Same one-line fix, deliberately left untouched here since it's Ollama's CLI, not `llama-cpp`'s — outside that phase's scope |
+| Real Windows AMD/Intel GPU detection (DXGI) | `hardware_detect::detect_windows_dxgi` (v0.5.3 M11) is a stub returning `None` — this project's development environment has no Windows target to build/verify a real `windows`/`windows-sys` DXGI FFI binding against. Falls through to the CPU-only/system-RAM path cleanly (not a regression, no dependency added), but a real Windows dev machine could implement `IDXGIFactory1::EnumAdapters1` as originally scoped in `ccguf-managment-imrpoment-plan.md` Phase M11 |
 
 ---
 

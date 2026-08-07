@@ -92,6 +92,12 @@ pub enum TuiEvent {
     /// dialog (Ctrl+G).
     LlamaCppModelsListed(Vec<super::llama_cpp_download::LlamaCppModelSummary>),
 
+    /// This machine's hardware (GPU/VRAM/RAM) was detected for the llama.cpp
+    /// Local Models dialog's host-info row (Phase M11) - fired once, the
+    /// first time the dialog opens per TUI session (see
+    /// `App::open_llama_cpp_models`).
+    LlamaCppHardwareDetected(super::llama_cpp_download::HardwareSummary),
+
     /// Progress update for an in-flight llama.cpp `.gguf` download.
     LlamaCppDownloadProgress(super::llama_cpp_download::LlamaCppDownloadProgress),
 

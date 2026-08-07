@@ -22,6 +22,19 @@ use tokio::sync::mpsc::UnboundedSender;
 /// models is far larger than anyone would default to in practice).
 const ESTIMATE_DEFAULT_CONTEXT_LENGTH: u64 = 8_192;
 
+/// The context length used for a memory estimate: `native` capped at
+/// [`ESTIMATE_DEFAULT_CONTEXT_LENGTH`], or that default when `native` is
+/// `None` (header didn't set one) - the exact rule Phase M12's fit
+/// comparison needs to know the estimate was computed at (see
+/// `LocalGgufModel::estimated_memory_context_length`), extracted here so
+/// both `list_local_models` and `parse_ollama_manifest` compute it
+/// identically rather than duplicating the same two-line rule.
+fn estimate_default_context_length(native: Option<u64>) -> u64 {
+    native
+        .map(|n| n.min(ESTIMATE_DEFAULT_CONTEXT_LENGTH))
+        .unwrap_or(ESTIMATE_DEFAULT_CONTEXT_LENGTH)
+}
+
 /// A locally-present `.gguf` file - the llama.cpp equivalent of
 /// `ollama_models::LocalModelInfo` (which reports installed models via
 /// Ollama's `/api/tags` instead of a directory scan).
@@ -76,6 +89,15 @@ pub struct LocalGgufModel {
     /// it, in which case the estimate covers weights only - meaningless
     /// when `estimated_memory_bytes` is `None`.
     pub estimated_memory_includes_kv_cache: bool,
+    /// The context length `estimated_memory_bytes` was actually computed
+    /// at - `estimate_default_context_length`'s result, i.e. the header's
+    /// native context length capped at `ESTIMATE_DEFAULT_CONTEXT_LENGTH`,
+    /// or that default when the header didn't set one. `None` exactly
+    /// when `estimated_memory_bytes` is `None` (nothing to report a
+    /// context length for). Surfaced by Phase M12's fit annotation so a
+    /// "Tight"/"Won't fit" label is a number a user can sanity-check, not
+    /// just a bare word.
+    pub estimated_memory_context_length: Option<u64>,
     /// Whether this file is a vision/audio projector (mmproj), per the
     /// header's `clip.has_vision_encoder`/`clip.has_audio_encoder`
     /// (verified against llama.cpp's own source, see
@@ -190,13 +212,11 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
                     .and_then(quantization_hint_from_filename)
             });
 
-        let estimate = header.as_ref().and_then(|h| {
-            let ctx = h
-                .context_length
-                .map(|native| native.min(ESTIMATE_DEFAULT_CONTEXT_LENGTH))
-                .unwrap_or(ESTIMATE_DEFAULT_CONTEXT_LENGTH);
-            super::gguf_metadata::estimate_memory_bytes(h, ctx)
-        });
+        let estimate_context_length =
+            estimate_default_context_length(header.as_ref().and_then(|h| h.context_length));
+        let estimate = header
+            .as_ref()
+            .and_then(|h| super::gguf_metadata::estimate_memory_bytes(h, estimate_context_length));
         let is_mmproj = match &header {
             Some(h) => h.is_vision_projector || h.is_audio_projector,
             None => path
@@ -217,6 +237,7 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
             display_name: None,
             estimated_memory_bytes: estimate.map(|e| e.total_bytes),
             estimated_memory_includes_kv_cache: estimate.is_some_and(|e| e.includes_kv_cache),
+            estimated_memory_context_length: estimate.map(|_| estimate_context_length),
             is_mmproj,
             mmproj_path: None,
         });
@@ -391,13 +412,11 @@ fn parse_ollama_manifest(
     // model's own contents.
     let header = super::gguf_metadata::read_gguf_metadata(&blob_path);
     let quantization_hint = header.as_ref().and_then(|h| h.quantization.clone());
-    let estimate = header.as_ref().and_then(|h| {
-        let ctx = h
-            .context_length
-            .map(|native| native.min(ESTIMATE_DEFAULT_CONTEXT_LENGTH))
-            .unwrap_or(ESTIMATE_DEFAULT_CONTEXT_LENGTH);
-        super::gguf_metadata::estimate_memory_bytes(h, ctx)
-    });
+    let estimate_context_length =
+        estimate_default_context_length(header.as_ref().and_then(|h| h.context_length));
+    let estimate = header
+        .as_ref()
+        .and_then(|h| super::gguf_metadata::estimate_memory_bytes(h, estimate_context_length));
 
     Some(LocalGgufModel {
         path: blob_path,
@@ -411,6 +430,7 @@ fn parse_ollama_manifest(
         display_name: Some(display_name),
         estimated_memory_bytes: estimate.map(|e| e.total_bytes),
         estimated_memory_includes_kv_cache: estimate.is_some_and(|e| e.includes_kv_cache),
+        estimated_memory_context_length: estimate.map(|_| estimate_context_length),
         // No filename-based fallback here: an Ollama blob's on-disk name
         // is always "sha256-<hex>", never anything containing "mmproj".
         is_mmproj: header
@@ -669,6 +689,96 @@ fn pair_mmproj_files(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
 
     result.extend(bases);
     result
+}
+
+/// How a model's estimated memory footprint (`LocalGgufModel::estimated_memory_bytes`)
+/// compares against a detected hardware budget
+/// (`hardware_detect::HardwareInfo::budget_bytes`) - Phase M12. Three states,
+/// deliberately not a percentage: a false-precision number would imply an
+/// accuracy neither the memory estimate (M2, itself an order-of-magnitude
+/// figure) nor "VRAM+RAM" as a single pooled budget (M11's own documented
+/// simplification - it doesn't model partial-offload behavior) actually has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HardwareFit {
+    /// Comfortably under budget.
+    Fits,
+    /// Under budget, but with little headroom (see `TIGHT_THRESHOLD_RATIO`).
+    Tight,
+    /// Exceeds the detected budget.
+    WontFit,
+    /// Either the model's estimate or the hardware budget (or both)
+    /// couldn't be determined - no comparison is possible.
+    Unknown,
+}
+
+/// The fraction of the budget above which a model that still technically
+/// fits is labeled `Tight` rather than `Fits` - e.g. at the default 0.85, a
+/// model using 90% of the detected budget is `Tight`, one using 60% is
+/// `Fits`. A documented, reasonable default (same posture as
+/// `ESTIMATE_DEFAULT_CONTEXT_LENGTH` above), not a tuned/validated number -
+/// there is no benchmark data behind it (that stays out of scope, M10).
+const TIGHT_THRESHOLD_RATIO: f64 = 0.85;
+
+/// Compares `estimated_memory_bytes` against `budget_bytes`. See
+/// `HardwareFit`'s own doc comment for what each state means.
+pub fn hardware_fit(estimated_memory_bytes: Option<u64>, budget_bytes: Option<u64>) -> HardwareFit {
+    let (Some(estimate), Some(budget)) = (estimated_memory_bytes, budget_bytes) else {
+        return HardwareFit::Unknown;
+    };
+    if estimate > budget {
+        HardwareFit::WontFit
+    } else if estimate as f64 > budget as f64 * TIGHT_THRESHOLD_RATIO {
+        HardwareFit::Tight
+    } else {
+        HardwareFit::Fits
+    }
+}
+
+/// Sorts `models` by fit against `budget_bytes`: `Fits` first, then
+/// `Tight`, then `WontFit`, then `Unknown` last - within a category, the
+/// largest `estimated_memory_bytes` sorts first (the most-capable model
+/// that still fits its category is the most useful one to see at the top,
+/// a reasonable proxy for "best" absent benchmark-ranked data - that axis
+/// stays deferred, M10). Powers `crustly llama-cpp list --best-fit`
+/// (`src/cli/mod.rs`).
+pub fn sort_by_fit(models: &mut [LocalGgufModel], budget_bytes: Option<u64>) {
+    fn rank(fit: HardwareFit) -> u8 {
+        match fit {
+            HardwareFit::Fits => 0,
+            HardwareFit::Tight => 1,
+            HardwareFit::WontFit => 2,
+            HardwareFit::Unknown => 3,
+        }
+    }
+    models.sort_by(|a, b| {
+        let fit_a = hardware_fit(a.estimated_memory_bytes, budget_bytes);
+        let fit_b = hardware_fit(b.estimated_memory_bytes, budget_bytes);
+        rank(fit_a).cmp(&rank(fit_b)).then_with(|| {
+            b.estimated_memory_bytes
+                .unwrap_or(0)
+                .cmp(&a.estimated_memory_bytes.unwrap_or(0))
+        })
+    });
+}
+
+/// The single most-capable already-downloaded model that `Fits` or is
+/// `Tight` against `budget_bytes` - `None` if nothing does (or `models` is
+/// empty, or the budget itself is unknown). Used by `crustly llama-cpp
+/// doctor`'s "largest model your hardware can hold" finding (Phase M9's own
+/// doc comment named this as M11/M12's eventual payoff for that phase).
+pub fn best_fitting_model(
+    models: &[LocalGgufModel],
+    budget_bytes: Option<u64>,
+) -> Option<&LocalGgufModel> {
+    models
+        .iter()
+        .filter(|m| {
+            matches!(
+                hardware_fit(m.estimated_memory_bytes, budget_bytes),
+                HardwareFit::Fits | HardwareFit::Tight
+            )
+        })
+        .max_by_key(|m| m.estimated_memory_bytes.unwrap_or(0))
 }
 
 /// Parse an `hf:org/repo/file.gguf` (or revision-pinned
@@ -1809,5 +1919,119 @@ mod tests {
             2,
             "ordinary unrelated files must stay separate"
         );
+    }
+
+    // -- Phase M12: hardware_fit / sort_by_fit / best_fitting_model --------
+
+    /// A minimal `LocalGgufModel` fixture for the pure fit-comparison
+    /// functions below, which only ever look at `estimated_memory_bytes` -
+    /// every other field is filler, unlike this file's other tests (which
+    /// exercise real `.gguf` byte fixtures through `list_local_models`
+    /// end-to-end).
+    fn fixture_model(name: &str, estimated_memory_bytes: Option<u64>) -> LocalGgufModel {
+        LocalGgufModel {
+            path: PathBuf::from(format!("/models/{name}.gguf")),
+            size_bytes: 0,
+            modified_at: String::new(),
+            quantization_hint: None,
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
+            display_name: Some(name.to_string()),
+            estimated_memory_bytes,
+            estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: estimated_memory_bytes.map(|_| 8_192),
+            is_mmproj: false,
+            mmproj_path: None,
+        }
+    }
+
+    #[test]
+    fn hardware_fit_reports_fits_comfortably_under_budget() {
+        assert_eq!(hardware_fit(Some(5_000), Some(10_000)), HardwareFit::Fits);
+    }
+
+    #[test]
+    fn hardware_fit_reports_tight_near_the_threshold() {
+        // 9_000 / 10_000 = 0.90 > TIGHT_THRESHOLD_RATIO (0.85).
+        assert_eq!(hardware_fit(Some(9_000), Some(10_000)), HardwareFit::Tight);
+    }
+
+    #[test]
+    fn hardware_fit_reports_wont_fit_over_budget() {
+        assert_eq!(
+            hardware_fit(Some(11_000), Some(10_000)),
+            HardwareFit::WontFit
+        );
+    }
+
+    #[test]
+    fn hardware_fit_is_unknown_when_estimate_is_missing() {
+        assert_eq!(hardware_fit(None, Some(10_000)), HardwareFit::Unknown);
+    }
+
+    #[test]
+    fn hardware_fit_is_unknown_when_budget_is_missing() {
+        assert_eq!(hardware_fit(Some(5_000), None), HardwareFit::Unknown);
+    }
+
+    #[test]
+    fn sort_by_fit_orders_fits_before_tight_before_wont_fit_before_unknown() {
+        let mut models = vec![
+            fixture_model("wont-fit", Some(20_000)),
+            fixture_model("unknown", None),
+            fixture_model("fits", Some(1_000)),
+            fixture_model("tight", Some(9_000)),
+        ];
+        sort_by_fit(&mut models, Some(10_000));
+        let names: Vec<&str> = models
+            .iter()
+            .map(|m| m.display_name.as_deref().unwrap())
+            .collect();
+        assert_eq!(names, ["fits", "tight", "wont-fit", "unknown"]);
+    }
+
+    #[test]
+    fn sort_by_fit_orders_largest_first_within_a_category() {
+        let mut models = vec![
+            fixture_model("small-fit", Some(1_000)),
+            fixture_model("big-fit", Some(5_000)),
+        ];
+        sort_by_fit(&mut models, Some(10_000));
+        let names: Vec<&str> = models
+            .iter()
+            .map(|m| m.display_name.as_deref().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            ["big-fit", "small-fit"],
+            "largest still-fitting model should sort first"
+        );
+    }
+
+    #[test]
+    fn best_fitting_model_picks_the_largest_that_fits_or_is_tight() {
+        let models = vec![
+            fixture_model("too-big", Some(20_000)),
+            fixture_model("small", Some(1_000)),
+            fixture_model("tight-but-biggest-that-fits", Some(9_000)),
+        ];
+        let best = best_fitting_model(&models, Some(10_000)).expect("expected a best fit");
+        assert_eq!(
+            best.display_name.as_deref(),
+            Some("tight-but-biggest-that-fits")
+        );
+    }
+
+    #[test]
+    fn best_fitting_model_is_none_when_nothing_fits() {
+        let models = vec![fixture_model("too-big", Some(20_000))];
+        assert!(best_fitting_model(&models, Some(10_000)).is_none());
+    }
+
+    #[test]
+    fn best_fitting_model_is_none_for_an_empty_list() {
+        assert!(best_fitting_model(&[], Some(10_000)).is_none());
     }
 }

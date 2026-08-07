@@ -159,6 +159,7 @@ agents:
       "has_chat_template": true,
       "estimated_memory_bytes": 5726732288,
       "estimated_memory_includes_kv_cache": true,
+      "estimated_memory_context_length": 8192,
       "is_mmproj": false,
       "mmproj_path": null
     }
@@ -180,6 +181,50 @@ branch on the exit code instead of parsing error text:
 | `12` | Checksum mismatch |
 | `13` | Network/download failure |
 | `14` | This build wasn't compiled with `--features gguf-management` |
+
+#### `--best-fit`: which model already on disk should I actually run?
+
+Crustly can do a best-effort read of this machine's GPU VRAM (via
+`nvidia-smi`/`rocm-smi`/`system_profiler`/`vulkaninfo` — whichever is
+installed) and system RAM, then compare each local model's estimated memory
+footprint against that budget:
+
+```bash
+crustly llama-cpp list --best-fit
+```
+
+Each row is annotated `Fits` (comfortably under budget), `Tight` (fits, but
+with little headroom), or `Won't fit` (exceeds the detected budget), along
+with the context length the estimate used (the model's own native context
+length capped at 8192 tokens, since a model advertising a huge native
+context nobody would actually configure by default shouldn't get flagged
+`Won't fit` against an unrealistic KV-cache estimate). `--best-fit` also
+sorts the list so the most-capable model that still fits comes first.
+Combine with `--json` to get `fit`/`estimated_memory_context_length` fields
+in the machine-readable output instead.
+
+Hardware detection is a real subprocess spawn, so it's only ever triggered
+by `--best-fit`, `crustly llama-cpp doctor`, or the TUI's Local Models
+dialog (Ctrl+G) — never by a plain `crustly llama-cpp list`. It's cached for
+the lifetime of the process (or the TUI session), and degrades cleanly to
+"unknown"/CPU-only when no supported vendor tool is installed — never an
+error. **Windows AMD/Intel GPUs are not yet detected** (no VRAM figure) —
+NVIDIA works on Windows via `nvidia-smi`; see the DXGI note in
+`ROADMAP.md`'s Backlog if you want to pick that up.
+
+#### `crustly llama-cpp doctor`
+
+Diagnoses your local setup — build features, `models_dir`
+existence/writability, free disk space, configured extra sources, detected
+hardware, and (once you have at least one local model) the largest one your
+detected hardware can comfortably hold:
+
+```bash
+crustly llama-cpp doctor
+```
+
+Always exits `0` — this reports structured findings, it doesn't gate on
+them the way `list`/`pull`/`rm` can fail.
 
 ## Configuration
 

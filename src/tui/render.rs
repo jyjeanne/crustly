@@ -2042,6 +2042,29 @@ fn format_param_count(n: u64) -> String {
     }
 }
 
+/// Fit label + color against `budget_bytes` - mirrors
+/// `llama_cpp_models::hardware_fit`'s three-threshold logic (`WontFit`/
+/// `Tight`/`Fits`), duplicated here rather than called through to it: that
+/// function lives in `llama_cpp_models`, gated on `gguf-management`, and
+/// this file (the TUI's always-compiled render layer) must not pick up
+/// that gate just for a two-line threshold comparison. `None` when either
+/// side is unknown - matches `HardwareFit::Unknown`'s "no tag at all"
+/// treatment (see `llama_cpp_model_lines`'s caller).
+fn llama_cpp_fit_tag(
+    estimated_memory_bytes: Option<u64>,
+    budget_bytes: Option<u64>,
+) -> Option<(&'static str, Color)> {
+    let (estimate, budget) = (estimated_memory_bytes?, budget_bytes?);
+    const TIGHT_THRESHOLD_RATIO: f64 = 0.85;
+    Some(if estimate > budget {
+        ("Won't fit", Color::Red)
+    } else if estimate as f64 > budget as f64 * TIGHT_THRESHOLD_RATIO {
+        ("Tight", Color::Yellow)
+    } else {
+        ("Fits", Color::Green)
+    })
+}
+
 /// Renders one Ctrl+G dialog entry: always a compact main line (using
 /// `display_name` when set - previously this dialog always showed the raw
 /// filename, which for an Ollama-sourced entry is a meaningless
@@ -2052,9 +2075,16 @@ fn format_param_count(n: u64) -> String {
 /// indented detail line - the "expandable detail line" the source plan
 /// describes, expressed as "expands on selection" rather than a new
 /// keybinding, reusing the dialog's existing up/down selection state.
+///
+/// `budget_bytes` (Phase M12) - this machine's detected VRAM+RAM budget, or
+/// `None` when hardware detection hasn't completed/found anything yet -
+/// appends a color-coded Fits/Tight/Won't fit tag to the main line, next to
+/// the quantization label (glanceable per-row, not buried in the
+/// selected-only detail line below).
 fn llama_cpp_model_lines(
     model: &super::llama_cpp_download::LlamaCppModelSummary,
     is_selected: bool,
+    budget_bytes: Option<u64>,
 ) -> Vec<Line<'static>> {
     let style = if is_selected {
         Style::default()
@@ -2086,10 +2116,23 @@ fn llama_cpp_model_lines(
     let size_gb = model.size_bytes as f64 / 1_073_741_824.0;
     let quant = model.quantization_hint.as_deref().unwrap_or("unknown");
 
-    let mut lines = vec![Line::from(vec![
+    let mut main_line_spans = vec![
         Span::styled(prefix, style),
         Span::styled(format!("{name}  ({size_gb:.2} GB, {quant})"), style),
-    ])];
+    ];
+    if let Some((label, color)) = llama_cpp_fit_tag(model.estimated_memory_bytes, budget_bytes) {
+        // When selected, keep the row's own highlight styling for the tag
+        // too (bold, same fg/bg) rather than the distinct color - a
+        // differently-colored span would punch an inconsistent-looking
+        // hole in the selection highlight bar.
+        let tag_style = if is_selected {
+            style
+        } else {
+            Style::default().fg(color)
+        };
+        main_line_spans.push(Span::styled(format!("  [{label}]"), tag_style));
+    }
+    let mut lines = vec![Line::from(main_line_spans)];
 
     if is_selected {
         let mut parts = Vec::new();
@@ -2130,6 +2173,37 @@ fn llama_cpp_model_lines(
     lines
 }
 
+/// The Ctrl+G dialog's one-line host-info row (Phase M11): "detecting
+/// hardware…" while the background task from `App::open_llama_cpp_models`
+/// is in flight, then a GPU/RAM summary once it completes, or nothing (an
+/// empty line, keeping row positions stable) if detection somehow never
+/// got kicked off - not expected via the normal `open_llama_cpp_models`
+/// path, but a defensive fallback rather than a panic.
+fn llama_cpp_hardware_line(app: &App) -> Line<'static> {
+    let style = Style::default().fg(Color::DarkGray);
+    if app.llama_cpp_hardware_loading {
+        return Line::from(Span::styled("  detecting hardware…", style));
+    }
+    let Some(hardware) = &app.llama_cpp_hardware else {
+        return Line::from("");
+    };
+    let gpu_part = match (&hardware.gpu_name, hardware.vram_available_bytes) {
+        (Some(name), Some(vram)) => {
+            format!(
+                "🖥 {name} (~{:.1} GB VRAM free)",
+                vram as f64 / 1_073_741_824.0
+            )
+        }
+        (Some(name), None) => format!("🖥 {name} (VRAM unknown)"),
+        (None, _) => "🖥 CPU-only".to_string(),
+    };
+    let ram_part = match hardware.system_ram_total_bytes {
+        Some(bytes) => format!("RAM ~{:.1} GB", bytes as f64 / 1_073_741_824.0),
+        None => "RAM unknown".to_string(),
+    };
+    Line::from(Span::styled(format!("  {gpu_part} · {ram_part}"), style))
+}
+
 /// Render the llama.cpp Local Models dialog (Ctrl+G): pick a locally-present
 /// `.gguf` file to switch to, or type a URL/`hf:org/repo/file.gguf`
 /// shorthand to download a new one.
@@ -2159,6 +2233,7 @@ fn render_llama_cpp_models(f: &mut Frame, app: &App, area: Rect) {
             .fg(Color::Cyan)
             .add_modifier(Modifier::BOLD),
     )]));
+    lines.push(llama_cpp_hardware_line(app));
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled("  > ", Style::default().fg(Color::DarkGray)),
@@ -2190,8 +2265,16 @@ fn render_llama_cpp_models(f: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(Color::DarkGray),
         )));
     } else {
+        let budget_bytes = app
+            .llama_cpp_hardware
+            .as_ref()
+            .and_then(super::llama_cpp_download::HardwareSummary::budget_bytes);
         for (idx, model) in app.llama_cpp_models.iter().enumerate() {
-            lines.extend(llama_cpp_model_lines(model, idx == app.llama_cpp_selected));
+            lines.extend(llama_cpp_model_lines(
+                model,
+                idx == app.llama_cpp_selected,
+                budget_bytes,
+            ));
         }
     }
 
@@ -2809,6 +2892,7 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
             is_mmproj: false,
             mmproj_path: None,
         }];
@@ -2833,6 +2917,7 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: Some(5_200_000_000),
             estimated_memory_includes_kv_cache: true,
+            estimated_memory_context_length: None,
             is_mmproj: false,
             mmproj_path: None,
         }
@@ -2851,7 +2936,7 @@ mod tests {
         let mut model = llama_cpp_model_fixture("/models/sha256-abc123.gguf");
         model.display_name = Some("qwen2.5-coder:7b".to_string());
 
-        let lines = llama_cpp_model_lines(&model, false);
+        let lines = llama_cpp_model_lines(&model, false, None);
         let text: String = lines[0].spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(text.contains("qwen2.5-coder:7b"));
         assert!(!text.contains("sha256-abc123"));
@@ -2861,7 +2946,7 @@ mod tests {
     fn llama_cpp_model_lines_labels_a_paired_and_an_unpaired_mmproj_entry_differently() {
         let mut paired = llama_cpp_model_fixture("/models/a.gguf");
         paired.mmproj_path = Some(std::path::PathBuf::from("/models/mmproj-a.gguf"));
-        let paired_text: String = llama_cpp_model_lines(&paired, false)[0]
+        let paired_text: String = llama_cpp_model_lines(&paired, false, None)[0]
             .spans
             .iter()
             .map(|s| s.content.as_ref())
@@ -2870,7 +2955,7 @@ mod tests {
 
         let mut unpaired = llama_cpp_model_fixture("/models/mmproj-b.gguf");
         unpaired.is_mmproj = true;
-        let unpaired_text: String = llama_cpp_model_lines(&unpaired, false)[0]
+        let unpaired_text: String = llama_cpp_model_lines(&unpaired, false, None)[0]
             .spans
             .iter()
             .map(|s| s.content.as_ref())
@@ -2882,10 +2967,10 @@ mod tests {
     fn llama_cpp_model_lines_shows_a_detail_line_only_when_selected() {
         let model = llama_cpp_model_fixture("/models/a.gguf");
 
-        let unselected = llama_cpp_model_lines(&model, false);
+        let unselected = llama_cpp_model_lines(&model, false, None);
         assert_eq!(unselected.len(), 1, "no detail line when not selected");
 
-        let selected = llama_cpp_model_lines(&model, true);
+        let selected = llama_cpp_model_lines(&model, true, None);
         assert_eq!(selected.len(), 2, "a detail line appears when selected");
         let detail: String = selected[1]
             .spans
@@ -2897,6 +2982,64 @@ mod tests {
         assert!(detail.contains("ctx 32768"));
         assert!(detail.contains("4.8 GB")); // 5.2e9 bytes as GiB (1_073_741_824 divisor)
         assert!(detail.contains("chat template"));
+    }
+
+    #[test]
+    fn llama_cpp_model_lines_shows_a_fit_tag_when_budget_is_known() {
+        let model = llama_cpp_model_fixture("/models/a.gguf"); // 5.2 GB estimate
+        let text: String = llama_cpp_model_lines(&model, false, Some(10_000_000_000))[0]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(text.contains("[Fits]"), "got: {text}");
+    }
+
+    #[test]
+    fn llama_cpp_model_lines_shows_wont_fit_when_estimate_exceeds_budget() {
+        let model = llama_cpp_model_fixture("/models/a.gguf"); // 5.2 GB estimate
+        let text: String = llama_cpp_model_lines(&model, false, Some(1_000_000_000))[0]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(text.contains("[Won't fit]"), "got: {text}");
+    }
+
+    #[test]
+    fn llama_cpp_model_lines_shows_no_fit_tag_when_budget_is_unknown() {
+        let model = llama_cpp_model_fixture("/models/a.gguf");
+        let text: String = llama_cpp_model_lines(&model, false, None)[0]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(!text.contains('['), "got: {text}");
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_models_dialog_shows_hardware_detecting_state() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_hardware_loading = true;
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("detecting hardware"));
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_models_dialog_shows_hardware_summary_once_detected() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        app.llama_cpp_hardware = Some(super::super::llama_cpp_download::HardwareSummary {
+            gpu_name: Some("Test GPU 9000".to_string()),
+            vram_available_bytes: Some(21_474_836_480),
+            system_ram_total_bytes: Some(34_359_738_368),
+        });
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("Test GPU 9000"));
+        assert!(screen.contains("RAM"));
     }
 
     #[tokio::test]

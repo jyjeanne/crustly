@@ -279,6 +279,14 @@ pub enum LlamaCppCommands {
         /// table - no emoji header, just the JSON, for scripting/agents.
         #[arg(long)]
         json: bool,
+        /// Sort by fit against this machine's detected GPU VRAM/system RAM
+        /// (best-effort, best-effort-cached per invocation) instead of by
+        /// path, and annotate each entry Fits/Tight/Won't fit. Composable
+        /// with --json (adds `fit`/`estimated_memory_context_length`
+        /// fields). Never used for anything but already-downloaded models -
+        /// this does not search Hugging Face for new ones.
+        #[arg(long)]
+        best_fit: bool,
     },
     /// Download a model: a direct URL, or an `hf:org/repo/file.gguf[@revision]`
     /// shorthand resolved against Hugging Face
@@ -343,8 +351,18 @@ struct LlamaCppModelJson {
     has_chat_template: bool,
     estimated_memory_bytes: Option<u64>,
     estimated_memory_includes_kv_cache: bool,
+    /// The context length `estimated_memory_bytes` was actually computed
+    /// at - see `LocalGgufModel::estimated_memory_context_length`.
+    estimated_memory_context_length: Option<u64>,
     is_mmproj: bool,
     mmproj_path: Option<std::path::PathBuf>,
+    /// Fit against this machine's detected hardware ("Fits"/"Tight"/"Won't
+    /// fit"/"unknown") - Phase M12. Only set (present in the serialized
+    /// JSON) when `--best-fit` was passed; omitted entirely on a plain
+    /// `list --json`, matching that flag's opt-in, detection-costs-a-
+    /// subprocess-spawn framing (`hardware_detect`'s own module doc).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fit: Option<String>,
 }
 
 #[cfg(feature = "gguf-management")]
@@ -362,8 +380,10 @@ impl From<&crate::llm::provider::llama_cpp_models::LocalGgufModel> for LlamaCppM
             has_chat_template: m.has_chat_template,
             estimated_memory_bytes: m.estimated_memory_bytes,
             estimated_memory_includes_kv_cache: m.estimated_memory_includes_kv_cache,
+            estimated_memory_context_length: m.estimated_memory_context_length,
             is_mmproj: m.is_mmproj,
             mmproj_path: m.mmproj_path.clone(),
+            fit: None,
         }
     }
 }
@@ -373,6 +393,23 @@ impl From<&crate::llm::provider::llama_cpp_models::LocalGgufModel> for LlamaCppM
 struct LlamaCppListJson {
     schema_version: u32,
     models: Vec<LlamaCppModelJson>,
+}
+
+/// Human/JSON display label for a `HardwareFit` value - Phase M12. A
+/// standalone function (not a `Display` impl on `HardwareFit` itself,
+/// which lives in `llama_cpp_models.rs` and has no reason to know about
+/// this CLI's specific wording) so `--best-fit`'s human table and its
+/// `--json` `fit` field use one identical wording, not two that could
+/// drift apart.
+#[cfg(feature = "gguf-management")]
+fn hardware_fit_label(fit: crate::llm::provider::llama_cpp_models::HardwareFit) -> &'static str {
+    use crate::llm::provider::llama_cpp_models::HardwareFit;
+    match fit {
+        HardwareFit::Fits => "Fits",
+        HardwareFit::Tight => "Tight",
+        HardwareFit::WontFit => "Won't fit",
+        HardwareFit::Unknown => "unknown",
+    }
 }
 
 /// Maps an error from a `crustly llama-cpp` subcommand to a specific,
@@ -1399,20 +1436,43 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
     let models_dir = config.providers.llama_cpp_models_dir();
 
     match operation {
-        LlamaCppCommands::List { json } => {
+        LlamaCppCommands::List { json, best_fit } => {
             let extra_model_paths = config.providers.llama_cpp_extra_model_paths();
             let ollama_models_dir = config.providers.llama_cpp_ollama_models_dir();
-            let models = llama_cpp_models::list_all_local_models(
+            let mut models = llama_cpp_models::list_all_local_models(
                 &models_dir,
                 &extra_model_paths,
                 ollama_models_dir.as_deref(),
             )?;
 
+            // Detection spawns subprocesses - only paid for when actually
+            // asked for (`hardware_detect`'s own module doc), never as a
+            // side effect of a plain `list`.
+            let budget_bytes = if best_fit {
+                crate::llm::provider::hardware_detect::detect_hardware().budget_bytes()
+            } else {
+                None
+            };
+            if best_fit {
+                llama_cpp_models::sort_by_fit(&mut models, budget_bytes);
+            }
+
             if json {
-                let payload = LlamaCppListJson {
+                let mut payload = LlamaCppListJson {
                     schema_version: LLAMA_CPP_LIST_JSON_SCHEMA_VERSION,
                     models: models.iter().map(LlamaCppModelJson::from).collect(),
                 };
+                if best_fit {
+                    for (m, j) in models.iter().zip(payload.models.iter_mut()) {
+                        j.fit = Some(
+                            hardware_fit_label(llama_cpp_models::hardware_fit(
+                                m.estimated_memory_bytes,
+                                budget_bytes,
+                            ))
+                            .to_string(),
+                        );
+                    }
+                }
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&payload)
@@ -1454,9 +1514,26 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
                         }
                         None => "-".to_string(),
                     };
-                    println!(
+                    print!(
                         "  {:<45} {:>7.2} GB   {:<10} {:<22} {}",
                         name, size_gb, quant, memory, m.modified_at
+                    );
+                    if best_fit {
+                        let fit =
+                            llama_cpp_models::hardware_fit(m.estimated_memory_bytes, budget_bytes);
+                        match m.estimated_memory_context_length {
+                            Some(ctx) => {
+                                print!("   {} (ctx {ctx})", hardware_fit_label(fit))
+                            }
+                            None => print!("   {}", hardware_fit_label(fit)),
+                        }
+                    }
+                    println!();
+                }
+                if best_fit && budget_bytes.is_none() {
+                    println!(
+                        "\n  (hardware detection found no usable GPU/RAM reading on this \
+                         machine - every entry above is \"unknown\")"
                     );
                 }
             }
@@ -1731,6 +1808,80 @@ fn llama_cpp_doctor_findings(
                 ),
             }
         });
+    }
+
+    // Phase M11/M12: surface the detected hardware as text - this is the
+    // natural home for that output (M9's own doc comment already called it
+    // out), not a reason to duplicate detection logic here. Always `Ok` -
+    // "CPU-only, RAM unknown" is a legitimate, non-fatal reading on a
+    // machine/CI image with no vendor tools installed, same as every other
+    // "unknown" this function already reports without failing.
+    let hardware = crate::llm::provider::hardware_detect::detect_hardware();
+    let hardware_message = match &hardware.gpu {
+        Some(gpu) => {
+            let name = gpu.name.as_deref().unwrap_or("unknown GPU");
+            match gpu.vram_available_bytes() {
+                Some(vram) => format!(
+                    "detected GPU: {name} (~{:.1} GB VRAM available)",
+                    vram as f64 / 1_073_741_824.0
+                ),
+                None => format!("detected GPU: {name} (VRAM unknown)"),
+            }
+        }
+        None => "no GPU detected (or no supported vendor tool installed) - CPU-only".to_string(),
+    };
+    let ram_message = match hardware.system_ram_total_bytes {
+        Some(bytes) => format!("system RAM: ~{:.1} GB", bytes as f64 / 1_073_741_824.0),
+        None => "system RAM: unknown".to_string(),
+    };
+    findings.push(DoctorFinding {
+        status: DoctorStatus::Ok,
+        message: format!("{hardware_message}; {ram_message}"),
+    });
+
+    // Best-effort - a models scan failure here (e.g. models_dir genuinely
+    // unreadable, already reported above) just means this bonus finding is
+    // skipped, not that `doctor` itself fails.
+    if let Ok(models) = llama_cpp_models::list_all_local_models(
+        models_dir,
+        &config.providers.llama_cpp_extra_model_paths(),
+        config.providers.llama_cpp_ollama_models_dir().as_deref(),
+    ) {
+        if !models.is_empty() {
+            let budget_bytes = hardware.budget_bytes();
+            findings.push(
+                match llama_cpp_models::best_fitting_model(&models, budget_bytes) {
+                    Some(best) => {
+                        let name = best.display_name.clone().unwrap_or_else(|| {
+                            best.path
+                                .file_name()
+                                .map(|n| n.to_string_lossy().into_owned())
+                                .unwrap_or_default()
+                        });
+                        let gb = best.estimated_memory_bytes.unwrap_or(0) as f64 / 1_073_741_824.0;
+                        DoctorFinding {
+                            status: DoctorStatus::Ok,
+                            message: format!(
+                                "largest already-downloaded model this hardware can hold: \
+                             {name} (~{gb:.1} GB estimated)"
+                            ),
+                        }
+                    }
+                    None if budget_bytes.is_some() => DoctorFinding {
+                        status: DoctorStatus::Warn,
+                        message: "no already-downloaded model comfortably fits this hardware's \
+                              detected budget - consider a smaller quantization"
+                            .to_string(),
+                    },
+                    None => DoctorFinding {
+                        status: DoctorStatus::Warn,
+                        message: "could not determine a hardware budget to compare downloaded \
+                              models against"
+                            .to_string(),
+                    },
+                },
+            );
+        }
     }
 
     findings
@@ -2086,7 +2237,10 @@ mod tests {
         assert!(matches!(
             cli.command,
             Some(Commands::LlamaCpp {
-                operation: LlamaCppCommands::List { json: false }
+                operation: LlamaCppCommands::List {
+                    json: false,
+                    best_fit: false
+                }
             })
         ));
 
@@ -2094,7 +2248,32 @@ mod tests {
         assert!(matches!(
             cli.command,
             Some(Commands::LlamaCpp {
-                operation: LlamaCppCommands::List { json: true }
+                operation: LlamaCppCommands::List {
+                    json: true,
+                    best_fit: false
+                }
+            })
+        ));
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "list", "--best-fit"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::List {
+                    json: false,
+                    best_fit: true
+                }
+            })
+        ));
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "list", "--json", "--best-fit"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::List {
+                    json: true,
+                    best_fit: true
+                }
             })
         ));
 
@@ -2142,8 +2321,10 @@ mod tests {
             has_chat_template: true,
             estimated_memory_bytes: Some(5_200_000_000),
             estimated_memory_includes_kv_cache: true,
+            estimated_memory_context_length: Some(8_192),
             is_mmproj: false,
             mmproj_path: None,
+            fit: None,
         };
         let payload = LlamaCppListJson {
             schema_version: LLAMA_CPP_LIST_JSON_SCHEMA_VERSION,
@@ -2157,6 +2338,11 @@ mod tests {
         assert_eq!(json["models"][0]["has_chat_template"], true);
         assert_eq!(json["models"][0]["is_mmproj"], false);
         assert!(json["models"][0]["mmproj_path"].is_null());
+        assert_eq!(json["models"][0]["estimated_memory_context_length"], 8192);
+        // `fit` is only present when `--best-fit` was passed - omitted
+        // entirely (not even `null`) on a plain `list --json`, per its
+        // `#[serde(skip_serializing_if = "Option::is_none")]`.
+        assert!(!json["models"][0].as_object().unwrap().contains_key("fit"));
     }
 
     #[cfg(feature = "gguf-management")]
@@ -2176,6 +2362,7 @@ mod tests {
             display_name: Some("nice-name".to_string()),
             estimated_memory_bytes: Some(5_000_000_000),
             estimated_memory_includes_kv_cache: true,
+            estimated_memory_context_length: Some(8_192),
             is_mmproj: false,
             mmproj_path: None,
         };
@@ -2183,6 +2370,12 @@ mod tests {
         assert_eq!(json.quantization.as_deref(), Some("Q4_K_M"));
         assert_eq!(json.display_name.as_deref(), Some("nice-name"));
         assert_eq!(json.parameter_count, Some(7_000_000_000));
+        assert_eq!(json.estimated_memory_context_length, Some(8_192));
+        assert_eq!(
+            json.fit, None,
+            "From<&LocalGgufModel> never sets `fit` - only --best-fit's own \
+             handler does, after conversion"
+        );
     }
 
     #[test]
@@ -2303,6 +2496,57 @@ mod tests {
             |f| f.message.contains("gguf-management feature compiled in")
                 && f.status == DoctorStatus::Ok
         ));
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_always_reports_detected_hardware() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config = crate::config::Config::default();
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        // This sandbox has no nvidia-smi/rocm-smi/vulkaninfo installed, so
+        // this exercises the real "no vendor tool found" degrade-to-
+        // CPU-only path end-to-end, not a mocked one - the same "missing
+        // tool -> unknown, never fatal" contract `hardware_detect`'s own
+        // tests establish in isolation.
+        let hardware_finding = findings
+            .iter()
+            .find(|f| f.message.contains("system RAM"))
+            .expect("must report a hardware finding");
+        assert_eq!(hardware_finding.status, DoctorStatus::Ok);
+        assert!(
+            hardware_finding.message.contains("GPU"),
+            "expected the GPU half of the hardware finding, got: {}",
+            hardware_finding.message
+        );
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_skips_the_best_fit_finding_when_no_models_present() {
+        let tmp = tempfile::tempdir().expect("tempdir"); // empty - no .gguf files
+        let config = crate::config::Config::default();
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.message.contains("already-downloaded model")),
+            "no local models means no best-fit bonus finding at all, not a Warn about it"
+        );
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn hardware_fit_label_matches_the_documented_wording() {
+        use crate::llm::provider::llama_cpp_models::HardwareFit;
+        assert_eq!(hardware_fit_label(HardwareFit::Fits), "Fits");
+        assert_eq!(hardware_fit_label(HardwareFit::Tight), "Tight");
+        assert_eq!(hardware_fit_label(HardwareFit::WontFit), "Won't fit");
+        assert_eq!(hardware_fit_label(HardwareFit::Unknown), "unknown");
     }
 
     #[cfg(feature = "gguf-management")]

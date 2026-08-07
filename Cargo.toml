@@ -77,8 +77,12 @@ sha2 = { version = "0.11", optional = true }
 # Only the `Disks`/`Disk` API is used (`Disks::new_with_refreshed_list()`,
 # `.mount_point()`, `.available_space()`), so default features are dropped
 # to skip process/network/component enumeration this crate doesn't need.
+# "system" added for Phase M11 (hardware_detect.rs) - `System::total_memory()`
+# for the CPU-only/Apple-unified-memory RAM reading is gated behind it (confirmed
+# by reading the vendored crate's Cargo.toml, not assumed).
 sysinfo = { version = "0.33", optional = true, default-features = false, features = [
     "disk",
+    "system",
 ] }
 # Grammar-constrained decoding for tool calls (Phase 4b, `llama-cpp-llguidance`
 # feature only) - builds the JSON-Schema-union grammar and the constrained

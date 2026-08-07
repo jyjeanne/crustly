@@ -208,6 +208,16 @@ pub struct App {
     /// `llama-cpp` - used by the Model Info panel for GPU-layers/quantization
     /// details, since neither is on the generic `Provider` trait.
     llama_cpp_active_model_path: Option<std::path::PathBuf>,
+    /// This machine's detected hardware (Phase M11) - `None` until the
+    /// Ctrl+G dialog's background detection task completes; stays `Some`
+    /// for the rest of the TUI session once set (detection itself is
+    /// separately cached process-wide by `hardware_detect`'s own
+    /// `OnceLock` - this field just avoids re-firing the background task
+    /// on every dialog open).
+    pub llama_cpp_hardware: Option<super::llama_cpp_download::HardwareSummary>,
+    /// Whether the hardware-detection background task is in flight - drives
+    /// the dialog's "detecting hardware…" host-info row.
+    pub llama_cpp_hardware_loading: bool,
 
     // `/skills` slash command state
     pub skills_list: Vec<crate::llm::tools::skill::SkillListing>,
@@ -362,6 +372,8 @@ impl App {
             llama_cpp_ollama_models_dir: None,
             llama_cpp_config: None,
             llama_cpp_active_model_path: None,
+            llama_cpp_hardware: None,
+            llama_cpp_hardware_loading: false,
             skills_list: Vec::new(),
             skills_selected: 0,
             mcp_selected: 0,
@@ -914,6 +926,10 @@ impl App {
                 self.llama_cpp_loading = false;
                 self.llama_cpp_models = models;
                 self.llama_cpp_selected = 0;
+            }
+            TuiEvent::LlamaCppHardwareDetected(hardware) => {
+                self.llama_cpp_hardware_loading = false;
+                self.llama_cpp_hardware = Some(hardware);
             }
             TuiEvent::LlamaCppDownloadProgress(progress) => {
                 self.llama_cpp_download_fraction = progress.fraction();
@@ -2860,6 +2876,20 @@ impl App {
             let _ = sender.send(TuiEvent::LlamaCppModelsListed(models));
         });
 
+        // Hardware detection (Phase M11) spawns subprocesses, so it's only
+        // triggered once per TUI session - the first time this dialog opens
+        // (`hardware_detect`'s own "when this runs" rule) - not on every
+        // subsequent open, even though detection itself is separately
+        // cached process-wide by a `OnceLock` and would be cheap either way.
+        if self.llama_cpp_hardware.is_none() && !self.llama_cpp_hardware_loading {
+            self.llama_cpp_hardware_loading = true;
+            let sender = self.event_sender();
+            tokio::spawn(async move {
+                let hardware = super::llama_cpp_download::detect_hardware_summary().await;
+                let _ = sender.send(TuiEvent::LlamaCppHardwareDetected(hardware));
+            });
+        }
+
         self.switch_mode(AppMode::LlamaCppModelPicker).await
     }
 
@@ -4325,6 +4355,51 @@ mod tests {
         assert_eq!(app.mode, AppMode::LlamaCppModelPicker);
         assert!(app.llama_cpp_loading);
         assert!(app.llama_cpp_models.is_empty());
+        // Phase M11: hardware detection kicks off alongside the model scan
+        // the first time this dialog opens.
+        assert!(app.llama_cpp_hardware_loading);
+        assert!(app.llama_cpp_hardware.is_none());
+    }
+
+    #[tokio::test]
+    async fn ctrl_g_does_not_re_trigger_hardware_detection_on_a_second_open() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.llama_cpp_hardware = Some(super::super::llama_cpp_download::HardwareSummary {
+            gpu_name: None,
+            vram_available_bytes: None,
+            system_ram_total_bytes: Some(1),
+        });
+
+        app.handle_key_event(key_mod(KeyCode::Char('g'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert!(
+            !app.llama_cpp_hardware_loading,
+            "already-detected hardware must not be re-fetched on a later dialog open"
+        );
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_hardware_detected_clears_loading_state_and_stores_the_result() {
+        let mut app = test_app().await;
+        app.llama_cpp_hardware_loading = true;
+
+        app.handle_event(TuiEvent::LlamaCppHardwareDetected(
+            super::super::llama_cpp_download::HardwareSummary {
+                gpu_name: Some("Test GPU".to_string()),
+                vram_available_bytes: Some(1_000),
+                system_ram_total_bytes: Some(2_000),
+            },
+        ))
+        .await
+        .unwrap();
+
+        assert!(!app.llama_cpp_hardware_loading);
+        let hardware = app.llama_cpp_hardware.expect("hardware must be set");
+        assert_eq!(hardware.gpu_name.as_deref(), Some("Test GPU"));
+        assert_eq!(hardware.budget_bytes(), Some(3_000));
     }
 
     #[tokio::test]
@@ -4344,6 +4419,7 @@ mod tests {
                 display_name: None,
                 estimated_memory_bytes: None,
                 estimated_memory_includes_kv_cache: false,
+                estimated_memory_context_length: None,
                 is_mmproj: false,
                 mmproj_path: None,
             },
@@ -4358,6 +4434,7 @@ mod tests {
                 display_name: None,
                 estimated_memory_bytes: None,
                 estimated_memory_includes_kv_cache: false,
+                estimated_memory_context_length: None,
                 is_mmproj: false,
                 mmproj_path: None,
             },
@@ -4387,6 +4464,7 @@ mod tests {
                 display_name: None,
                 estimated_memory_bytes: None,
                 estimated_memory_includes_kv_cache: false,
+                estimated_memory_context_length: None,
                 is_mmproj: false,
                 mmproj_path: None,
             },
@@ -4401,6 +4479,7 @@ mod tests {
                 display_name: None,
                 estimated_memory_bytes: None,
                 estimated_memory_includes_kv_cache: false,
+                estimated_memory_context_length: None,
                 is_mmproj: false,
                 mmproj_path: None,
             },
@@ -4464,6 +4543,7 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
             is_mmproj: false,
             mmproj_path: None,
         }];
@@ -4494,6 +4574,7 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
             is_mmproj: false,
             mmproj_path: None,
         }];
@@ -4584,6 +4665,7 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
             is_mmproj: false,
             mmproj_path: None,
         }];

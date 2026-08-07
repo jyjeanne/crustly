@@ -726,7 +726,48 @@ replicating that maintenance burden isn't justified by this plan's scope.
 see M12 below. If this phase is ever picked back up, it's specifically about
 suggesting *new* models to download, not about ranking ones already on disk.
 
-### Phase M11 — Hardware detection & display
+### Phase M11 — Hardware detection & display ✅ Done
+
+Implemented largely as planned, with one deliberate scope reduction disclosed
+up front rather than discovered mid-implementation: **the Windows AMD/Intel
+DXGI path is a documented stub returning `None`**, not a real Win32 FFI
+binding. This development environment is Linux-only with no Windows target to
+build or test against; writing `unsafe` COM interface calls with zero ability
+to verify they even compile is worse than being explicit about the gap - it
+falls through cleanly to the CPU-only/system-RAM path, which is this phase's
+own designed-in degrade-cleanly outcome, not a crash. NVIDIA-on-Windows is
+unaffected (`nvidia-smi` is a portable subprocess call). No new
+`windows`/`windows-sys` dependency was added as a result - if a future pass
+picks this up on a real Windows dev machine, add it then.
+
+Every other detection path shipped as designed: `src/llm/provider/hardware_detect.rs`
+(new, `gguf-management`-gated) with `detect_nvidia`/`detect_amd_rocm`/
+`detect_apple_display`/`detect_vulkan_fallback`, each split into a subprocess-spawn
+half and an independently-unit-tested pure parse half (`parse_nvidia_smi_csv`,
+`parse_rocm_smi_json`, `parse_system_profiler_json`, `parse_vulkaninfo_summary`) -
+23 new tests, all against captured real-shaped sample output, no live GPU needed.
+`run_with_timeout` hand-rolls the subprocess timeout via a poll loop (`try_wait` +
+`kill` on deadline) rather than a new crate, per the plan's own dependency table.
+System RAM comes from `sysinfo::System::total_memory()` - required adding the
+crate's `"system"` feature (`Cargo.toml`), confirmed by reading the vendored
+0.33.1 source directly rather than assumed, alongside the `"disk"` feature M6
+already enabled. `detect_hardware()` caches in a `OnceLock` exactly as specified,
+and is only ever called from `doctor`, `list --best-fit` (M12), and the TUI's
+host-info row on the Ctrl+G dialog's first open per session
+(`App::open_llama_cpp_models`, guarded by `llama_cpp_hardware.is_none()`) -
+verified by a dedicated test that a second dialog open does not re-trigger
+detection. Display: `doctor` gained a hardware finding (GPU name+available-VRAM
+or "CPU-only", plus system RAM, always `Ok`); the Ctrl+G dialog gained a
+one-line host-info row ("detecting hardware…" while the background task runs,
+then the summary) via a new `TuiEvent::LlamaCppHardwareDetected` and always-
+compiled `HardwareSummary` struct in `llama_cpp_download.rs`, mirroring the
+existing `LlamaCppModelSummary` feature-decoupling pattern exactly.
+
+End-to-end smoke test against the real binary in this sandbox (which has none
+of `nvidia-smi`/`rocm-smi`/`vulkaninfo` installed) confirmed the CPU-only/
+system-RAM-only degrade path live, not just in unit tests: `crustly llama-cpp
+doctor` reported "no GPU detected (or no supported vendor tool installed) -
+CPU-only; system RAM: ~15.7 GB" with `Ok` status and exit 0.
 
 **Depends on**: nothing functionally (can ship independently of M1-M9), but
 most useful once M2 exists to interpret it against.
@@ -786,7 +827,42 @@ from also becoming a "never slows down the common path" regression.
 each independently testable against captured sample output) plus the
 degradation-path testing the "clean fallback" requirement above demands.
 
-### Phase M12 — Local hardware-fit filtering (the part of `recommend` that doesn't need benchmark data)
+### Phase M12 — Local hardware-fit filtering (the part of `recommend` that doesn't need benchmark data) ✅ Done
+
+Implemented as planned, plus one useful discovery: `LocalGgufModel::estimated_memory_bytes`
+(M2) was **already** computed at `min(native_context_length, 8192)` - the
+exact capped-context rule this phase's spec calls for - so no new memory-
+estimate logic was needed, only the fit comparison itself and a place to
+surface which context length the estimate used
+(`LocalGgufModel::estimated_memory_context_length`, a new field threaded
+through the same `LlamaCppModelJson`/`LlamaCppModelSummary` mirror boundaries
+every prior field addition established).
+
+`src/llm/provider/llama_cpp_models.rs` gained `HardwareFit` (`Fits`/`Tight`/
+`WontFit`/`Unknown`, `Tight` at >85% of budget, a documented default not a
+tuned one), `hardware_fit()`, `sort_by_fit()` (fit category first, largest
+`estimated_memory_bytes` first within a category - the most-capable
+already-fitting model sorts to the top, a reasonable proxy for "best" absent
+benchmark data), and `best_fitting_model()` (doctor's payoff line). `crustly
+llama-cpp list --best-fit` sorts and annotates each row with `Fit: <label>
+(ctx N)`; combined with `--json` it adds `fit`/`estimated_memory_context_length`
+fields to the existing versioned schema (additive, no `schema_version` bump).
+`doctor` gained a `best_fitting_model`-powered finding naming the largest
+already-downloaded model the detected hardware can hold (or a `Warn` when
+none fit) - the exact payoff M9's and M11's own doc comments predicted this
+phase would deliver. The TUI Ctrl+G dialog annotates each row with a
+color-coded `[Fits]`/`[Tight]`/`[Won't fit]` tag (green/yellow/red, or the
+row's own highlight color when selected, to avoid a visually inconsistent
+un-highlighted patch) via a small duplicated threshold function in
+`render.rs` rather than importing the `gguf-management`-gated
+`HardwareFit` type into the TUI's always-compiled render layer.
+
+End-to-end smoke test against the real binary confirmed the full chain live:
+a synthetic 7B Q4_K_M `.gguf` fixture (~5.0 GB estimate at the capped 8192-
+token context) against this sandbox's real (GPU-less) ~15.7 GB system RAM
+budget correctly labeled `Fits`, both in the human table (`Fits (ctx 8192)`)
+and in `--json` output (`"fit": "Fits"`), and surfaced identically through
+`doctor`'s "largest already-downloaded model this hardware can hold" line.
 
 **Depends on**: M1, M2, M11.
 
