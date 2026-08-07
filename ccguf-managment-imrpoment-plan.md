@@ -599,7 +599,30 @@ environment to exercise the reject branch otherwise.
 
 **Effort**: Medium.
 
-### Phase M7 — Agent-facing CLI contract
+### Phase M7 — Agent-facing CLI contract ✅ Done
+
+Implemented as planned: `LlamaCppModelJson`/`LlamaCppListJson` (a dedicated,
+versioned DTO decoupled from `LocalGgufModel`, `schema_version` starting at 1) for
+`crustly llama-cpp list --json`; exit codes scoped only to `llama-cpp` subcommands
+(10 no such file, 11 disk space, 12 checksum, 13 network, 14 feature not compiled
+in, 1 generic - unchanged from every other Crustly command), matched against known
+error-message prefixes in `anyhow::Error::chain()` rather than a new taxonomy,
+exactly as the plan called for. One correction made along the way: `llama_cpp_exit_code`
+must check the whole context chain, not just `.to_string()`'s outermost layer - `Pull`
+wraps every error in `"Failed to download '...'"`, so the specific cause is always a
+layer deeper; the first version of this logic (checking only the outermost message)
+would have silently classified every `Pull` failure as "unrecognized."
+
+**Bug found and fixed along the way, unrelated to this phase's own logic**:
+verifying the `10` (no-such-file) exit code against the real CLI binary surfaced a
+genuine pre-existing clap arg-parsing bug - `LlamaCppCommands::Rm`'s positional field
+was named `model`, identical to the top-level `global = true` `--model` flag's ident,
+which caused clap to route the positional value into the wrong field entirely (`rm
+some-model.gguf` behaved as if `--model some-model.gguf` had been passed, never
+reaching `Rm` at all). Fixed by renaming the field to `name` (also more accurate -
+it's a filename, not "the model"). **`ollama rm` has the identical bug via the same
+root cause and was deliberately left unfixed** - confirmed independently, but
+touching Ollama's CLI is outside this phase's scope; flagged for a future pass.
 
 **Depends on**: M1 (for `list --json` to be worth adding).
 
@@ -615,7 +638,22 @@ environment to exercise the reject branch otherwise.
 
 **Effort**: Small–Medium.
 
-### Phase M8 — TUI enhancements
+### Phase M8 — TUI enhancements ✅ Done
+
+Implemented as planned, plus one baseline fix the plan didn't call out explicitly:
+the Ctrl+G dialog was rendering `model.path.file_name()` directly, never
+`display_name` - meaning an Ollama-sourced entry showed its raw `sha256-<hex>` blob
+filename, and M3/M4/M5's merged split-GGUF/mmproj-paired entries didn't show their
+synthesized names either. Fixed as a prerequisite (new `llama_cpp_model_lines`
+helper, `display_name`-aware, same `" (+ mmproj)"`/`" [mmproj]"` labels as the CLI),
+with an expandable detail line shown on selection (architecture, parameter count via
+a new `format_param_count` helper, native context length, memory estimate, chat-
+template presence) rather than a new keybinding - reuses the dialog's existing
+up/down selection state. Ctrl+O panel: quantization already used the header-parsed
+value as of M1; this phase added `LlamaCppModelDetails.context_length`/
+`has_chat_template` and two new panel rows ("Nat. ctx:", "Chat tmpl:"), computed via
+a new small always-compiled two-variant helper mirroring `quantization_hint_for_path`'s
+existing `#[cfg(feature = "gguf-management")]` split exactly.
 
 **Depends on**: M1, M2, M4, M5.
 

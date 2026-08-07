@@ -86,6 +86,9 @@ crustly llama-cpp pull https://example.com/path/to/model.gguf
 # Hugging Face shorthand - resolves to
 # https://huggingface.co/<org>/<repo>/resolve/main/<file>
 crustly llama-cpp pull hf:Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+
+# Pin a specific revision/commit for reproducible pulls
+crustly llama-cpp pull hf:Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf@abc123
 ```
 
 The `hf:` shorthand also looks up the file's published SHA-256 (Hugging
@@ -97,12 +100,26 @@ against, so it downloads with a warning that no integrity hash is
 available. **Gated/private Hugging Face repos aren't supported** — there's
 no token support in this version.
 
+Before streaming starts, Crustly checks that the destination has enough
+free disk space for the download (plus a safety margin) and fails fast
+with a clear message rather than filling the disk mid-download. If a
+download is interrupted, running `pull` again for the same file resumes
+from where it left off instead of restarting, when the server supports
+`Range` requests (most do; a server that doesn't just restarts cleanly).
+
 Downloaded models land in `providers.llama_cpp.models_dir` (default: a
-platform cache directory, `~/.cache/crustly/models` on Linux).
+platform cache directory, `~/.cache/crustly/models` on Linux). Crustly also
+scans `providers.llama_cpp.extra_model_paths` (extra directories you list
+in config) and, if `providers.llama_cpp.scan_ollama_models = true`, models
+already pulled via `ollama pull` — read directly from Ollama's own manifest
+tree, not duplicated on disk.
 
 ```bash
-# List what's downloaded
+# List what's downloaded (all configured sources merged into one list)
 crustly llama-cpp list
+
+# Same, as machine-readable JSON (stable, versioned schema - see below)
+crustly llama-cpp list --json
 
 # Remove one (asks for confirmation - a self-downloaded multi-GB file is
 # harder to reacquire than an `ollama pull` re-fetch from a registry)
@@ -110,9 +127,59 @@ crustly llama-cpp rm qwen2.5-coder-7b-instruct-q4_k_m.gguf
 ```
 
 There is no `crustly llama-cpp show` (unlike Ollama) — `llama.cpp` has no
-equivalent of Ollama's `/api/show` metadata endpoint. `crustly llama-cpp
-list` shows a best-effort quantization guess parsed from the filename
-convention (e.g. `Q4_K_M`, `Q8_0`) instead.
+equivalent of Ollama's `/api/show` metadata endpoint. Instead, `crustly
+llama-cpp list` reads each file's own GGUF header directly (architecture,
+real quantization, parameter count, native context length, chat-template
+presence, an estimated memory footprint) — a filename-convention guess
+(`Q4_K_M`, `Q8_0`) is only used as a last resort, when the header itself
+can't be read. Split multi-part GGUFs (`model-00001-of-00005.gguf`) and a
+paired vision/audio projector (`mmproj-*.gguf`, matched to its base model
+by filename and shown as `"model.gguf (+ mmproj)"`) are collapsed into one
+listing entry rather than shown as unrelated files.
+
+#### `--json` output and exit codes
+
+`crustly llama-cpp list --json` prints a stable, versioned schema instead
+of the human-readable table — no emoji header, just JSON, for scripts and
+agents:
+
+```json
+{
+  "schema_version": 1,
+  "models": [
+    {
+      "path": "/home/user/.cache/crustly/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+      "display_name": null,
+      "size_bytes": 4692672512,
+      "modified_at": "2026-08-07T13:38:28+00:00",
+      "architecture": "qwen2",
+      "parameter_count": 7615616512,
+      "quantization": "Q4_K_M",
+      "context_length": 32768,
+      "has_chat_template": true,
+      "estimated_memory_bytes": 5726732288,
+      "estimated_memory_includes_kv_cache": true,
+      "is_mmproj": false,
+      "mmproj_path": null
+    }
+  ]
+}
+```
+
+`schema_version` bumps only on a breaking change to this shape; new fields
+may be added without a bump. `list`/`pull`/`rm` also exit with a specific,
+documented code instead of a generic failure, so a calling script/agent can
+branch on the exit code instead of parsing error text:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | Any other/unrecognized error |
+| `10` | No such file (`rm` on a name that doesn't resolve) |
+| `11` | Not enough disk space for the download |
+| `12` | Checksum mismatch |
+| `13` | Network/download failure |
+| `14` | This build wasn't compiled with `--features gguf-management` |
 
 ## Configuration
 

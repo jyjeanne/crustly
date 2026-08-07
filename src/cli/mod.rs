@@ -268,19 +268,138 @@ pub enum OllamaCommands {
 
 #[derive(Subcommand, Debug)]
 pub enum LlamaCppCommands {
-    /// List .gguf files in the configured models directory
-    List,
-    /// Download a model: a direct URL, or an `hf:org/repo/file.gguf`
+    /// List .gguf files in the configured models directory, plus any
+    /// extra_model_paths/scan_ollama_models sources
+    ///
+    /// Exit codes: 0 success, 1 unrecognized error. `--json` output is a
+    /// stable, versioned schema (`schema_version` field) suitable for
+    /// scripting - see docs/guides/LLAMA_CPP_GUIDE.md.
+    List {
+        /// Print a stable, versioned JSON schema instead of a human-readable
+        /// table - no emoji header, just the JSON, for scripting/agents.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Download a model: a direct URL, or an `hf:org/repo/file.gguf[@revision]`
     /// shorthand resolved against Hugging Face
+    ///
+    /// Exit codes: 0 success, 11 not enough disk space, 12 checksum mismatch,
+    /// 13 network/download failure, 14 build missing the 'gguf-management'
+    /// feature, 1 any other error.
     Pull {
-        /// Direct URL or `hf:org/repo/file.gguf` shorthand
+        /// Direct URL or `hf:org/repo/file.gguf[@revision]` shorthand
         source: String,
     },
     /// Delete a local .gguf file by name or path
+    ///
+    /// Exit codes: 0 success, 10 no such file, 14 build missing the
+    /// 'gguf-management' feature, 1 any other error.
     Rm {
-        /// Filename (resolved inside the models directory) or full path
-        model: String,
+        /// Filename (resolved inside the models directory) or full path.
+        /// Named `name`, not `model` - a positional field sharing an ident
+        /// with the top-level `global = true` `--model` flag causes clap
+        /// to route the value into the wrong one (confirmed independently
+        /// of this plan's own changes - `ollama rm` has the identical
+        /// pre-existing bug via the same collision, left unfixed here as
+        /// out of this phase's scope, flagged separately).
+        name: String,
     },
+}
+
+/// `crustly llama-cpp list --json`'s schema version. Bump only on a
+/// breaking change to `LlamaCppModelJson`'s field set/types - additive
+/// fields don't need a bump, per the usual "additive is non-breaking"
+/// convention for a versioned JSON contract.
+const LLAMA_CPP_LIST_JSON_SCHEMA_VERSION: u32 = 1;
+
+/// Stable, versioned wire format for `crustly llama-cpp list --json` -
+/// deliberately a separate type from `LocalGgufModel`
+/// (`src/llm/provider/llama_cpp_models.rs`), not `#[derive(Serialize)]` on
+/// it directly, so the internal struct can keep evolving without silently
+/// breaking this contract. snake_case field names, no `rename_all` needed -
+/// matches the dominant convention for Crustly's own domain types (e.g.
+/// `src/config/mod.rs`); camelCase in this codebase is reserved for structs
+/// mirroring an external API, which this isn't.
+#[derive(Debug, Clone, serde::Serialize)]
+struct LlamaCppModelJson {
+    path: std::path::PathBuf,
+    display_name: Option<String>,
+    size_bytes: u64,
+    modified_at: String,
+    architecture: Option<String>,
+    parameter_count: Option<u64>,
+    quantization: Option<String>,
+    context_length: Option<u64>,
+    has_chat_template: bool,
+    estimated_memory_bytes: Option<u64>,
+    estimated_memory_includes_kv_cache: bool,
+    is_mmproj: bool,
+    mmproj_path: Option<std::path::PathBuf>,
+}
+
+impl From<&crate::llm::provider::llama_cpp_models::LocalGgufModel> for LlamaCppModelJson {
+    fn from(m: &crate::llm::provider::llama_cpp_models::LocalGgufModel) -> Self {
+        Self {
+            path: m.path.clone(),
+            display_name: m.display_name.clone(),
+            size_bytes: m.size_bytes,
+            modified_at: m.modified_at.clone(),
+            architecture: m.architecture.clone(),
+            parameter_count: m.parameter_count,
+            quantization: m.quantization_hint.clone(),
+            context_length: m.context_length,
+            has_chat_template: m.has_chat_template,
+            estimated_memory_bytes: m.estimated_memory_bytes,
+            estimated_memory_includes_kv_cache: m.estimated_memory_includes_kv_cache,
+            is_mmproj: m.is_mmproj,
+            mmproj_path: m.mmproj_path.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct LlamaCppListJson {
+    schema_version: u32,
+    models: Vec<LlamaCppModelJson>,
+}
+
+/// Maps an error from a `crustly llama-cpp` subcommand to a specific,
+/// documented exit code, by matching known message prefixes anywhere in
+/// the error's context chain (`anyhow::Error::chain()`, not just
+/// `.to_string()`'s outermost layer - `Pull`'s errors are wrapped in
+/// `"Failed to download '...'"`, so the more specific cause is a layer
+/// deeper). Reuses Crustly's own existing error *messages* as the taxonomy
+/// (every prefix here is a string this codebase already produces
+/// elsewhere, unchanged by this function) rather than inventing new ones
+/// or importing llamastash's specific numeric meanings - see
+/// `ccguf-managment-imrpoment-plan.md` Phase M7.
+///
+/// An unmatched error falls back to `1`, identical to every other Crustly
+/// command's behavior today - this only adds finer-grained codes on top of
+/// that default for failure messages that already exist, it never changes
+/// what a *new*, unrecognized error does.
+fn llama_cpp_exit_code(err: &anyhow::Error) -> i32 {
+    for cause in err.chain() {
+        let msg = cause.to_string();
+        if msg.starts_with("No such file:") {
+            return 10; // model/file not found
+        }
+        if msg.starts_with("Not enough disk space") {
+            return 11;
+        }
+        if msg.starts_with("Checksum mismatch for") {
+            return 12;
+        }
+        if msg.starts_with("Failed to start download from")
+            || msg.starts_with("Download failed for")
+        {
+            return 13; // network/HTTP failure
+        }
+        if msg.starts_with("This build of crustly was compiled without") {
+            return 14; // feature not compiled in
+        }
+    }
+    1
 }
 
 #[derive(Subcommand, Debug)]
@@ -404,7 +523,17 @@ pub async fn run() -> Result<()> {
             max_iterations,
         }) => cmd_autoplan(&config, goal, max_iterations).await,
         Some(Commands::Ollama { operation }) => cmd_ollama(&config, operation).await,
-        Some(Commands::LlamaCpp { operation }) => cmd_llama_cpp(&config, operation).await,
+        Some(Commands::LlamaCpp { operation }) => match cmd_llama_cpp(&config, operation).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                // Matches Rust's default `Termination` output for a `Result`
+                // returned from `main` byte-for-byte (`Error: {:?}`), so a
+                // human watching the terminal sees identical text to every
+                // other Crustly command - only the exit code differs here.
+                eprintln!("Error: {e:?}");
+                std::process::exit(llama_cpp_exit_code(&e));
+            }
+        },
     }
 }
 
@@ -1258,8 +1387,7 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
     let models_dir = config.providers.llama_cpp_models_dir();
 
     match operation {
-        LlamaCppCommands::List => {
-            println!("🦙 Local .gguf models\n");
+        LlamaCppCommands::List { json } => {
             let extra_model_paths = config.providers.llama_cpp_extra_model_paths();
             let ollama_models_dir = config.providers.llama_cpp_ollama_models_dir();
             let models = llama_cpp_models::list_all_local_models(
@@ -1268,6 +1396,20 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
                 ollama_models_dir.as_deref(),
             )?;
 
+            if json {
+                let payload = LlamaCppListJson {
+                    schema_version: LLAMA_CPP_LIST_JSON_SCHEMA_VERSION,
+                    models: models.iter().map(LlamaCppModelJson::from).collect(),
+                };
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&payload)
+                        .context("Failed to serialize model list as JSON")?
+                );
+                return Ok(());
+            }
+
+            println!("🦙 Local .gguf models\n");
             if models.is_empty() {
                 println!("  (none) - pull one with: crustly llama-cpp pull <source>");
             } else {
@@ -1358,8 +1500,8 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
             Ok(())
         }
 
-        LlamaCppCommands::Rm { model } => {
-            let path = resolve_llama_cpp_model_path(&models_dir, &model);
+        LlamaCppCommands::Rm { name } => {
+            let path = resolve_llama_cpp_model_path(&models_dir, &name);
             if !path.exists() {
                 anyhow::bail!("No such file: {}", path.display());
             }
@@ -1734,17 +1876,130 @@ mod tests {
         assert!(matches!(
             cli.command,
             Some(Commands::LlamaCpp {
-                operation: LlamaCppCommands::List
+                operation: LlamaCppCommands::List { json: false }
+            })
+        ));
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "list", "--json"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::List { json: true }
             })
         ));
 
         let cli = Cli::parse_from(["crustly", "llama-cpp", "rm", "model.gguf"]);
         match cli.command {
             Some(Commands::LlamaCpp {
-                operation: LlamaCppCommands::Rm { model },
-            }) => assert_eq!(model, "model.gguf"),
+                operation: LlamaCppCommands::Rm { name },
+            }) => assert_eq!(name, "model.gguf"),
             other => panic!("expected LlamaCpp Rm command, got {other:?}"),
         }
+
+        // Regression test for the actual bug this rename fixed: a bare
+        // positional value must resolve to `Rm.name`, not silently be
+        // captured by the global `--model` flag (which shares its ident
+        // with the *old* field name and confused clap's arg matching -
+        // reproduced independently of this test file, confirmed against
+        // the real built binary before this fix).
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "rm", "some-model.gguf"]);
+        assert!(
+            cli.model.is_none(),
+            "the positional Rm argument must not be captured by the global --model flag"
+        );
+    }
+
+    #[test]
+    fn llama_cpp_list_json_round_trips_with_the_documented_schema() {
+        let model = LlamaCppModelJson {
+            path: std::path::PathBuf::from("/models/a.gguf"),
+            display_name: Some("qwen2.5-coder:7b".to_string()),
+            size_bytes: 4_294_967_296,
+            modified_at: "2026-08-07T13:38:28Z".to_string(),
+            architecture: Some("qwen2".to_string()),
+            parameter_count: Some(7_000_000_000),
+            quantization: Some("Q4_K_M".to_string()),
+            context_length: Some(32768),
+            has_chat_template: true,
+            estimated_memory_bytes: Some(5_200_000_000),
+            estimated_memory_includes_kv_cache: true,
+            is_mmproj: false,
+            mmproj_path: None,
+        };
+        let payload = LlamaCppListJson {
+            schema_version: LLAMA_CPP_LIST_JSON_SCHEMA_VERSION,
+            models: vec![model],
+        };
+
+        let json = serde_json::to_value(&payload).expect("must serialize");
+        assert_eq!(json["schema_version"], 1);
+        assert_eq!(json["models"][0]["display_name"], "qwen2.5-coder:7b");
+        assert_eq!(json["models"][0]["parameter_count"], 7_000_000_000_u64);
+        assert_eq!(json["models"][0]["has_chat_template"], true);
+        assert_eq!(json["models"][0]["is_mmproj"], false);
+        assert!(json["models"][0]["mmproj_path"].is_null());
+    }
+
+    #[test]
+    fn llama_cpp_model_json_from_local_gguf_model_carries_every_field() {
+        use crate::llm::provider::llama_cpp_models::LocalGgufModel;
+
+        let model = LocalGgufModel {
+            path: std::path::PathBuf::from("/models/a.gguf"),
+            size_bytes: 100,
+            modified_at: "now".to_string(),
+            quantization_hint: Some("Q4_K_M".to_string()),
+            architecture: Some("qwen2".to_string()),
+            parameter_count: Some(7_000_000_000),
+            context_length: Some(32768),
+            has_chat_template: true,
+            display_name: Some("nice-name".to_string()),
+            estimated_memory_bytes: Some(5_000_000_000),
+            estimated_memory_includes_kv_cache: true,
+            is_mmproj: false,
+            mmproj_path: None,
+        };
+        let json = LlamaCppModelJson::from(&model);
+        assert_eq!(json.quantization.as_deref(), Some("Q4_K_M"));
+        assert_eq!(json.display_name.as_deref(), Some("nice-name"));
+        assert_eq!(json.parameter_count, Some(7_000_000_000));
+    }
+
+    #[test]
+    fn llama_cpp_exit_code_maps_each_known_message_prefix() {
+        let cases: &[(&str, i32)] = &[
+            ("No such file: /models/x.gguf", 10),
+            ("Not enough disk space to download 'x.gguf': ...", 11),
+            ("Checksum mismatch for x.gguf: ...", 12),
+            ("Failed to start download from https://example.com", 13),
+            ("Download failed for https://example.com", 13),
+            (
+                "This build of crustly was compiled without the 'gguf-management' feature.",
+                14,
+            ),
+        ];
+        for (msg, expected) in cases {
+            let err = anyhow::anyhow!("{msg}");
+            assert_eq!(llama_cpp_exit_code(&err), *expected, "for message: {msg}");
+        }
+    }
+
+    #[test]
+    fn llama_cpp_exit_code_checks_the_whole_chain_not_just_the_outermost_context() {
+        // Mirrors how `Pull` actually wraps its errors: the outermost
+        // context is always "Failed to download '...'", so the specific
+        // cause (checksum mismatch, here) is a layer deeper.
+        let root = anyhow::anyhow!("Checksum mismatch for model.gguf: expected a, got b.");
+        let wrapped: anyhow::Error = Err::<(), _>(root)
+            .context("Failed to download 'model.gguf'")
+            .unwrap_err();
+        assert_eq!(llama_cpp_exit_code(&wrapped), 12);
+    }
+
+    #[test]
+    fn llama_cpp_exit_code_falls_back_to_one_for_an_unrecognized_error() {
+        let err = anyhow::anyhow!("some entirely new failure mode nobody has seen before");
+        assert_eq!(llama_cpp_exit_code(&err), 1);
     }
 
     #[cfg(feature = "gguf-management")]

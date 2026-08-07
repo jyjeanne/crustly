@@ -156,10 +156,16 @@ tasks and acceptance criteria per item.
   dependency across M0–M6, no stable stdlib API exists for free-space queries), `@revision`
   pinning on the `hf:org/repo/file.gguf@revision` shorthand, and `Range`-header resume (checksum
   verification correctly covers the whole file across a resume, not just the newly-streamed part)
-- [ ] **Agent-facing `--json` CLI contract** — stable schema + documented exit codes on `crustly
-  llama-cpp list/pull/rm`, extending Crustly's existing agent-facing positioning (`AGENTS.md`)
-- [ ] **TUI enhancements** — Ctrl+G/Ctrl+O dialogs show real header-parsed metadata instead of the
-  filename guess
+- [x] **Agent-facing `--json` CLI contract** — `crustly llama-cpp list --json` (versioned
+  `schema_version`, dedicated DTO decoupled from the internal `LocalGgufModel`) and documented exit
+  codes (10 no such file, 11 disk space, 12 checksum, 13 network, 14 feature not compiled in) on
+  `list`/`pull`/`rm`, scoped to `llama-cpp` subcommands only — reuses Crustly's own existing error
+  *messages* as the taxonomy rather than inventing new numeric meanings
+- [x] **TUI enhancements** — Ctrl+G dialog shows `display_name`/architecture/parameter-count/native
+  context/memory-estimate/mmproj pairing (previously showed the raw filename even for
+  Ollama-sourced/merged entries — fixed as part of this pass); Ctrl+O panel adds native
+  context-length and chat-template-present rows (its quantization row already used the
+  header-parsed value as of M1)
 
 **Hardware-aware local model selection (DP6 — new since the plan's Update 3):**
 - [ ] **Hardware detection & display** — best-effort GPU vendor/VRAM + system RAM probe

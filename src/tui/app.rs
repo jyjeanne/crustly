@@ -268,6 +268,28 @@ fn quantization_hint_for_path(_path: &std::path::Path) -> Option<String> {
     None
 }
 
+/// The model's native/trained context length and whether it has an
+/// embedded chat template, for the Model Info panel (Ctrl+O) - the
+/// `context_length`/`has_chat_template` counterpart of
+/// `quantization_hint_for_path` above, same cfg-gating rationale
+/// (`ccguf-managment-imrpoment-plan.md` Phase M0/M8). A second,
+/// independent header read from `quantization_hint_for_path`'s - the
+/// Model Info panel is a low-frequency render, not a hot loop, so the
+/// minor duplication isn't worth threading the header through both call
+/// sites for.
+#[cfg(feature = "gguf-management")]
+fn llama_cpp_context_and_chat_template_for_path(path: &std::path::Path) -> (Option<u64>, bool) {
+    match crate::llm::provider::gguf_metadata::read_gguf_metadata(path) {
+        Some(m) => (m.context_length, m.has_chat_template),
+        None => (None, false),
+    }
+}
+
+#[cfg(not(feature = "gguf-management"))]
+fn llama_cpp_context_and_chat_template_for_path(_path: &std::path::Path) -> (Option<u64>, bool) {
+    (None, false)
+}
+
 impl App {
     /// Create a new app instance
     pub fn new(agent_service: Arc<AgentService>, context: ServiceContext) -> Self {
@@ -614,9 +636,13 @@ impl App {
             .llama_cpp_active_model_path
             .as_ref()
             .unwrap_or(&cfg.model_path);
+        let (context_length, has_chat_template) =
+            llama_cpp_context_and_chat_template_for_path(model_path);
         Some(super::llama_cpp_download::LlamaCppModelDetails {
             n_gpu_layers: cfg.n_gpu_layers,
             quantization_hint: quantization_hint_for_path(model_path),
+            context_length,
+            has_chat_template,
         })
     }
 
@@ -3008,6 +3034,49 @@ mod tests {
         let display_msg: DisplayMessage = msg.into();
         assert_eq!(display_msg.role, "user");
         assert_eq!(display_msg.content, "Hello");
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_context_and_chat_template_for_path_reads_a_real_header() {
+        // Hand-crafted minimal GGUF bytes, same pattern as
+        // gguf_metadata.rs's own tests - magic + version + zero tensors +
+        // two KV pairs (a context_length key and chat_template presence).
+        fn push_string(buf: &mut Vec<u8>, s: &str) {
+            buf.extend_from_slice(&(s.len() as u64).to_le_bytes());
+            buf.extend_from_slice(s.as_bytes());
+        }
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"GGUF");
+        buf.extend_from_slice(&3u32.to_le_bytes()); // version
+        buf.extend_from_slice(&0u64.to_le_bytes()); // tensor_count
+        buf.extend_from_slice(&2u64.to_le_bytes()); // kv_count
+
+        push_string(&mut buf, "qwen2.context_length");
+        buf.extend_from_slice(&4u32.to_le_bytes()); // ValueType::U32
+        buf.extend_from_slice(&32768u32.to_le_bytes());
+
+        push_string(&mut buf, "tokenizer.chat_template");
+        buf.extend_from_slice(&8u32.to_le_bytes()); // ValueType::String
+        push_string(&mut buf, "{{ messages }}");
+
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        std::fs::write(file.path(), &buf).expect("write fixture");
+
+        let (context_length, has_chat_template) =
+            llama_cpp_context_and_chat_template_for_path(file.path());
+        assert_eq!(context_length, Some(32768));
+        assert!(has_chat_template);
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_context_and_chat_template_for_path_degrades_cleanly_on_a_missing_file() {
+        let path = std::path::Path::new("/definitely/does/not/exist/crustly-test.gguf");
+        assert_eq!(
+            llama_cpp_context_and_chat_template_for_path(path),
+            (None, false)
+        );
     }
 
     use crate::db::Database;

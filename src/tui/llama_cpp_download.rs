@@ -71,11 +71,15 @@ impl LlamaCppDownloadProgress {
 
 /// GPU offload / quantization details for the Model Info panel (Ctrl+O)
 /// when the active provider is `llama-cpp`. Context size is already shown
-/// generically via `App::provider_context_window()` - not duplicated here.
+/// generically via `App::provider_context_window()` - not duplicated here,
+/// though it can legitimately differ from `context_length` below (the
+/// *configured* `n_ctx` vs. the model's own *native/trained* context).
 #[derive(Debug, Clone)]
 pub struct LlamaCppModelDetails {
     pub n_gpu_layers: u32,
     pub quantization_hint: Option<String>,
+    pub context_length: Option<u64>,
+    pub has_chat_template: bool,
 }
 
 /// Shared slot the background switch task drops a freshly-built provider

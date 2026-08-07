@@ -1613,6 +1613,26 @@ fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::White),
             ),
         ]));
+        if let Some(native_ctx) = details.context_length {
+            lines.push(Line::from(vec![
+                Span::styled("Nat. ctx: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{native_ctx} tokens"),
+                    Style::default().fg(Color::White),
+                ),
+            ]));
+        }
+        lines.push(Line::from(vec![
+            Span::styled("Chat tmpl:", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                if details.has_chat_template {
+                    " yes"
+                } else {
+                    " no"
+                },
+                Style::default().fg(Color::White),
+            ),
+        ]));
     }
 
     lines.push(Line::from(""));
@@ -2006,6 +2026,110 @@ fn render_model_download_deleting(f: &mut Frame, model: &str, area: Rect) {
     f.render_widget(widget, area);
 }
 
+/// Formats a parameter count for compact display (`7_600_000_000 ->
+/// "7.6B"`, `500_000_000 -> "500M"`, `1_500 -> "2K"`) - one significant
+/// decimal place above the million mark, none below it, since a Ctrl+G row
+/// doesn't have room for (and a user doesn't need) an exact count.
+fn format_param_count(n: u64) -> String {
+    if n >= 1_000_000_000 {
+        format!("{:.1}B", n as f64 / 1_000_000_000.0)
+    } else if n >= 1_000_000 {
+        format!("{:.0}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{:.0}K", n as f64 / 1_000.0)
+    } else {
+        n.to_string()
+    }
+}
+
+/// Renders one Ctrl+G dialog entry: always a compact main line (using
+/// `display_name` when set - previously this dialog always showed the raw
+/// filename, which for an Ollama-sourced entry is a meaningless
+/// `sha256-<hex>` blob name; a split-GGUF group or mmproj-paired entry
+/// already carries a synthesized `display_name` too, from
+/// `list_all_local_models`'s M3/M4/M5 merging - this was the one place
+/// that data wasn't being shown). When `is_selected`, an additional
+/// indented detail line - the "expandable detail line" the source plan
+/// describes, expressed as "expands on selection" rather than a new
+/// keybinding, reusing the dialog's existing up/down selection state.
+fn llama_cpp_model_lines(
+    model: &super::llama_cpp_download::LlamaCppModelSummary,
+    is_selected: bool,
+) -> Vec<Line<'static>> {
+    let style = if is_selected {
+        Style::default()
+            .fg(Color::Black)
+            .bg(Color::Cyan)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    let prefix = if is_selected { "▶ " } else { "  " };
+
+    let mut name = model.display_name.clone().unwrap_or_else(|| {
+        model
+            .path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    });
+    // A paired base model's projector is folded into this entry (its own
+    // row was removed by `pair_mmproj_files`); an unpaired projector keeps
+    // its own row, labeled so it's not just a mysteriously-named model -
+    // same convention as the CLI's `list` printer (`src/cli/mod.rs`).
+    if model.mmproj_path.is_some() {
+        name.push_str(" (+ mmproj)");
+    } else if model.is_mmproj {
+        name.push_str(" [mmproj]");
+    }
+
+    let size_gb = model.size_bytes as f64 / 1_073_741_824.0;
+    let quant = model.quantization_hint.as_deref().unwrap_or("unknown");
+
+    let mut lines = vec![Line::from(vec![
+        Span::styled(prefix, style),
+        Span::styled(format!("{name}  ({size_gb:.2} GB, {quant})"), style),
+    ])];
+
+    if is_selected {
+        let mut parts = Vec::new();
+        if let Some(arch) = &model.architecture {
+            parts.push(arch.clone());
+        }
+        if let Some(params) = model.parameter_count {
+            parts.push(format!("{} params", format_param_count(params)));
+        }
+        if let Some(ctx) = model.context_length {
+            parts.push(format!("ctx {ctx}"));
+        }
+        if let Some(mem) = model.estimated_memory_bytes {
+            let gb = mem as f64 / 1_073_741_824.0;
+            parts.push(if model.estimated_memory_includes_kv_cache {
+                format!("~{gb:.1} GB")
+            } else {
+                format!("~{gb:.1} GB weights")
+            });
+        }
+        parts.push(
+            if model.has_chat_template {
+                "chat template"
+            } else {
+                "no chat template"
+            }
+            .to_string(),
+        );
+
+        if !parts.is_empty() {
+            lines.push(Line::from(Span::styled(
+                format!("      {}", parts.join(" · ")),
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
+
+    lines
+}
+
 /// Render the llama.cpp Local Models dialog (Ctrl+G): pick a locally-present
 /// `.gguf` file to switch to, or type a URL/`hf:org/repo/file.gguf`
 /// shorthand to download a new one.
@@ -2067,27 +2191,7 @@ fn render_llama_cpp_models(f: &mut Frame, app: &App, area: Rect) {
         )));
     } else {
         for (idx, model) in app.llama_cpp_models.iter().enumerate() {
-            let is_selected = idx == app.llama_cpp_selected;
-            let style = if is_selected {
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            let prefix = if is_selected { "▶ " } else { "  " };
-            let name = model
-                .path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let size_gb = model.size_bytes as f64 / 1_073_741_824.0;
-            let quant = model.quantization_hint.as_deref().unwrap_or("unknown");
-            lines.push(Line::from(vec![
-                Span::styled(prefix, style),
-                Span::styled(format!("{name}  ({size_gb:.2} GB, {quant})"), style),
-            ]));
+            lines.extend(llama_cpp_model_lines(model, idx == app.llama_cpp_selected));
         }
     }
 
@@ -2713,6 +2817,99 @@ mod tests {
         assert!(screen.contains("Local llama.cpp models"));
         assert!(screen.contains("qwen2.5-coder-7b-Q4_K_M.gguf"));
         assert!(screen.contains("Q4_K_M"));
+    }
+
+    fn llama_cpp_model_fixture(
+        name: &str,
+    ) -> super::super::llama_cpp_download::LlamaCppModelSummary {
+        super::super::llama_cpp_download::LlamaCppModelSummary {
+            path: std::path::PathBuf::from(name),
+            size_bytes: 4_294_967_296,
+            quantization_hint: Some("Q4_K_M".to_string()),
+            architecture: Some("qwen2".to_string()),
+            parameter_count: Some(7_000_000_000),
+            context_length: Some(32768),
+            has_chat_template: true,
+            display_name: None,
+            estimated_memory_bytes: Some(5_200_000_000),
+            estimated_memory_includes_kv_cache: true,
+            is_mmproj: false,
+            mmproj_path: None,
+        }
+    }
+
+    #[test]
+    fn format_param_count_formats_at_the_expected_scale() {
+        assert_eq!(format_param_count(7_600_000_000), "7.6B");
+        assert_eq!(format_param_count(500_000_000), "500M");
+        assert_eq!(format_param_count(1_500), "2K");
+        assert_eq!(format_param_count(42), "42");
+    }
+
+    #[test]
+    fn llama_cpp_model_lines_prefers_display_name_over_the_raw_filename() {
+        let mut model = llama_cpp_model_fixture("/models/sha256-abc123.gguf");
+        model.display_name = Some("qwen2.5-coder:7b".to_string());
+
+        let lines = llama_cpp_model_lines(&model, false);
+        let text: String = lines[0].spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(text.contains("qwen2.5-coder:7b"));
+        assert!(!text.contains("sha256-abc123"));
+    }
+
+    #[test]
+    fn llama_cpp_model_lines_labels_a_paired_and_an_unpaired_mmproj_entry_differently() {
+        let mut paired = llama_cpp_model_fixture("/models/a.gguf");
+        paired.mmproj_path = Some(std::path::PathBuf::from("/models/mmproj-a.gguf"));
+        let paired_text: String = llama_cpp_model_lines(&paired, false)[0]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(paired_text.contains("(+ mmproj)"));
+
+        let mut unpaired = llama_cpp_model_fixture("/models/mmproj-b.gguf");
+        unpaired.is_mmproj = true;
+        let unpaired_text: String = llama_cpp_model_lines(&unpaired, false)[0]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(unpaired_text.contains("[mmproj]"));
+    }
+
+    #[test]
+    fn llama_cpp_model_lines_shows_a_detail_line_only_when_selected() {
+        let model = llama_cpp_model_fixture("/models/a.gguf");
+
+        let unselected = llama_cpp_model_lines(&model, false);
+        assert_eq!(unselected.len(), 1, "no detail line when not selected");
+
+        let selected = llama_cpp_model_lines(&model, true);
+        assert_eq!(selected.len(), 2, "a detail line appears when selected");
+        let detail: String = selected[1]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(detail.contains("qwen2"));
+        assert!(detail.contains("7.0B params"));
+        assert!(detail.contains("ctx 32768"));
+        assert!(detail.contains("4.8 GB")); // 5.2e9 bytes as GiB (1_073_741_824 divisor)
+        assert!(detail.contains("chat template"));
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_models_dialog_shows_display_name_not_the_raw_path() {
+        let mut app = test_app().await;
+        app.mode = AppMode::LlamaCppModelPicker;
+        let mut model = llama_cpp_model_fixture("/models/sha256-deadbeef.gguf");
+        model.display_name = Some("qwen2.5-coder:7b".to_string());
+        app.llama_cpp_models = vec![model];
+
+        let screen = render_to_string(&app, 100, 20);
+        assert!(screen.contains("qwen2.5-coder:7b"));
+        assert!(!screen.contains("sha256-deadbeef"));
     }
 
     #[tokio::test]
