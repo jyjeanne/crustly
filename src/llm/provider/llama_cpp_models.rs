@@ -760,8 +760,10 @@ async fn fetch_hf_lfs_sha256(
 /// filesystem of its nearest existing ancestor (the download target
 /// itself doesn't exist yet, so `path` alone can't be queried directly).
 /// `None` when no matching disk is found - advisory only, callers must
-/// never block a download on an unknown.
-fn available_space_at(path: &Path) -> Option<u64> {
+/// never block a download on an unknown. `pub(crate)` (not just used by
+/// `download_model` below) since `crustly llama-cpp doctor`
+/// (`src/cli/mod.rs`, Phase M9) reports the same figure as a diagnostic.
+pub(crate) fn available_space_at(path: &Path) -> Option<u64> {
     let mut probe = path.to_path_buf();
     while !probe.exists() {
         probe = probe.parent()?.to_path_buf();

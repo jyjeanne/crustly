@@ -304,12 +304,19 @@ pub enum LlamaCppCommands {
         /// out of this phase's scope, flagged separately).
         name: String,
     },
+    /// Diagnose local .gguf model management setup: build features,
+    /// models directory, disk space, configured extra sources
+    ///
+    /// Always exits 0 - this reports findings as text, it never fails
+    /// the way `list`/`pull`/`rm` can.
+    Doctor,
 }
 
 /// `crustly llama-cpp list --json`'s schema version. Bump only on a
 /// breaking change to `LlamaCppModelJson`'s field set/types - additive
 /// fields don't need a bump, per the usual "additive is non-breaking"
 /// convention for a versioned JSON contract.
+#[cfg(feature = "gguf-management")]
 const LLAMA_CPP_LIST_JSON_SCHEMA_VERSION: u32 = 1;
 
 /// Stable, versioned wire format for `crustly llama-cpp list --json` -
@@ -319,7 +326,10 @@ const LLAMA_CPP_LIST_JSON_SCHEMA_VERSION: u32 = 1;
 /// breaking this contract. snake_case field names, no `rename_all` needed -
 /// matches the dominant convention for Crustly's own domain types (e.g.
 /// `src/config/mod.rs`); camelCase in this codebase is reserved for structs
-/// mirroring an external API, which this isn't.
+/// mirroring an external API, which this isn't. Gated on `gguf-management`
+/// since it references `LocalGgufModel`, which is itself gated - the not-
+/// compiled-in build of `cmd_llama_cpp` never needs this type at all.
+#[cfg(feature = "gguf-management")]
 #[derive(Debug, Clone, serde::Serialize)]
 struct LlamaCppModelJson {
     path: std::path::PathBuf,
@@ -337,6 +347,7 @@ struct LlamaCppModelJson {
     mmproj_path: Option<std::path::PathBuf>,
 }
 
+#[cfg(feature = "gguf-management")]
 impl From<&crate::llm::provider::llama_cpp_models::LocalGgufModel> for LlamaCppModelJson {
     fn from(m: &crate::llm::provider::llama_cpp_models::LocalGgufModel) -> Self {
         Self {
@@ -357,6 +368,7 @@ impl From<&crate::llm::provider::llama_cpp_models::LocalGgufModel> for LlamaCppM
     }
 }
 
+#[cfg(feature = "gguf-management")]
 #[derive(Debug, Clone, serde::Serialize)]
 struct LlamaCppListJson {
     schema_version: u32,
@@ -1523,7 +1535,205 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
             println!("✅ Deleted '{}'", path.display());
             Ok(())
         }
+
+        LlamaCppCommands::Doctor => {
+            println!("🩺 crustly llama-cpp doctor\n");
+            let findings = llama_cpp_doctor_findings(config, &models_dir);
+            let (mut ok, mut warn, mut fail) = (0, 0, 0);
+            for f in &findings {
+                match f.status {
+                    DoctorStatus::Ok => ok += 1,
+                    DoctorStatus::Warn => warn += 1,
+                    DoctorStatus::Fail => fail += 1,
+                }
+                println!("  {} {}", f.status.icon(), f.message);
+            }
+            println!("\n{ok} ok, {warn} warning(s), {fail} failure(s)");
+            // Always exits 0 - this reports findings, it doesn't fail like
+            // `list`/`pull`/`rm` can (see the subcommand's own doc comment).
+            Ok(())
+        }
     }
+}
+
+/// A single `crustly llama-cpp doctor` finding's severity - not a hard
+/// pass/fail gate, since `doctor` always exits 0 regardless (structured
+/// findings for a human/agent to read, not a check the process itself
+/// lives or dies by). Gated on `gguf-management`, same as `Doctor`'s real
+/// implementation - the not-compiled-in stub never constructs one.
+#[cfg(feature = "gguf-management")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DoctorStatus {
+    Ok,
+    Warn,
+    Fail,
+}
+
+#[cfg(feature = "gguf-management")]
+impl DoctorStatus {
+    fn icon(self) -> &'static str {
+        match self {
+            Self::Ok => "✅",
+            Self::Warn => "⚠️ ",
+            Self::Fail => "❌",
+        }
+    }
+}
+
+#[cfg(feature = "gguf-management")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DoctorFinding {
+    status: DoctorStatus,
+    message: String,
+}
+
+/// Computes `doctor`'s findings - a pure function over `config`/
+/// `models_dir` (plus the filesystem/disk they point at) so the checklist
+/// logic is testable without going through the CLI dispatch machinery.
+/// Every check degrades to a `Warn`, never panics or errors the whole
+/// function, on anything it can't determine - same "honest unknown, not a
+/// crash" posture the rest of this plan's phases already established.
+#[cfg(feature = "gguf-management")]
+fn llama_cpp_doctor_findings(
+    config: &crate::config::Config,
+    models_dir: &std::path::Path,
+) -> Vec<DoctorFinding> {
+    use crate::llm::provider::llama_cpp_models;
+
+    let mut findings = vec![DoctorFinding {
+        status: DoctorStatus::Ok,
+        message: "gguf-management feature compiled in - list/pull/rm/doctor available".to_string(),
+    }];
+
+    if cfg!(feature = "llama-cpp") {
+        findings.push(DoctorFinding {
+            status: DoctorStatus::Ok,
+            message: "llama-cpp feature compiled in - in-process inference available".to_string(),
+        });
+        let gpu_backend_compiled_in = cfg!(any(
+            feature = "llama-cpp-cuda",
+            feature = "llama-cpp-metal",
+            feature = "llama-cpp-vulkan",
+            feature = "llama-cpp-rocm",
+            feature = "llama-cpp-opencl",
+            feature = "llama-cpp-mkl",
+        ));
+        findings.push(if gpu_backend_compiled_in {
+            DoctorFinding {
+                status: DoctorStatus::Ok,
+                message: "a GPU backend feature is compiled in".to_string(),
+            }
+        } else {
+            DoctorFinding {
+                status: DoctorStatus::Warn,
+                message: "no GPU backend feature compiled in - n_gpu_layers > 0 in config \
+                          will be a silent no-op (CPU only)"
+                    .to_string(),
+            }
+        });
+    } else {
+        findings.push(DoctorFinding {
+            status: DoctorStatus::Warn,
+            message: "llama-cpp feature not compiled in - in-process inference unavailable; \
+                      management (list/pull/rm) still works"
+                .to_string(),
+        });
+    }
+
+    if !models_dir.exists() {
+        findings.push(DoctorFinding {
+            status: DoctorStatus::Warn,
+            message: format!(
+                "models_dir does not exist yet: {} (created automatically on first `pull`)",
+                models_dir.display()
+            ),
+        });
+    } else if !models_dir.is_dir() {
+        findings.push(DoctorFinding {
+            status: DoctorStatus::Fail,
+            message: format!(
+                "models_dir exists but is not a directory: {}",
+                models_dir.display()
+            ),
+        });
+    } else {
+        let probe = models_dir.join(".crustly-doctor-write-test");
+        match std::fs::write(&probe, b"x") {
+            Ok(()) => {
+                let _ = std::fs::remove_file(&probe);
+                findings.push(DoctorFinding {
+                    status: DoctorStatus::Ok,
+                    message: format!(
+                        "models_dir exists and is writable: {}",
+                        models_dir.display()
+                    ),
+                });
+            }
+            Err(e) => {
+                findings.push(DoctorFinding {
+                    status: DoctorStatus::Fail,
+                    message: format!(
+                        "models_dir exists but is not writable: {} ({e})",
+                        models_dir.display()
+                    ),
+                });
+            }
+        }
+    }
+
+    findings.push(match llama_cpp_models::available_space_at(models_dir) {
+        Some(bytes) => DoctorFinding {
+            status: DoctorStatus::Ok,
+            message: format!(
+                "~{:.1} GB free at models_dir's filesystem",
+                bytes as f64 / 1_073_741_824.0
+            ),
+        },
+        None => DoctorFinding {
+            status: DoctorStatus::Warn,
+            message: "could not determine free disk space at models_dir".to_string(),
+        },
+    });
+
+    for path in config.providers.llama_cpp_extra_model_paths() {
+        findings.push(if path.exists() {
+            DoctorFinding {
+                status: DoctorStatus::Ok,
+                message: format!("extra_model_paths entry exists: {}", path.display()),
+            }
+        } else {
+            DoctorFinding {
+                status: DoctorStatus::Warn,
+                message: format!(
+                    "extra_model_paths entry does not exist: {} (typo, or not mounted yet?)",
+                    path.display()
+                ),
+            }
+        });
+    }
+
+    if let Some(ollama_dir) = config.providers.llama_cpp_ollama_models_dir() {
+        findings.push(if ollama_dir.join("manifests").exists() {
+            DoctorFinding {
+                status: DoctorStatus::Ok,
+                message: format!(
+                    "scan_ollama_models is on and a manifest tree was found: {}",
+                    ollama_dir.display()
+                ),
+            }
+        } else {
+            DoctorFinding {
+                status: DoctorStatus::Warn,
+                message: format!(
+                    "scan_ollama_models is on but no manifests found at: {} (has Ollama \
+                     pulled anything, or is $OLLAMA_MODELS set correctly?)",
+                    ollama_dir.display()
+                ),
+            }
+        });
+    }
+
+    findings
 }
 
 #[cfg(not(feature = "gguf-management"))]
@@ -1907,8 +2117,17 @@ mod tests {
             cli.model.is_none(),
             "the positional Rm argument must not be captured by the global --model flag"
         );
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "doctor"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::Doctor
+            })
+        ));
     }
 
+    #[cfg(feature = "gguf-management")]
     #[test]
     fn llama_cpp_list_json_round_trips_with_the_documented_schema() {
         let model = LlamaCppModelJson {
@@ -1940,6 +2159,7 @@ mod tests {
         assert!(json["models"][0]["mmproj_path"].is_null());
     }
 
+    #[cfg(feature = "gguf-management")]
     #[test]
     fn llama_cpp_model_json_from_local_gguf_model_carries_every_field() {
         use crate::llm::provider::llama_cpp_models::LocalGgufModel;
@@ -2000,6 +2220,89 @@ mod tests {
     fn llama_cpp_exit_code_falls_back_to_one_for_an_unrecognized_error() {
         let err = anyhow::anyhow!("some entirely new failure mode nobody has seen before");
         assert_eq!(llama_cpp_exit_code(&err), 1);
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_reports_a_writable_models_dir_as_ok() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config = crate::config::Config::default();
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        let models_dir_finding = findings
+            .iter()
+            .find(|f| f.message.contains("models_dir exists and is writable"))
+            .expect("must report the writable models_dir");
+        assert_eq!(models_dir_finding.status, DoctorStatus::Ok);
+        // The write-probe file must not be left behind.
+        assert!(!tmp.path().join(".crustly-doctor-write-test").exists());
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_warns_on_a_missing_models_dir() {
+        let config = crate::config::Config::default();
+        let missing = std::path::Path::new("/definitely/does/not/exist/crustly-doctor-test");
+
+        let findings = llama_cpp_doctor_findings(&config, missing);
+
+        let finding = findings
+            .iter()
+            .find(|f| f.message.contains("does not exist yet"))
+            .expect("must report the missing models_dir");
+        assert_eq!(finding.status, DoctorStatus::Warn);
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_reports_extra_model_paths_existence() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let mut config = crate::config::Config::default();
+        config.providers.llama_cpp = Some(crate::config::LlamaCppProviderConfig {
+            extra_model_paths: vec![
+                tmp.path().to_path_buf(),
+                std::path::PathBuf::from("/definitely/does/not/exist/crustly-extra"),
+            ],
+            ..Default::default()
+        });
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        assert!(findings.iter().any(|f| f.status == DoctorStatus::Ok
+            && f.message.contains("extra_model_paths entry exists")));
+        assert!(findings.iter().any(|f| f.status == DoctorStatus::Warn
+            && f.message.contains("extra_model_paths entry does not exist")));
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_says_nothing_about_ollama_when_not_opted_in() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config = crate::config::Config::default(); // scan_ollama_models defaults false
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.message.contains("scan_ollama_models")),
+            "opting out of Ollama scanning should produce no finding about it at all"
+        );
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_reports_build_features() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config = crate::config::Config::default();
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        assert!(findings.iter().any(
+            |f| f.message.contains("gguf-management feature compiled in")
+                && f.status == DoctorStatus::Ok
+        ));
     }
 
     #[cfg(feature = "gguf-management")]

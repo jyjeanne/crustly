@@ -177,8 +177,10 @@ tasks and acceptance criteria per item.
   detected hardware; explicitly not a HuggingFace catalog search
 
 **Diagnostics (DP5, lowest priority — cheap once the above exists):**
-- [ ] **`crustly llama-cpp doctor`** — structured diagnostics (build feature, `models_dir`
-  writability, disk space, detected hardware), always exits 0
+- [x] **`crustly llama-cpp doctor`** — structured diagnostics (build feature/GPU backend, `models_dir`
+  existence/writability, disk space, `extra_model_paths`/`scan_ollama_models` sanity), always exits
+  0 regardless of findings. Detected-hardware line deferred with M11/M12 below — this command
+  surfaces that data once it exists, not a reason to duplicate detection logic here
 
 **Deferred — tracked in Backlog below, not this milestone:** catalog-based, benchmark-ranked
 `recommend` for models not yet downloaded (needs an external CI-maintained benchmark dataset;
@@ -280,6 +282,7 @@ are done; the rest are tracked here as they get picked up:
 | Azure OpenAI provider | Azure-specific auth and endpoint routing |
 | `crustly run` pipelines | Chain multiple prompts with conditional logic in a YAML file |
 | Catalog-based, benchmark-ranked GGUF recommend | Rank models *not yet downloaded* against a benchmark dataset (llamastash's `recommend`, minus the VRAM-fit-only subset already covered by v0.5.3's hardware-aware local selection). Needs an external, CI-refreshed benchmark pipeline — deferred until a concrete need shows up; see `ccguf-managment-imrpoment-plan.md` Phase M10 |
+| Fix `crustly ollama rm`'s arg-parsing bug | `OllamaCommands::Rm`'s positional field is named `model`, identical to the top-level `global = true` `--model` flag's ident — clap silently routes the value into the wrong field (confirmed against the real binary while fixing the identical bug in `LlamaCppCommands::Rm` during v0.5.3 M7, which renamed its own field to `name`). Same one-line fix, deliberately left untouched here since it's Ollama's CLI, not `llama-cpp`'s — outside that phase's scope |
 
 ---
 

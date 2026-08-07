@@ -669,7 +669,37 @@ existing `#[cfg(feature = "gguf-management")]` split exactly.
 `render_llama_cpp_models` pattern noted in `llama-cpp-2-integration-plan.md`
 Phase 7's corrected-assumptions note).
 
-### Phase M9 — `crustly llama-cpp doctor`
+### Phase M9 — `crustly llama-cpp doctor` ✅ Done
+
+Implemented as planned: build-feature/GPU-backend detection (`cfg!()`-based, no
+cross-feature-gate function calls - `llama_cpp.rs`'s own `gpu_backend_compiled_in()`
+is itself gated behind `feature = "llama-cpp"`, unusable from `gguf-management`-only
+code, so this duplicates the same `cfg!(any(...))` check locally rather than trying
+to share it), `models_dir` existence/writability (a real write-probe file, not just a
+permissions read), disk space (reusing M6's `available_space_at`, now `pub(crate)`),
+and `extra_model_paths`/`scan_ollama_models` sanity. Structured findings
+(`DoctorStatus::{Ok,Warn,Fail}` + message), always exits 0 regardless, exactly as
+specified. Detected-hardware line explicitly deferred, matching DP5's own note in
+§8 - `doctor` surfaces M11's output once that phase lands, not a reason to duplicate
+detection logic here.
+
+**Two things found and fixed while implementing this phase, neither part of its own
+design**:
+1. **A real gap in this whole document's own verification discipline**: M7's new
+   JSON DTOs (`LlamaCppModelJson`/`LlamaCppListJson`) were never gated behind
+   `#[cfg(feature = "gguf-management")]`, breaking the *true* zero-feature build
+   (`cargo build --no-default-features`, no `--features` added back) - a build this
+   plan's own phases had claimed to verify at every step but, it turns out, never
+   actually ran. Every prior "no-feature build" check in this document's phase
+   write-ups was actually `--features gguf-management --no-default-features`, which
+   is `gguf-management` **on** (it's the crate's `default` feature -
+   `default = ["gguf-management"]`, confirmed by reading `Cargo.toml`, not assumed).
+   Fixed by gating the DTOs (and `DoctorStatus`/`DoctorFinding`, found by the same
+   omission) properly; the true zero-feature build is now part of this phase's own
+   verification and should be for any future phase too.
+2. Confirmed (not new) the `ollama rm` arg-collision bug flagged in M7 is real and
+   independent of `llama-cpp`'s own fix - tracked in `ROADMAP.md`'s Backlog, still
+   deliberately unfixed here.
 
 **Depends on**: M0.
 
