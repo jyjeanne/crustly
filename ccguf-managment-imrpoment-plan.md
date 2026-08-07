@@ -238,7 +238,22 @@ Phases are ordered so each one is independently shippable and earlier phases
 unblock later ones (metadata parsing in particular is a dependency for most
 of what follows). No phase requires the ones after it.
 
-### Phase M0 — Decouple management from the `llama-cpp` build feature
+### Phase M0 — Decouple management from the `llama-cpp` build feature ✅ Done
+
+Implemented as planned, with one scope addition found during implementation:
+`src/tui/llama_cpp_download.rs`'s `list_local`/`spawn_download`/`spawn_delete`
+(pure management, called directly from the CLI's own management code) and
+`src/tui/app.rs`'s `quantization_hint_for_path` were gated on `llama-cpp` too
+and would otherwise have stayed silently degraded (empty list / `None` hint)
+under a `gguf-management`-only build even though nothing FFI-related stood in
+the way — moved alongside the two files below. `gguf-management` also joined
+`default` (not just `all-llm`), since the only real marginal cost is `sha2`
+(`reqwest` was already unconditional). Verified: zero `llama-cpp-2`/`-sys-2`
+in the dependency tree under `--features gguf-management`; 834/834 tests pass
+there (including the pre-existing 11 `llama_cpp_models` tests and the moved
+CLI/TUI tests, unmodified in behavior); 851/851 under `--features llama-cpp`
+and 883/883 under `all-llm` confirm no regression; `cargo clippy -D warnings`
+and `cargo fmt --check` both clean on the affected feature combinations.
 
 **Problem**: listing/downloading/deleting `.gguf` files does no FFI and needs
 no C++ toolchain, but is currently only compiled under `feature = "llama-cpp"`.

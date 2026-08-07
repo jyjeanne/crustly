@@ -116,9 +116,14 @@ analysis), not by phase number — highest-value/most-blocking first. Six execut
 tasks and acceptance criteria per item.
 
 **Foundation — unblocks everything else below (DP1):**
-- [ ] **Decouple GGUF file management from the `llama-cpp` build feature** — `list`/`pull`/`rm`
-  today require the full cmake/C++ toolchain even though they do no FFI; new `gguf-management`
-  feature fixes this and folds into `all-llm`
+- [x] **Decouple GGUF file management from the `llama-cpp` build feature** — `list`/`pull`/`rm`
+  no longer require the cmake/C++ toolchain; new `gguf-management` feature carries just the
+  management code (plus `sha2`), joins both `default` and `all-llm`, and `llama-cpp` depends
+  on it so nothing regressed. Also decoupled the TUI Ctrl+G dialog's list/download/delete and
+  the Model Info panel's quantization hint, which the source plan hadn't originally scoped in
+  but turned out to need the same fix. Verified: zero `llama-cpp-2`/`-sys-2` in the dependency
+  tree under `--features gguf-management`; 834/834 tests pass there, 851/851 under
+  `--features llama-cpp`, 883/883 under `all-llm` — no regressions
 - [ ] **Pure-Rust GGUF header metadata parser** — real architecture/parameter-count/quantization/
   context-length/chat-template-presence, replacing today's filename-only quantization guess;
   hardened against malformed/truncated/adversarial files (never panics/OOMs on a crafted header)
