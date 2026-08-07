@@ -49,6 +49,8 @@ pub struct LlamaCppModelSummary {
     pub display_name: Option<String>,
     pub estimated_memory_bytes: Option<u64>,
     pub estimated_memory_includes_kv_cache: bool,
+    pub is_mmproj: bool,
+    pub mmproj_path: Option<PathBuf>,
 }
 
 /// One progress update from an in-flight download, decoupled from the
@@ -114,6 +116,8 @@ pub async fn list_local(
         display_name: m.display_name,
         estimated_memory_bytes: m.estimated_memory_bytes,
         estimated_memory_includes_kv_cache: m.estimated_memory_includes_kv_cache,
+        is_mmproj: m.is_mmproj,
+        mmproj_path: m.mmproj_path,
     })
     .collect()
 }
@@ -335,6 +339,8 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            is_mmproj: false,
+            mmproj_path: None,
         }
     }
 

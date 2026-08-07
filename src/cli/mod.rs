@@ -1274,12 +1274,21 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
                 for m in models {
                     let size_gb = m.size_bytes as f64 / 1_073_741_824.0;
                     let quant = m.quantization_hint.as_deref().unwrap_or("unknown");
-                    let name = m.display_name.clone().unwrap_or_else(|| {
+                    let mut name = m.display_name.clone().unwrap_or_else(|| {
                         m.path
                             .file_name()
                             .map(|n| n.to_string_lossy().into_owned())
                             .unwrap_or_default()
                     });
+                    // A paired base model's projector is folded into this
+                    // entry (its own row was removed by `pair_mmproj_files`);
+                    // an unpaired projector keeps its own row, labeled so
+                    // it's not just a mysteriously-named model.
+                    if m.mmproj_path.is_some() {
+                        name.push_str(" (+ mmproj)");
+                    } else if m.is_mmproj {
+                        name.push_str(" [mmproj]");
+                    }
                     let memory = match m.estimated_memory_bytes {
                         Some(bytes) => {
                             let gb = bytes as f64 / 1_073_741_824.0;

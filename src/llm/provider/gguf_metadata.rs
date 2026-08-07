@@ -81,6 +81,17 @@ pub struct GgufMetadata {
     /// `<arch>.embedding_length` - divided by `attention_head_count` to
     /// get the per-head dimension.
     pub embedding_length: Option<u64>,
+    /// `clip.has_vision_encoder` - identifies a vision projector (mmproj)
+    /// GGUF file, verified against llama.cpp's own `tools/mtmd/
+    /// clip-impl.h` rather than assumed (not `general.architecture ==
+    /// "clip"`, which doesn't exist as a detection signal in the actual
+    /// source). `false` both when the key is absent and when it's present
+    /// but `false` - both mean "not established as a vision projector."
+    pub is_vision_projector: bool,
+    /// `clip.has_audio_encoder` - the audio-projector equivalent of
+    /// `is_vision_projector`, same source and same `false`-means-both
+    /// semantics.
+    pub is_audio_projector: bool,
 }
 
 /// Read `path`'s GGUF header/metadata. `None` on any structural problem —
@@ -153,6 +164,7 @@ impl ValueType {
 enum DecodedValue {
     Str(String),
     UInt(u64),
+    Bool(bool),
     Other,
 }
 
@@ -246,6 +258,7 @@ impl<R: Read> BoundedReader<R> {
                     ValueType::U64 => {
                         DecodedValue::UInt(u64::from_le_bytes(buf[..8].try_into().ok()?))
                     }
+                    ValueType::Bool => DecodedValue::Bool(buf[0] != 0),
                     _ => DecodedValue::Other,
                 })
             }
@@ -306,6 +319,12 @@ fn parse(reader: &mut BoundedReader<impl Read>) -> Option<GgufMetadata> {
             }
             (k, DecodedValue::UInt(n)) if k.ends_with(".embedding_length") => {
                 metadata.embedding_length = Some(n);
+            }
+            ("clip.has_vision_encoder", DecodedValue::Bool(b)) => {
+                metadata.is_vision_projector = b;
+            }
+            ("clip.has_audio_encoder", DecodedValue::Bool(b)) => {
+                metadata.is_audio_projector = b;
             }
             _ => {}
         }
@@ -530,6 +549,12 @@ mod tests {
         buf.extend_from_slice(&value.to_le_bytes());
     }
 
+    fn push_bool_kv(buf: &mut Vec<u8>, key: &str, value: bool) {
+        push_string(buf, key);
+        buf.extend_from_slice(&7u32.to_le_bytes()); // ValueType::Bool
+        buf.push(value as u8);
+    }
+
     /// Appends one tensor-info entry: name, dims, `ggml_type`, offset.
     fn push_tensor(buf: &mut Vec<u8>, name: &str, dims: &[u64], ggml_type: u32) {
         push_string(buf, name);
@@ -589,6 +614,47 @@ mod tests {
         assert_eq!(metadata.architecture, None);
         assert!(!metadata.has_chat_template);
         assert_eq!(metadata.quantization, None);
+    }
+
+    #[test]
+    fn clip_has_vision_encoder_true_sets_is_vision_projector() {
+        let mut buf = header(0, 1);
+        push_bool_kv(&mut buf, "clip.has_vision_encoder", true);
+
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse");
+        assert!(metadata.is_vision_projector);
+        assert!(!metadata.is_audio_projector);
+    }
+
+    #[test]
+    fn clip_has_vision_encoder_false_does_not_set_is_vision_projector() {
+        let mut buf = header(0, 1);
+        push_bool_kv(&mut buf, "clip.has_vision_encoder", false);
+
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse");
+        assert!(!metadata.is_vision_projector);
+    }
+
+    #[test]
+    fn clip_has_audio_encoder_true_sets_is_audio_projector() {
+        let mut buf = header(0, 1);
+        push_bool_kv(&mut buf, "clip.has_audio_encoder", true);
+
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse");
+        assert!(metadata.is_audio_projector);
+        assert!(!metadata.is_vision_projector);
+    }
+
+    #[test]
+    fn neither_clip_key_present_leaves_both_projector_flags_false() {
+        let buf = header(0, 0);
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse");
+        assert!(!metadata.is_vision_projector);
+        assert!(!metadata.is_audio_projector);
     }
 
     #[test]

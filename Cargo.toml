@@ -72,6 +72,14 @@ llama-cpp-2 = { version = "0.1.153", optional = true, default-features = false }
 # `gguf-management` rather than `llama-cpp`, ccguf-managment-imrpoment-plan.md
 # Phase M0.
 sha2 = { version = "0.11", optional = true }
+# Cross-platform free-disk-space query for the download precheck
+# (llama_cpp_models.rs, Phase M6) - no stable stdlib API exists for this.
+# Only the `Disks`/`Disk` API is used (`Disks::new_with_refreshed_list()`,
+# `.mount_point()`, `.available_space()`), so default features are dropped
+# to skip process/network/component enumeration this crate doesn't need.
+sysinfo = { version = "0.33", optional = true, default-features = false, features = [
+    "disk",
+] }
 # Grammar-constrained decoding for tool calls (Phase 4b, `llama-cpp-llguidance`
 # feature only) - builds the JSON-Schema-union grammar and the constrained
 # sampler in src/llm/provider/llama_cpp_grammar.rs. Neither is re-exported
@@ -166,7 +174,7 @@ ollama = ["dep:ollama-rs", "dep:schemars"]
 # small pure-Rust dependency), so it's part of `default` and `all-llm`:
 # managing `.gguf` files shouldn't require building the in-process inference
 # engine just to list what's on disk.
-gguf-management = ["dep:sha2"]
+gguf-management = ["dep:sha2", "dep:sysinfo"]
 # Deliberately NOT part of `all-llm`/`default`: unlike every other provider
 # feature (and unlike `gguf-management` above), this one compiles native
 # C++ (cmake + a C/C++ toolchain required) - see

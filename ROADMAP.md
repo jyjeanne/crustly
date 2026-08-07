@@ -147,8 +147,15 @@ tasks and acceptance criteria per item.
   one blob — names combine rather than one being dropped) and split-GGUF
   (`-00001-of-00005.gguf`) unification with summed size, handling a partial/incomplete group
   honestly
-- [ ] **`mmproj` pairing** — vision/audio projector files shown attached to their base model
-- [ ] **Download hardening** — disk-space precheck, `--revision` pinning, resumable downloads
+- [x] **`mmproj` pairing** — vision/audio projector files (detected via the header's
+  `clip.has_vision_encoder`/`clip.has_audio_encoder`, verified against llama.cpp's own source;
+  filename fallback only when the header can't be read) shown attached to their base model
+  (`"model.gguf (+ mmproj)"`) via a conservative exact-core-name match within one directory —
+  ambiguous or cross-directory candidates are left standalone (`"[mmproj]"`) rather than guessed
+- [x] **Download hardening** — disk-space precheck (new `sysinfo` dependency — the one new Cargo
+  dependency across M0–M6, no stable stdlib API exists for free-space queries), `@revision`
+  pinning on the `hf:org/repo/file.gguf@revision` shorthand, and `Range`-header resume (checksum
+  verification correctly covers the whole file across a resume, not just the newly-streamed part)
 - [ ] **Agent-facing `--json` CLI contract** — stable schema + documented exit codes on `crustly
   llama-cpp list/pull/rm`, extending Crustly's existing agent-facing positioning (`AGENTS.md`)
 - [ ] **TUI enhancements** — Ctrl+G/Ctrl+O dialogs show real header-parsed metadata instead of the

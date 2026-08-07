@@ -11,7 +11,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use tokio::io::AsyncWriteExt as _;
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::sync::mpsc::UnboundedSender;
 
 /// Context length used for `list_local_models`'s memory estimate when a
@@ -76,6 +76,22 @@ pub struct LocalGgufModel {
     /// it, in which case the estimate covers weights only - meaningless
     /// when `estimated_memory_bytes` is `None`.
     pub estimated_memory_includes_kv_cache: bool,
+    /// Whether this file is a vision/audio projector (mmproj), per the
+    /// header's `clip.has_vision_encoder`/`clip.has_audio_encoder`
+    /// (verified against llama.cpp's own source, see
+    /// `gguf_metadata::GgufMetadata::is_vision_projector`'s doc comment),
+    /// or - only when the header itself couldn't be read at all - a
+    /// filename containing "mmproj"/"mm-proj"/"mm_proj". A paired
+    /// projector's own entry is removed from the merged listing (see
+    /// `mmproj_path` below); an unpaired one keeps `is_mmproj = true` on
+    /// its own standalone entry so callers can label it, rather than
+    /// showing a mysteriously-named model.
+    pub is_mmproj: bool,
+    /// Set on a *base model* entry once `pair_mmproj_files` confidently
+    /// matches it with a projector in the same directory - `None` for an
+    /// ordinary entry, and always `None` on an entry that is itself
+    /// `is_mmproj` (a projector doesn't get its own `mmproj_path`).
+    pub mmproj_path: Option<PathBuf>,
 }
 
 /// One progress update from an in-flight `download_model` transfer. The
@@ -118,6 +134,19 @@ pub fn quantization_hint_from_filename(filename: &str) -> Option<String> {
         .iter()
         .find(|tag| upper.contains(*tag))
         .map(|tag| tag.to_string())
+}
+
+/// Filename markers (checked case-insensitively) that suggest a `.gguf`
+/// file is a multimodal projector, used only as a fallback when the header
+/// itself couldn't be read at all (`gguf_metadata::read_gguf_metadata`
+/// returned `None`) - when the header *did* parse, its
+/// `is_vision_projector`/`is_audio_projector` fields are the source of
+/// truth, not this heuristic.
+const MMPROJ_FILENAME_MARKERS: &[&str] = &["mmproj", "mm-proj", "mm_proj"];
+
+fn filename_suggests_mmproj(filename: &str) -> bool {
+    let lower = filename.to_lowercase();
+    MMPROJ_FILENAME_MARKERS.iter().any(|m| lower.contains(m))
 }
 
 /// Scan `models_dir` for `*.gguf` files. Ollama's `list_models()`
@@ -168,6 +197,13 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
                 .unwrap_or(ESTIMATE_DEFAULT_CONTEXT_LENGTH);
             super::gguf_metadata::estimate_memory_bytes(h, ctx)
         });
+        let is_mmproj = match &header {
+            Some(h) => h.is_vision_projector || h.is_audio_projector,
+            None => path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(filename_suggests_mmproj),
+        };
 
         models.push(LocalGgufModel {
             path,
@@ -181,6 +217,8 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
             display_name: None,
             estimated_memory_bytes: estimate.map(|e| e.total_bytes),
             estimated_memory_includes_kv_cache: estimate.is_some_and(|e| e.includes_kv_cache),
+            is_mmproj,
+            mmproj_path: None,
         });
     }
 
@@ -215,7 +253,8 @@ pub fn list_all_local_models(
         models.extend(list_ollama_models(ollama_dir));
     }
 
-    let mut models = deduplicate_and_merge(models);
+    let models = deduplicate_and_merge(models);
+    let mut models = pair_mmproj_files(models);
     models.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(models)
 }
@@ -372,6 +411,12 @@ fn parse_ollama_manifest(
         display_name: Some(display_name),
         estimated_memory_bytes: estimate.map(|e| e.total_bytes),
         estimated_memory_includes_kv_cache: estimate.is_some_and(|e| e.includes_kv_cache),
+        // No filename-based fallback here: an Ollama blob's on-disk name
+        // is always "sha256-<hex>", never anything containing "mmproj".
+        is_mmproj: header
+            .as_ref()
+            .is_some_and(|h| h.is_vision_projector || h.is_audio_projector),
+        mmproj_path: None,
     })
 }
 
@@ -545,40 +590,130 @@ fn merge_split_gguf_groups(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
     result
 }
 
-/// Parse an `hf:org/repo/file.gguf` shorthand into its parts. Pure
+/// Reduces a `.gguf` filename stem to its "core name" for mmproj pairing:
+/// lowercase, strip every `QUANTIZATION_TAGS` tag and every
+/// `MMPROJ_FILENAME_MARKERS` marker (both checked case-insensitively, in
+/// whichever order they appear), trim leftover `-`/`_`/` ` at the ends.
+/// Two files naming "the same model" (a base model plus its projector)
+/// should reduce to an identical core name once quant/mmproj-specific
+/// decoration is stripped from both - e.g. `"Qwen2-VL-7B-Q4_K_M"` and
+/// `"mmproj-Qwen2-VL-7B-f16"` both reduce to `"qwen2-vl-7b"`.
+fn mmproj_core_name(filename: &str) -> String {
+    let stem = filename.strip_suffix(".gguf").unwrap_or(filename);
+    let mut core = stem.to_lowercase();
+    for marker in MMPROJ_FILENAME_MARKERS {
+        core = core.replace(marker, "");
+    }
+    for tag in QUANTIZATION_TAGS {
+        core = core.replace(&tag.to_lowercase(), "");
+    }
+    core.trim_matches(|c: char| c == '-' || c == '_' || c == ' ')
+        .to_string()
+}
+
+/// Pairs `is_mmproj` entries with a confident-match base model in the same
+/// directory (never across directories), per
+/// `ccguf-managment-imrpoment-plan.md` Phase M5. Conservative by design: a
+/// wrong pairing is actively misleading, so this only pairs on an
+/// unambiguous exact core-name match - zero or more than one candidate
+/// leaves the projector as its own standalone entry rather than guessing.
+/// Run after `deduplicate_and_merge` so it operates on the final,
+/// already-deduplicated listing.
+fn pair_mmproj_files(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
+    let (mut projectors, mut bases): (Vec<LocalGgufModel>, Vec<LocalGgufModel>) =
+        (Vec::new(), Vec::new());
+    for model in models {
+        if model.is_mmproj {
+            projectors.push(model);
+        } else {
+            bases.push(model);
+        }
+    }
+
+    let mut result = Vec::with_capacity(bases.len() + projectors.len());
+    'projector: for projector in projectors {
+        let Some(filename) = projector.path.file_name().and_then(|n| n.to_str()) else {
+            result.push(projector);
+            continue;
+        };
+        let parent = projector.path.parent();
+        let projector_core = mmproj_core_name(filename);
+
+        let mut match_index = None;
+        for (i, base) in bases.iter().enumerate() {
+            if base.mmproj_path.is_some() {
+                continue; // already paired with a different projector
+            }
+            if base.path.parent() != parent {
+                continue; // never pair across directories
+            }
+            let Some(base_filename) = base.path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if mmproj_core_name(base_filename) == projector_core {
+                if match_index.is_some() {
+                    // A second candidate makes this ambiguous - stand
+                    // alone rather than guess which one is right.
+                    result.push(projector);
+                    continue 'projector;
+                }
+                match_index = Some(i);
+            }
+        }
+
+        match match_index {
+            Some(i) => bases[i].mmproj_path = Some(projector.path.clone()),
+            None => result.push(projector),
+        }
+    }
+
+    result.extend(bases);
+    result
+}
+
+/// Parse an `hf:org/repo/file.gguf` (or revision-pinned
+/// `hf:org/repo/file.gguf@revision`) shorthand into its parts. Pure
 /// string-parsing, no I/O - `None` if `source` isn't in that shorthand
-/// form (a direct URL, for instance).
-fn parse_hf_shorthand(source: &str) -> Option<(&str, &str, &str)> {
+/// form (a direct URL, for instance) or the `@revision` suffix is
+/// malformed (an `@` present with an empty file or revision side).
+fn parse_hf_shorthand(source: &str) -> Option<(&str, &str, &str, Option<&str>)> {
     let rest = source.strip_prefix("hf:")?;
     let mut parts = rest.splitn(3, '/');
     let org = parts.next()?;
     let repo = parts.next()?;
-    let file = parts.next()?;
-    if org.is_empty() || repo.is_empty() || file.is_empty() {
+    let file_and_revision = parts.next()?;
+    if org.is_empty() || repo.is_empty() || file_and_revision.is_empty() {
         return None;
     }
-    Some((org, repo, file))
+
+    let (file, revision) = match file_and_revision.split_once('@') {
+        Some((f, r)) if !f.is_empty() && !r.is_empty() => (f, Some(r)),
+        Some(_) => return None,
+        None => (file_and_revision, None),
+    };
+    Some((org, repo, file, revision))
 }
 
-/// Resolve `source` (a direct URL, or an `hf:org/repo/file.gguf`
+/// Resolve `source` (a direct URL, or an `hf:org/repo/file.gguf[@revision]`
 /// shorthand) into a downloadable URL and, where resolvable, the file's
 /// expected SHA-256 checksum.
 ///
 /// For the `hf:` shorthand, this expands to
-/// `https://huggingface.co/org/repo/resolve/main/file` and queries
-/// Hugging Face's model API (`https://huggingface.co/api/models/org/repo`)
-/// for the file's published LFS SHA-256 - a plain unauthenticated `GET`, no
-/// HuggingFace client dependency needed. A direct URL has no metadata
-/// endpoint to query at all, so it always resolves with `None` - callers
-/// must treat that as "no integrity hash available", not silently skip the
-/// gap (`llama-cpp-2-integration-plan.md` §4.11 point 2).
+/// `https://huggingface.co/org/repo/resolve/<revision-or-main>/file` and
+/// queries Hugging Face's model API for the file's published LFS SHA-256 -
+/// a plain unauthenticated `GET`, no HuggingFace client dependency needed.
+/// A direct URL has no metadata endpoint to query at all, so it always
+/// resolves with `None` - callers must treat that as "no integrity hash
+/// available", not silently skip the gap
+/// (`llama-cpp-2-integration-plan.md` §4.11 point 2).
 pub async fn resolve_download_source(source: &str) -> Result<(String, Option<String>)> {
-    let Some((org, repo, file)) = parse_hf_shorthand(source) else {
+    let Some((org, repo, file, revision)) = parse_hf_shorthand(source) else {
         return Ok((source.to_string(), None));
     };
 
-    let download_url = format!("https://huggingface.co/{org}/{repo}/resolve/main/{file}");
-    let expected_sha256 = fetch_hf_lfs_sha256(org, repo, file).await;
+    let ref_segment = revision.unwrap_or("main");
+    let download_url = format!("https://huggingface.co/{org}/{repo}/resolve/{ref_segment}/{file}");
+    let expected_sha256 = fetch_hf_lfs_sha256(org, repo, file, revision).await;
     Ok((download_url, expected_sha256))
 }
 
@@ -587,8 +722,28 @@ pub async fn resolve_download_source(source: &str) -> Result<(String, Option<Str
 /// non-LFS file, unexpected response shape) rather than propagating an
 /// error - a missing checksum degrades to an explicit warning at the call
 /// site, it does not block the download.
-async fn fetch_hf_lfs_sha256(org: &str, repo: &str, file: &str) -> Option<String> {
-    let api_url = format!("https://huggingface.co/api/models/{org}/{repo}");
+///
+/// When `revision` is `Some`, queries
+/// `/api/models/{org}/{repo}/revision/{revision}` instead of the bare
+/// `/api/models/{org}/{repo}` endpoint - HuggingFace's documented
+/// git-ref-based URL convention (the same shape the download URL itself
+/// already uses via `resolve/{revision}/`). **Unverified against a live
+/// response**: `huggingface.co` is unreachable from this development
+/// sandbox's own network policy (already known, not newly discovered -
+/// see `llama-cpp-2-integration-plan.md`'s prior finding on this exact
+/// point). A wrong guess here costs a missing checksum for pinned
+/// revisions, never a crash or bad data, given this function's existing
+/// degrade-to-`None` posture on any failure.
+async fn fetch_hf_lfs_sha256(
+    org: &str,
+    repo: &str,
+    file: &str,
+    revision: Option<&str>,
+) -> Option<String> {
+    let api_url = match revision {
+        Some(rev) => format!("https://huggingface.co/api/models/{org}/{repo}/revision/{rev}"),
+        None => format!("https://huggingface.co/api/models/{org}/{repo}"),
+    };
     let response = reqwest::get(&api_url).await.ok()?;
     let body: serde_json::Value = response.json().await.ok()?;
     body.get("siblings")?
@@ -599,6 +754,62 @@ async fn fetch_hf_lfs_sha256(org: &str, repo: &str, file: &str) -> Option<String
         .get("sha256")?
         .as_str()
         .map(str::to_string)
+}
+
+/// Best-effort available disk space at `path`'s filesystem, or the
+/// filesystem of its nearest existing ancestor (the download target
+/// itself doesn't exist yet, so `path` alone can't be queried directly).
+/// `None` when no matching disk is found - advisory only, callers must
+/// never block a download on an unknown.
+fn available_space_at(path: &Path) -> Option<u64> {
+    let mut probe = path.to_path_buf();
+    while !probe.exists() {
+        probe = probe.parent()?.to_path_buf();
+    }
+    let canonical = std::fs::canonicalize(&probe).ok()?;
+
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    disks
+        .list()
+        .iter()
+        // The disk whose mount point is the *longest* matching prefix
+        // wins - handles nested mount points correctly (e.g. a separate
+        // `/home` mount under `/`).
+        .filter(|d| canonical.starts_with(d.mount_point()))
+        .max_by_key(|d| d.mount_point().as_os_str().len())
+        .map(|d| d.available_space())
+}
+
+/// Pure comparison extracted from `download_model`'s disk-space precheck so
+/// the reject-path is unit-testable without depending on real filesystem
+/// free space - every dev/CI machine has generously more of that than any
+/// test download body, making a true end-to-end "insufficient space" test
+/// impractical to set up deterministically. `available_space_at`'s result
+/// is passed in already-resolved rather than this function calling it
+/// itself, which is exactly the seam that makes the fabricated-values test
+/// below possible.
+fn check_disk_space(
+    available: Option<u64>,
+    still_needed: u64,
+    filename: &str,
+    models_dir: &Path,
+) -> Result<()> {
+    let Some(available) = available else {
+        return Ok(()); // unknown - never block on missing information
+    };
+    // A fixed safety margin, not a zero-margin check - leaves room for the
+    // OS/other processes right after the download lands.
+    const SAFETY_MARGIN_BYTES: u64 = 512 * 1024 * 1024;
+    if available < still_needed.saturating_add(SAFETY_MARGIN_BYTES) {
+        anyhow::bail!(
+            "Not enough disk space to download '{filename}': need ~{:.2} GB (plus a safety \
+             margin) but only ~{:.2} GB free at {}",
+            still_needed as f64 / 1_073_741_824.0,
+            available as f64 / 1_073_741_824.0,
+            models_dir.display()
+        );
+    }
+    Ok(())
 }
 
 /// Download `url` into `models_dir`, streaming progress through
@@ -635,20 +846,96 @@ pub async fn download_model(
     let final_path = models_dir.join(filename);
     let partial_path = models_dir.join(format!("{filename}.part"));
 
-    let response = reqwest::get(url)
+    // Resume support: if a `.part` file already exists, ask the server to
+    // continue from where it left off via a `Range` header. Needs
+    // `reqwest::Client` rather than the bare `reqwest::get` free function
+    // used elsewhere in this module, since that has no header control.
+    let existing_bytes = tokio::fs::metadata(&partial_path)
+        .await
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let mut request = reqwest::Client::new().get(url);
+    if existing_bytes > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={existing_bytes}-"));
+    }
+    let response = request
+        .send()
         .await
         .with_context(|| format!("Failed to start download from {url}"))?
         .error_for_status()
         .with_context(|| format!("Download failed for {url}"))?;
-    let total_bytes = response.content_length();
 
-    let mut file = tokio::fs::File::create(&partial_path)
-        .await
-        .with_context(|| format!("Failed to create {}", partial_path.display()))?;
+    // A 206 confirms the server actually honored the `Range` request - a
+    // server that ignores it and sends 200 (full content) falls through to
+    // exactly today's from-scratch behavior below, discarding the stale
+    // partial bytes rather than corrupting the file by appending to them.
+    let resumed = existing_bytes > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    let total_bytes = if resumed {
+        // A 206's own `Content-Length` is the *remaining* bytes, not the
+        // whole file's size.
+        response
+            .content_length()
+            .map(|remaining| existing_bytes + remaining)
+    } else {
+        response.content_length()
+    };
+
+    // Disk-space precheck: only meaningful when both the size still to be
+    // downloaded and the destination's free space are known - skips
+    // silently (never blocks on missing information) otherwise. Reuses
+    // this same in-flight response's `Content-Length` rather than a
+    // separate `HEAD` round-trip.
+    if let Some(total) = total_bytes {
+        let still_needed = total.saturating_sub(if resumed { existing_bytes } else { 0 });
+        check_disk_space(
+            available_space_at(models_dir),
+            still_needed,
+            filename,
+            models_dir,
+        )?;
+    }
+
+    let mut file = if resumed {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&partial_path)
+            .await
+            .with_context(|| format!("Failed to resume {}", partial_path.display()))?
+    } else {
+        tokio::fs::File::create(&partial_path)
+            .await
+            .with_context(|| format!("Failed to create {}", partial_path.display()))?
+    };
+
     let mut hasher = Sha256::new();
     let mut bytes_downloaded: u64 = 0;
-    let mut stream = response.bytes_stream();
 
+    if resumed {
+        bytes_downloaded = existing_bytes;
+        if expected_sha256.is_some() {
+            // The final checksum must cover the *whole* file, not just the
+            // newly-streamed portion - hash the already-on-disk bytes too,
+            // incrementally (never the whole file in memory at once, even
+            // for a multi-GB partial download).
+            let mut existing_file = tokio::fs::File::open(&partial_path)
+                .await
+                .with_context(|| format!("Failed to re-read {}", partial_path.display()))?;
+            let mut buf = vec![0u8; 1024 * 1024];
+            loop {
+                let n = existing_file
+                    .read(&mut buf)
+                    .await
+                    .with_context(|| format!("Failed to re-read {}", partial_path.display()))?;
+                if n == 0 {
+                    break;
+                }
+                hasher.update(&buf[..n]);
+            }
+        }
+    }
+
+    let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.context("Error while downloading")?;
         hasher.update(&chunk);
@@ -737,7 +1024,25 @@ mod tests {
     fn parse_hf_shorthand_extracts_org_repo_file() {
         assert_eq!(
             parse_hf_shorthand("hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf"),
-            Some(("TheBloke", "Llama-2-7B-GGUF", "llama-2-7b.Q4_K_M.gguf"))
+            Some((
+                "TheBloke",
+                "Llama-2-7B-GGUF",
+                "llama-2-7b.Q4_K_M.gguf",
+                None
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_hf_shorthand_extracts_a_pinned_revision() {
+        assert_eq!(
+            parse_hf_shorthand("hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf@abc123"),
+            Some((
+                "TheBloke",
+                "Llama-2-7B-GGUF",
+                "llama-2-7b.Q4_K_M.gguf",
+                Some("abc123")
+            ))
         );
     }
 
@@ -755,6 +1060,8 @@ mod tests {
             "hf:org/repo",
             "hf:/repo/file",
             "hf:org//file",
+            "hf:org/repo/file.gguf@", // empty revision after "@"
+            "hf:org/repo/@abc123",    // empty file before "@"
         ] {
             assert_eq!(parse_hf_shorthand(bad), None, "should reject: {bad}");
         }
@@ -787,6 +1094,78 @@ mod tests {
             .expect("resolve");
         assert_eq!(url, "https://example.com/model.gguf");
         assert_eq!(sha, None, "a direct URL has no known checksum endpoint");
+    }
+
+    #[tokio::test]
+    async fn resolve_download_source_uses_the_pinned_revision_in_the_url() {
+        let (url, _sha) =
+            resolve_download_source("hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf@abc123")
+                .await
+                .expect("resolve");
+        assert_eq!(
+            url,
+            "https://huggingface.co/TheBloke/Llama-2-7B-GGUF/resolve/abc123/llama-2-7b.Q4_K_M.gguf"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_download_source_defaults_to_main_without_a_revision() {
+        let (url, _sha) =
+            resolve_download_source("hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf")
+                .await
+                .expect("resolve");
+        assert_eq!(
+            url,
+            "https://huggingface.co/TheBloke/Llama-2-7B-GGUF/resolve/main/llama-2-7b.Q4_K_M.gguf"
+        );
+    }
+
+    #[test]
+    fn check_disk_space_rejects_when_available_is_below_needed_plus_margin() {
+        let err = check_disk_space(
+            Some(1_000_000_000),
+            900_000_000,
+            "model.gguf",
+            Path::new("/models"),
+        )
+        .expect_err("900MB needed + 512MB margin exceeds 1GB available");
+        assert!(err.to_string().contains("Not enough disk space"));
+    }
+
+    #[test]
+    fn check_disk_space_allows_when_comfortably_available() {
+        assert!(check_disk_space(
+            Some(100_000_000_000),
+            1_000_000_000,
+            "model.gguf",
+            Path::new("/models")
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn check_disk_space_skips_when_available_is_unknown() {
+        assert!(check_disk_space(None, u64::MAX, "model.gguf", Path::new("/models")).is_ok());
+    }
+
+    #[test]
+    fn available_space_at_a_real_directory_returns_a_plausible_value_or_none() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        // Best-effort - some sandboxes may not expose disk info at all, so
+        // this only asserts that a `Some` result is a real, non-zero
+        // number, not that a result is always available.
+        if let Some(bytes) = available_space_at(tmp.path()) {
+            assert!(bytes > 0);
+        }
+    }
+
+    #[test]
+    fn available_space_at_walks_up_to_the_nearest_existing_ancestor() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let nonexistent = tmp.path().join("does").join("not").join("exist");
+        // Must not panic or loop forever walking up to `tmp` (which does
+        // exist) instead of the nonexistent leaf.
+        let _ = available_space_at(&nonexistent);
     }
 
     #[tokio::test]
@@ -876,6 +1255,148 @@ mod tests {
         });
 
         format!("http://{addr}")
+    }
+
+    /// Like `mock_http_server`, but honors a `Range: bytes=N-` request
+    /// header by returning `206 Partial Content` with only the requested
+    /// tail of `body` - lets `download_model`'s resume path be tested
+    /// without a real remote server.
+    async fn mock_resumable_http_server(body: Vec<u8>) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind mock server");
+        let addr = listener.local_addr().expect("mock server addr");
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept request");
+
+            let mut request = Vec::new();
+            let mut buf = [0u8; 1024];
+            loop {
+                let n = socket.read(&mut buf).await.expect("read request");
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buf[..n]);
+                if request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    break;
+                }
+            }
+
+            let request_text = String::from_utf8_lossy(&request);
+            let range_start: Option<usize> = request_text
+                .lines()
+                .find(|l| l.to_ascii_lowercase().starts_with("range:"))
+                .and_then(|l| l.split("bytes=").nth(1))
+                .and_then(|s| s.trim().trim_end_matches('-').parse().ok());
+
+            let served: &[u8] = match range_start {
+                Some(start) if start < body.len() => &body[start..],
+                _ => &body[..],
+            };
+
+            let response = match range_start {
+                Some(start) if start < body.len() => format!(
+                    "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\n\
+                     Content-Length: {}\r\nConnection: close\r\n\r\n",
+                    start,
+                    body.len().saturating_sub(1),
+                    body.len(),
+                    served.len()
+                ),
+                _ => format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    served.len()
+                ),
+            };
+            socket
+                .write_all(response.as_bytes())
+                .await
+                .expect("write response headers");
+            socket.write_all(served).await.expect("write response body");
+            socket.shutdown().await.ok();
+        });
+
+        format!("http://{addr}")
+    }
+
+    #[tokio::test]
+    async fn download_model_resumes_from_an_existing_partial_file() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let full_body = b"0123456789ABCDEFGHIJ".to_vec();
+        let already_have = &full_body[..10];
+        tokio::fs::write(tmp.path().join("model.gguf.part"), already_have)
+            .await
+            .expect("seed partial file");
+
+        let server = mock_resumable_http_server(full_body.clone()).await;
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let path = download_model(&format!("{server}/model.gguf"), tmp.path(), None, tx)
+            .await
+            .expect("resumed download should succeed");
+
+        assert_eq!(std::fs::read(&path).expect("read final file"), full_body);
+
+        let mut saw_full_progress = false;
+        while let Ok(p) = rx.try_recv() {
+            assert!(
+                p.bytes_downloaded as usize >= already_have.len(),
+                "progress must reflect true cumulative total, never regress below what was \
+                 already on disk before resuming"
+            );
+            if p.bytes_downloaded as usize == full_body.len() {
+                saw_full_progress = true;
+            }
+        }
+        assert!(saw_full_progress);
+    }
+
+    #[tokio::test]
+    async fn download_model_verifies_checksum_across_a_resumed_download() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let full_body = b"the quick brown fox jumps over the lazy dog, resumed".to_vec();
+        let mut hasher = Sha256::new();
+        hasher.update(&full_body);
+        let expected_sha256 = to_hex(&hasher.finalize());
+
+        let already_have = &full_body[..20];
+        tokio::fs::write(tmp.path().join("model.gguf.part"), already_have)
+            .await
+            .expect("seed partial file");
+
+        let server = mock_resumable_http_server(full_body.clone()).await;
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let path = download_model(
+            &format!("{server}/model.gguf"),
+            tmp.path(),
+            Some(&expected_sha256),
+            tx,
+        )
+        .await
+        .expect("checksum must match across the resumed + already-on-disk bytes");
+
+        assert_eq!(std::fs::read(&path).expect("read final file"), full_body);
+    }
+
+    #[tokio::test]
+    async fn download_model_falls_back_to_a_fresh_start_when_the_server_ignores_range() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let full_body = b"a fresh, non-resumable download".to_vec();
+        // Stale/wrong partial bytes on disk - a server that ignores Range
+        // and returns 200 must discard these, not append to them.
+        tokio::fs::write(tmp.path().join("model.gguf.part"), b"WRONG STALE BYTES")
+            .await
+            .expect("seed stale partial file");
+
+        let server = mock_http_server(full_body.clone()).await; // always 200, ignores Range
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let path = download_model(&format!("{server}/model.gguf"), tmp.path(), None, tx)
+            .await
+            .expect("download should succeed");
+
+        assert_eq!(std::fs::read(&path).expect("read final file"), full_body);
     }
 
     // --- M3: multi-source discovery ---
@@ -1177,6 +1698,101 @@ mod tests {
                 .ends_with("big-model-00002-of-00003.gguf"),
             "with only one part found, it is its own canonical path"
         );
+    }
+
+    // --- M5: mmproj pairing ---
+
+    #[test]
+    fn mmproj_core_name_reduces_a_base_model_and_its_projector_identically() {
+        assert_eq!(
+            mmproj_core_name("Qwen2-VL-7B-Q4_K_M.gguf"),
+            mmproj_core_name("mmproj-Qwen2-VL-7B-f16.gguf"),
+        );
+        assert_eq!(mmproj_core_name("Qwen2-VL-7B-Q4_K_M.gguf"), "qwen2-vl-7b");
+    }
+
+    #[test]
+    fn list_all_local_models_pairs_a_base_model_with_its_mmproj_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("Qwen2-VL-7B-Q4_K_M.gguf"),
+            b"base model bytes",
+        )
+        .expect("write base");
+        std::fs::write(
+            dir.path().join("mmproj-Qwen2-VL-7B-f16.gguf"),
+            b"projector bytes",
+        )
+        .expect("write projector");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(
+            models.len(),
+            1,
+            "a paired projector's own entry must be removed from the listing"
+        );
+        assert!(models[0]
+            .path
+            .to_string_lossy()
+            .ends_with("Qwen2-VL-7B-Q4_K_M.gguf"));
+        assert!(models[0]
+            .mmproj_path
+            .as_ref()
+            .is_some_and(|p| p.to_string_lossy().ends_with("mmproj-Qwen2-VL-7B-f16.gguf")));
+    }
+
+    #[test]
+    fn list_all_local_models_leaves_an_unmatched_mmproj_file_standing_alone() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("mmproj-SomeVisionModel-f16.gguf"),
+            b"projector bytes",
+        )
+        .expect("write projector");
+        std::fs::write(dir.path().join("unrelated-model.gguf"), b"unrelated")
+            .expect("write unrelated");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(models.len(), 2, "no confident match - nothing gets hidden");
+        let projector = models
+            .iter()
+            .find(|m| m.path.to_string_lossy().contains("mmproj"))
+            .expect("projector entry must still be present");
+        assert!(projector.is_mmproj);
+        assert!(projector.mmproj_path.is_none());
+    }
+
+    #[test]
+    fn list_all_local_models_does_not_pair_when_two_candidates_are_ambiguous() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("Model-A-Q4_K_M.gguf"), b"a").expect("write a");
+        std::fs::write(dir.path().join("Model-A-Q8_0.gguf"), b"a2").expect("write a2");
+        std::fs::write(dir.path().join("mmproj-Model-A-f16.gguf"), b"proj").expect("write proj");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(
+            models.len(),
+            3,
+            "two equally-good candidates must not be guessed between"
+        );
+        assert!(models.iter().all(|m| m.mmproj_path.is_none()));
+    }
+
+    #[test]
+    fn list_all_local_models_does_not_pair_across_directories() {
+        let primary = tempfile::tempdir().expect("tempdir");
+        let extra = tempfile::tempdir().expect("tempdir");
+        std::fs::write(primary.path().join("Model-A-Q4_K_M.gguf"), b"a").expect("write a");
+        std::fs::write(extra.path().join("mmproj-Model-A-f16.gguf"), b"proj").expect("write proj");
+
+        let models = list_all_local_models(primary.path(), &[extra.path().to_path_buf()], None)
+            .expect("list");
+
+        assert_eq!(models.len(), 2, "pairing must never cross directories");
+        assert!(models.iter().all(|m| m.mmproj_path.is_none()));
     }
 
     #[test]

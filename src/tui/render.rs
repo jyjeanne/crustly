@@ -2705,6 +2705,8 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            is_mmproj: false,
+            mmproj_path: None,
         }];
 
         let screen = render_to_string(&app, 100, 20);

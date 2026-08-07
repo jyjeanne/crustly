@@ -4275,6 +4275,8 @@ mod tests {
                 display_name: None,
                 estimated_memory_bytes: None,
                 estimated_memory_includes_kv_cache: false,
+                is_mmproj: false,
+                mmproj_path: None,
             },
             super::super::llama_cpp_download::LlamaCppModelSummary {
                 path: std::path::PathBuf::from("/models/b.gguf"),
@@ -4287,6 +4289,8 @@ mod tests {
                 display_name: None,
                 estimated_memory_bytes: None,
                 estimated_memory_includes_kv_cache: false,
+                is_mmproj: false,
+                mmproj_path: None,
             },
         ]))
         .await
@@ -4314,6 +4318,8 @@ mod tests {
                 display_name: None,
                 estimated_memory_bytes: None,
                 estimated_memory_includes_kv_cache: false,
+                is_mmproj: false,
+                mmproj_path: None,
             },
             super::super::llama_cpp_download::LlamaCppModelSummary {
                 path: std::path::PathBuf::from("/models/b.gguf"),
@@ -4326,6 +4332,8 @@ mod tests {
                 display_name: None,
                 estimated_memory_bytes: None,
                 estimated_memory_includes_kv_cache: false,
+                is_mmproj: false,
+                mmproj_path: None,
             },
         ];
 
@@ -4387,6 +4395,8 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            is_mmproj: false,
+            mmproj_path: None,
         }];
 
         app.handle_llama_cpp_models_key(key(KeyCode::Delete))
@@ -4415,6 +4425,8 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            is_mmproj: false,
+            mmproj_path: None,
         }];
         app.llama_cpp_deleting = Some(std::path::PathBuf::from("/models/a.gguf"));
 
@@ -4503,6 +4515,8 @@ mod tests {
             display_name: None,
             estimated_memory_bytes: None,
             estimated_memory_includes_kv_cache: false,
+            is_mmproj: false,
+            mmproj_path: None,
         }];
 
         // Enter would normally start a switch to the highlighted model.

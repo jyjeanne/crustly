@@ -535,7 +535,21 @@ listings of the same file.
 
 **Effort**: Medium.
 
-### Phase M5 — `mmproj` (vision/audio projector) pairing
+### Phase M5 — `mmproj` (vision/audio projector) pairing ✅ Done
+
+Implemented as planned, grounded in verified ground truth rather than a guess: fetched
+llama.cpp's actual `tools/mtmd/clip-impl.h` before writing any code, which confirmed
+projector detection is the boolean keys `clip.has_vision_encoder`/
+`clip.has_audio_encoder` - **not** `general.architecture == "clip"`, which I'd have
+guessed wrong otherwise. `GgufMetadata` gained both booleans (plus a `DecodedValue::
+Bool` variant the parser needed to actually read them, not just note their presence).
+Pairing (`pair_mmproj_files`) is conservative by design: exact core-name match
+(quant/mmproj-marker-stripped filename stem) within one directory only; zero or
+multiple candidates leaves the projector standing alone rather than guessing. One
+simplification from the plan's own phrasing: `LocalGgufModel` collapsed vision/audio
+into a single `is_mmproj: bool` (not tracked separately once paired), so the CLI's
+display label is the generic `"(+ mmproj)"`/`"[mmproj]"` rather than
+vision-or-audio-specific text - a disclosed simplification, not an oversight.
 
 **Depends on**: M1.
 
@@ -547,7 +561,27 @@ Crustly's own multimodal path (`llama-cpp-2-integration-plan.md` §4.9,
 
 **Effort**: Small–Medium.
 
-### Phase M6 — Download hardening
+### Phase M6 — Download hardening ✅ Done
+
+Implemented all three sub-items. Disk-space precheck required this plan's one new
+Cargo dependency across M0-M6: `sysinfo` (its `Disks`/`Disk` API verified against the
+actual crate source before use, since docs.rs was unreachable from this sandbox) -
+no stable stdlib API exists for cross-platform free-space queries, and this is
+exactly the kind of commodity functionality not worth hand-rolling (unlike the GGUF
+parser itself). Landed at `sysinfo` 0.33.1, not the latest 0.39.x, after discovering
+0.39 requires a newer rustc than this sandbox has installed - a real constraint the
+plan hadn't anticipated, resolved by loosening the version requirement rather than
+assuming latest-is-fine. `@revision` pinning extends the `hf:` shorthand as planned;
+the revision-specific HuggingFace API endpoint stayed unverified against a live
+response (network-blocked sandbox, already known) but degrades safely on a wrong
+guess per the function's existing posture. Resume support via `Range` correctly
+recomputes `total_bytes` from a 206 response's *remaining*-bytes `Content-Length`,
+falls back to a clean fresh start when a server ignores `Range`, and hashes
+already-on-disk bytes incrementally so checksum verification covers the whole file
+across a resume. The disk-space reject-path logic was extracted into a pure
+`check_disk_space` function specifically so it's unit-testable with fabricated
+values - real disk free space can't be deterministically driven low enough in a test
+environment to exercise the reject branch otherwise.
 
 **Depends on**: M0.
 
