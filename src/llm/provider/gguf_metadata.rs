@@ -1,0 +1,613 @@
+//! Pure-Rust GGUF header/metadata parser — no FFI, no `llama-cpp-2` dependency.
+//!
+//! Reads only the GGUF header, metadata key-value section, and tensor-info
+//! section of a `.gguf` file — never the (multi-GB) tensor data blob that
+//! follows. See `ccguf-managment-imrpoment-plan.md` Phase M1 for the design
+//! rationale and the public GGUF spec this implements against.
+//!
+//! **Hardening**: every value handed to this parser may come from an
+//! untrusted source (a file downloaded from an arbitrary URL via
+//! `llama_cpp_models::download_model`, or just a corrupted/truncated file).
+//! Every declared length is validated against a cap *before* anything
+//! allocation-shaped is called on it, and any structural problem (bad
+//! magic, unsupported version, truncation, or a cap violation) makes the
+//! whole parse return `None` rather than panicking or returning
+//! partial/corrupt data. A structurally valid file that's simply missing an
+//! optional key is not such a problem — it still returns `Some`, with
+//! `None` in the specific missing fields.
+
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::Path;
+
+/// GGUF magic bytes ("GGUF"), compared byte-for-byte rather than as a
+/// little/big-endian `u32` to sidestep any endianness ambiguity entirely.
+const GGUF_MAGIC: [u8; 4] = *b"GGUF";
+
+/// GGUF versions this parser understands. Older files are rare in practice
+/// (llama.cpp has published v3 for a long time); newer major versions, if
+/// they ever appear, are safer to decline than to assume compatibility with.
+const MIN_SUPPORTED_VERSION: u32 = 2;
+const MAX_SUPPORTED_VERSION: u32 = 3;
+
+/// Per-value hardening caps — generous enough for any real GGUF file (a
+/// tokenizer vocabulary array commonly runs to 100-200k entries, for
+/// example) while still bounding worst-case adversarial memory use. See the
+/// module doc comment and `ccguf-managment-imrpoment-plan.md` Phase M1's
+/// "Hardening" section for the reasoning behind each number.
+const MAX_KV_COUNT: u64 = 100_000;
+const MAX_TENSOR_COUNT: u64 = 100_000;
+const MAX_TENSOR_DIMS: u32 = 8;
+const MAX_STRING_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_ARRAY_LEN: u64 = 1_000_000;
+/// Cumulative cap on total bytes read while parsing the KV + tensor-info
+/// sections, independent of the per-value caps above — defense in depth
+/// against many small-but-not-individually-over-cap values adding up.
+const MAX_TOTAL_METADATA_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Parsed GGUF metadata. Every field is best-effort/`Option` — see the
+/// module doc comment for when `read_gguf_metadata` returns `None` for the
+/// whole file versus `Some` with individual fields unset.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GgufMetadata {
+    pub architecture: Option<String>,
+    pub name: Option<String>,
+    /// Total scalar weight count, summed across every tensor's dimensions —
+    /// independent of quantization (which affects storage bytes per
+    /// parameter, not the logical parameter count).
+    pub parameter_count: Option<u64>,
+    /// Best-effort quantization label. Prefers `general.file_type` (precise
+    /// — distinguishes e.g. `Q4_K_S` from `Q4_K_M`) over the tensor-type
+    /// mode (coarser — that distinction doesn't exist at the per-tensor
+    /// level, only in the file-level preset name).
+    pub quantization: Option<String>,
+    pub context_length: Option<u64>,
+    pub has_chat_template: bool,
+}
+
+/// Read `path`'s GGUF header/metadata. `None` on any structural problem —
+/// not a valid GGUF file, truncated, or a value exceeds this parser's
+/// hardening caps — never panics. Only the header/KV/tensor-info sections
+/// are read; the tensor data blob itself (the bulk of the file) is never
+/// touched, so this stays fast and memory-light even for a multi-GB model.
+pub fn read_gguf_metadata(path: &Path) -> Option<GgufMetadata> {
+    let file = File::open(path).ok()?;
+    let mut reader = BoundedReader::new(BufReader::new(file));
+    parse(&mut reader)
+}
+
+/// GGUF metadata value type tags (spec-defined, fixed numbering).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ValueType {
+    U8,
+    I8,
+    U16,
+    I16,
+    U32,
+    I32,
+    F32,
+    Bool,
+    String,
+    Array,
+    U64,
+    I64,
+    F64,
+}
+
+impl ValueType {
+    fn from_tag(tag: u32) -> Option<Self> {
+        Some(match tag {
+            0 => Self::U8,
+            1 => Self::I8,
+            2 => Self::U16,
+            3 => Self::I16,
+            4 => Self::U32,
+            5 => Self::I32,
+            6 => Self::F32,
+            7 => Self::Bool,
+            8 => Self::String,
+            9 => Self::Array,
+            10 => Self::U64,
+            11 => Self::I64,
+            12 => Self::F64,
+            _ => return None,
+        })
+    }
+
+    /// Byte width of a scalar of this type. `None` for `String`/`Array`,
+    /// which aren't fixed-width.
+    fn scalar_width(self) -> Option<usize> {
+        Some(match self {
+            Self::U8 | Self::I8 | Self::Bool => 1,
+            Self::U16 | Self::I16 => 2,
+            Self::U32 | Self::I32 | Self::F32 => 4,
+            Self::U64 | Self::I64 | Self::F64 => 8,
+            Self::String | Self::Array => return None,
+        })
+    }
+}
+
+/// A decoded value, retained only for the types this parser actually cares
+/// about (strings, and the unsigned-integer types used by
+/// `general.file_type`/`*.context_length`). Every other type is still fully
+/// consumed from the stream (so subsequent KV pairs stay in sync) but
+/// discarded as `Other`.
+enum DecodedValue {
+    Str(String),
+    UInt(u64),
+    Other,
+}
+
+/// Wraps a `Read` with the cumulative byte-budget enforcement shared by
+/// every read in this module — a read fails once the budget is exhausted,
+/// independent of any individual value's own cap.
+struct BoundedReader<R> {
+    inner: R,
+    remaining_budget: u64,
+}
+
+impl<R: Read> BoundedReader<R> {
+    fn new(inner: R) -> Self {
+        Self {
+            inner,
+            remaining_budget: MAX_TOTAL_METADATA_BYTES,
+        }
+    }
+
+    fn read_exact(&mut self, buf: &mut [u8]) -> Option<()> {
+        let len = buf.len() as u64;
+        if len > self.remaining_budget {
+            return None;
+        }
+        self.inner.read_exact(buf).ok()?;
+        self.remaining_budget -= len;
+        Some(())
+    }
+
+    fn read_u32(&mut self) -> Option<u32> {
+        let mut buf = [0u8; 4];
+        self.read_exact(&mut buf)?;
+        Some(u32::from_le_bytes(buf))
+    }
+
+    fn read_u64(&mut self) -> Option<u64> {
+        let mut buf = [0u8; 8];
+        self.read_exact(&mut buf)?;
+        Some(u64::from_le_bytes(buf))
+    }
+
+    /// Reads a length-prefixed GGUF string. The declared length is checked
+    /// against `MAX_STRING_BYTES` *before* the backing buffer is allocated
+    /// — the core hardening invariant of this module: never allocate from
+    /// an unchecked, attacker-influenced length.
+    fn read_string(&mut self) -> Option<String> {
+        let len = self.read_u64()?;
+        if len > MAX_STRING_BYTES {
+            return None;
+        }
+        // Safe to allocate: `len` is now bounded by `MAX_STRING_BYTES` (64
+        // MiB), not the raw declared value.
+        let mut buf = vec![0u8; len as usize];
+        self.read_exact(&mut buf)?;
+        Some(String::from_utf8_lossy(&buf).into_owned())
+    }
+
+    /// Reads one value of `ty`, returning a decoded form for the types this
+    /// parser retains (`String`, `U32`/`U64`) or `Other` for everything
+    /// else. Always fully consumes the value's bytes from the stream
+    /// regardless of whether it's retained, so the next KV pair or tensor
+    /// info starts at the right offset.
+    fn read_value(&mut self, ty: ValueType) -> Option<DecodedValue> {
+        match ty {
+            ValueType::String => Some(DecodedValue::Str(self.read_string()?)),
+            ValueType::Array => {
+                let elem_tag = self.read_u32()?;
+                let elem_ty = ValueType::from_tag(elem_tag)?;
+                let len = self.read_u64()?;
+                if len > MAX_ARRAY_LEN {
+                    return None;
+                }
+                // Arrays aren't retained by this parser (no field needs
+                // array contents today) - each element is still fully
+                // decoded to keep the stream position correct.
+                for _ in 0..len {
+                    self.read_value(elem_ty)?;
+                }
+                Some(DecodedValue::Other)
+            }
+            _ => {
+                let width = ty
+                    .scalar_width()
+                    .expect("non-String/Array type has a scalar width");
+                let mut buf = [0u8; 8];
+                self.read_exact(&mut buf[..width])?;
+                Some(match ty {
+                    ValueType::U32 => {
+                        DecodedValue::UInt(u32::from_le_bytes(buf[..4].try_into().ok()?) as u64)
+                    }
+                    ValueType::U64 => {
+                        DecodedValue::UInt(u64::from_le_bytes(buf[..8].try_into().ok()?))
+                    }
+                    _ => DecodedValue::Other,
+                })
+            }
+        }
+    }
+}
+
+fn parse(reader: &mut BoundedReader<impl Read>) -> Option<GgufMetadata> {
+    let mut magic = [0u8; 4];
+    reader.read_exact(&mut magic)?;
+    if magic != GGUF_MAGIC {
+        return None;
+    }
+
+    let version = reader.read_u32()?;
+    if !(MIN_SUPPORTED_VERSION..=MAX_SUPPORTED_VERSION).contains(&version) {
+        return None;
+    }
+
+    let tensor_count = reader.read_u64()?;
+    if tensor_count > MAX_TENSOR_COUNT {
+        return None;
+    }
+    let kv_count = reader.read_u64()?;
+    if kv_count > MAX_KV_COUNT {
+        return None;
+    }
+
+    let mut metadata = GgufMetadata::default();
+    let mut file_type: Option<u64> = None;
+
+    for _ in 0..kv_count {
+        let key = reader.read_string()?;
+        let value_tag = reader.read_u32()?;
+        let value_ty = ValueType::from_tag(value_tag)?;
+        let value = reader.read_value(value_ty)?;
+
+        match (key.as_str(), value) {
+            ("general.architecture", DecodedValue::Str(s)) => metadata.architecture = Some(s),
+            ("general.name", DecodedValue::Str(s)) => metadata.name = Some(s),
+            ("general.file_type", DecodedValue::UInt(n)) => file_type = Some(n),
+            ("tokenizer.chat_template", _) => metadata.has_chat_template = true,
+            (k, DecodedValue::UInt(n)) if k.ends_with(".context_length") => {
+                metadata.context_length = Some(n);
+            }
+            _ => {}
+        }
+    }
+
+    // Tensor-info section: always parsed (cheap - no tensor *data* is read)
+    // for parameter count and the quantization fallback.
+    let mut param_count: Option<u64> = Some(0);
+    let mut type_counts: HashMap<u32, u32> = HashMap::new();
+
+    for _ in 0..tensor_count {
+        let _name = reader.read_string()?;
+        let n_dims = reader.read_u32()?;
+        if n_dims > MAX_TENSOR_DIMS {
+            return None;
+        }
+
+        let mut tensor_elems: Option<u64> = Some(1);
+        for _ in 0..n_dims {
+            let dim = reader.read_u64()?;
+            tensor_elems = tensor_elems.and_then(|acc| acc.checked_mul(dim));
+        }
+
+        let tensor_type = reader.read_u32()?;
+        let _offset = reader.read_u64()?;
+
+        param_count = match (param_count, tensor_elems) {
+            (Some(total), Some(elems)) => total.checked_add(elems),
+            _ => None,
+        };
+        *type_counts.entry(tensor_type).or_insert(0) += 1;
+    }
+
+    metadata.parameter_count = param_count;
+    metadata.quantization = file_type.and_then(ftype_to_string).or_else(|| {
+        type_counts
+            .into_iter()
+            .max_by_key(|(_, count)| *count)
+            .and_then(|(ty, _)| ggml_type_to_string(ty))
+    });
+
+    Some(metadata)
+}
+
+/// Maps `general.file_type` (the `ggml_ftype`/`llama_ftype` enum — a
+/// file-level "which quantization preset was used" value, distinct from
+/// the per-tensor `ggml_type` enum below) to its human name.
+///
+/// Deliberately incomplete: only entries verified with high confidence
+/// against the public spec are mapped. `ggml_ftype` has grown many `IQ*`/
+/// `TQ*` variants over time whose exact integer codes aren't worth
+/// guessing at — an unmapped code has no entry here and the caller falls
+/// through to the coarser tensor-type-mode inference (or ultimately
+/// "unknown"), never a wrong name. Extend this table when a specific,
+/// verified code is reported missing, not preemptively.
+fn ftype_to_string(code: u64) -> Option<String> {
+    let name = match code {
+        0 => "F32",
+        1 => "F16",
+        2 => "Q4_0",
+        3 => "Q4_1",
+        7 => "Q8_0",
+        8 => "Q5_0",
+        9 => "Q5_1",
+        10 => "Q2_K",
+        11 => "Q3_K_S",
+        12 => "Q3_K_M",
+        13 => "Q3_K_L",
+        14 => "Q4_K_S",
+        15 => "Q4_K_M",
+        16 => "Q5_K_S",
+        17 => "Q5_K_M",
+        18 => "Q6_K",
+        _ => return None,
+    };
+    Some(name.to_string())
+}
+
+/// Maps a per-tensor `ggml_type` code to its human name. Coarser than
+/// `ftype_to_string` above by nature — the K-quant `_S`/`_M`/`_L` preset
+/// suffix is a file-level naming convention (which tensors got which
+/// quantization under a given strategy), not a distinct raw tensor type,
+/// so this table can only express the base family (e.g. `"Q4_K"`, not
+/// `"Q4_K_M"`). Same "verified entries only" policy as `ftype_to_string`.
+fn ggml_type_to_string(code: u32) -> Option<String> {
+    let name = match code {
+        0 => "F32",
+        1 => "F16",
+        2 => "Q4_0",
+        3 => "Q4_1",
+        6 => "Q5_0",
+        7 => "Q5_1",
+        8 => "Q8_0",
+        9 => "Q8_1",
+        10 => "Q2_K",
+        11 => "Q3_K",
+        12 => "Q4_K",
+        13 => "Q5_K",
+        14 => "Q6_K",
+        15 => "Q8_K",
+        _ => return None,
+    };
+    Some(name.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Appends a GGUF length-prefixed string.
+    fn push_string(buf: &mut Vec<u8>, s: &str) {
+        buf.extend_from_slice(&(s.len() as u64).to_le_bytes());
+        buf.extend_from_slice(s.as_bytes());
+    }
+
+    /// Appends one `general.architecture`/`general.name`-shaped STRING KV
+    /// pair (`key`, value type tag 8, then the length-prefixed value).
+    fn push_string_kv(buf: &mut Vec<u8>, key: &str, value: &str) {
+        push_string(buf, key);
+        buf.extend_from_slice(&8u32.to_le_bytes()); // ValueType::String
+        push_string(buf, value);
+    }
+
+    /// Appends one U32 KV pair (used for `general.file_type` and
+    /// `*.context_length` in these tests).
+    fn push_u32_kv(buf: &mut Vec<u8>, key: &str, value: u32) {
+        push_string(buf, key);
+        buf.extend_from_slice(&4u32.to_le_bytes()); // ValueType::U32
+        buf.extend_from_slice(&value.to_le_bytes());
+    }
+
+    /// Appends one tensor-info entry: name, dims, `ggml_type`, offset.
+    fn push_tensor(buf: &mut Vec<u8>, name: &str, dims: &[u64], ggml_type: u32) {
+        push_string(buf, name);
+        buf.extend_from_slice(&(dims.len() as u32).to_le_bytes());
+        for d in dims {
+            buf.extend_from_slice(&d.to_le_bytes());
+        }
+        buf.extend_from_slice(&ggml_type.to_le_bytes());
+        buf.extend_from_slice(&0u64.to_le_bytes()); // offset - unused by this parser
+    }
+
+    fn header(tensor_count: u64, kv_count: u64) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"GGUF");
+        buf.extend_from_slice(&3u32.to_le_bytes()); // version
+        buf.extend_from_slice(&tensor_count.to_le_bytes());
+        buf.extend_from_slice(&kv_count.to_le_bytes());
+        buf
+    }
+
+    fn write_temp_gguf(bytes: &[u8]) -> tempfile::NamedTempFile {
+        use std::io::Write as _;
+        let mut file = tempfile::NamedTempFile::new().expect("create temp file");
+        file.write_all(bytes).expect("write temp file");
+        file
+    }
+
+    #[test]
+    fn parses_architecture_name_context_length_and_chat_template() {
+        let mut buf = header(0, 4);
+        push_string_kv(&mut buf, "general.architecture", "qwen2");
+        push_string_kv(&mut buf, "general.name", "Test Model");
+        push_u32_kv(&mut buf, "qwen2.context_length", 32768);
+        push_string_kv(&mut buf, "tokenizer.chat_template", "{{ messages }}");
+
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse a well-formed file");
+
+        assert_eq!(metadata.architecture.as_deref(), Some("qwen2"));
+        assert_eq!(metadata.name.as_deref(), Some("Test Model"));
+        assert_eq!(metadata.context_length, Some(32768));
+        assert!(metadata.has_chat_template);
+        assert_eq!(
+            metadata.parameter_count,
+            Some(0),
+            "zero tensors, zero params"
+        );
+    }
+
+    #[test]
+    fn missing_optional_keys_still_parses_successfully() {
+        let buf = header(0, 0);
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path())
+            .expect("a structurally valid file with no KV pairs is not a parse failure");
+
+        assert_eq!(metadata.architecture, None);
+        assert!(!metadata.has_chat_template);
+        assert_eq!(metadata.quantization, None);
+    }
+
+    #[test]
+    fn general_file_type_maps_to_the_precise_quantization_string() {
+        let mut buf = header(0, 1);
+        push_u32_kv(&mut buf, "general.file_type", 15); // MOSTLY_Q4_K_M
+
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse");
+        assert_eq!(metadata.quantization.as_deref(), Some("Q4_K_M"));
+    }
+
+    #[test]
+    fn tensor_type_mode_is_the_fallback_when_file_type_is_absent() {
+        let mut buf = header(4, 0);
+        // Three Q4_K tensors, one F32 (e.g. a token embedding kept at
+        // higher precision) - Q4_K is the mode.
+        push_tensor(&mut buf, "blk.0.weight", &[4096, 4096], 12); // GGML_TYPE_Q4_K
+        push_tensor(&mut buf, "blk.1.weight", &[4096, 4096], 12);
+        push_tensor(&mut buf, "blk.2.weight", &[4096, 4096], 12);
+        push_tensor(&mut buf, "token_embd.weight", &[4096, 32000], 0); // GGML_TYPE_F32
+
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse");
+        assert_eq!(
+            metadata.quantization.as_deref(),
+            Some("Q4_K"),
+            "the coarser per-tensor mode can't express the _M/_S/_L preset suffix"
+        );
+    }
+
+    #[test]
+    fn parameter_count_sums_across_tensor_dimensions() {
+        let mut buf = header(2, 0);
+        push_tensor(&mut buf, "a", &[4096, 4096], 0); // 16,777,216
+        push_tensor(&mut buf, "b", &[128, 256, 2], 0); // 65,536
+
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse");
+        assert_eq!(metadata.parameter_count, Some(4096 * 4096 + 128 * 256 * 2));
+    }
+
+    #[test]
+    fn a_string_array_between_two_kv_pairs_is_skipped_correctly() {
+        let mut buf = header(0, 3);
+        push_string_kv(&mut buf, "general.architecture", "qwen2");
+        // tokenizer.ggml.tokens-shaped STRING array - must be fully (and
+        // correctly) skipped for `general.name` below to still parse.
+        push_string(&mut buf, "tokenizer.ggml.tokens");
+        buf.extend_from_slice(&9u32.to_le_bytes()); // ValueType::Array
+        buf.extend_from_slice(&8u32.to_le_bytes()); // element type: String
+        buf.extend_from_slice(&3u64.to_le_bytes()); // 3 elements
+        push_string(&mut buf, "<s>");
+        push_string(&mut buf, "</s>");
+        push_string(&mut buf, "hello");
+        push_string_kv(&mut buf, "general.name", "After The Array");
+
+        let file = write_temp_gguf(&buf);
+        let metadata = read_gguf_metadata(file.path()).expect("must parse");
+        assert_eq!(metadata.architecture.as_deref(), Some("qwen2"));
+        assert_eq!(metadata.name.as_deref(), Some("After The Array"));
+    }
+
+    #[test]
+    fn rejects_bad_magic() {
+        let mut buf = b"NOPE".to_vec();
+        buf.extend_from_slice(&3u32.to_le_bytes());
+        buf.extend_from_slice(&0u64.to_le_bytes());
+        buf.extend_from_slice(&0u64.to_le_bytes());
+
+        let file = write_temp_gguf(&buf);
+        assert!(read_gguf_metadata(file.path()).is_none());
+    }
+
+    #[test]
+    fn rejects_unsupported_version() {
+        let mut buf = b"GGUF".to_vec();
+        buf.extend_from_slice(&99u32.to_le_bytes());
+        buf.extend_from_slice(&0u64.to_le_bytes());
+        buf.extend_from_slice(&0u64.to_le_bytes());
+
+        let file = write_temp_gguf(&buf);
+        assert!(read_gguf_metadata(file.path()).is_none());
+    }
+
+    #[test]
+    fn truncation_at_several_points_returns_none_not_a_panic() {
+        let mut full = header(0, 1);
+        push_string_kv(&mut full, "general.architecture", "qwen2");
+
+        // Cut at every byte offset from 0 up to (but not including) the
+        // full length - none of them should panic, all should report a
+        // clean parse failure.
+        for cut in 0..full.len() {
+            let file = write_temp_gguf(&full[..cut]);
+            assert!(
+                read_gguf_metadata(file.path()).is_none(),
+                "truncation at byte {cut} of {} should fail cleanly",
+                full.len()
+            );
+        }
+    }
+
+    #[test]
+    fn oversized_declared_string_length_is_rejected_before_allocating() {
+        // A KV pair claiming a ~1 TiB string, with no actual bytes behind
+        // it. If the cap were checked *after* attempting to allocate, this
+        // would abort or hang the test process; completing quickly with
+        // `None` is the proof the length was validated first.
+        let mut buf = header(0, 1);
+        push_string(&mut buf, "general.architecture");
+        buf.extend_from_slice(&8u32.to_le_bytes()); // ValueType::String
+        buf.extend_from_slice(&(1u64 << 40).to_le_bytes()); // declared length, no data follows
+
+        let file = write_temp_gguf(&buf);
+        assert!(read_gguf_metadata(file.path()).is_none());
+    }
+
+    #[test]
+    fn oversized_declared_array_length_is_rejected() {
+        let mut buf = header(0, 1);
+        push_string(&mut buf, "tokenizer.ggml.tokens");
+        buf.extend_from_slice(&9u32.to_le_bytes()); // ValueType::Array
+        buf.extend_from_slice(&8u32.to_le_bytes()); // element type: String
+        buf.extend_from_slice(&(MAX_ARRAY_LEN + 1).to_le_bytes()); // over the cap, no elements follow
+
+        let file = write_temp_gguf(&buf);
+        assert!(read_gguf_metadata(file.path()).is_none());
+    }
+
+    #[test]
+    fn oversized_declared_kv_count_is_rejected_before_reading_any_of_them() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"GGUF");
+        buf.extend_from_slice(&3u32.to_le_bytes());
+        buf.extend_from_slice(&0u64.to_le_bytes()); // tensor_count
+        buf.extend_from_slice(&(MAX_KV_COUNT + 1).to_le_bytes()); // kv_count - no KV data follows
+
+        let file = write_temp_gguf(&buf);
+        assert!(read_gguf_metadata(file.path()).is_none());
+    }
+
+    #[test]
+    fn nonexistent_file_returns_none() {
+        let path = std::path::Path::new("/definitely/does/not/exist/crustly-gguf-test.gguf");
+        assert!(read_gguf_metadata(path).is_none());
+    }
+}

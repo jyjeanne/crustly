@@ -2698,6 +2698,10 @@ mod tests {
             path: std::path::PathBuf::from("/models/qwen2.5-coder-7b-Q4_K_M.gguf"),
             size_bytes: 4_294_967_296,
             quantization_hint: Some("Q4_K_M".to_string()),
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
         }];
 
         let screen = render_to_string(&app, 100, 20);

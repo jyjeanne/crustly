@@ -33,12 +33,19 @@ use tokio::task::JoinHandle;
 
 /// A locally-present `.gguf` file, decoupled from the `llama-cpp` feature so
 /// it can live on the always-compiled `TuiEvent`/`App` state - the TUI
-/// equivalent of `llama_cpp_models::LocalGgufModel`.
+/// equivalent of `llama_cpp_models::LocalGgufModel`. Field-for-field mirror
+/// (see `list_local`'s mapping) so header-parsed metadata added in
+/// `LocalGgufModel` (Phase M1) isn't dropped at this boundary even before a
+/// later phase renders it.
 #[derive(Debug, Clone)]
 pub struct LlamaCppModelSummary {
     pub path: PathBuf,
     pub size_bytes: u64,
     pub quantization_hint: Option<String>,
+    pub architecture: Option<String>,
+    pub parameter_count: Option<u64>,
+    pub context_length: Option<u64>,
+    pub has_chat_template: bool,
 }
 
 /// One progress update from an in-flight download, decoupled from the
@@ -87,6 +94,10 @@ pub async fn list_local(models_dir: PathBuf) -> Vec<LlamaCppModelSummary> {
             path: m.path,
             size_bytes: m.size_bytes,
             quantization_hint: m.quantization_hint,
+            architecture: m.architecture,
+            parameter_count: m.parameter_count,
+            context_length: m.context_length,
+            has_chat_template: m.has_chat_template,
         })
         .collect()
 }
@@ -297,6 +308,10 @@ mod tests {
             path: PathBuf::from(name),
             size_bytes: 1_000_000,
             quantization_hint: Some("Q4_K_M".to_string()),
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
         }
     }
 

@@ -20,11 +20,31 @@ pub struct LocalGgufModel {
     pub path: PathBuf,
     pub size_bytes: u64,
     pub modified_at: String,
-    /// Best-effort guess from the filename convention (e.g. "Q4_K_M",
-    /// "Q8_0") when GGUF header metadata isn't read. `None` if nothing
-    /// matches - displayed as "unknown" by callers rather than guessed
-    /// further.
+    /// Best-effort quantization label, layered: the GGUF header's
+    /// `general.file_type` (precise, e.g. "Q4_K_M") when readable, else the
+    /// header's per-tensor type mode (coarser, e.g. "Q4_K"), else a
+    /// filename-convention guess (e.g. spotting "Q4_K_M" as a substring of
+    /// the filename) when the header itself can't be read at all. `None`
+    /// only if none of those three sources produced anything - displayed as
+    /// "unknown" by callers rather than guessed further. See
+    /// `crate::llm::provider::gguf_metadata` for the header parser.
     pub quantization_hint: Option<String>,
+    /// GGUF `general.architecture` (e.g. "llama", "qwen2"). `None` if the
+    /// header couldn't be read or didn't set it.
+    pub architecture: Option<String>,
+    /// Total scalar weight count, summed across the header's tensor-info
+    /// dimensions - independent of quantization. `None` if the header
+    /// couldn't be read.
+    pub parameter_count: Option<u64>,
+    /// The model's trained/native context window, read from the
+    /// architecture-namespaced `*.context_length` GGUF key. `None` if the
+    /// header couldn't be read or didn't set it.
+    pub context_length: Option<u64>,
+    /// Whether the header has a `tokenizer.chat_template` key. `false` (not
+    /// `Option`) if the header couldn't be read, same as "no template
+    /// found" - this field is advisory display data, not something callers
+    /// branch safety-critical behavior on.
+    pub has_chat_template: bool,
 }
 
 /// One progress update from an in-flight `download_model` transfer. The
@@ -89,22 +109,36 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
             continue;
         }
 
-        let metadata = entry.metadata()?;
-        let modified_at = metadata
+        let fs_metadata = entry.metadata()?;
+        let modified_at = fs_metadata
             .modified()
             .ok()
             .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339())
             .unwrap_or_default();
-        let quantization_hint = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .and_then(quantization_hint_from_filename);
+
+        // Header-parsed metadata takes priority; the filename-convention
+        // guess is only consulted as a last resort, when the header itself
+        // couldn't be read (see `gguf_metadata::read_gguf_metadata`'s doc
+        // comment for exactly when that happens).
+        let header = super::gguf_metadata::read_gguf_metadata(&path);
+        let quantization_hint = header
+            .as_ref()
+            .and_then(|h| h.quantization.clone())
+            .or_else(|| {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .and_then(quantization_hint_from_filename)
+            });
 
         models.push(LocalGgufModel {
             path,
-            size_bytes: metadata.len(),
+            size_bytes: fs_metadata.len(),
             modified_at,
             quantization_hint,
+            architecture: header.as_ref().and_then(|h| h.architecture.clone()),
+            parameter_count: header.as_ref().and_then(|h| h.parameter_count),
+            context_length: header.as_ref().and_then(|h| h.context_length),
+            has_chat_template: header.as_ref().is_some_and(|h| h.has_chat_template),
         });
     }
 

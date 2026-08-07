@@ -236,13 +236,21 @@ fn plain_textarea() -> TextArea<'static> {
 
 /// Best-effort quantization guess for the Model Info panel - `None` when
 /// this build wasn't compiled with `--features gguf-management` (on by
-/// `default`; nothing to guess from) or the filename doesn't match a known
-/// convention. Gated on `gguf-management`, not `llama-cpp`, since this is
-/// pure filename parsing with no FFI involved - see
-/// `ccguf-managment-imrpoment-plan.md` Phase M0.
+/// `default`) or nothing could be determined at all. Gated on
+/// `gguf-management`, not `llama-cpp`, since this involves no FFI - see
+/// `ccguf-managment-imrpoment-plan.md` Phase M0. Prefers the real
+/// GGUF-header-parsed value (Phase M1 - precise where `general.file_type`
+/// is set, coarser otherwise) over the filename-convention guess, falling
+/// back to the filename only when the header itself can't be read.
 #[cfg(feature = "gguf-management")]
 fn quantization_hint_for_path(path: &std::path::Path) -> Option<String> {
-    crate::llm::provider::llama_cpp_models::quantization_hint_from_filename(&path.to_string_lossy())
+    crate::llm::provider::gguf_metadata::read_gguf_metadata(path)
+        .and_then(|m| m.quantization)
+        .or_else(|| {
+            crate::llm::provider::llama_cpp_models::quantization_hint_from_filename(
+                &path.to_string_lossy(),
+            )
+        })
 }
 
 #[cfg(not(feature = "gguf-management"))]
@@ -4218,11 +4226,19 @@ mod tests {
                 path: std::path::PathBuf::from("/models/a.gguf"),
                 size_bytes: 100,
                 quantization_hint: Some("Q4_K_M".to_string()),
+                architecture: None,
+                parameter_count: None,
+                context_length: None,
+                has_chat_template: false,
             },
             super::super::llama_cpp_download::LlamaCppModelSummary {
                 path: std::path::PathBuf::from("/models/b.gguf"),
                 size_bytes: 200,
                 quantization_hint: None,
+                architecture: None,
+                parameter_count: None,
+                context_length: None,
+                has_chat_template: false,
             },
         ]))
         .await
@@ -4243,11 +4259,19 @@ mod tests {
                 path: std::path::PathBuf::from("/models/a.gguf"),
                 size_bytes: 100,
                 quantization_hint: None,
+                architecture: None,
+                parameter_count: None,
+                context_length: None,
+                has_chat_template: false,
             },
             super::super::llama_cpp_download::LlamaCppModelSummary {
                 path: std::path::PathBuf::from("/models/b.gguf"),
                 size_bytes: 100,
                 quantization_hint: None,
+                architecture: None,
+                parameter_count: None,
+                context_length: None,
+                has_chat_template: false,
             },
         ];
 
@@ -4302,6 +4326,10 @@ mod tests {
             path: std::path::PathBuf::from("/models/a.gguf"),
             size_bytes: 100,
             quantization_hint: None,
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
         }];
 
         app.handle_llama_cpp_models_key(key(KeyCode::Delete))
@@ -4323,6 +4351,10 @@ mod tests {
             path: std::path::PathBuf::from("/models/a.gguf"),
             size_bytes: 100,
             quantization_hint: None,
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
         }];
         app.llama_cpp_deleting = Some(std::path::PathBuf::from("/models/a.gguf"));
 
@@ -4404,6 +4436,10 @@ mod tests {
             path: std::path::PathBuf::from("/models/b.gguf"),
             size_bytes: 100,
             quantization_hint: None,
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
         }];
 
         // Enter would normally start a switch to the highlighted model.
