@@ -1237,7 +1237,7 @@ async fn cmd_ollama(_config: &crate::config::Config, _operation: OllamaCommands)
 /// Resolve a user-supplied `model` argument (from `crustly llama-cpp rm`)
 /// to a path: an absolute path or one containing a separator is used as-is,
 /// otherwise it's treated as a filename inside `models_dir`.
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 fn resolve_llama_cpp_model_path(models_dir: &std::path::Path, model: &str) -> std::path::PathBuf {
     let candidate = std::path::Path::new(model);
     if candidate.is_absolute() || model.contains(std::path::MAIN_SEPARATOR) {
@@ -1247,7 +1247,7 @@ fn resolve_llama_cpp_model_path(models_dir: &std::path::Path, model: &str) -> st
     }
 }
 
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppCommands) -> Result<()> {
     use crate::llm::provider::llama_cpp_models;
 
@@ -1353,14 +1353,14 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
     }
 }
 
-#[cfg(not(feature = "llama-cpp"))]
+#[cfg(not(feature = "gguf-management"))]
 async fn cmd_llama_cpp(
     _config: &crate::config::Config,
     _operation: LlamaCppCommands,
 ) -> Result<()> {
     anyhow::bail!(
-        "This build of crustly was compiled without the 'llama-cpp' feature. \
-         Rebuild with `--features llama-cpp` to use `crustly llama-cpp`."
+        "This build of crustly was compiled without the 'gguf-management' feature. \
+         Rebuild with `--features gguf-management` to use `crustly llama-cpp`."
     );
 }
 
@@ -1716,7 +1716,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "llama-cpp")]
+    #[cfg(feature = "gguf-management")]
     #[test]
     fn resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir() {
         let dir = std::path::Path::new("/models");

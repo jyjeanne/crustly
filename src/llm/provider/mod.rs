@@ -25,7 +25,7 @@ pub mod gemini;
 pub mod llama_cpp;
 #[cfg(feature = "llama-cpp-llguidance")]
 pub mod llama_cpp_grammar;
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 pub mod llama_cpp_models;
 #[cfg(feature = "ollama")]
 pub mod ollama;

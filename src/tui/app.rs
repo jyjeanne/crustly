@@ -235,14 +235,17 @@ fn plain_textarea() -> TextArea<'static> {
 }
 
 /// Best-effort quantization guess for the Model Info panel - `None` when
-/// this build wasn't compiled with `--features llama-cpp` (nothing to guess
-/// from) or the filename doesn't match a known convention.
-#[cfg(feature = "llama-cpp")]
+/// this build wasn't compiled with `--features gguf-management` (on by
+/// `default`; nothing to guess from) or the filename doesn't match a known
+/// convention. Gated on `gguf-management`, not `llama-cpp`, since this is
+/// pure filename parsing with no FFI involved - see
+/// `ccguf-managment-imrpoment-plan.md` Phase M0.
+#[cfg(feature = "gguf-management")]
 fn quantization_hint_for_path(path: &std::path::Path) -> Option<String> {
     crate::llm::provider::llama_cpp_models::quantization_hint_from_filename(&path.to_string_lossy())
 }
 
-#[cfg(not(feature = "llama-cpp"))]
+#[cfg(not(feature = "gguf-management"))]
 fn quantization_hint_for_path(_path: &std::path::Path) -> Option<String> {
     None
 }

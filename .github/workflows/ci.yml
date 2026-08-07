@@ -20,7 +20,14 @@ env:
   # needs a C/C++ toolchain, already present on GitHub's ubuntu/macos
   # runners (llama-cpp compiles vendored llama.cpp via cmake; see
   # llama-cpp-2-integration-plan.md §3/§4.2). Windows keeps its own
-  # narrower openai,aws-bedrock list below, unrelated to this.
+  # narrower openai,aws-bedrock list below - but that list still exercises
+  # `gguf-management` (local .gguf list/pull/rm, no FFI/cmake) because it's
+  # part of `default`, which every command below includes automatically
+  # (none pass `--no-default-features`). That's the point of
+  # ccguf-managment-imrpoment-plan.md Phase M0: Windows CI could never
+  # exercise the model-management commands before this split (they lived
+  # behind `llama-cpp`, which Windows CI has never enabled, since it has no
+  # `cmake` install step for it), and now it does, with no toolchain cost.
   CI_FEATURES: openai,aws-bedrock,ollama,llama-cpp,llama-cpp-llguidance,profiling
 
 jobs:

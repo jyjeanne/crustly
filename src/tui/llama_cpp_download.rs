@@ -14,11 +14,16 @@
 //! runtime, while the dialog shows a "Loading model…" state.
 //!
 //! Every function is compiled unconditionally so `AppMode::LlamaCppModelPicker`
-//! always exists and always says something sensible; the actual filesystem
-//! scan / download / model construction only run when this crate is built
-//! with `--features llama-cpp` (`list_local`/`spawn_download`/`spawn_delete`
-//! degrade to "nothing found" / a clear "rebuild with..." error, mirroring
-//! `ollama_download.rs`'s not-compiled-in fallbacks).
+//! always exists and always says something sensible; the real implementations
+//! are split across two build-time gates
+//! (`ccguf-managment-imrpoment-plan.md` Phase M0). `list_local`/
+//! `spawn_download`/`spawn_delete` (pure filesystem/HTTP, no FFI) only need
+//! `--features gguf-management` (on by `default`); `build_llama_cpp_provider`/
+//! `spawn_switch` (loads model weights via `LlamaCppProvider::new()`) still
+//! need the heavier `--features llama-cpp`. Each not-compiled-in fallback
+//! degrades to "nothing found" / a clear "rebuild with..." error naming the
+//! specific feature it needs, mirroring `ollama_download.rs`'s not-compiled-in
+//! fallbacks.
 
 use super::events::TuiEvent;
 use std::path::PathBuf;
@@ -71,7 +76,7 @@ pub type PendingProvider = Arc<Mutex<Option<Arc<dyn crate::llm::provider::Provid
 /// list (never an error) when the feature isn't compiled in or the
 /// directory can't be read - the dialog just shows "no local models" rather
 /// than surfacing a scan failure the user can't act on.
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 pub async fn list_local(models_dir: PathBuf) -> Vec<LlamaCppModelSummary> {
     use crate::llm::provider::llama_cpp_models;
 
@@ -86,7 +91,7 @@ pub async fn list_local(models_dir: PathBuf) -> Vec<LlamaCppModelSummary> {
         .collect()
 }
 
-#[cfg(not(feature = "llama-cpp"))]
+#[cfg(not(feature = "gguf-management"))]
 pub async fn list_local(_models_dir: PathBuf) -> Vec<LlamaCppModelSummary> {
     Vec::new()
 }
@@ -159,7 +164,7 @@ pub async fn spawn_switch(
 /// Start downloading `source` (a direct URL or `hf:org/repo/file.gguf`
 /// shorthand) into `models_dir` in the background, forwarding progress and
 /// the final result through `event_sender`.
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 pub async fn spawn_download(
     source: String,
     models_dir: PathBuf,
@@ -208,7 +213,7 @@ pub async fn spawn_download(
     })
 }
 
-#[cfg(not(feature = "llama-cpp"))]
+#[cfg(not(feature = "gguf-management"))]
 pub async fn spawn_download(
     source: String,
     _models_dir: PathBuf,
@@ -218,8 +223,8 @@ pub async fn spawn_download(
         let _ = event_sender.send(TuiEvent::LlamaCppDownloadFinished {
             source,
             error: Some(
-                "This build of crustly was compiled without the 'llama-cpp' feature. \
-                 Rebuild with `--features llama-cpp`."
+                "This build of crustly was compiled without the 'gguf-management' feature. \
+                 Rebuild with `--features gguf-management`."
                     .to_string(),
             ),
         });
@@ -228,7 +233,7 @@ pub async fn spawn_download(
 
 /// Start deleting the `.gguf` file at `path` in the background, forwarding
 /// the result through `event_sender`.
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 pub async fn spawn_delete(
     path: PathBuf,
     event_sender: UnboundedSender<TuiEvent>,
@@ -244,7 +249,7 @@ pub async fn spawn_delete(
     })
 }
 
-#[cfg(not(feature = "llama-cpp"))]
+#[cfg(not(feature = "gguf-management"))]
 pub async fn spawn_delete(
     path: PathBuf,
     event_sender: UnboundedSender<TuiEvent>,
@@ -253,8 +258,8 @@ pub async fn spawn_delete(
         let _ = event_sender.send(TuiEvent::LlamaCppDeleteFinished {
             path,
             error: Some(
-                "This build of crustly was compiled without the 'llama-cpp' feature. \
-                 Rebuild with `--features llama-cpp`."
+                "This build of crustly was compiled without the 'gguf-management' feature. \
+                 Rebuild with `--features gguf-management`."
                     .to_string(),
             ),
         });
@@ -336,7 +341,7 @@ mod tests {
         assert!(filter_local(&models, "mistral").is_empty());
     }
 
-    #[cfg(not(feature = "llama-cpp"))]
+    #[cfg(not(feature = "gguf-management"))]
     #[tokio::test]
     async fn list_local_without_feature_is_empty() {
         assert!(list_local(PathBuf::from("/tmp/anything")).await.is_empty());
