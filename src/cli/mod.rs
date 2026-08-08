@@ -368,21 +368,43 @@ struct LlamaCppModelJson {
 #[cfg(feature = "gguf-management")]
 impl From<&crate::llm::provider::llama_cpp_models::LocalGgufModel> for LlamaCppModelJson {
     fn from(m: &crate::llm::provider::llama_cpp_models::LocalGgufModel) -> Self {
+        // Destructured with every field named and no `..` rest pattern -
+        // deliberately, as a poor man's exhaustiveness check: a field added
+        // to `LocalGgufModel` fails to compile right here instead of
+        // silently never reaching the `--json` output. See
+        // `llama_cpp_download.rs`'s `list_local` for the identical
+        // safeguard on the TUI's own mirror of this same struct.
+        let crate::llm::provider::llama_cpp_models::LocalGgufModel {
+            path,
+            size_bytes,
+            modified_at,
+            quantization_hint,
+            architecture,
+            parameter_count,
+            context_length,
+            has_chat_template,
+            display_name,
+            estimated_memory_bytes,
+            estimated_memory_includes_kv_cache,
+            estimated_memory_context_length,
+            is_mmproj,
+            mmproj_path,
+        } = m;
         Self {
-            path: m.path.clone(),
-            display_name: m.display_name.clone(),
-            size_bytes: m.size_bytes,
-            modified_at: m.modified_at.clone(),
-            architecture: m.architecture.clone(),
-            parameter_count: m.parameter_count,
-            quantization: m.quantization_hint.clone(),
-            context_length: m.context_length,
-            has_chat_template: m.has_chat_template,
-            estimated_memory_bytes: m.estimated_memory_bytes,
-            estimated_memory_includes_kv_cache: m.estimated_memory_includes_kv_cache,
-            estimated_memory_context_length: m.estimated_memory_context_length,
-            is_mmproj: m.is_mmproj,
-            mmproj_path: m.mmproj_path.clone(),
+            path: path.clone(),
+            display_name: display_name.clone(),
+            size_bytes: *size_bytes,
+            modified_at: modified_at.clone(),
+            architecture: architecture.clone(),
+            parameter_count: *parameter_count,
+            quantization: quantization_hint.clone(),
+            context_length: *context_length,
+            has_chat_template: *has_chat_template,
+            estimated_memory_bytes: *estimated_memory_bytes,
+            estimated_memory_includes_kv_cache: *estimated_memory_includes_kv_cache,
+            estimated_memory_context_length: *estimated_memory_context_length,
+            is_mmproj: *is_mmproj,
+            mmproj_path: mmproj_path.clone(),
             fit: None,
         }
     }
@@ -412,6 +434,44 @@ fn hardware_fit_label(fit: crate::llm::provider::llama_cpp_models::HardwareFit) 
     }
 }
 
+/// Error-message prefixes this file's own `bail!` sites produce, that
+/// `llama_cpp_exit_code` below matches against - declared once and
+/// referenced at both the producing and matching sites for the same
+/// single-source-of-truth reason as `llama_cpp_models`'s
+/// `DISK_SPACE_ERROR_PREFIX`/etc. (see that module's doc comment on those
+/// constants). `FEATURE_NOT_COMPILED_ERROR_PREFIX` is shared by every
+/// provider's "not compiled in" `bail!` (`cmd_ollama`'s included), not just
+/// `llama-cpp`'s - only the latter is reachable through this exit-code
+/// mapping today, but the wording itself is meant to stay identical across
+/// providers.
+const NO_SUCH_FILE_ERROR_PREFIX: &str = "No such file:";
+const FEATURE_NOT_COMPILED_ERROR_PREFIX: &str = "This build of crustly was compiled without";
+
+/// `llama_cpp_exit_code` below is deliberately *not* `#[cfg(feature =
+/// "gguf-management")]`-gated itself - it still has to run (and correctly
+/// return 14) against `cmd_llama_cpp`'s `not(gguf-management)` stub error.
+/// That means its body must compile either way, but
+/// `llama_cpp_models::{DISK_SPACE_ERROR_PREFIX, ...}` only exist when the
+/// module they live in is compiled in (`provider/mod.rs` gates the whole
+/// `mod llama_cpp_models;` declaration on this same feature) - so the
+/// import is gated, with a same-named, same-valued local fallback for the
+/// off build below. That fallback never actually matches anything real:
+/// codes 11-13 can only be produced by `download_model`, which doesn't
+/// exist without this feature either.
+#[cfg(feature = "gguf-management")]
+use crate::llm::provider::llama_cpp_models::{
+    CHECKSUM_MISMATCH_ERROR_PREFIX, DISK_SPACE_ERROR_PREFIX, DOWNLOAD_FAILED_ERROR_PREFIX,
+    DOWNLOAD_START_ERROR_PREFIX,
+};
+#[cfg(not(feature = "gguf-management"))]
+const DISK_SPACE_ERROR_PREFIX: &str = "Not enough disk space";
+#[cfg(not(feature = "gguf-management"))]
+const CHECKSUM_MISMATCH_ERROR_PREFIX: &str = "Checksum mismatch for";
+#[cfg(not(feature = "gguf-management"))]
+const DOWNLOAD_START_ERROR_PREFIX: &str = "Failed to start download from";
+#[cfg(not(feature = "gguf-management"))]
+const DOWNLOAD_FAILED_ERROR_PREFIX: &str = "Download failed for";
+
 /// Maps an error from a `crustly llama-cpp` subcommand to a specific,
 /// documented exit code, by matching known message prefixes anywhere in
 /// the error's context chain (`anyhow::Error::chain()`, not just
@@ -430,21 +490,21 @@ fn hardware_fit_label(fit: crate::llm::provider::llama_cpp_models::HardwareFit) 
 fn llama_cpp_exit_code(err: &anyhow::Error) -> i32 {
     for cause in err.chain() {
         let msg = cause.to_string();
-        if msg.starts_with("No such file:") {
+        if msg.starts_with(NO_SUCH_FILE_ERROR_PREFIX) {
             return 10; // model/file not found
         }
-        if msg.starts_with("Not enough disk space") {
+        if msg.starts_with(DISK_SPACE_ERROR_PREFIX) {
             return 11;
         }
-        if msg.starts_with("Checksum mismatch for") {
+        if msg.starts_with(CHECKSUM_MISMATCH_ERROR_PREFIX) {
             return 12;
         }
-        if msg.starts_with("Failed to start download from")
-            || msg.starts_with("Download failed for")
+        if msg.starts_with(DOWNLOAD_START_ERROR_PREFIX)
+            || msg.starts_with(DOWNLOAD_FAILED_ERROR_PREFIX)
         {
             return 13; // network/HTTP failure
         }
-        if msg.starts_with("This build of crustly was compiled without") {
+        if msg.starts_with(FEATURE_NOT_COMPILED_ERROR_PREFIX) {
             return 14; // feature not compiled in
         }
     }
@@ -518,7 +578,7 @@ pub enum OutputFormat {
 }
 
 /// Main CLI entry point
-pub async fn run() -> Result<()> {
+pub async fn run() -> Result<std::process::ExitCode> {
     let cli = Cli::parse();
 
     // Set up logging level based on debug flag
@@ -548,7 +608,31 @@ pub async fn run() -> Result<()> {
     }
     let config = config;
 
-    match cli.command {
+    // `LlamaCpp` needs a documented, non-1 exit code on failure (10-14 -
+    // see `llama_cpp_exit_code`); every other command keeps Rust's default
+    // `Result<(), E>` `Termination` behavior (print `Error: {e:?}`, exit 1)
+    // completely unchanged below. `LlamaCpp` used to get its custom code via
+    // `std::process::exit()` directly - which terminates the process
+    // immediately, skipping every live destructor, including `main()`'s
+    // `_guard` (a `tracing_appender` `WorkerGuard`) that flushes buffered
+    // debug-mode log lines on drop. Returning a `std::process::ExitCode`
+    // instead (an early `return` here, not a `process::exit` call) lets
+    // `main()`'s async body finish and its locals drop normally before the
+    // process actually exits - the standard, destructor-safe way to produce
+    // a custom exit code, and the only change from before: the printed
+    // message and the exit code itself are identical to what
+    // `std::process::exit` produced.
+    if let Some(Commands::LlamaCpp { operation }) = cli.command {
+        return match cmd_llama_cpp(&config, operation).await {
+            Ok(()) => Ok(std::process::ExitCode::SUCCESS),
+            Err(e) => {
+                eprintln!("Error: {e:?}");
+                Ok(std::process::ExitCode::from(llama_cpp_exit_code(&e) as u8))
+            }
+        };
+    }
+
+    let result: Result<()> = match cli.command {
         None | Some(Commands::Chat { session: _ }) => {
             // Default: Interactive TUI mode
             let session = match &cli.command {
@@ -572,18 +656,9 @@ pub async fn run() -> Result<()> {
             max_iterations,
         }) => cmd_autoplan(&config, goal, max_iterations).await,
         Some(Commands::Ollama { operation }) => cmd_ollama(&config, operation).await,
-        Some(Commands::LlamaCpp { operation }) => match cmd_llama_cpp(&config, operation).await {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                // Matches Rust's default `Termination` output for a `Result`
-                // returned from `main` byte-for-byte (`Error: {:?}`), so a
-                // human watching the terminal sees identical text to every
-                // other Crustly command - only the exit code differs here.
-                eprintln!("Error: {e:?}");
-                std::process::exit(llama_cpp_exit_code(&e));
-            }
-        },
-    }
+        Some(Commands::LlamaCpp { .. }) => unreachable!("handled by the early return above"),
+    };
+    result.map(|()| std::process::ExitCode::SUCCESS)
 }
 
 /// Load configuration from file or defaults
@@ -1411,7 +1486,7 @@ async fn cmd_ollama(config: &crate::config::Config, operation: OllamaCommands) -
 #[cfg(not(feature = "ollama"))]
 async fn cmd_ollama(_config: &crate::config::Config, _operation: OllamaCommands) -> Result<()> {
     anyhow::bail!(
-        "This build of crustly was compiled without the 'ollama' feature. \
+        "{FEATURE_NOT_COMPILED_ERROR_PREFIX} the 'ollama' feature. \
          Rebuild with `--features ollama` (or `all-llm`) to use `crustly ollama`."
     );
 }
@@ -1592,7 +1667,7 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
         LlamaCppCommands::Rm { name } => {
             let path = resolve_llama_cpp_model_path(&models_dir, &name);
             if !path.exists() {
-                anyhow::bail!("No such file: {}", path.display());
+                anyhow::bail!("{NO_SUCH_FILE_ERROR_PREFIX} {}", path.display());
             }
 
             let size_gb = std::fs::metadata(&path)
@@ -1893,7 +1968,7 @@ async fn cmd_llama_cpp(
     _operation: LlamaCppCommands,
 ) -> Result<()> {
     anyhow::bail!(
-        "This build of crustly was compiled without the 'gguf-management' feature. \
+        "{FEATURE_NOT_COMPILED_ERROR_PREFIX} the 'gguf-management' feature. \
          Rebuild with `--features gguf-management` to use `crustly llama-cpp`."
     );
 }

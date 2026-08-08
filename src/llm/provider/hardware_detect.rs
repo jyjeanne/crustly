@@ -155,6 +155,19 @@ fn detect_hardware_uncached() -> HardwareInfo {
 /// Also returns `None` on any spawn failure (binary not found - the common
 /// case in CI/most dev machines, and the primary path this module's own
 /// tests can exercise portably without a real GPU).
+///
+/// A hand-rolled `std::process::Command` + poll loop, not
+/// `tokio::process::Command` + `tokio::time::timeout` (the pattern
+/// `llm/tools/bash.rs`/`llm/tools/powershell.rs` already use for the same
+/// "bound a subprocess's runtime" problem) - a deliberate tradeoff, not an
+/// oversight: this whole module is synchronous by design, so
+/// `detect_hardware`'s result can be cached in a plain `OnceLock` and
+/// called from non-async contexts (the CLI's `doctor`) without needing a
+/// runtime handle threaded through. Every async caller already wraps the
+/// entry point in `spawn_blocking` (see `tui/llama_cpp_download.rs`'s
+/// `detect_hardware_summary`) specifically so this module doesn't have to
+/// be async-native. Revisit only if the sync/`OnceLock` design itself ever
+/// needs to change - not just to deduplicate this one function.
 fn run_with_timeout(cmd: &mut Command) -> Option<Output> {
     let mut child = cmd
         .stdin(Stdio::null())

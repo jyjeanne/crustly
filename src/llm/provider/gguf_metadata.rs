@@ -362,7 +362,14 @@ fn parse(reader: &mut BoundedReader<impl Read>) -> Option<GgufMetadata> {
     metadata.quantization = file_type.and_then(ftype_to_string).or_else(|| {
         type_counts
             .into_iter()
-            .max_by_key(|(_, count)| *count)
+            // `HashMap`'s iteration order is randomized per-hasher-instance,
+            // so on a genuine tie in tensor count `max_by_key` alone would
+            // pick a different `ggml_type` across otherwise-identical runs.
+            // Breaking ties by the lowest type code makes this deterministic
+            // and reproducible for the same file, at the cost of no
+            // particular semantic meaning to *which* tied type wins - there
+            // is no more-correct tiebreak available from the header alone.
+            .max_by_key(|(ty, count)| (*count, std::cmp::Reverse(*ty)))
             .and_then(|(ty, _)| ggml_type_to_string(ty))
     });
 
@@ -684,6 +691,32 @@ mod tests {
             Some("Q4_K"),
             "the coarser per-tensor mode can't express the _M/_S/_L preset suffix"
         );
+    }
+
+    #[test]
+    fn tensor_type_mode_breaks_a_tensor_count_tie_deterministically() {
+        // Two Q4_K (type 12) and two Q5_K (type 13) tensors - a genuine
+        // tie in count, with no `general.file_type` to disambiguate.
+        let mut buf = header(4, 0);
+        push_tensor(&mut buf, "a", &[4096, 4096], 12); // GGML_TYPE_Q4_K
+        push_tensor(&mut buf, "b", &[4096, 4096], 12);
+        push_tensor(&mut buf, "c", &[4096, 4096], 13); // GGML_TYPE_Q5_K
+        push_tensor(&mut buf, "d", &[4096, 4096], 13);
+
+        let expected = read_gguf_metadata(write_temp_gguf(&buf).path())
+            .expect("must parse")
+            .quantization;
+        // Re-parse the byte-identical file many times: a `HashMap`-order-
+        // dependent tiebreak would occasionally disagree with itself across
+        // process-local hasher instances; a deterministic one never does.
+        for _ in 0..50 {
+            let file = write_temp_gguf(&buf);
+            let metadata = read_gguf_metadata(file.path()).expect("must parse");
+            assert_eq!(
+                metadata.quantization, expected,
+                "tied tensor-type counts must resolve the same way every parse"
+            );
+        }
     }
 
     #[test]

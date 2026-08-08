@@ -2042,27 +2042,52 @@ fn format_param_count(n: u64) -> String {
     }
 }
 
-/// Fit label + color against `budget_bytes` - mirrors
-/// `llama_cpp_models::hardware_fit`'s three-threshold logic (`WontFit`/
-/// `Tight`/`Fits`), duplicated here rather than called through to it: that
-/// function lives in `llama_cpp_models`, gated on `gguf-management`, and
-/// this file (the TUI's always-compiled render layer) must not pick up
-/// that gate just for a two-line threshold comparison. `None` when either
-/// side is unknown - matches `HardwareFit::Unknown`'s "no tag at all"
-/// treatment (see `llama_cpp_model_lines`'s caller).
+/// Fit label + color against `budget_bytes`, with the context length the
+/// estimate assumed appended when known (`"Fits (ctx 8192)"`) - matches
+/// `crustly llama-cpp list --best-fit`'s wording (`src/cli/mod.rs`) so the
+/// CLI and this dialog never disagree about the same model/hardware pair.
+/// `#[cfg(feature = "gguf-management")]`-gated to match
+/// `llama_cpp_models::hardware_fit`'s own gate exactly (that module's
+/// declaration in `provider/mod.rs` - not just the code inside it - is
+/// behind the same feature), calling through to it for the actual
+/// three-threshold comparison rather than duplicating it, now that both
+/// sides carry the identical gate and can never disagree about which build
+/// they're compiled into. Under the `not(...)` build below, the caller's
+/// `estimated_memory_bytes` is always `None` anyway (nothing populates
+/// `LlamaCppModelSummary`'s estimate fields without this feature), so
+/// always returning `None` here matches the real behavior, not just a
+/// stub. `None` when either side is unknown - matches `HardwareFit::Unknown`'s
+/// "no tag at all" treatment (see `llama_cpp_model_lines`'s caller).
+#[cfg(feature = "gguf-management")]
 fn llama_cpp_fit_tag(
     estimated_memory_bytes: Option<u64>,
+    estimated_memory_context_length: Option<u64>,
     budget_bytes: Option<u64>,
-) -> Option<(&'static str, Color)> {
-    let (estimate, budget) = (estimated_memory_bytes?, budget_bytes?);
-    const TIGHT_THRESHOLD_RATIO: f64 = 0.85;
-    Some(if estimate > budget {
-        ("Won't fit", Color::Red)
-    } else if estimate as f64 > budget as f64 * TIGHT_THRESHOLD_RATIO {
-        ("Tight", Color::Yellow)
-    } else {
-        ("Fits", Color::Green)
-    })
+) -> Option<(String, Color)> {
+    use crate::llm::provider::llama_cpp_models::HardwareFit;
+    let (label, color) = match crate::llm::provider::llama_cpp_models::hardware_fit(
+        estimated_memory_bytes,
+        budget_bytes,
+    ) {
+        HardwareFit::Fits => ("Fits", Color::Green),
+        HardwareFit::Tight => ("Tight", Color::Yellow),
+        HardwareFit::WontFit => ("Won't fit", Color::Red),
+        HardwareFit::Unknown => return None,
+    };
+    let label = match estimated_memory_context_length {
+        Some(ctx) => format!("{label} (ctx {ctx})"),
+        None => label.to_string(),
+    };
+    Some((label, color))
+}
+
+#[cfg(not(feature = "gguf-management"))]
+fn llama_cpp_fit_tag(
+    _estimated_memory_bytes: Option<u64>,
+    _estimated_memory_context_length: Option<u64>,
+    _budget_bytes: Option<u64>,
+) -> Option<(String, Color)> {
+    None
 }
 
 /// Renders one Ctrl+G dialog entry: always a compact main line (using
@@ -2120,7 +2145,11 @@ fn llama_cpp_model_lines(
         Span::styled(prefix, style),
         Span::styled(format!("{name}  ({size_gb:.2} GB, {quant})"), style),
     ];
-    if let Some((label, color)) = llama_cpp_fit_tag(model.estimated_memory_bytes, budget_bytes) {
+    if let Some((label, color)) = llama_cpp_fit_tag(
+        model.estimated_memory_bytes,
+        model.estimated_memory_context_length,
+        budget_bytes,
+    ) {
         // When selected, keep the row's own highlight styling for the tag
         // too (bold, same fg/bg) rather than the distinct color - a
         // differently-colored span would punch an inconsistent-looking
@@ -2984,6 +3013,14 @@ mod tests {
         assert!(detail.contains("chat template"));
     }
 
+    // The three tests below exercise `llama_cpp_fit_tag`'s real threshold
+    // logic, which only exists (and is only ever fed a non-`None` estimate
+    // in practice) when `gguf-management` is compiled in - see that
+    // function's doc comment. `llama_cpp_model_lines_shows_no_fit_tag_when_budget_is_unknown`
+    // just below isn't gated, since "no tag when budget is unknown" holds
+    // in every build.
+
+    #[cfg(feature = "gguf-management")]
     #[test]
     fn llama_cpp_model_lines_shows_a_fit_tag_when_budget_is_known() {
         let model = llama_cpp_model_fixture("/models/a.gguf"); // 5.2 GB estimate
@@ -2995,6 +3032,7 @@ mod tests {
         assert!(text.contains("[Fits]"), "got: {text}");
     }
 
+    #[cfg(feature = "gguf-management")]
     #[test]
     fn llama_cpp_model_lines_shows_wont_fit_when_estimate_exceeds_budget() {
         let model = llama_cpp_model_fixture("/models/a.gguf"); // 5.2 GB estimate
@@ -3004,6 +3042,36 @@ mod tests {
             .map(|s| s.content.as_ref())
             .collect();
         assert!(text.contains("[Won't fit]"), "got: {text}");
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_model_lines_shows_the_context_length_the_estimate_used() {
+        let mut model = llama_cpp_model_fixture("/models/a.gguf"); // 5.2 GB estimate
+        model.estimated_memory_context_length = Some(8_192);
+        let text: String = llama_cpp_model_lines(&model, false, Some(10_000_000_000))[0]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(text.contains("[Fits (ctx 8192)]"), "got: {text}");
+    }
+
+    #[cfg(not(feature = "gguf-management"))]
+    #[test]
+    fn llama_cpp_model_lines_shows_no_fit_tag_without_the_gguf_management_feature() {
+        // Nothing in a `not(gguf-management)` build ever actually populates
+        // `estimated_memory_bytes`, but even if a caller set it directly
+        // (as this fixture does), the tag must stay suppressed - matches
+        // `llama_cpp_fit_tag`'s `not(feature = ...)` stub always returning
+        // `None`.
+        let model = llama_cpp_model_fixture("/models/a.gguf"); // 5.2 GB estimate
+        let text: String = llama_cpp_model_lines(&model, false, Some(10_000_000_000))[0]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(!text.contains('['), "got: {text}");
     }
 
     #[test]

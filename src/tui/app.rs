@@ -254,50 +254,44 @@ fn plain_textarea() -> TextArea<'static> {
     textarea
 }
 
-/// Best-effort quantization guess for the Model Info panel - `None` when
-/// this build wasn't compiled with `--features gguf-management` (on by
-/// `default`) or nothing could be determined at all. Gated on
-/// `gguf-management`, not `llama-cpp`, since this involves no FFI - see
-/// `ccguf-managment-imrpoment-plan.md` Phase M0. Prefers the real
-/// GGUF-header-parsed value (Phase M1 - precise where `general.file_type`
-/// is set, coarser otherwise) over the filename-convention guess, falling
-/// back to the filename only when the header itself can't be read.
+/// Quantization hint, native/trained context length, and embedded-chat-
+/// template presence for the Model Info panel (Ctrl+O), from a *single*
+/// GGUF header read - `None`/defaults when this build wasn't compiled with
+/// `--features gguf-management` (on by `default`) or nothing could be
+/// determined at all. Gated on `gguf-management`, not `llama-cpp`, since
+/// this involves no FFI - see `ccguf-managment-imrpoment-plan.md` Phase M0.
+///
+/// `render_model_info` (`render.rs`) redraws on every `terminal.draw` while
+/// the panel is open (every ~100ms per the runner's cadence, not the
+/// "low-frequency render" this used to assume when it read the header
+/// twice via two separate functions) - one parse per call halves the
+/// per-frame disk I/O that duplication cost. Full elimination (caching the
+/// parsed header for the lifetime of the active model path) would need a
+/// new `App` field and an invalidation rule; left for a future pass if the
+/// remaining per-frame read still matters in practice.
 #[cfg(feature = "gguf-management")]
-fn quantization_hint_for_path(path: &std::path::Path) -> Option<String> {
-    crate::llm::provider::gguf_metadata::read_gguf_metadata(path)
-        .and_then(|m| m.quantization)
+fn llama_cpp_model_header_summary_for_path(
+    path: &std::path::Path,
+) -> (Option<String>, Option<u64>, bool) {
+    let header = crate::llm::provider::gguf_metadata::read_gguf_metadata(path);
+    let quantization_hint = header
+        .as_ref()
+        .and_then(|m| m.quantization.clone())
         .or_else(|| {
             crate::llm::provider::llama_cpp_models::quantization_hint_from_filename(
                 &path.to_string_lossy(),
             )
-        })
+        });
+    let context_length = header.as_ref().and_then(|m| m.context_length);
+    let has_chat_template = header.as_ref().is_some_and(|m| m.has_chat_template);
+    (quantization_hint, context_length, has_chat_template)
 }
 
 #[cfg(not(feature = "gguf-management"))]
-fn quantization_hint_for_path(_path: &std::path::Path) -> Option<String> {
-    None
-}
-
-/// The model's native/trained context length and whether it has an
-/// embedded chat template, for the Model Info panel (Ctrl+O) - the
-/// `context_length`/`has_chat_template` counterpart of
-/// `quantization_hint_for_path` above, same cfg-gating rationale
-/// (`ccguf-managment-imrpoment-plan.md` Phase M0/M8). A second,
-/// independent header read from `quantization_hint_for_path`'s - the
-/// Model Info panel is a low-frequency render, not a hot loop, so the
-/// minor duplication isn't worth threading the header through both call
-/// sites for.
-#[cfg(feature = "gguf-management")]
-fn llama_cpp_context_and_chat_template_for_path(path: &std::path::Path) -> (Option<u64>, bool) {
-    match crate::llm::provider::gguf_metadata::read_gguf_metadata(path) {
-        Some(m) => (m.context_length, m.has_chat_template),
-        None => (None, false),
-    }
-}
-
-#[cfg(not(feature = "gguf-management"))]
-fn llama_cpp_context_and_chat_template_for_path(_path: &std::path::Path) -> (Option<u64>, bool) {
-    (None, false)
+fn llama_cpp_model_header_summary_for_path(
+    _path: &std::path::Path,
+) -> (Option<String>, Option<u64>, bool) {
+    (None, None, false)
 }
 
 impl App {
@@ -648,11 +642,11 @@ impl App {
             .llama_cpp_active_model_path
             .as_ref()
             .unwrap_or(&cfg.model_path);
-        let (context_length, has_chat_template) =
-            llama_cpp_context_and_chat_template_for_path(model_path);
+        let (quantization_hint, context_length, has_chat_template) =
+            llama_cpp_model_header_summary_for_path(model_path);
         Some(super::llama_cpp_download::LlamaCppModelDetails {
             n_gpu_layers: cfg.n_gpu_layers,
-            quantization_hint: quantization_hint_for_path(model_path),
+            quantization_hint,
             context_length,
             has_chat_template,
         })
@@ -3068,10 +3062,11 @@ mod tests {
 
     #[cfg(feature = "gguf-management")]
     #[test]
-    fn llama_cpp_context_and_chat_template_for_path_reads_a_real_header() {
+    fn llama_cpp_model_header_summary_for_path_reads_a_real_header_once() {
         // Hand-crafted minimal GGUF bytes, same pattern as
         // gguf_metadata.rs's own tests - magic + version + zero tensors +
-        // two KV pairs (a context_length key and chat_template presence).
+        // three KV pairs (quantization, context_length, chat_template
+        // presence) - covering all three return values from one parse.
         fn push_string(buf: &mut Vec<u8>, s: &str) {
             buf.extend_from_slice(&(s.len() as u64).to_le_bytes());
             buf.extend_from_slice(s.as_bytes());
@@ -3080,7 +3075,11 @@ mod tests {
         buf.extend_from_slice(b"GGUF");
         buf.extend_from_slice(&3u32.to_le_bytes()); // version
         buf.extend_from_slice(&0u64.to_le_bytes()); // tensor_count
-        buf.extend_from_slice(&2u64.to_le_bytes()); // kv_count
+        buf.extend_from_slice(&3u64.to_le_bytes()); // kv_count
+
+        push_string(&mut buf, "general.file_type");
+        buf.extend_from_slice(&4u32.to_le_bytes()); // ValueType::U32
+        buf.extend_from_slice(&15u32.to_le_bytes()); // Q4_K_M
 
         push_string(&mut buf, "qwen2.context_length");
         buf.extend_from_slice(&4u32.to_le_bytes()); // ValueType::U32
@@ -3093,20 +3092,25 @@ mod tests {
         let file = tempfile::NamedTempFile::new().expect("temp file");
         std::fs::write(file.path(), &buf).expect("write fixture");
 
-        let (context_length, has_chat_template) =
-            llama_cpp_context_and_chat_template_for_path(file.path());
+        let (quantization_hint, context_length, has_chat_template) =
+            llama_cpp_model_header_summary_for_path(file.path());
+        assert_eq!(quantization_hint.as_deref(), Some("Q4_K_M"));
         assert_eq!(context_length, Some(32768));
         assert!(has_chat_template);
     }
 
     #[cfg(feature = "gguf-management")]
     #[test]
-    fn llama_cpp_context_and_chat_template_for_path_degrades_cleanly_on_a_missing_file() {
+    fn llama_cpp_model_header_summary_for_path_degrades_cleanly_on_a_missing_file() {
         let path = std::path::Path::new("/definitely/does/not/exist/crustly-test.gguf");
-        assert_eq!(
-            llama_cpp_context_and_chat_template_for_path(path),
-            (None, false)
-        );
+        let (quantization_hint, context_length, has_chat_template) =
+            llama_cpp_model_header_summary_for_path(path);
+        assert_eq!(context_length, None);
+        assert!(!has_chat_template);
+        // Falls back to the filename-convention guess when the header
+        // itself can't be read - this fixture's name has no recognizable
+        // quantization tag in it, so that fallback comes up empty too.
+        assert_eq!(quantization_hint, None);
     }
 
     use crate::db::Database;

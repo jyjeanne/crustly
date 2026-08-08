@@ -22,6 +22,19 @@ use tokio::sync::mpsc::UnboundedSender;
 /// models is far larger than anyone would default to in practice).
 const ESTIMATE_DEFAULT_CONTEXT_LENGTH: u64 = 8_192;
 
+/// Error-message prefixes this module's `bail!`/`with_context` sites
+/// produce, that `cli::llama_cpp_exit_code` (`src/cli/mod.rs`) matches
+/// against to pick `crustly llama-cpp`'s documented exit codes (11-13).
+/// Declared once and referenced by both the producing and matching sites
+/// (rather than each spelling out the literal separately) so the two
+/// cannot silently drift apart - a wording change here changes what
+/// `bail!` prints AND what the exit-code matcher looks for, in one edit,
+/// since there is exactly one place the text is written down.
+pub(crate) const DISK_SPACE_ERROR_PREFIX: &str = "Not enough disk space";
+pub(crate) const CHECKSUM_MISMATCH_ERROR_PREFIX: &str = "Checksum mismatch for";
+pub(crate) const DOWNLOAD_START_ERROR_PREFIX: &str = "Failed to start download from";
+pub(crate) const DOWNLOAD_FAILED_ERROR_PREFIX: &str = "Download failed for";
+
 /// The context length used for a memory estimate: `native` capped at
 /// [`ESTIMATE_DEFAULT_CONTEXT_LENGTH`], or that default when `native` is
 /// `None` (header didn't set one) - the exact rule Phase M12's fit
@@ -266,13 +279,50 @@ pub fn list_all_local_models(
     extra_model_paths: &[PathBuf],
     ollama_models_dir: Option<&Path>,
 ) -> Result<Vec<LocalGgufModel>> {
-    let mut models = list_local_models(models_dir)?;
-    for extra in extra_model_paths {
-        models.extend(list_local_models(extra)?);
+    // Each source is an independent directory scan / manifest-tree walk
+    // (its own `read_dir` plus one GGUF header parse per file found) with
+    // no data dependency on any other source - run them concurrently
+    // rather than sequentially, per this project's own documented
+    // parallel-dispatch convention for independent work (CLAUDE.md).
+    // `std::thread::scope` lets each closure borrow `extra_model_paths`/
+    // `ollama_models_dir` directly rather than needing owned clones for a
+    // detached `thread::spawn`; this function is already synchronous and
+    // meant to be called off the async runtime (`spawn_blocking`), so
+    // blocking the calling thread on `scope`'s join is the expected cost
+    // here, same as it already was for the un-parallelized version.
+    let (models_dir_result, extra_results, ollama_models) = std::thread::scope(|scope| {
+        let models_dir_handle = scope.spawn(|| list_local_models(models_dir));
+        let extra_handles: Vec<_> = extra_model_paths
+            .iter()
+            .map(|extra| scope.spawn(|| list_local_models(extra)))
+            .collect();
+        let ollama_handle = ollama_models_dir.map(|dir| scope.spawn(|| list_ollama_models(dir)));
+
+        let models_dir_result = models_dir_handle
+            .join()
+            .unwrap_or_else(|_| Err(anyhow::anyhow!("models_dir scan thread panicked")));
+        let extra_results: Vec<Result<Vec<LocalGgufModel>>> = extra_handles
+            .into_iter()
+            .map(|h| {
+                h.join().unwrap_or_else(|_| {
+                    Err(anyhow::anyhow!("extra_model_paths scan thread panicked"))
+                })
+            })
+            .collect();
+        // Best-effort, same as the un-parallelized version: a panicked or
+        // errored Ollama scan just means "nothing found there."
+        let ollama_models = ollama_handle
+            .and_then(|h| h.join().ok())
+            .unwrap_or_default();
+
+        (models_dir_result, extra_results, ollama_models)
+    });
+
+    let mut models = models_dir_result?;
+    for extra_result in extra_results {
+        models.extend(extra_result?);
     }
-    if let Some(ollama_dir) = ollama_models_dir {
-        models.extend(list_ollama_models(ollama_dir));
-    }
+    models.extend(ollama_models);
 
     let models = deduplicate_and_merge(models);
     let mut models = pair_mmproj_files(models);
@@ -590,10 +640,18 @@ fn merge_split_gguf_groups(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
 
         let (_parent, base, _total) = key;
         let summed_size = parts.iter().map(|p| p.size_bytes).sum();
+        // `parts` is already sorted by part index ascending (above), so
+        // `.find()` - not `.max_by_key()` - is what "prefer the lowest-index
+        // part that actually has a header" means: `max_by_key` breaks ties
+        // by keeping the *last* matching element, which silently preferred
+        // the highest-index part with a parsed header on any tie (realistic:
+        // llama.cpp's own `gguf-split` duplicates the full metadata KV
+        // section into every shard, not just the first). `.unwrap_or(0)`
+        // falls back to part 1 only when *no* part has a header at all.
         let template_index = parts
             .iter()
             .enumerate()
-            .max_by_key(|(_, m)| m.architecture.is_some())
+            .find(|(_, m)| m.architecture.is_some())
             .map(|(i, _)| i)
             .unwrap_or(0);
         let canonical_path = parts[0].path.clone();
@@ -914,7 +972,7 @@ fn check_disk_space(
     const SAFETY_MARGIN_BYTES: u64 = 512 * 1024 * 1024;
     if available < still_needed.saturating_add(SAFETY_MARGIN_BYTES) {
         anyhow::bail!(
-            "Not enough disk space to download '{filename}': need ~{:.2} GB (plus a safety \
+            "{DISK_SPACE_ERROR_PREFIX} to download '{filename}': need ~{:.2} GB (plus a safety \
              margin) but only ~{:.2} GB free at {}",
             still_needed as f64 / 1_073_741_824.0,
             available as f64 / 1_073_741_824.0,
@@ -974,9 +1032,9 @@ pub async fn download_model(
     let response = request
         .send()
         .await
-        .with_context(|| format!("Failed to start download from {url}"))?
+        .with_context(|| format!("{DOWNLOAD_START_ERROR_PREFIX} {url}"))?
         .error_for_status()
-        .with_context(|| format!("Download failed for {url}"))?;
+        .with_context(|| format!("{DOWNLOAD_FAILED_ERROR_PREFIX} {url}"))?;
 
     // A 206 confirms the server actually honored the `Range` request - a
     // server that ignores it and sends 200 (full content) falls through to
@@ -1072,7 +1130,7 @@ pub async fn download_model(
         if !actual.eq_ignore_ascii_case(expected) {
             let _ = tokio::fs::remove_file(&partial_path).await;
             anyhow::bail!(
-                "Checksum mismatch for {filename}: expected {expected}, got {actual}. \
+                "{CHECKSUM_MISMATCH_ERROR_PREFIX} {filename}: expected {expected}, got {actual}. \
                  The partial download has been deleted."
             );
         }
@@ -1786,6 +1844,47 @@ mod tests {
                 .ends_with("big-model-00001-of-00003.gguf"),
             "the canonical path should be the lowest-found part"
         );
+    }
+
+    #[test]
+    fn merge_split_gguf_groups_prefers_the_first_part_with_a_parsed_header_on_a_tie() {
+        // Realistic per M11's own review: llama.cpp's `gguf-split` tool
+        // duplicates the full metadata KV section into every output shard,
+        // not just the first - so more than one part can have
+        // `architecture.is_some()`. The lowest-index part must still win.
+        let dir = PathBuf::from("/models");
+        let mut part1 = fixture_model("big-model-00001-of-00002", None);
+        part1.path = dir.join("big-model-00001-of-00002.gguf");
+        part1.architecture = Some("part1-arch".to_string());
+        let mut part2 = fixture_model("big-model-00002-of-00002", None);
+        part2.path = dir.join("big-model-00002-of-00002.gguf");
+        part2.architecture = Some("part2-arch".to_string());
+
+        let merged = merge_split_gguf_groups(vec![part1, part2]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            merged[0].architecture.as_deref(),
+            Some("part1-arch"),
+            "the lowest-index part with a parsed header must win the tie, not the last"
+        );
+    }
+
+    #[test]
+    fn merge_split_gguf_groups_falls_back_to_part_one_when_no_part_has_a_header() {
+        let dir = PathBuf::from("/models");
+        let mut part1 = fixture_model("big-model-00001-of-00002", None);
+        part1.path = dir.join("big-model-00001-of-00002.gguf");
+        let mut part2 = fixture_model("big-model-00002-of-00002", None);
+        part2.path = dir.join("big-model-00002-of-00002.gguf");
+
+        let merged = merge_split_gguf_groups(vec![part1, part2]);
+
+        assert_eq!(merged.len(), 1);
+        assert!(merged[0]
+            .path
+            .to_string_lossy()
+            .ends_with("big-model-00001-of-00002.gguf"));
     }
 
     #[test]
