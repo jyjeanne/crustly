@@ -1514,11 +1514,22 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
         LlamaCppCommands::List { json, best_fit } => {
             let extra_model_paths = config.providers.llama_cpp_extra_model_paths();
             let ollama_models_dir = config.providers.llama_cpp_ollama_models_dir();
-            let mut models = llama_cpp_models::list_all_local_models(
-                &models_dir,
-                &extra_model_paths,
-                ollama_models_dir.as_deref(),
-            )?;
+            // `list_all_local_models` is a blocking synchronous scan
+            // (directory reads + a GGUF header parse per file, internally
+            // parallelized across its own OS threads via `std::thread::scope`)
+            // - dispatched through `spawn_blocking` here for the same reason
+            // `tui/llama_cpp_download.rs`'s `list_local` already does: it
+            // must not run directly on a Tokio worker thread.
+            let dir_for_scan = models_dir.clone();
+            let mut models = tokio::task::spawn_blocking(move || {
+                llama_cpp_models::list_all_local_models(
+                    &dir_for_scan,
+                    &extra_model_paths,
+                    ollama_models_dir.as_deref(),
+                )
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("Model scan task panicked: {e}"))??;
 
             // Detection spawns subprocesses - only paid for when actually
             // asked for (`hardware_detect`'s own module doc), never as a
@@ -1690,7 +1701,27 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
 
         LlamaCppCommands::Doctor => {
             println!("🩺 crustly llama-cpp doctor\n");
-            let findings = llama_cpp_doctor_findings(config, &models_dir);
+            // `llama_cpp_doctor_findings` stays a plain sync fn (its own
+            // unit tests call it directly, synchronously) - dispatched
+            // through `spawn_blocking` at this one async call site instead,
+            // for the same reason `List` above is: it scans `models_dir`
+            // via `list_all_local_models`, the same blocking, internally-
+            // multi-threaded call. A panic inside it degrades to a single
+            // `Fail` finding rather than aborting `doctor` entirely,
+            // matching this command's own "always exits 0, reports
+            // findings rather than failing" contract.
+            let config_for_scan = config.clone();
+            let dir_for_scan = models_dir.clone();
+            let findings = tokio::task::spawn_blocking(move || {
+                llama_cpp_doctor_findings(&config_for_scan, &dir_for_scan)
+            })
+            .await
+            .unwrap_or_else(|e| {
+                vec![DoctorFinding {
+                    status: DoctorStatus::Fail,
+                    message: format!("doctor's diagnostic task panicked: {e}"),
+                }]
+            });
             let (mut ok, mut warn, mut fail) = (0, 0, 0);
             for f in &findings {
                 match f.status {
