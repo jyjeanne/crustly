@@ -363,6 +363,39 @@ impl ProviderConfigs {
                     .join("models")
             })
     }
+
+    /// `providers.llama_cpp.extra_model_paths`, or empty if unconfigured -
+    /// shared by the CLI and TUI so both scan the same extra directories
+    /// without duplicating the resolution.
+    pub fn llama_cpp_extra_model_paths(&self) -> Vec<std::path::PathBuf> {
+        self.llama_cpp
+            .as_ref()
+            .map(|c| c.extra_model_paths.clone())
+            .unwrap_or_default()
+    }
+
+    /// Ollama's models directory, only when
+    /// `providers.llama_cpp.scan_ollama_models` opted in - `None`
+    /// otherwise, and `None` (not a guess) if `$OLLAMA_MODELS` is unset
+    /// and the home directory can't be resolved either. See
+    /// `LlamaCppProviderConfig::scan_ollama_models`'s doc comment for why
+    /// this is independent of the `ollama` Cargo feature.
+    pub fn llama_cpp_ollama_models_dir(&self) -> Option<std::path::PathBuf> {
+        let opted_in = self
+            .llama_cpp
+            .as_ref()
+            .map(|c| c.scan_ollama_models)
+            .unwrap_or(false);
+        if !opted_in {
+            return None;
+        }
+        if let Ok(dir) = std::env::var("OLLAMA_MODELS") {
+            if !dir.is_empty() {
+                return Some(std::path::PathBuf::from(dir));
+            }
+        }
+        dirs::home_dir().map(|h| h.join(".ollama").join("models"))
+    }
 }
 
 /// Individual provider configuration
@@ -644,6 +677,23 @@ pub struct LlamaCppProviderConfig {
     /// unset.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub models_dir: Option<std::path::PathBuf>,
+
+    /// Extra directories the `llama-cpp` model-management commands also
+    /// scan for `.gguf` files, beyond `models_dir`. Empty by default -
+    /// see `ccguf-managment-imrpoment-plan.md` Phase M3.
+    #[serde(default)]
+    pub extra_model_paths: Vec<std::path::PathBuf>,
+
+    /// Also discover models Ollama has already pulled, by reading its
+    /// manifest tree (`$OLLAMA_MODELS` or `~/.ollama/models`) rather than
+    /// guessing blob names - not a raw blob-store scan. `false` by
+    /// default: this is an explicit opt-in, independent of whether this
+    /// build was compiled with the `ollama` Cargo feature (that feature
+    /// only governs talking to an Ollama *server*; whether an Ollama
+    /// *daemon* left models on disk is unrelated) - see Phase M3's
+    /// correction in `ccguf-managment-imrpoment-plan.md`.
+    #[serde(default)]
+    pub scan_ollama_models: bool,
 }
 
 impl Default for LlamaCppProviderConfig {
@@ -663,6 +713,8 @@ impl Default for LlamaCppProviderConfig {
             seed: None,
             idle_unload_secs: None,
             models_dir: None,
+            extra_model_paths: Vec::new(),
+            scan_ollama_models: false,
         }
     }
 }

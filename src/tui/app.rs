@@ -190,6 +190,16 @@ pub struct App {
     llama_cpp_switch_task: Option<tokio::task::JoinHandle<()>>,
     llama_cpp_pending_provider: super::llama_cpp_download::PendingProvider,
     llama_cpp_models_dir: std::path::PathBuf,
+    /// `providers.llama_cpp.extra_model_paths` - additional directories the
+    /// Ctrl+G dialog also scans, beyond `llama_cpp_models_dir`. Empty
+    /// unless configured - see `ccguf-managment-imrpoment-plan.md` M3.
+    llama_cpp_extra_model_paths: Vec<std::path::PathBuf>,
+    /// Ollama's models directory, only `Some` when
+    /// `providers.llama_cpp.scan_ollama_models` opted in
+    /// (`ProviderConfigs::llama_cpp_ollama_models_dir()` already applies
+    /// that gate) - `None` means the Ctrl+G dialog doesn't scan Ollama at
+    /// all, same as before this field existed.
+    llama_cpp_ollama_models_dir: Option<std::path::PathBuf>,
     /// The `[providers.llama_cpp]` config section, applied (minus
     /// `model_path`, which is always the picked file) when Ctrl+G switches
     /// models - mirrors `ollama_config`'s rationale exactly.
@@ -198,6 +208,16 @@ pub struct App {
     /// `llama-cpp` - used by the Model Info panel for GPU-layers/quantization
     /// details, since neither is on the generic `Provider` trait.
     llama_cpp_active_model_path: Option<std::path::PathBuf>,
+    /// This machine's detected hardware (Phase M11) - `None` until the
+    /// Ctrl+G dialog's background detection task completes; stays `Some`
+    /// for the rest of the TUI session once set (detection itself is
+    /// separately cached process-wide by `hardware_detect`'s own
+    /// `OnceLock` - this field just avoids re-firing the background task
+    /// on every dialog open).
+    pub llama_cpp_hardware: Option<super::llama_cpp_download::HardwareSummary>,
+    /// Whether the hardware-detection background task is in flight - drives
+    /// the dialog's "detecting hardware…" host-info row.
+    pub llama_cpp_hardware_loading: bool,
 
     // `/skills` slash command state
     pub skills_list: Vec<crate::llm::tools::skill::SkillListing>,
@@ -234,17 +254,44 @@ fn plain_textarea() -> TextArea<'static> {
     textarea
 }
 
-/// Best-effort quantization guess for the Model Info panel - `None` when
-/// this build wasn't compiled with `--features llama-cpp` (nothing to guess
-/// from) or the filename doesn't match a known convention.
-#[cfg(feature = "llama-cpp")]
-fn quantization_hint_for_path(path: &std::path::Path) -> Option<String> {
-    crate::llm::provider::llama_cpp_models::quantization_hint_from_filename(&path.to_string_lossy())
+/// Quantization hint, native/trained context length, and embedded-chat-
+/// template presence for the Model Info panel (Ctrl+O), from a *single*
+/// GGUF header read - `None`/defaults when this build wasn't compiled with
+/// `--features gguf-management` (on by `default`) or nothing could be
+/// determined at all. Gated on `gguf-management`, not `llama-cpp`, since
+/// this involves no FFI - see `ccguf-managment-imrpoment-plan.md` Phase M0.
+///
+/// `render_model_info` (`render.rs`) redraws on every `terminal.draw` while
+/// the panel is open (every ~100ms per the runner's cadence, not the
+/// "low-frequency render" this used to assume when it read the header
+/// twice via two separate functions) - one parse per call halves the
+/// per-frame disk I/O that duplication cost. Full elimination (caching the
+/// parsed header for the lifetime of the active model path) would need a
+/// new `App` field and an invalidation rule; left for a future pass if the
+/// remaining per-frame read still matters in practice.
+#[cfg(feature = "gguf-management")]
+fn llama_cpp_model_header_summary_for_path(
+    path: &std::path::Path,
+) -> (Option<String>, Option<u64>, bool) {
+    let header = crate::llm::provider::gguf_metadata::read_gguf_metadata(path);
+    let quantization_hint = header
+        .as_ref()
+        .and_then(|m| m.quantization.clone())
+        .or_else(|| {
+            crate::llm::provider::llama_cpp_models::quantization_hint_from_filename(
+                &path.to_string_lossy(),
+            )
+        });
+    let context_length = header.as_ref().and_then(|m| m.context_length);
+    let has_chat_template = header.as_ref().is_some_and(|m| m.has_chat_template);
+    (quantization_hint, context_length, has_chat_template)
 }
 
-#[cfg(not(feature = "llama-cpp"))]
-fn quantization_hint_for_path(_path: &std::path::Path) -> Option<String> {
-    None
+#[cfg(not(feature = "gguf-management"))]
+fn llama_cpp_model_header_summary_for_path(
+    _path: &std::path::Path,
+) -> (Option<String>, Option<u64>, bool) {
+    (None, None, false)
 }
 
 impl App {
@@ -315,8 +362,12 @@ impl App {
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
                 .join("crustly")
                 .join("models"),
+            llama_cpp_extra_model_paths: Vec::new(),
+            llama_cpp_ollama_models_dir: None,
             llama_cpp_config: None,
             llama_cpp_active_model_path: None,
+            llama_cpp_hardware: None,
+            llama_cpp_hardware_loading: false,
             skills_list: Vec::new(),
             skills_selected: 0,
             mcp_selected: 0,
@@ -548,6 +599,22 @@ impl App {
         self.llama_cpp_models_dir = dir;
     }
 
+    /// Record the extra discovery sources
+    /// (`ProviderConfigs::llama_cpp_extra_model_paths()`/
+    /// `llama_cpp_ollama_models_dir()`) the Ctrl+G dialog also scans,
+    /// beyond `llama_cpp_models_dir`. Separate from
+    /// `set_llama_cpp_models_dir` since the primary directory is also used
+    /// as the download target (`start_llama_cpp_download`), which these
+    /// extra sources are not.
+    pub fn set_llama_cpp_discovery_sources(
+        &mut self,
+        extra_model_paths: Vec<std::path::PathBuf>,
+        ollama_models_dir: Option<std::path::PathBuf>,
+    ) {
+        self.llama_cpp_extra_model_paths = extra_model_paths;
+        self.llama_cpp_ollama_models_dir = ollama_models_dir;
+    }
+
     /// Record the `[providers.llama_cpp]` config (and, if the active
     /// provider is `llama-cpp` at startup, its `model_path`) so the Ctrl+G
     /// switch rebuilds providers with the same settings as the one built at
@@ -575,9 +642,13 @@ impl App {
             .llama_cpp_active_model_path
             .as_ref()
             .unwrap_or(&cfg.model_path);
+        let (quantization_hint, context_length, has_chat_template) =
+            llama_cpp_model_header_summary_for_path(model_path);
         Some(super::llama_cpp_download::LlamaCppModelDetails {
             n_gpu_layers: cfg.n_gpu_layers,
-            quantization_hint: quantization_hint_for_path(model_path),
+            quantization_hint,
+            context_length,
+            has_chat_template,
         })
     }
 
@@ -850,6 +921,10 @@ impl App {
                 self.llama_cpp_models = models;
                 self.llama_cpp_selected = 0;
             }
+            TuiEvent::LlamaCppHardwareDetected(hardware) => {
+                self.llama_cpp_hardware_loading = false;
+                self.llama_cpp_hardware = Some(hardware);
+            }
             TuiEvent::LlamaCppDownloadProgress(progress) => {
                 self.llama_cpp_download_fraction = progress.fraction();
                 self.llama_cpp_download_status = Some(match progress.total_bytes {
@@ -890,9 +965,16 @@ impl App {
                 // Refresh the local model list in the background so a
                 // successful download shows up next time the dialog opens.
                 let models_dir = self.llama_cpp_models_dir.clone();
+                let extra_model_paths = self.llama_cpp_extra_model_paths.clone();
+                let ollama_models_dir = self.llama_cpp_ollama_models_dir.clone();
                 let sender = self.event_sender();
                 tokio::spawn(async move {
-                    let models = super::llama_cpp_download::list_local(models_dir).await;
+                    let models = super::llama_cpp_download::list_local(
+                        models_dir,
+                        extra_model_paths,
+                        ollama_models_dir,
+                    )
+                    .await;
                     let _ = sender.send(TuiEvent::LlamaCppModelsListed(models));
                 });
             }
@@ -2775,11 +2857,32 @@ impl App {
         self.llama_cpp_loading = true;
 
         let models_dir = self.llama_cpp_models_dir.clone();
+        let extra_model_paths = self.llama_cpp_extra_model_paths.clone();
+        let ollama_models_dir = self.llama_cpp_ollama_models_dir.clone();
         let sender = self.event_sender();
         tokio::spawn(async move {
-            let models = super::llama_cpp_download::list_local(models_dir).await;
+            let models = super::llama_cpp_download::list_local(
+                models_dir,
+                extra_model_paths,
+                ollama_models_dir,
+            )
+            .await;
             let _ = sender.send(TuiEvent::LlamaCppModelsListed(models));
         });
+
+        // Hardware detection (Phase M11) spawns subprocesses, so it's only
+        // triggered once per TUI session - the first time this dialog opens
+        // (`hardware_detect`'s own "when this runs" rule) - not on every
+        // subsequent open, even though detection itself is separately
+        // cached process-wide by a `OnceLock` and would be cheap either way.
+        if self.llama_cpp_hardware.is_none() && !self.llama_cpp_hardware_loading {
+            self.llama_cpp_hardware_loading = true;
+            let sender = self.event_sender();
+            tokio::spawn(async move {
+                let hardware = super::llama_cpp_download::detect_hardware_summary().await;
+                let _ = sender.send(TuiEvent::LlamaCppHardwareDetected(hardware));
+            });
+        }
 
         self.switch_mode(AppMode::LlamaCppModelPicker).await
     }
@@ -2955,6 +3058,59 @@ mod tests {
         let display_msg: DisplayMessage = msg.into();
         assert_eq!(display_msg.role, "user");
         assert_eq!(display_msg.content, "Hello");
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_model_header_summary_for_path_reads_a_real_header_once() {
+        // Hand-crafted minimal GGUF bytes, same pattern as
+        // gguf_metadata.rs's own tests - magic + version + zero tensors +
+        // three KV pairs (quantization, context_length, chat_template
+        // presence) - covering all three return values from one parse.
+        fn push_string(buf: &mut Vec<u8>, s: &str) {
+            buf.extend_from_slice(&(s.len() as u64).to_le_bytes());
+            buf.extend_from_slice(s.as_bytes());
+        }
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"GGUF");
+        buf.extend_from_slice(&3u32.to_le_bytes()); // version
+        buf.extend_from_slice(&0u64.to_le_bytes()); // tensor_count
+        buf.extend_from_slice(&3u64.to_le_bytes()); // kv_count
+
+        push_string(&mut buf, "general.file_type");
+        buf.extend_from_slice(&4u32.to_le_bytes()); // ValueType::U32
+        buf.extend_from_slice(&15u32.to_le_bytes()); // Q4_K_M
+
+        push_string(&mut buf, "qwen2.context_length");
+        buf.extend_from_slice(&4u32.to_le_bytes()); // ValueType::U32
+        buf.extend_from_slice(&32768u32.to_le_bytes());
+
+        push_string(&mut buf, "tokenizer.chat_template");
+        buf.extend_from_slice(&8u32.to_le_bytes()); // ValueType::String
+        push_string(&mut buf, "{{ messages }}");
+
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        std::fs::write(file.path(), &buf).expect("write fixture");
+
+        let (quantization_hint, context_length, has_chat_template) =
+            llama_cpp_model_header_summary_for_path(file.path());
+        assert_eq!(quantization_hint.as_deref(), Some("Q4_K_M"));
+        assert_eq!(context_length, Some(32768));
+        assert!(has_chat_template);
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_model_header_summary_for_path_degrades_cleanly_on_a_missing_file() {
+        let path = std::path::Path::new("/definitely/does/not/exist/crustly-test.gguf");
+        let (quantization_hint, context_length, has_chat_template) =
+            llama_cpp_model_header_summary_for_path(path);
+        assert_eq!(context_length, None);
+        assert!(!has_chat_template);
+        // Falls back to the filename-convention guess when the header
+        // itself can't be read - this fixture's name has no recognizable
+        // quantization tag in it, so that fallback comes up empty too.
+        assert_eq!(quantization_hint, None);
     }
 
     use crate::db::Database;
@@ -4203,6 +4359,51 @@ mod tests {
         assert_eq!(app.mode, AppMode::LlamaCppModelPicker);
         assert!(app.llama_cpp_loading);
         assert!(app.llama_cpp_models.is_empty());
+        // Phase M11: hardware detection kicks off alongside the model scan
+        // the first time this dialog opens.
+        assert!(app.llama_cpp_hardware_loading);
+        assert!(app.llama_cpp_hardware.is_none());
+    }
+
+    #[tokio::test]
+    async fn ctrl_g_does_not_re_trigger_hardware_detection_on_a_second_open() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.llama_cpp_hardware = Some(super::super::llama_cpp_download::HardwareSummary {
+            gpu_name: None,
+            vram_available_bytes: None,
+            system_ram_total_bytes: Some(1),
+        });
+
+        app.handle_key_event(key_mod(KeyCode::Char('g'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+
+        assert!(
+            !app.llama_cpp_hardware_loading,
+            "already-detected hardware must not be re-fetched on a later dialog open"
+        );
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_hardware_detected_clears_loading_state_and_stores_the_result() {
+        let mut app = test_app().await;
+        app.llama_cpp_hardware_loading = true;
+
+        app.handle_event(TuiEvent::LlamaCppHardwareDetected(
+            super::super::llama_cpp_download::HardwareSummary {
+                gpu_name: Some("Test GPU".to_string()),
+                vram_available_bytes: Some(1_000),
+                system_ram_total_bytes: Some(2_000),
+            },
+        ))
+        .await
+        .unwrap();
+
+        assert!(!app.llama_cpp_hardware_loading);
+        let hardware = app.llama_cpp_hardware.expect("hardware must be set");
+        assert_eq!(hardware.gpu_name.as_deref(), Some("Test GPU"));
+        assert_eq!(hardware.budget_bytes(), Some(3_000));
     }
 
     #[tokio::test]
@@ -4215,11 +4416,31 @@ mod tests {
                 path: std::path::PathBuf::from("/models/a.gguf"),
                 size_bytes: 100,
                 quantization_hint: Some("Q4_K_M".to_string()),
+                architecture: None,
+                parameter_count: None,
+                context_length: None,
+                has_chat_template: false,
+                display_name: None,
+                estimated_memory_bytes: None,
+                estimated_memory_includes_kv_cache: false,
+                estimated_memory_context_length: None,
+                is_mmproj: false,
+                mmproj_path: None,
             },
             super::super::llama_cpp_download::LlamaCppModelSummary {
                 path: std::path::PathBuf::from("/models/b.gguf"),
                 size_bytes: 200,
                 quantization_hint: None,
+                architecture: None,
+                parameter_count: None,
+                context_length: None,
+                has_chat_template: false,
+                display_name: None,
+                estimated_memory_bytes: None,
+                estimated_memory_includes_kv_cache: false,
+                estimated_memory_context_length: None,
+                is_mmproj: false,
+                mmproj_path: None,
             },
         ]))
         .await
@@ -4240,11 +4461,31 @@ mod tests {
                 path: std::path::PathBuf::from("/models/a.gguf"),
                 size_bytes: 100,
                 quantization_hint: None,
+                architecture: None,
+                parameter_count: None,
+                context_length: None,
+                has_chat_template: false,
+                display_name: None,
+                estimated_memory_bytes: None,
+                estimated_memory_includes_kv_cache: false,
+                estimated_memory_context_length: None,
+                is_mmproj: false,
+                mmproj_path: None,
             },
             super::super::llama_cpp_download::LlamaCppModelSummary {
                 path: std::path::PathBuf::from("/models/b.gguf"),
                 size_bytes: 100,
                 quantization_hint: None,
+                architecture: None,
+                parameter_count: None,
+                context_length: None,
+                has_chat_template: false,
+                display_name: None,
+                estimated_memory_bytes: None,
+                estimated_memory_includes_kv_cache: false,
+                estimated_memory_context_length: None,
+                is_mmproj: false,
+                mmproj_path: None,
             },
         ];
 
@@ -4299,6 +4540,16 @@ mod tests {
             path: std::path::PathBuf::from("/models/a.gguf"),
             size_bytes: 100,
             quantization_hint: None,
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
+            is_mmproj: false,
+            mmproj_path: None,
         }];
 
         app.handle_llama_cpp_models_key(key(KeyCode::Delete))
@@ -4320,6 +4571,16 @@ mod tests {
             path: std::path::PathBuf::from("/models/a.gguf"),
             size_bytes: 100,
             quantization_hint: None,
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
+            is_mmproj: false,
+            mmproj_path: None,
         }];
         app.llama_cpp_deleting = Some(std::path::PathBuf::from("/models/a.gguf"));
 
@@ -4401,6 +4662,16 @@ mod tests {
             path: std::path::PathBuf::from("/models/b.gguf"),
             size_bytes: 100,
             quantization_hint: None,
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
+            is_mmproj: false,
+            mmproj_path: None,
         }];
 
         // Enter would normally start a switch to the highlighted model.

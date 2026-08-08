@@ -7,10 +7,46 @@
 
 use anyhow::{Context, Result};
 use futures::StreamExt as _;
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use tokio::io::AsyncWriteExt as _;
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::sync::mpsc::UnboundedSender;
+
+/// Context length used for `list_local_models`'s memory estimate when a
+/// model's own header doesn't set one (or sets an implausibly large one) -
+/// matches `default_llama_cpp_n_ctx()` (`src/config/mod.rs`), so the
+/// estimate reflects what a freshly-configured provider would actually
+/// allocate, not the model's full trained context (which for some modern
+/// models is far larger than anyone would default to in practice).
+const ESTIMATE_DEFAULT_CONTEXT_LENGTH: u64 = 8_192;
+
+/// Error-message prefixes this module's `bail!`/`with_context` sites
+/// produce, that `cli::llama_cpp_exit_code` (`src/cli/mod.rs`) matches
+/// against to pick `crustly llama-cpp`'s documented exit codes (11-13).
+/// Declared once and referenced by both the producing and matching sites
+/// (rather than each spelling out the literal separately) so the two
+/// cannot silently drift apart - a wording change here changes what
+/// `bail!` prints AND what the exit-code matcher looks for, in one edit,
+/// since there is exactly one place the text is written down.
+pub(crate) const DISK_SPACE_ERROR_PREFIX: &str = "Not enough disk space";
+pub(crate) const CHECKSUM_MISMATCH_ERROR_PREFIX: &str = "Checksum mismatch for";
+pub(crate) const DOWNLOAD_START_ERROR_PREFIX: &str = "Failed to start download from";
+pub(crate) const DOWNLOAD_FAILED_ERROR_PREFIX: &str = "Download failed for";
+
+/// The context length used for a memory estimate: `native` capped at
+/// [`ESTIMATE_DEFAULT_CONTEXT_LENGTH`], or that default when `native` is
+/// `None` (header didn't set one) - the exact rule Phase M12's fit
+/// comparison needs to know the estimate was computed at (see
+/// `LocalGgufModel::estimated_memory_context_length`), extracted here so
+/// both `list_local_models` and `parse_ollama_manifest` compute it
+/// identically rather than duplicating the same two-line rule.
+fn estimate_default_context_length(native: Option<u64>) -> u64 {
+    native
+        .map(|n| n.min(ESTIMATE_DEFAULT_CONTEXT_LENGTH))
+        .unwrap_or(ESTIMATE_DEFAULT_CONTEXT_LENGTH)
+}
 
 /// A locally-present `.gguf` file - the llama.cpp equivalent of
 /// `ollama_models::LocalModelInfo` (which reports installed models via
@@ -20,11 +56,77 @@ pub struct LocalGgufModel {
     pub path: PathBuf,
     pub size_bytes: u64,
     pub modified_at: String,
-    /// Best-effort guess from the filename convention (e.g. "Q4_K_M",
-    /// "Q8_0") when GGUF header metadata isn't read. `None` if nothing
-    /// matches - displayed as "unknown" by callers rather than guessed
-    /// further.
+    /// Best-effort quantization label, layered: the GGUF header's
+    /// `general.file_type` (precise, e.g. "Q4_K_M") when readable, else the
+    /// header's per-tensor type mode (coarser, e.g. "Q4_K"), else a
+    /// filename-convention guess (e.g. spotting "Q4_K_M" as a substring of
+    /// the filename) when the header itself can't be read at all. `None`
+    /// only if none of those three sources produced anything - displayed as
+    /// "unknown" by callers rather than guessed further. See
+    /// `crate::llm::provider::gguf_metadata` for the header parser.
     pub quantization_hint: Option<String>,
+    /// GGUF `general.architecture` (e.g. "llama", "qwen2"). `None` if the
+    /// header couldn't be read or didn't set it.
+    pub architecture: Option<String>,
+    /// Total scalar weight count, summed across the header's tensor-info
+    /// dimensions - independent of quantization. `None` if the header
+    /// couldn't be read.
+    pub parameter_count: Option<u64>,
+    /// The model's trained/native context window, read from the
+    /// architecture-namespaced `*.context_length` GGUF key. `None` if the
+    /// header couldn't be read or didn't set it.
+    pub context_length: Option<u64>,
+    /// Whether the header has a `tokenizer.chat_template` key. `false` (not
+    /// `Option`) if the header couldn't be read, same as "no template
+    /// found" - this field is advisory display data, not something callers
+    /// branch safety-critical behavior on.
+    pub has_chat_template: bool,
+    /// A name to display instead of `path`'s filename, when the filename
+    /// itself isn't meaningful - e.g. an Ollama-sourced entry's real path
+    /// is a content-addressed blob (`sha256-<hex>`), so this carries the
+    /// manifest's own `name:tag`. Comma-joined when more than one manifest
+    /// tag resolves to the identical blob. `None` for ordinary
+    /// filesystem-scanned entries, where the filename already is the
+    /// name; callers fall back to `path`'s filename in that case, exactly
+    /// as they did before this field existed.
+    pub display_name: Option<String>,
+    /// Estimated resident memory (weights + KV cache when the header has
+    /// enough geometry) at `ESTIMATE_DEFAULT_CONTEXT_LENGTH` tokens, or the
+    /// header's own native context length if smaller. `None` if
+    /// `parameter_count`/`quantization_hint` weren't determined - see
+    /// `gguf_metadata::estimate_memory_bytes`'s doc comment for the
+    /// "order-of-magnitude, not a guarantee" framing.
+    pub estimated_memory_bytes: Option<u64>,
+    /// Whether `estimated_memory_bytes` includes the KV-cache term.
+    /// `false` when the header lacked the attention geometry to compute
+    /// it, in which case the estimate covers weights only - meaningless
+    /// when `estimated_memory_bytes` is `None`.
+    pub estimated_memory_includes_kv_cache: bool,
+    /// The context length `estimated_memory_bytes` was actually computed
+    /// at - `estimate_default_context_length`'s result, i.e. the header's
+    /// native context length capped at `ESTIMATE_DEFAULT_CONTEXT_LENGTH`,
+    /// or that default when the header didn't set one. `None` exactly
+    /// when `estimated_memory_bytes` is `None` (nothing to report a
+    /// context length for). Surfaced by Phase M12's fit annotation so a
+    /// "Tight"/"Won't fit" label is a number a user can sanity-check, not
+    /// just a bare word.
+    pub estimated_memory_context_length: Option<u64>,
+    /// Whether this file is a vision/audio projector (mmproj), per the
+    /// header's `clip.has_vision_encoder`/`clip.has_audio_encoder`
+    /// (verified against llama.cpp's own source, see
+    /// `gguf_metadata::GgufMetadata::is_vision_projector`'s doc comment),
+    /// or - only when the header itself couldn't be read at all - a
+    /// filename containing "mmproj"/"mm-proj"/"mm_proj". A paired
+    /// projector's own entry is removed from the merged listing (see
+    /// `mmproj_path` below); an unpaired one keeps `is_mmproj = true` on
+    /// its own standalone entry so callers can label it, rather than
+    /// showing a mysteriously-named model.
+    pub is_mmproj: bool,
+    /// Set on a *base model* entry once `pair_mmproj_files` confidently
+    /// matches it with a projector in the same directory - `None` for an
+    /// ordinary entry, and always `None` on an entry that is itself
+    /// `is_mmproj` (a projector doesn't get its own `mmproj_path`).
+    pub mmproj_path: Option<PathBuf>,
 }
 
 /// One progress update from an in-flight `download_model` transfer. The
@@ -69,6 +171,19 @@ pub fn quantization_hint_from_filename(filename: &str) -> Option<String> {
         .map(|tag| tag.to_string())
 }
 
+/// Filename markers (checked case-insensitively) that suggest a `.gguf`
+/// file is a multimodal projector, used only as a fallback when the header
+/// itself couldn't be read at all (`gguf_metadata::read_gguf_metadata`
+/// returned `None`) - when the header *did* parse, its
+/// `is_vision_projector`/`is_audio_projector` fields are the source of
+/// truth, not this heuristic.
+const MMPROJ_FILENAME_MARKERS: &[&str] = &["mmproj", "mm-proj", "mm_proj"];
+
+fn filename_suggests_mmproj(filename: &str) -> bool {
+    let lower = filename.to_lowercase();
+    MMPROJ_FILENAME_MARKERS.iter().any(|m| lower.contains(m))
+}
+
 /// Scan `models_dir` for `*.gguf` files. Ollama's `list_models()`
 /// equivalent, but a directory listing instead of an `/api/tags` call -
 /// there is no `client_for()` analog because there is no server to address.
@@ -89,22 +204,55 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
             continue;
         }
 
-        let metadata = entry.metadata()?;
-        let modified_at = metadata
+        let fs_metadata = entry.metadata()?;
+        let modified_at = fs_metadata
             .modified()
             .ok()
             .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339())
             .unwrap_or_default();
-        let quantization_hint = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .and_then(quantization_hint_from_filename);
+
+        // Header-parsed metadata takes priority; the filename-convention
+        // guess is only consulted as a last resort, when the header itself
+        // couldn't be read (see `gguf_metadata::read_gguf_metadata`'s doc
+        // comment for exactly when that happens).
+        let header = super::gguf_metadata::read_gguf_metadata(&path);
+        let quantization_hint = header
+            .as_ref()
+            .and_then(|h| h.quantization.clone())
+            .or_else(|| {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .and_then(quantization_hint_from_filename)
+            });
+
+        let estimate_context_length =
+            estimate_default_context_length(header.as_ref().and_then(|h| h.context_length));
+        let estimate = header
+            .as_ref()
+            .and_then(|h| super::gguf_metadata::estimate_memory_bytes(h, estimate_context_length));
+        let is_mmproj = match &header {
+            Some(h) => h.is_vision_projector || h.is_audio_projector,
+            None => path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(filename_suggests_mmproj),
+        };
 
         models.push(LocalGgufModel {
             path,
-            size_bytes: metadata.len(),
+            size_bytes: fs_metadata.len(),
             modified_at,
             quantization_hint,
+            architecture: header.as_ref().and_then(|h| h.architecture.clone()),
+            parameter_count: header.as_ref().and_then(|h| h.parameter_count),
+            context_length: header.as_ref().and_then(|h| h.context_length),
+            has_chat_template: header.as_ref().is_some_and(|h| h.has_chat_template),
+            display_name: None,
+            estimated_memory_bytes: estimate.map(|e| e.total_bytes),
+            estimated_memory_includes_kv_cache: estimate.is_some_and(|e| e.includes_kv_cache),
+            estimated_memory_context_length: estimate.map(|_| estimate_context_length),
+            is_mmproj,
+            mmproj_path: None,
         });
     }
 
@@ -112,40 +260,628 @@ pub fn list_local_models(models_dir: &Path) -> Result<Vec<LocalGgufModel>> {
     Ok(models)
 }
 
-/// Parse an `hf:org/repo/file.gguf` shorthand into its parts. Pure
+/// Scan every configured source and merge the results: `models_dir`,
+/// `extra_model_paths`, and (when `ollama_models_dir` is `Some` -
+/// `Config::providers::llama_cpp_ollama_models_dir()` already gates this on
+/// the `scan_ollama_models` opt-in) Ollama's manifest tree. This is the
+/// entry point the CLI and TUI should use instead of `list_local_models`
+/// directly; `list_local_models` itself is unchanged (still a single
+/// directory, still what this function calls per source).
+///
+/// A failure scanning one `extra_model_paths` entry fails the whole call
+/// (same "surface real errors" posture `list_local_models` already has for
+/// its one directory) - but the Ollama scan is best-effort and never fails
+/// the call, since a missing/unreadable manifest tree just means "nothing
+/// found there," not a problem with the directories the user explicitly
+/// configured.
+pub fn list_all_local_models(
+    models_dir: &Path,
+    extra_model_paths: &[PathBuf],
+    ollama_models_dir: Option<&Path>,
+) -> Result<Vec<LocalGgufModel>> {
+    // Each source is an independent directory scan / manifest-tree walk
+    // (its own `read_dir` plus one GGUF header parse per file found) with
+    // no data dependency on any other source - run them concurrently
+    // rather than sequentially, per this project's own documented
+    // parallel-dispatch convention for independent work (CLAUDE.md).
+    // `std::thread::scope` lets each closure borrow `extra_model_paths`/
+    // `ollama_models_dir` directly rather than needing owned clones for a
+    // detached `thread::spawn`; this function is already synchronous and
+    // meant to be called off the async runtime (`spawn_blocking`), so
+    // blocking the calling thread on `scope`'s join is the expected cost
+    // here, same as it already was for the un-parallelized version.
+    let (models_dir_result, extra_results, ollama_models) = std::thread::scope(|scope| {
+        let models_dir_handle = scope.spawn(|| list_local_models(models_dir));
+        let extra_handles: Vec<_> = extra_model_paths
+            .iter()
+            .map(|extra| scope.spawn(|| list_local_models(extra)))
+            .collect();
+        let ollama_handle = ollama_models_dir.map(|dir| scope.spawn(|| list_ollama_models(dir)));
+
+        let models_dir_result = models_dir_handle
+            .join()
+            .unwrap_or_else(|_| Err(anyhow::anyhow!("models_dir scan thread panicked")));
+        let extra_results: Vec<Result<Vec<LocalGgufModel>>> = extra_handles
+            .into_iter()
+            .map(|h| {
+                h.join().unwrap_or_else(|_| {
+                    Err(anyhow::anyhow!("extra_model_paths scan thread panicked"))
+                })
+            })
+            .collect();
+        // Best-effort, same as the un-parallelized version: a panicked or
+        // errored Ollama scan just means "nothing found there."
+        let ollama_models = ollama_handle
+            .and_then(|h| h.join().ok())
+            .unwrap_or_default();
+
+        (models_dir_result, extra_results, ollama_models)
+    });
+
+    let mut models = models_dir_result?;
+    for extra_result in extra_results {
+        models.extend(extra_result?);
+    }
+    models.extend(ollama_models);
+
+    let models = deduplicate_and_merge(models);
+    let mut models = pair_mmproj_files(models);
+    models.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(models)
+}
+
+/// One layer entry in an Ollama manifest's `layers` array.
+#[derive(Debug, Deserialize)]
+struct OllamaManifestLayer {
+    #[serde(rename = "mediaType")]
+    media_type: String,
+    digest: String,
+}
+
+/// The subset of an Ollama manifest's JSON this module reads. Verified
+/// against Ollama's own source (`server/manifest.go`/`server/images.go`,
+/// `types/model/name.go`) rather than assumed - see
+/// `ccguf-managment-imrpoment-plan.md` Phase M3.
+#[derive(Debug, Deserialize)]
+struct OllamaManifest {
+    layers: Vec<OllamaManifestLayer>,
+}
+
+/// The GGUF model-weights layer's media type - distinct from
+/// `application/vnd.ollama.image.projector` (mmproj, out of scope until
+/// Phase M5), `.../adapter`, `.../template`, `.../license`, etc.
+const OLLAMA_MODEL_LAYER_MEDIA_TYPE: &str = "application/vnd.ollama.image.model";
+
+/// Discover models Ollama has already pulled by reading its manifest tree
+/// at `<ollama_models_dir>/manifests/{host}/{namespace}/{model}/{tag}` -
+/// always exactly 4 path components deep (verified against Ollama's
+/// `Filepath()` layout), so a fixed 4-level `read_dir` nest finds every
+/// manifest without a general recursive walker. Each manifest resolves to
+/// its model-weights blob (`<ollama_models_dir>/blobs/sha256-<hex>`, colon
+/// replaced with a dash - verified against Ollama's own blob-naming code)
+/// and a human-readable `display_name` reconstructed from the manifest's
+/// own path, not guessed from the blob's content-addressed filename.
+///
+/// Best-effort: a missing `manifests/` directory returns an empty list (not
+/// an error - this is likely just "Ollama isn't installed" or "opted in
+/// without Ollama ever having pulled anything"); an individual unreadable
+/// or malformed manifest, or one whose blob is missing (pruned since the
+/// manifest was written), is skipped rather than failing the whole scan.
+fn list_ollama_models(ollama_models_dir: &Path) -> Vec<LocalGgufModel> {
+    let manifests_root = ollama_models_dir.join("manifests");
+    let blobs_root = ollama_models_dir.join("blobs");
+
+    walk_ollama_manifest_files(&manifests_root)
+        .into_iter()
+        .filter_map(|manifest_path| {
+            parse_ollama_manifest(&manifest_path, &manifests_root, &blobs_root)
+        })
+        .collect()
+}
+
+/// Fixed 4-level directory walk (`host/namespace/model/tag`) - deliberately
+/// not a general recursive walker: Ollama's manifest layout is always
+/// exactly this deep, so this is both simpler and immune to the
+/// symlink-loop/unbounded-depth concerns a generic walker would need to
+/// guard against.
+fn walk_ollama_manifest_files(manifests_root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let Ok(hosts) = std::fs::read_dir(manifests_root) else {
+        return files;
+    };
+    for host in hosts.flatten() {
+        let Ok(namespaces) = std::fs::read_dir(host.path()) else {
+            continue;
+        };
+        for namespace in namespaces.flatten() {
+            let Ok(models) = std::fs::read_dir(namespace.path()) else {
+                continue;
+            };
+            for model in models.flatten() {
+                let Ok(tags) = std::fs::read_dir(model.path()) else {
+                    continue;
+                };
+                for tag in tags.flatten() {
+                    let path = tag.path();
+                    if path.is_file() {
+                        files.push(path);
+                    }
+                }
+            }
+        }
+    }
+    files
+}
+
+/// Parse one manifest file into a `LocalGgufModel`. `None` on any problem
+/// (unreadable, malformed JSON, no model layer, unresolvable digest,
+/// missing blob, or a path that isn't the expected 4 components deep under
+/// `manifests_root`) - the caller (`list_ollama_models`) treats that as
+/// "skip this one," not a hard failure.
+fn parse_ollama_manifest(
+    manifest_path: &Path,
+    manifests_root: &Path,
+    blobs_root: &Path,
+) -> Option<LocalGgufModel> {
+    let bytes = std::fs::read(manifest_path).ok()?;
+    let manifest: OllamaManifest = serde_json::from_slice(&bytes).ok()?;
+    let model_layer = manifest
+        .layers
+        .iter()
+        .find(|l| l.media_type == OLLAMA_MODEL_LAYER_MEDIA_TYPE)?;
+
+    let hex_digest = model_layer.digest.strip_prefix("sha256:")?;
+    if hex_digest.is_empty() || !hex_digest.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let blob_path = blobs_root.join(format!("sha256-{hex_digest}"));
+    let fs_metadata = std::fs::metadata(&blob_path).ok()?; // also confirms the blob exists
+
+    let rel = manifest_path.strip_prefix(manifests_root).ok()?;
+    let parts: Vec<&str> = rel
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .collect();
+    let [_host, namespace, model, tag] = parts[..] else {
+        return None;
+    };
+    let display_name = if namespace == "library" {
+        format!("{model}:{tag}")
+    } else {
+        format!("{namespace}/{model}:{tag}")
+    };
+
+    let modified_at = fs_metadata
+        .modified()
+        .ok()
+        .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339())
+        .unwrap_or_default();
+
+    // An Ollama blob's own bytes are a plain GGUF file - the same header
+    // parser applies directly, no Ollama-specific decoding needed for the
+    // model's own contents.
+    let header = super::gguf_metadata::read_gguf_metadata(&blob_path);
+    let quantization_hint = header.as_ref().and_then(|h| h.quantization.clone());
+    let estimate_context_length =
+        estimate_default_context_length(header.as_ref().and_then(|h| h.context_length));
+    let estimate = header
+        .as_ref()
+        .and_then(|h| super::gguf_metadata::estimate_memory_bytes(h, estimate_context_length));
+
+    Some(LocalGgufModel {
+        path: blob_path,
+        size_bytes: fs_metadata.len(),
+        modified_at,
+        quantization_hint,
+        architecture: header.as_ref().and_then(|h| h.architecture.clone()),
+        parameter_count: header.as_ref().and_then(|h| h.parameter_count),
+        context_length: header.as_ref().and_then(|h| h.context_length),
+        has_chat_template: header.as_ref().is_some_and(|h| h.has_chat_template),
+        display_name: Some(display_name),
+        estimated_memory_bytes: estimate.map(|e| e.total_bytes),
+        estimated_memory_includes_kv_cache: estimate.is_some_and(|e| e.includes_kv_cache),
+        estimated_memory_context_length: estimate.map(|_| estimate_context_length),
+        // No filename-based fallback here: an Ollama blob's on-disk name
+        // is always "sha256-<hex>", never anything containing "mmproj".
+        is_mmproj: header
+            .as_ref()
+            .is_some_and(|h| h.is_vision_projector || h.is_audio_projector),
+        mmproj_path: None,
+    })
+}
+
+/// Detects the `<base>-00001-of-00005.gguf` split-file naming convention
+/// (both numbers zero-padded to the same width, per
+/// `ccguf-managment-imrpoment-plan.md` Phase M4). Pure string parsing, no
+/// regex dependency needed. Returns `(base, part_index, total_parts)` -
+/// `part_index` is 1-based, matching the filename's own convention. `None`
+/// if `filename` doesn't match (including a width mismatch between the two
+/// numbers, which the convention requires).
+fn parse_split_gguf_filename(filename: &str) -> Option<(&str, u32, u32)> {
+    let stem = filename.strip_suffix(".gguf")?;
+    let of_pos = stem.rfind("-of-")?;
+    let (before_of, total_str) = (&stem[..of_pos], &stem[of_pos + 4..]);
+    if total_str.is_empty() || !total_str.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let dash_pos = before_of.rfind('-')?;
+    let (base, part_str) = (&before_of[..dash_pos], &before_of[dash_pos + 1..]);
+    if part_str.len() != total_str.len() || !part_str.bytes().all(|b| b.is_ascii_digit()) {
+        return None; // widths must match - that's the whole convention
+    }
+
+    let part: u32 = part_str.parse().ok()?;
+    let total: u32 = total_str.parse().ok()?;
+    if part == 0 || part > total {
+        return None;
+    }
+    Some((base, part, total))
+}
+
+/// Post-process a merged listing from `list_all_local_models`'s sources:
+///
+/// 1. **Canonical-path dedup** - the same underlying file reached two ways
+///    (a symlink in one scanned directory pointing at a file already found
+///    via another, or two Ollama manifest tags pointing at the identical
+///    blob) collapses to one entry. `display_name`s combine
+///    (comma-joined) rather than one being silently dropped; the entry
+///    with the richer header (`architecture.is_some()`, first-seen as a
+///    tiebreak) "wins" for the other fields. Sizes are **not** summed here
+///    - it's the same file counted once, not two files.
+/// 2. **Split-GGUF grouping** - `-00001-of-00005.gguf`-convention parts
+///    collapse into one logical entry: canonical `path` is the
+///    lowest-found part index (GGUF's split convention puts the real
+///    header/metadata in part 1; later shards carry only bookkeeping
+///    keys), `size_bytes` is **summed** (these are genuinely separate
+///    files), `display_name` is the base name, and metadata comes from
+///    whichever found part has it (same "richest wins" rule) - a partial
+///    download (not all parts present yet) is handled honestly rather
+///    than requiring completeness.
+///
+/// `O(n²)` over the input - the expected entry count (tens, not thousands
+/// of models on one machine) doesn't justify a hash-based grouping
+/// implementation's added complexity here.
+fn deduplicate_and_merge(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
+    let by_canonical_path = merge_by_canonical_path(models);
+    merge_split_gguf_groups(by_canonical_path)
+}
+
+/// True if `richer` has more identifying header data than `current` -
+/// the tiebreak `deduplicate_and_merge`'s two passes both use to decide
+/// which of two entries for "the same logical model" supplies the
+/// metadata fields on the merged result.
+fn is_richer(candidate: &LocalGgufModel, current: &LocalGgufModel) -> bool {
+    candidate.architecture.is_some() && current.architecture.is_none()
+}
+
+fn merge_by_canonical_path(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
+    let mut by_path: HashMap<PathBuf, LocalGgufModel> = HashMap::new();
+    let mut order: Vec<PathBuf> = Vec::new();
+
+    for model in models {
+        let key = std::fs::canonicalize(&model.path).unwrap_or_else(|_| model.path.clone());
+        match by_path.get_mut(&key) {
+            None => {
+                order.push(key.clone());
+                by_path.insert(key, model);
+            }
+            Some(existing) => {
+                let merged_display_name = match (&existing.display_name, &model.display_name) {
+                    (Some(a), Some(b)) if a != b => Some(format!("{a}, {b}")),
+                    (Some(a), _) => Some(a.clone()),
+                    (None, Some(b)) => Some(b.clone()),
+                    (None, None) => None,
+                };
+                if is_richer(&model, existing) {
+                    let display_name = merged_display_name;
+                    *existing = LocalGgufModel {
+                        display_name,
+                        ..model
+                    };
+                } else {
+                    existing.display_name = merged_display_name;
+                }
+            }
+        }
+    }
+
+    order
+        .into_iter()
+        .filter_map(|key| by_path.remove(&key))
+        .collect()
+}
+
+fn merge_split_gguf_groups(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
+    let mut groups: HashMap<(PathBuf, String, u32), Vec<LocalGgufModel>> = HashMap::new();
+    let mut order: Vec<(PathBuf, String, u32)> = Vec::new();
+    let mut passthrough: Vec<LocalGgufModel> = Vec::new();
+
+    for model in models {
+        let filename = model
+            .path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(str::to_string);
+        let parent = model
+            .path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default();
+        let split = filename
+            .as_deref()
+            .and_then(parse_split_gguf_filename)
+            .map(|(base, part, total)| (base.to_string(), part, total));
+
+        match split {
+            None => passthrough.push(model),
+            Some((base, _part, total)) => {
+                let key = (parent, base, total);
+                if !groups.contains_key(&key) {
+                    order.push(key.clone());
+                }
+                groups.entry(key).or_default().push(model);
+            }
+        }
+    }
+
+    let mut result = passthrough;
+    for key in order {
+        let Some(mut parts) = groups.remove(&key) else {
+            continue;
+        };
+        parts.sort_by_key(|m| {
+            m.path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(parse_split_gguf_filename)
+                .map(|(_, part, _)| part)
+                .unwrap_or(u32::MAX)
+        });
+
+        let (_parent, base, _total) = key;
+        let summed_size = parts.iter().map(|p| p.size_bytes).sum();
+        // `parts` is already sorted by part index ascending (above), so
+        // `.find()` - not `.max_by_key()` - is what "prefer the lowest-index
+        // part that actually has a header" means: `max_by_key` breaks ties
+        // by keeping the *last* matching element, which silently preferred
+        // the highest-index part with a parsed header on any tie (realistic:
+        // llama.cpp's own `gguf-split` duplicates the full metadata KV
+        // section into every shard, not just the first). `.unwrap_or(0)`
+        // falls back to part 1 only when *no* part has a header at all.
+        let template_index = parts
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.architecture.is_some())
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        let canonical_path = parts[0].path.clone();
+        let modified_at = parts[0].modified_at.clone();
+        let mut merged = parts[template_index].clone();
+        merged.path = canonical_path;
+        merged.modified_at = modified_at;
+        merged.size_bytes = summed_size;
+        merged.display_name = Some(format!("{base}.gguf"));
+
+        result.push(merged);
+    }
+
+    result
+}
+
+/// Reduces a `.gguf` filename stem to its "core name" for mmproj pairing:
+/// lowercase, strip every `QUANTIZATION_TAGS` tag and every
+/// `MMPROJ_FILENAME_MARKERS` marker (both checked case-insensitively, in
+/// whichever order they appear), trim leftover `-`/`_`/` ` at the ends.
+/// Two files naming "the same model" (a base model plus its projector)
+/// should reduce to an identical core name once quant/mmproj-specific
+/// decoration is stripped from both - e.g. `"Qwen2-VL-7B-Q4_K_M"` and
+/// `"mmproj-Qwen2-VL-7B-f16"` both reduce to `"qwen2-vl-7b"`.
+fn mmproj_core_name(filename: &str) -> String {
+    let stem = filename.strip_suffix(".gguf").unwrap_or(filename);
+    let mut core = stem.to_lowercase();
+    for marker in MMPROJ_FILENAME_MARKERS {
+        core = core.replace(marker, "");
+    }
+    for tag in QUANTIZATION_TAGS {
+        core = core.replace(&tag.to_lowercase(), "");
+    }
+    core.trim_matches(|c: char| c == '-' || c == '_' || c == ' ')
+        .to_string()
+}
+
+/// Pairs `is_mmproj` entries with a confident-match base model in the same
+/// directory (never across directories), per
+/// `ccguf-managment-imrpoment-plan.md` Phase M5. Conservative by design: a
+/// wrong pairing is actively misleading, so this only pairs on an
+/// unambiguous exact core-name match - zero or more than one candidate
+/// leaves the projector as its own standalone entry rather than guessing.
+/// Run after `deduplicate_and_merge` so it operates on the final,
+/// already-deduplicated listing.
+fn pair_mmproj_files(models: Vec<LocalGgufModel>) -> Vec<LocalGgufModel> {
+    let (mut projectors, mut bases): (Vec<LocalGgufModel>, Vec<LocalGgufModel>) =
+        (Vec::new(), Vec::new());
+    for model in models {
+        if model.is_mmproj {
+            projectors.push(model);
+        } else {
+            bases.push(model);
+        }
+    }
+
+    let mut result = Vec::with_capacity(bases.len() + projectors.len());
+    'projector: for projector in projectors {
+        let Some(filename) = projector.path.file_name().and_then(|n| n.to_str()) else {
+            result.push(projector);
+            continue;
+        };
+        let parent = projector.path.parent();
+        let projector_core = mmproj_core_name(filename);
+
+        let mut match_index = None;
+        for (i, base) in bases.iter().enumerate() {
+            if base.mmproj_path.is_some() {
+                continue; // already paired with a different projector
+            }
+            if base.path.parent() != parent {
+                continue; // never pair across directories
+            }
+            let Some(base_filename) = base.path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if mmproj_core_name(base_filename) == projector_core {
+                if match_index.is_some() {
+                    // A second candidate makes this ambiguous - stand
+                    // alone rather than guess which one is right.
+                    result.push(projector);
+                    continue 'projector;
+                }
+                match_index = Some(i);
+            }
+        }
+
+        match match_index {
+            Some(i) => bases[i].mmproj_path = Some(projector.path.clone()),
+            None => result.push(projector),
+        }
+    }
+
+    result.extend(bases);
+    result
+}
+
+/// How a model's estimated memory footprint (`LocalGgufModel::estimated_memory_bytes`)
+/// compares against a detected hardware budget
+/// (`hardware_detect::HardwareInfo::budget_bytes`) - Phase M12. Three states,
+/// deliberately not a percentage: a false-precision number would imply an
+/// accuracy neither the memory estimate (M2, itself an order-of-magnitude
+/// figure) nor "VRAM+RAM" as a single pooled budget (M11's own documented
+/// simplification - it doesn't model partial-offload behavior) actually has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HardwareFit {
+    /// Comfortably under budget.
+    Fits,
+    /// Under budget, but with little headroom (see `TIGHT_THRESHOLD_RATIO`).
+    Tight,
+    /// Exceeds the detected budget.
+    WontFit,
+    /// Either the model's estimate or the hardware budget (or both)
+    /// couldn't be determined - no comparison is possible.
+    Unknown,
+}
+
+/// The fraction of the budget above which a model that still technically
+/// fits is labeled `Tight` rather than `Fits` - e.g. at the default 0.85, a
+/// model using 90% of the detected budget is `Tight`, one using 60% is
+/// `Fits`. A documented, reasonable default (same posture as
+/// `ESTIMATE_DEFAULT_CONTEXT_LENGTH` above), not a tuned/validated number -
+/// there is no benchmark data behind it (that stays out of scope, M10).
+const TIGHT_THRESHOLD_RATIO: f64 = 0.85;
+
+/// Compares `estimated_memory_bytes` against `budget_bytes`. See
+/// `HardwareFit`'s own doc comment for what each state means.
+pub fn hardware_fit(estimated_memory_bytes: Option<u64>, budget_bytes: Option<u64>) -> HardwareFit {
+    let (Some(estimate), Some(budget)) = (estimated_memory_bytes, budget_bytes) else {
+        return HardwareFit::Unknown;
+    };
+    if estimate > budget {
+        HardwareFit::WontFit
+    } else if estimate as f64 > budget as f64 * TIGHT_THRESHOLD_RATIO {
+        HardwareFit::Tight
+    } else {
+        HardwareFit::Fits
+    }
+}
+
+/// Sorts `models` by fit against `budget_bytes`: `Fits` first, then
+/// `Tight`, then `WontFit`, then `Unknown` last - within a category, the
+/// largest `estimated_memory_bytes` sorts first (the most-capable model
+/// that still fits its category is the most useful one to see at the top,
+/// a reasonable proxy for "best" absent benchmark-ranked data - that axis
+/// stays deferred, M10). Powers `crustly llama-cpp list --best-fit`
+/// (`src/cli/mod.rs`).
+pub fn sort_by_fit(models: &mut [LocalGgufModel], budget_bytes: Option<u64>) {
+    fn rank(fit: HardwareFit) -> u8 {
+        match fit {
+            HardwareFit::Fits => 0,
+            HardwareFit::Tight => 1,
+            HardwareFit::WontFit => 2,
+            HardwareFit::Unknown => 3,
+        }
+    }
+    models.sort_by(|a, b| {
+        let fit_a = hardware_fit(a.estimated_memory_bytes, budget_bytes);
+        let fit_b = hardware_fit(b.estimated_memory_bytes, budget_bytes);
+        rank(fit_a).cmp(&rank(fit_b)).then_with(|| {
+            b.estimated_memory_bytes
+                .unwrap_or(0)
+                .cmp(&a.estimated_memory_bytes.unwrap_or(0))
+        })
+    });
+}
+
+/// The single most-capable already-downloaded model that `Fits` or is
+/// `Tight` against `budget_bytes` - `None` if nothing does (or `models` is
+/// empty, or the budget itself is unknown). Used by `crustly llama-cpp
+/// doctor`'s "largest model your hardware can hold" finding (Phase M9's own
+/// doc comment named this as M11/M12's eventual payoff for that phase).
+pub fn best_fitting_model(
+    models: &[LocalGgufModel],
+    budget_bytes: Option<u64>,
+) -> Option<&LocalGgufModel> {
+    models
+        .iter()
+        .filter(|m| {
+            matches!(
+                hardware_fit(m.estimated_memory_bytes, budget_bytes),
+                HardwareFit::Fits | HardwareFit::Tight
+            )
+        })
+        .max_by_key(|m| m.estimated_memory_bytes.unwrap_or(0))
+}
+
+/// Parse an `hf:org/repo/file.gguf` (or revision-pinned
+/// `hf:org/repo/file.gguf@revision`) shorthand into its parts. Pure
 /// string-parsing, no I/O - `None` if `source` isn't in that shorthand
-/// form (a direct URL, for instance).
-fn parse_hf_shorthand(source: &str) -> Option<(&str, &str, &str)> {
+/// form (a direct URL, for instance) or the `@revision` suffix is
+/// malformed (an `@` present with an empty file or revision side).
+fn parse_hf_shorthand(source: &str) -> Option<(&str, &str, &str, Option<&str>)> {
     let rest = source.strip_prefix("hf:")?;
     let mut parts = rest.splitn(3, '/');
     let org = parts.next()?;
     let repo = parts.next()?;
-    let file = parts.next()?;
-    if org.is_empty() || repo.is_empty() || file.is_empty() {
+    let file_and_revision = parts.next()?;
+    if org.is_empty() || repo.is_empty() || file_and_revision.is_empty() {
         return None;
     }
-    Some((org, repo, file))
+
+    let (file, revision) = match file_and_revision.split_once('@') {
+        Some((f, r)) if !f.is_empty() && !r.is_empty() => (f, Some(r)),
+        Some(_) => return None,
+        None => (file_and_revision, None),
+    };
+    Some((org, repo, file, revision))
 }
 
-/// Resolve `source` (a direct URL, or an `hf:org/repo/file.gguf`
+/// Resolve `source` (a direct URL, or an `hf:org/repo/file.gguf[@revision]`
 /// shorthand) into a downloadable URL and, where resolvable, the file's
 /// expected SHA-256 checksum.
 ///
 /// For the `hf:` shorthand, this expands to
-/// `https://huggingface.co/org/repo/resolve/main/file` and queries
-/// Hugging Face's model API (`https://huggingface.co/api/models/org/repo`)
-/// for the file's published LFS SHA-256 - a plain unauthenticated `GET`, no
-/// HuggingFace client dependency needed. A direct URL has no metadata
-/// endpoint to query at all, so it always resolves with `None` - callers
-/// must treat that as "no integrity hash available", not silently skip the
-/// gap (`llama-cpp-2-integration-plan.md` §4.11 point 2).
+/// `https://huggingface.co/org/repo/resolve/<revision-or-main>/file` and
+/// queries Hugging Face's model API for the file's published LFS SHA-256 -
+/// a plain unauthenticated `GET`, no HuggingFace client dependency needed.
+/// A direct URL has no metadata endpoint to query at all, so it always
+/// resolves with `None` - callers must treat that as "no integrity hash
+/// available", not silently skip the gap
+/// (`llama-cpp-2-integration-plan.md` §4.11 point 2).
 pub async fn resolve_download_source(source: &str) -> Result<(String, Option<String>)> {
-    let Some((org, repo, file)) = parse_hf_shorthand(source) else {
+    let Some((org, repo, file, revision)) = parse_hf_shorthand(source) else {
         return Ok((source.to_string(), None));
     };
 
-    let download_url = format!("https://huggingface.co/{org}/{repo}/resolve/main/{file}");
-    let expected_sha256 = fetch_hf_lfs_sha256(org, repo, file).await;
+    let ref_segment = revision.unwrap_or("main");
+    let download_url = format!("https://huggingface.co/{org}/{repo}/resolve/{ref_segment}/{file}");
+    let expected_sha256 = fetch_hf_lfs_sha256(org, repo, file, revision).await;
     Ok((download_url, expected_sha256))
 }
 
@@ -154,8 +890,28 @@ pub async fn resolve_download_source(source: &str) -> Result<(String, Option<Str
 /// non-LFS file, unexpected response shape) rather than propagating an
 /// error - a missing checksum degrades to an explicit warning at the call
 /// site, it does not block the download.
-async fn fetch_hf_lfs_sha256(org: &str, repo: &str, file: &str) -> Option<String> {
-    let api_url = format!("https://huggingface.co/api/models/{org}/{repo}");
+///
+/// When `revision` is `Some`, queries
+/// `/api/models/{org}/{repo}/revision/{revision}` instead of the bare
+/// `/api/models/{org}/{repo}` endpoint - HuggingFace's documented
+/// git-ref-based URL convention (the same shape the download URL itself
+/// already uses via `resolve/{revision}/`). **Unverified against a live
+/// response**: `huggingface.co` is unreachable from this development
+/// sandbox's own network policy (already known, not newly discovered -
+/// see `llama-cpp-2-integration-plan.md`'s prior finding on this exact
+/// point). A wrong guess here costs a missing checksum for pinned
+/// revisions, never a crash or bad data, given this function's existing
+/// degrade-to-`None` posture on any failure.
+async fn fetch_hf_lfs_sha256(
+    org: &str,
+    repo: &str,
+    file: &str,
+    revision: Option<&str>,
+) -> Option<String> {
+    let api_url = match revision {
+        Some(rev) => format!("https://huggingface.co/api/models/{org}/{repo}/revision/{rev}"),
+        None => format!("https://huggingface.co/api/models/{org}/{repo}"),
+    };
     let response = reqwest::get(&api_url).await.ok()?;
     let body: serde_json::Value = response.json().await.ok()?;
     body.get("siblings")?
@@ -166,6 +922,64 @@ async fn fetch_hf_lfs_sha256(org: &str, repo: &str, file: &str) -> Option<String
         .get("sha256")?
         .as_str()
         .map(str::to_string)
+}
+
+/// Best-effort available disk space at `path`'s filesystem, or the
+/// filesystem of its nearest existing ancestor (the download target
+/// itself doesn't exist yet, so `path` alone can't be queried directly).
+/// `None` when no matching disk is found - advisory only, callers must
+/// never block a download on an unknown. `pub(crate)` (not just used by
+/// `download_model` below) since `crustly llama-cpp doctor`
+/// (`src/cli/mod.rs`, Phase M9) reports the same figure as a diagnostic.
+pub(crate) fn available_space_at(path: &Path) -> Option<u64> {
+    let mut probe = path.to_path_buf();
+    while !probe.exists() {
+        probe = probe.parent()?.to_path_buf();
+    }
+    let canonical = std::fs::canonicalize(&probe).ok()?;
+
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    disks
+        .list()
+        .iter()
+        // The disk whose mount point is the *longest* matching prefix
+        // wins - handles nested mount points correctly (e.g. a separate
+        // `/home` mount under `/`).
+        .filter(|d| canonical.starts_with(d.mount_point()))
+        .max_by_key(|d| d.mount_point().as_os_str().len())
+        .map(|d| d.available_space())
+}
+
+/// Pure comparison extracted from `download_model`'s disk-space precheck so
+/// the reject-path is unit-testable without depending on real filesystem
+/// free space - every dev/CI machine has generously more of that than any
+/// test download body, making a true end-to-end "insufficient space" test
+/// impractical to set up deterministically. `available_space_at`'s result
+/// is passed in already-resolved rather than this function calling it
+/// itself, which is exactly the seam that makes the fabricated-values test
+/// below possible.
+fn check_disk_space(
+    available: Option<u64>,
+    still_needed: u64,
+    filename: &str,
+    models_dir: &Path,
+) -> Result<()> {
+    let Some(available) = available else {
+        return Ok(()); // unknown - never block on missing information
+    };
+    // A fixed safety margin, not a zero-margin check - leaves room for the
+    // OS/other processes right after the download lands.
+    const SAFETY_MARGIN_BYTES: u64 = 512 * 1024 * 1024;
+    if available < still_needed.saturating_add(SAFETY_MARGIN_BYTES) {
+        anyhow::bail!(
+            "{DISK_SPACE_ERROR_PREFIX} to download '{filename}': need ~{:.2} GB (plus a safety \
+             margin) but only ~{:.2} GB free at {}",
+            still_needed as f64 / 1_073_741_824.0,
+            available as f64 / 1_073_741_824.0,
+            models_dir.display()
+        );
+    }
+    Ok(())
 }
 
 /// Download `url` into `models_dir`, streaming progress through
@@ -202,20 +1016,96 @@ pub async fn download_model(
     let final_path = models_dir.join(filename);
     let partial_path = models_dir.join(format!("{filename}.part"));
 
-    let response = reqwest::get(url)
+    // Resume support: if a `.part` file already exists, ask the server to
+    // continue from where it left off via a `Range` header. Needs
+    // `reqwest::Client` rather than the bare `reqwest::get` free function
+    // used elsewhere in this module, since that has no header control.
+    let existing_bytes = tokio::fs::metadata(&partial_path)
         .await
-        .with_context(|| format!("Failed to start download from {url}"))?
-        .error_for_status()
-        .with_context(|| format!("Download failed for {url}"))?;
-    let total_bytes = response.content_length();
+        .map(|m| m.len())
+        .unwrap_or(0);
 
-    let mut file = tokio::fs::File::create(&partial_path)
+    let mut request = reqwest::Client::new().get(url);
+    if existing_bytes > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={existing_bytes}-"));
+    }
+    let response = request
+        .send()
         .await
-        .with_context(|| format!("Failed to create {}", partial_path.display()))?;
+        .with_context(|| format!("{DOWNLOAD_START_ERROR_PREFIX} {url}"))?
+        .error_for_status()
+        .with_context(|| format!("{DOWNLOAD_FAILED_ERROR_PREFIX} {url}"))?;
+
+    // A 206 confirms the server actually honored the `Range` request - a
+    // server that ignores it and sends 200 (full content) falls through to
+    // exactly today's from-scratch behavior below, discarding the stale
+    // partial bytes rather than corrupting the file by appending to them.
+    let resumed = existing_bytes > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    let total_bytes = if resumed {
+        // A 206's own `Content-Length` is the *remaining* bytes, not the
+        // whole file's size.
+        response
+            .content_length()
+            .map(|remaining| existing_bytes + remaining)
+    } else {
+        response.content_length()
+    };
+
+    // Disk-space precheck: only meaningful when both the size still to be
+    // downloaded and the destination's free space are known - skips
+    // silently (never blocks on missing information) otherwise. Reuses
+    // this same in-flight response's `Content-Length` rather than a
+    // separate `HEAD` round-trip.
+    if let Some(total) = total_bytes {
+        let still_needed = total.saturating_sub(if resumed { existing_bytes } else { 0 });
+        check_disk_space(
+            available_space_at(models_dir),
+            still_needed,
+            filename,
+            models_dir,
+        )?;
+    }
+
+    let mut file = if resumed {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&partial_path)
+            .await
+            .with_context(|| format!("Failed to resume {}", partial_path.display()))?
+    } else {
+        tokio::fs::File::create(&partial_path)
+            .await
+            .with_context(|| format!("Failed to create {}", partial_path.display()))?
+    };
+
     let mut hasher = Sha256::new();
     let mut bytes_downloaded: u64 = 0;
-    let mut stream = response.bytes_stream();
 
+    if resumed {
+        bytes_downloaded = existing_bytes;
+        if expected_sha256.is_some() {
+            // The final checksum must cover the *whole* file, not just the
+            // newly-streamed portion - hash the already-on-disk bytes too,
+            // incrementally (never the whole file in memory at once, even
+            // for a multi-GB partial download).
+            let mut existing_file = tokio::fs::File::open(&partial_path)
+                .await
+                .with_context(|| format!("Failed to re-read {}", partial_path.display()))?;
+            let mut buf = vec![0u8; 1024 * 1024];
+            loop {
+                let n = existing_file
+                    .read(&mut buf)
+                    .await
+                    .with_context(|| format!("Failed to re-read {}", partial_path.display()))?;
+                if n == 0 {
+                    break;
+                }
+                hasher.update(&buf[..n]);
+            }
+        }
+    }
+
+    let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.context("Error while downloading")?;
         hasher.update(&chunk);
@@ -240,7 +1130,7 @@ pub async fn download_model(
         if !actual.eq_ignore_ascii_case(expected) {
             let _ = tokio::fs::remove_file(&partial_path).await;
             anyhow::bail!(
-                "Checksum mismatch for {filename}: expected {expected}, got {actual}. \
+                "{CHECKSUM_MISMATCH_ERROR_PREFIX} {filename}: expected {expected}, got {actual}. \
                  The partial download has been deleted."
             );
         }
@@ -304,7 +1194,25 @@ mod tests {
     fn parse_hf_shorthand_extracts_org_repo_file() {
         assert_eq!(
             parse_hf_shorthand("hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf"),
-            Some(("TheBloke", "Llama-2-7B-GGUF", "llama-2-7b.Q4_K_M.gguf"))
+            Some((
+                "TheBloke",
+                "Llama-2-7B-GGUF",
+                "llama-2-7b.Q4_K_M.gguf",
+                None
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_hf_shorthand_extracts_a_pinned_revision() {
+        assert_eq!(
+            parse_hf_shorthand("hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf@abc123"),
+            Some((
+                "TheBloke",
+                "Llama-2-7B-GGUF",
+                "llama-2-7b.Q4_K_M.gguf",
+                Some("abc123")
+            ))
         );
     }
 
@@ -322,6 +1230,8 @@ mod tests {
             "hf:org/repo",
             "hf:/repo/file",
             "hf:org//file",
+            "hf:org/repo/file.gguf@", // empty revision after "@"
+            "hf:org/repo/@abc123",    // empty file before "@"
         ] {
             assert_eq!(parse_hf_shorthand(bad), None, "should reject: {bad}");
         }
@@ -354,6 +1264,78 @@ mod tests {
             .expect("resolve");
         assert_eq!(url, "https://example.com/model.gguf");
         assert_eq!(sha, None, "a direct URL has no known checksum endpoint");
+    }
+
+    #[tokio::test]
+    async fn resolve_download_source_uses_the_pinned_revision_in_the_url() {
+        let (url, _sha) =
+            resolve_download_source("hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf@abc123")
+                .await
+                .expect("resolve");
+        assert_eq!(
+            url,
+            "https://huggingface.co/TheBloke/Llama-2-7B-GGUF/resolve/abc123/llama-2-7b.Q4_K_M.gguf"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_download_source_defaults_to_main_without_a_revision() {
+        let (url, _sha) =
+            resolve_download_source("hf:TheBloke/Llama-2-7B-GGUF/llama-2-7b.Q4_K_M.gguf")
+                .await
+                .expect("resolve");
+        assert_eq!(
+            url,
+            "https://huggingface.co/TheBloke/Llama-2-7B-GGUF/resolve/main/llama-2-7b.Q4_K_M.gguf"
+        );
+    }
+
+    #[test]
+    fn check_disk_space_rejects_when_available_is_below_needed_plus_margin() {
+        let err = check_disk_space(
+            Some(1_000_000_000),
+            900_000_000,
+            "model.gguf",
+            Path::new("/models"),
+        )
+        .expect_err("900MB needed + 512MB margin exceeds 1GB available");
+        assert!(err.to_string().contains("Not enough disk space"));
+    }
+
+    #[test]
+    fn check_disk_space_allows_when_comfortably_available() {
+        assert!(check_disk_space(
+            Some(100_000_000_000),
+            1_000_000_000,
+            "model.gguf",
+            Path::new("/models")
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn check_disk_space_skips_when_available_is_unknown() {
+        assert!(check_disk_space(None, u64::MAX, "model.gguf", Path::new("/models")).is_ok());
+    }
+
+    #[test]
+    fn available_space_at_a_real_directory_returns_a_plausible_value_or_none() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        // Best-effort - some sandboxes may not expose disk info at all, so
+        // this only asserts that a `Some` result is a real, non-zero
+        // number, not that a result is always available.
+        if let Some(bytes) = available_space_at(tmp.path()) {
+            assert!(bytes > 0);
+        }
+    }
+
+    #[test]
+    fn available_space_at_walks_up_to_the_nearest_existing_ancestor() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let nonexistent = tmp.path().join("does").join("not").join("exist");
+        // Must not panic or loop forever walking up to `tmp` (which does
+        // exist) instead of the nonexistent leaf.
+        let _ = available_space_at(&nonexistent);
     }
 
     #[tokio::test]
@@ -443,5 +1425,712 @@ mod tests {
         });
 
         format!("http://{addr}")
+    }
+
+    /// Like `mock_http_server`, but honors a `Range: bytes=N-` request
+    /// header by returning `206 Partial Content` with only the requested
+    /// tail of `body` - lets `download_model`'s resume path be tested
+    /// without a real remote server.
+    async fn mock_resumable_http_server(body: Vec<u8>) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind mock server");
+        let addr = listener.local_addr().expect("mock server addr");
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept request");
+
+            let mut request = Vec::new();
+            let mut buf = [0u8; 1024];
+            loop {
+                let n = socket.read(&mut buf).await.expect("read request");
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buf[..n]);
+                if request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    break;
+                }
+            }
+
+            let request_text = String::from_utf8_lossy(&request);
+            let range_start: Option<usize> = request_text
+                .lines()
+                .find(|l| l.to_ascii_lowercase().starts_with("range:"))
+                .and_then(|l| l.split("bytes=").nth(1))
+                .and_then(|s| s.trim().trim_end_matches('-').parse().ok());
+
+            let served: &[u8] = match range_start {
+                Some(start) if start < body.len() => &body[start..],
+                _ => &body[..],
+            };
+
+            let response = match range_start {
+                Some(start) if start < body.len() => format!(
+                    "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\n\
+                     Content-Length: {}\r\nConnection: close\r\n\r\n",
+                    start,
+                    body.len().saturating_sub(1),
+                    body.len(),
+                    served.len()
+                ),
+                _ => format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    served.len()
+                ),
+            };
+            socket
+                .write_all(response.as_bytes())
+                .await
+                .expect("write response headers");
+            socket.write_all(served).await.expect("write response body");
+            socket.shutdown().await.ok();
+        });
+
+        format!("http://{addr}")
+    }
+
+    #[tokio::test]
+    async fn download_model_resumes_from_an_existing_partial_file() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let full_body = b"0123456789ABCDEFGHIJ".to_vec();
+        let already_have = &full_body[..10];
+        tokio::fs::write(tmp.path().join("model.gguf.part"), already_have)
+            .await
+            .expect("seed partial file");
+
+        let server = mock_resumable_http_server(full_body.clone()).await;
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let path = download_model(&format!("{server}/model.gguf"), tmp.path(), None, tx)
+            .await
+            .expect("resumed download should succeed");
+
+        assert_eq!(std::fs::read(&path).expect("read final file"), full_body);
+
+        let mut saw_full_progress = false;
+        while let Ok(p) = rx.try_recv() {
+            assert!(
+                p.bytes_downloaded as usize >= already_have.len(),
+                "progress must reflect true cumulative total, never regress below what was \
+                 already on disk before resuming"
+            );
+            if p.bytes_downloaded as usize == full_body.len() {
+                saw_full_progress = true;
+            }
+        }
+        assert!(saw_full_progress);
+    }
+
+    #[tokio::test]
+    async fn download_model_verifies_checksum_across_a_resumed_download() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let full_body = b"the quick brown fox jumps over the lazy dog, resumed".to_vec();
+        let mut hasher = Sha256::new();
+        hasher.update(&full_body);
+        let expected_sha256 = to_hex(&hasher.finalize());
+
+        let already_have = &full_body[..20];
+        tokio::fs::write(tmp.path().join("model.gguf.part"), already_have)
+            .await
+            .expect("seed partial file");
+
+        let server = mock_resumable_http_server(full_body.clone()).await;
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let path = download_model(
+            &format!("{server}/model.gguf"),
+            tmp.path(),
+            Some(&expected_sha256),
+            tx,
+        )
+        .await
+        .expect("checksum must match across the resumed + already-on-disk bytes");
+
+        assert_eq!(std::fs::read(&path).expect("read final file"), full_body);
+    }
+
+    #[tokio::test]
+    async fn download_model_falls_back_to_a_fresh_start_when_the_server_ignores_range() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let full_body = b"a fresh, non-resumable download".to_vec();
+        // Stale/wrong partial bytes on disk - a server that ignores Range
+        // and returns 200 must discard these, not append to them.
+        tokio::fs::write(tmp.path().join("model.gguf.part"), b"WRONG STALE BYTES")
+            .await
+            .expect("seed stale partial file");
+
+        let server = mock_http_server(full_body.clone()).await; // always 200, ignores Range
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let path = download_model(&format!("{server}/model.gguf"), tmp.path(), None, tx)
+            .await
+            .expect("download should succeed");
+
+        assert_eq!(std::fs::read(&path).expect("read final file"), full_body);
+    }
+
+    // --- M3: multi-source discovery ---
+
+    #[test]
+    fn list_all_local_models_merges_models_dir_and_extra_paths() {
+        let primary = tempfile::tempdir().expect("tempdir");
+        let extra = tempfile::tempdir().expect("tempdir");
+        std::fs::write(primary.path().join("a.gguf"), b"gguf a").expect("write a");
+        std::fs::write(extra.path().join("b.gguf"), b"gguf b").expect("write b");
+
+        let models = list_all_local_models(primary.path(), &[extra.path().to_path_buf()], None)
+            .expect("list");
+
+        let names: Vec<_> = models
+            .iter()
+            .map(|m| m.path.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(models.len(), 2);
+        assert!(names.contains(&"a.gguf".to_string()));
+        assert!(names.contains(&"b.gguf".to_string()));
+    }
+
+    #[test]
+    fn list_all_local_models_with_no_ollama_dir_does_not_scan_ollama() {
+        let primary = tempfile::tempdir().expect("tempdir");
+        std::fs::write(primary.path().join("a.gguf"), b"gguf a").expect("write a");
+
+        let models = list_all_local_models(primary.path(), &[], None).expect("list");
+        assert_eq!(models.len(), 1);
+    }
+
+    // --- M3: Ollama manifest discovery ---
+
+    /// Builds a fake `<root>/manifests/<host>/<namespace>/<model>/<tag>`
+    /// manifest file naming `hex_digest` as its model layer, plus the
+    /// matching `<root>/blobs/sha256-<hex_digest>` blob file with
+    /// `blob_body` as its content.
+    fn write_fake_ollama_model(
+        root: &Path,
+        host: &str,
+        namespace: &str,
+        model: &str,
+        tag: &str,
+        hex_digest: &str,
+        blob_body: &[u8],
+    ) {
+        let manifest_dir = root
+            .join("manifests")
+            .join(host)
+            .join(namespace)
+            .join(model);
+        std::fs::create_dir_all(&manifest_dir).expect("create manifest dir");
+        let manifest_json = format!(
+            r#"{{"schemaVersion":2,"layers":[
+                {{"mediaType":"application/vnd.ollama.image.model","digest":"sha256:{hex_digest}","size":{size}}},
+                {{"mediaType":"application/vnd.ollama.image.template","digest":"sha256:{hex_digest}","size":1}}
+            ]}}"#,
+            size = blob_body.len()
+        );
+        std::fs::write(manifest_dir.join(tag), manifest_json).expect("write manifest");
+
+        let blobs_dir = root.join("blobs");
+        std::fs::create_dir_all(&blobs_dir).expect("create blobs dir");
+        std::fs::write(blobs_dir.join(format!("sha256-{hex_digest}")), blob_body)
+            .expect("write blob");
+    }
+
+    const FAKE_DIGEST_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    #[test]
+    fn list_ollama_models_resolves_library_namespace_display_name() {
+        let root = tempfile::tempdir().expect("tempdir");
+        write_fake_ollama_model(
+            root.path(),
+            "registry.ollama.ai",
+            "library",
+            "qwen2.5-coder",
+            "7b",
+            FAKE_DIGEST_A,
+            b"fake gguf blob content",
+        );
+
+        let models = list_ollama_models(root.path());
+        assert_eq!(models.len(), 1);
+        assert_eq!(
+            models[0].display_name.as_deref(),
+            Some("qwen2.5-coder:7b"),
+            "the default 'library' namespace is omitted, matching Ollama's own display convention"
+        );
+        assert_eq!(models[0].size_bytes, "fake gguf blob content".len() as u64);
+    }
+
+    #[test]
+    fn list_ollama_models_keeps_non_library_namespace_in_display_name() {
+        let root = tempfile::tempdir().expect("tempdir");
+        write_fake_ollama_model(
+            root.path(),
+            "registry.ollama.ai",
+            "myorg",
+            "custom-model",
+            "v1",
+            FAKE_DIGEST_A,
+            b"fake gguf blob content",
+        );
+
+        let models = list_ollama_models(root.path());
+        assert_eq!(models.len(), 1);
+        assert_eq!(
+            models[0].display_name.as_deref(),
+            Some("myorg/custom-model:v1")
+        );
+    }
+
+    #[test]
+    fn list_ollama_models_on_missing_manifests_dir_returns_empty_not_error() {
+        let root = tempfile::tempdir().expect("tempdir");
+        assert!(list_ollama_models(root.path()).is_empty());
+    }
+
+    #[test]
+    fn list_ollama_models_skips_a_manifest_whose_blob_is_missing() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let manifest_dir = root
+            .path()
+            .join("manifests")
+            .join("registry.ollama.ai")
+            .join("library")
+            .join("pruned-model");
+        std::fs::create_dir_all(&manifest_dir).expect("create manifest dir");
+        std::fs::write(
+            manifest_dir.join("latest"),
+            format!(
+                r#"{{"layers":[{{"mediaType":"application/vnd.ollama.image.model","digest":"sha256:{FAKE_DIGEST_A}","size":1}}]}}"#
+            ),
+        )
+        .expect("write manifest");
+        // Deliberately no matching blob file written.
+
+        assert!(list_ollama_models(root.path()).is_empty());
+    }
+
+    #[test]
+    fn list_all_local_models_merges_two_manifest_tags_sharing_one_blob() {
+        let root = tempfile::tempdir().expect("tempdir");
+        write_fake_ollama_model(
+            root.path(),
+            "registry.ollama.ai",
+            "library",
+            "qwen2.5-coder",
+            "7b",
+            FAKE_DIGEST_A,
+            b"shared blob content",
+        );
+        write_fake_ollama_model(
+            root.path(),
+            "registry.ollama.ai",
+            "library",
+            "qwen2.5-coder",
+            "latest",
+            FAKE_DIGEST_A, // same digest as above - the identical blob, two tags
+            b"shared blob content",
+        );
+
+        let empty_dir = tempfile::tempdir().expect("tempdir");
+        let models = list_all_local_models(empty_dir.path(), &[], Some(root.path())).expect("list");
+
+        assert_eq!(
+            models.len(),
+            1,
+            "two tags pointing at the identical blob must collapse to one entry"
+        );
+        let name = models[0].display_name.as_deref().unwrap_or_default();
+        assert!(name.contains("qwen2.5-coder:7b"));
+        assert!(name.contains("qwen2.5-coder:latest"));
+        assert_eq!(
+            models[0].size_bytes,
+            "shared blob content".len() as u64,
+            "size must not be double-counted for the same underlying blob"
+        );
+    }
+
+    // --- M4: symlink dedup ---
+
+    #[cfg(unix)]
+    #[test]
+    fn list_all_local_models_collapses_a_symlink_to_an_already_found_file() {
+        let primary = tempfile::tempdir().expect("tempdir");
+        let extra = tempfile::tempdir().expect("tempdir");
+        let real_path = primary.path().join("real-model.gguf");
+        std::fs::write(&real_path, b"gguf content").expect("write real file");
+        std::os::unix::fs::symlink(&real_path, extra.path().join("real-model.gguf"))
+            .expect("create symlink");
+
+        let models = list_all_local_models(primary.path(), &[extra.path().to_path_buf()], None)
+            .expect("list");
+
+        assert_eq!(
+            models.len(),
+            1,
+            "a symlink to an already-discovered file must not double-count it"
+        );
+        assert_eq!(models[0].size_bytes, "gguf content".len() as u64);
+    }
+
+    // --- M4: split-GGUF filename parsing and grouping ---
+
+    #[test]
+    fn parse_split_gguf_filename_matches_the_convention() {
+        assert_eq!(
+            parse_split_gguf_filename("model-00001-of-00005.gguf"),
+            Some(("model", 1, 5))
+        );
+        assert_eq!(
+            parse_split_gguf_filename("Qwen-235B-00012-of-00030.gguf"),
+            Some(("Qwen-235B", 12, 30))
+        );
+    }
+
+    #[test]
+    fn parse_split_gguf_filename_rejects_mismatched_widths() {
+        // "1" (1 digit) vs "00005" (5 digits) - the convention requires
+        // equal-width zero-padding on both sides.
+        assert_eq!(parse_split_gguf_filename("model-1-of-00005.gguf"), None);
+    }
+
+    #[test]
+    fn parse_split_gguf_filename_rejects_non_split_names_and_out_of_range_parts() {
+        for name in [
+            "model.gguf",
+            "model-Q4_K_M.gguf",
+            "model-of-00005.gguf",       // no part number before "-of-"
+            "model-00000-of-00005.gguf", // part 0 is out of range (1-based)
+            "model-00006-of-00005.gguf", // part exceeds total
+        ] {
+            assert_eq!(
+                parse_split_gguf_filename(name),
+                None,
+                "should reject: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn list_all_local_models_collapses_a_split_gguf_group() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("big-model-00001-of-00003.gguf"),
+            b"part one",
+        )
+        .expect("write part 1");
+        std::fs::write(
+            dir.path().join("big-model-00002-of-00003.gguf"),
+            b"part two!",
+        )
+        .expect("write part 2");
+        std::fs::write(
+            dir.path().join("big-model-00003-of-00003.gguf"),
+            b"part three!!",
+        )
+        .expect("write part 3");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(models.len(), 1, "three parts must collapse to one entry");
+        assert_eq!(models[0].display_name.as_deref(), Some("big-model.gguf"));
+        assert_eq!(
+            models[0].size_bytes,
+            b"part one".len() as u64 + b"part two!".len() as u64 + b"part three!!".len() as u64
+        );
+        assert!(
+            models[0]
+                .path
+                .to_string_lossy()
+                .ends_with("big-model-00001-of-00003.gguf"),
+            "the canonical path should be the lowest-found part"
+        );
+    }
+
+    #[test]
+    fn merge_split_gguf_groups_prefers_the_first_part_with_a_parsed_header_on_a_tie() {
+        // Realistic per M11's own review: llama.cpp's `gguf-split` tool
+        // duplicates the full metadata KV section into every output shard,
+        // not just the first - so more than one part can have
+        // `architecture.is_some()`. The lowest-index part must still win.
+        let dir = PathBuf::from("/models");
+        let mut part1 = fixture_model("big-model-00001-of-00002", None);
+        part1.path = dir.join("big-model-00001-of-00002.gguf");
+        part1.architecture = Some("part1-arch".to_string());
+        let mut part2 = fixture_model("big-model-00002-of-00002", None);
+        part2.path = dir.join("big-model-00002-of-00002.gguf");
+        part2.architecture = Some("part2-arch".to_string());
+
+        let merged = merge_split_gguf_groups(vec![part1, part2]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            merged[0].architecture.as_deref(),
+            Some("part1-arch"),
+            "the lowest-index part with a parsed header must win the tie, not the last"
+        );
+    }
+
+    #[test]
+    fn merge_split_gguf_groups_falls_back_to_part_one_when_no_part_has_a_header() {
+        let dir = PathBuf::from("/models");
+        let mut part1 = fixture_model("big-model-00001-of-00002", None);
+        part1.path = dir.join("big-model-00001-of-00002.gguf");
+        let mut part2 = fixture_model("big-model-00002-of-00002", None);
+        part2.path = dir.join("big-model-00002-of-00002.gguf");
+
+        let merged = merge_split_gguf_groups(vec![part1, part2]);
+
+        assert_eq!(merged.len(), 1);
+        assert!(merged[0]
+            .path
+            .to_string_lossy()
+            .ends_with("big-model-00001-of-00002.gguf"));
+    }
+
+    #[test]
+    fn list_all_local_models_handles_a_partial_split_group_honestly() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        // Only part 2 of 3 is present - e.g. an interrupted multi-part
+        // download.
+        std::fs::write(
+            dir.path().join("big-model-00002-of-00003.gguf"),
+            b"part two!",
+        )
+        .expect("write part 2");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].size_bytes, b"part two!".len() as u64);
+        assert!(
+            models[0]
+                .path
+                .to_string_lossy()
+                .ends_with("big-model-00002-of-00003.gguf"),
+            "with only one part found, it is its own canonical path"
+        );
+    }
+
+    // --- M5: mmproj pairing ---
+
+    #[test]
+    fn mmproj_core_name_reduces_a_base_model_and_its_projector_identically() {
+        assert_eq!(
+            mmproj_core_name("Qwen2-VL-7B-Q4_K_M.gguf"),
+            mmproj_core_name("mmproj-Qwen2-VL-7B-f16.gguf"),
+        );
+        assert_eq!(mmproj_core_name("Qwen2-VL-7B-Q4_K_M.gguf"), "qwen2-vl-7b");
+    }
+
+    #[test]
+    fn list_all_local_models_pairs_a_base_model_with_its_mmproj_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("Qwen2-VL-7B-Q4_K_M.gguf"),
+            b"base model bytes",
+        )
+        .expect("write base");
+        std::fs::write(
+            dir.path().join("mmproj-Qwen2-VL-7B-f16.gguf"),
+            b"projector bytes",
+        )
+        .expect("write projector");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(
+            models.len(),
+            1,
+            "a paired projector's own entry must be removed from the listing"
+        );
+        assert!(models[0]
+            .path
+            .to_string_lossy()
+            .ends_with("Qwen2-VL-7B-Q4_K_M.gguf"));
+        assert!(models[0]
+            .mmproj_path
+            .as_ref()
+            .is_some_and(|p| p.to_string_lossy().ends_with("mmproj-Qwen2-VL-7B-f16.gguf")));
+    }
+
+    #[test]
+    fn list_all_local_models_leaves_an_unmatched_mmproj_file_standing_alone() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("mmproj-SomeVisionModel-f16.gguf"),
+            b"projector bytes",
+        )
+        .expect("write projector");
+        std::fs::write(dir.path().join("unrelated-model.gguf"), b"unrelated")
+            .expect("write unrelated");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(models.len(), 2, "no confident match - nothing gets hidden");
+        let projector = models
+            .iter()
+            .find(|m| m.path.to_string_lossy().contains("mmproj"))
+            .expect("projector entry must still be present");
+        assert!(projector.is_mmproj);
+        assert!(projector.mmproj_path.is_none());
+    }
+
+    #[test]
+    fn list_all_local_models_does_not_pair_when_two_candidates_are_ambiguous() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("Model-A-Q4_K_M.gguf"), b"a").expect("write a");
+        std::fs::write(dir.path().join("Model-A-Q8_0.gguf"), b"a2").expect("write a2");
+        std::fs::write(dir.path().join("mmproj-Model-A-f16.gguf"), b"proj").expect("write proj");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+
+        assert_eq!(
+            models.len(),
+            3,
+            "two equally-good candidates must not be guessed between"
+        );
+        assert!(models.iter().all(|m| m.mmproj_path.is_none()));
+    }
+
+    #[test]
+    fn list_all_local_models_does_not_pair_across_directories() {
+        let primary = tempfile::tempdir().expect("tempdir");
+        let extra = tempfile::tempdir().expect("tempdir");
+        std::fs::write(primary.path().join("Model-A-Q4_K_M.gguf"), b"a").expect("write a");
+        std::fs::write(extra.path().join("mmproj-Model-A-f16.gguf"), b"proj").expect("write proj");
+
+        let models = list_all_local_models(primary.path(), &[extra.path().to_path_buf()], None)
+            .expect("list");
+
+        assert_eq!(models.len(), 2, "pairing must never cross directories");
+        assert!(models.iter().all(|m| m.mmproj_path.is_none()));
+    }
+
+    #[test]
+    fn list_all_local_models_does_not_group_unrelated_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("model-a.gguf"), b"a").expect("write a");
+        std::fs::write(dir.path().join("model-b.gguf"), b"b").expect("write b");
+
+        let models = list_all_local_models(dir.path(), &[], None).expect("list");
+        assert_eq!(
+            models.len(),
+            2,
+            "ordinary unrelated files must stay separate"
+        );
+    }
+
+    // -- Phase M12: hardware_fit / sort_by_fit / best_fitting_model --------
+
+    /// A minimal `LocalGgufModel` fixture for the pure fit-comparison
+    /// functions below, which only ever look at `estimated_memory_bytes` -
+    /// every other field is filler, unlike this file's other tests (which
+    /// exercise real `.gguf` byte fixtures through `list_local_models`
+    /// end-to-end).
+    fn fixture_model(name: &str, estimated_memory_bytes: Option<u64>) -> LocalGgufModel {
+        LocalGgufModel {
+            path: PathBuf::from(format!("/models/{name}.gguf")),
+            size_bytes: 0,
+            modified_at: String::new(),
+            quantization_hint: None,
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
+            display_name: Some(name.to_string()),
+            estimated_memory_bytes,
+            estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: estimated_memory_bytes.map(|_| 8_192),
+            is_mmproj: false,
+            mmproj_path: None,
+        }
+    }
+
+    #[test]
+    fn hardware_fit_reports_fits_comfortably_under_budget() {
+        assert_eq!(hardware_fit(Some(5_000), Some(10_000)), HardwareFit::Fits);
+    }
+
+    #[test]
+    fn hardware_fit_reports_tight_near_the_threshold() {
+        // 9_000 / 10_000 = 0.90 > TIGHT_THRESHOLD_RATIO (0.85).
+        assert_eq!(hardware_fit(Some(9_000), Some(10_000)), HardwareFit::Tight);
+    }
+
+    #[test]
+    fn hardware_fit_reports_wont_fit_over_budget() {
+        assert_eq!(
+            hardware_fit(Some(11_000), Some(10_000)),
+            HardwareFit::WontFit
+        );
+    }
+
+    #[test]
+    fn hardware_fit_is_unknown_when_estimate_is_missing() {
+        assert_eq!(hardware_fit(None, Some(10_000)), HardwareFit::Unknown);
+    }
+
+    #[test]
+    fn hardware_fit_is_unknown_when_budget_is_missing() {
+        assert_eq!(hardware_fit(Some(5_000), None), HardwareFit::Unknown);
+    }
+
+    #[test]
+    fn sort_by_fit_orders_fits_before_tight_before_wont_fit_before_unknown() {
+        let mut models = vec![
+            fixture_model("wont-fit", Some(20_000)),
+            fixture_model("unknown", None),
+            fixture_model("fits", Some(1_000)),
+            fixture_model("tight", Some(9_000)),
+        ];
+        sort_by_fit(&mut models, Some(10_000));
+        let names: Vec<&str> = models
+            .iter()
+            .map(|m| m.display_name.as_deref().unwrap())
+            .collect();
+        assert_eq!(names, ["fits", "tight", "wont-fit", "unknown"]);
+    }
+
+    #[test]
+    fn sort_by_fit_orders_largest_first_within_a_category() {
+        let mut models = vec![
+            fixture_model("small-fit", Some(1_000)),
+            fixture_model("big-fit", Some(5_000)),
+        ];
+        sort_by_fit(&mut models, Some(10_000));
+        let names: Vec<&str> = models
+            .iter()
+            .map(|m| m.display_name.as_deref().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            ["big-fit", "small-fit"],
+            "largest still-fitting model should sort first"
+        );
+    }
+
+    #[test]
+    fn best_fitting_model_picks_the_largest_that_fits_or_is_tight() {
+        let models = vec![
+            fixture_model("too-big", Some(20_000)),
+            fixture_model("small", Some(1_000)),
+            fixture_model("tight-but-biggest-that-fits", Some(9_000)),
+        ];
+        let best = best_fitting_model(&models, Some(10_000)).expect("expected a best fit");
+        assert_eq!(
+            best.display_name.as_deref(),
+            Some("tight-but-biggest-that-fits")
+        );
+    }
+
+    #[test]
+    fn best_fitting_model_is_none_when_nothing_fits() {
+        let models = vec![fixture_model("too-big", Some(20_000))];
+        assert!(best_fitting_model(&models, Some(10_000)).is_none());
+    }
+
+    #[test]
+    fn best_fitting_model_is_none_for_an_empty_list() {
+        assert!(best_fitting_model(&[], Some(10_000)).is_none());
     }
 }

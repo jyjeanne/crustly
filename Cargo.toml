@@ -68,8 +68,22 @@ schemars = { version = "1.2", optional = true, features = ["preserve_order"] }
 # enabled. See llama-cpp-2-integration-plan.md.
 llama-cpp-2 = { version = "0.1.153", optional = true, default-features = false }
 # Checksum verification for downloaded .gguf files (llama_cpp_models.rs) -
-# see llama-cpp-2-integration-plan.md §4.11/§8.
+# see llama-cpp-2-integration-plan.md §4.11/§8 and, for why this is gated on
+# `gguf-management` rather than `llama-cpp`, ccguf-managment-imrpoment-plan.md
+# Phase M0.
 sha2 = { version = "0.11", optional = true }
+# Cross-platform free-disk-space query for the download precheck
+# (llama_cpp_models.rs, Phase M6) - no stable stdlib API exists for this.
+# Only the `Disks`/`Disk` API is used (`Disks::new_with_refreshed_list()`,
+# `.mount_point()`, `.available_space()`), so default features are dropped
+# to skip process/network/component enumeration this crate doesn't need.
+# "system" added for Phase M11 (hardware_detect.rs) - `System::total_memory()`
+# for the CPU-only/Apple-unified-memory RAM reading is gated behind it (confirmed
+# by reading the vendored crate's Cargo.toml, not assumed).
+sysinfo = { version = "0.33", optional = true, default-features = false, features = [
+    "disk",
+    "system",
+] }
 # Grammar-constrained decoding for tool calls (Phase 4b, `llama-cpp-llguidance`
 # feature only) - builds the JSON-Schema-union grammar and the constrained
 # sampler in src/llm/provider/llama_cpp_grammar.rs. Neither is re-exported
@@ -151,17 +165,46 @@ tokio-test = "0.4"
 # Profiling (Unix-only - not supported on Windows)
 pprof = { version = "0.15", features = ["flamegraph", "frame-pointer"], optional = true }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# Win32 DXGI adapter enumeration for AMD/Intel GPU detection on Windows
+# (src/llm/provider/hardware_detect.rs, Phase M11) - a native API call, not
+# a subprocess, since no vendor CLI tool is a reliable cross-vendor default
+# on Windows the way nvidia-smi/rocm-smi/system_profiler are on their
+# platforms. `optional = true` + gated via `gguf-management`'s `dep:windows`
+# below (same wiring as `sha2`/`sysinfo`) so a Windows build with zero
+# Cargo features doesn't pay this compile cost either - target-specific
+# dependency tables and Cargo features compose independently, so this has
+# no effect at all on non-Windows targets regardless of which features are
+# enabled.
+windows = { version = "0.58", optional = true, features = [
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Foundation",
+] }
+
 [features]
-default = []
+default = ["gguf-management"]
 # Profiling feature enables pprof on Unix only (no-op on Windows)
 profiling = []
 openai = ["async-openai"]
 aws-bedrock = ["aws-sdk-bedrockruntime"]
 ollama = ["dep:ollama-rs", "dep:schemars"]
-# Deliberately NOT part of `all-llm`: unlike every other provider feature,
-# this one compiles native C++ (cmake + a C/C++ toolchain required) - see
-# llama-cpp-2-integration-plan.md §3/§3.4/§4.2.
-llama-cpp = ["dep:llama-cpp-2", "dep:sha2"]
+# Local `.gguf` file management (list/pull/rm - directory scan + plain HTTP)
+# plus hardware detection - see ccguf-managment-imrpoment-plan.md Phases M0
+# and M11. Unlike `llama-cpp` below, this carries no C/C++ toolchain cost on
+# any platform (`sha2`/`sysinfo` are small pure-Rust deps; `windows` is
+# Microsoft's own metadata-only FFI bindings crate, Windows-only per the
+# target table above, no C compiler needed to build it), so it's part of
+# `default` and `all-llm`: managing `.gguf` files shouldn't require building
+# the in-process inference engine just to list what's on disk.
+gguf-management = ["dep:sha2", "dep:sysinfo", "dep:windows"]
+# Deliberately NOT part of `all-llm`/`default`: unlike every other provider
+# feature (and unlike `gguf-management` above), this one compiles native
+# C++ (cmake + a C/C++ toolchain required) - see
+# llama-cpp-2-integration-plan.md §3/§3.4/§4.2. Depends on `gguf-management`
+# so `--features llama-cpp` still gets `crustly llama-cpp list/pull/rm`
+# exactly as before this feature was split out.
+llama-cpp = ["dep:llama-cpp-2", "gguf-management"]
 # GPU backends (llama-cpp-2-integration-plan.md §4.1/Phase 8), each layered
 # on top of `llama-cpp` and requiring its own SDK/toolkit at build time -
 # see §4.2. Opt-in individually; none are implied by `llama-cpp` alone
@@ -177,7 +220,7 @@ llama-cpp-mkl = ["llama-cpp", "llama-cpp-2/mkl"]
 # (§4.7), not a replacement for it. Not wired into the default generation
 # path yet - see src/llm/provider/llama_cpp_grammar.rs's module doc.
 llama-cpp-llguidance = ["llama-cpp", "llama-cpp-2/llguidance", "dep:llguidance", "dep:toktrie"]
-all-llm = ["openai", "aws-bedrock", "ollama"]
+all-llm = ["openai", "aws-bedrock", "ollama", "gguf-management"]
 
 [profile.dev]
 opt-level = 0

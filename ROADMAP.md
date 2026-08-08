@@ -3,7 +3,7 @@
 **Current Version:** 0.5.2 — July 2026
 **Author:** Jeremy JEANNE
 
-**Related strategy docs:** [`differentiation-strategy-vs-opencode.md`](./differentiation-strategy-vs-opencode.md) (competitive positioning — depth over breadth), [`docs/guides/SECURITY_MODEL.md`](./docs/guides/SECURITY_MODEL.md) (permission engine, compared to OpenCode's), [`llm-file-gguf-support.md`](./llm-file-gguf-support.md) (direct GGUF loading evaluation, conditional Go/No-Go)
+**Related strategy docs:** [`differentiation-strategy-vs-opencode.md`](./differentiation-strategy-vs-opencode.md) (competitive positioning — depth over breadth), [`docs/guides/SECURITY_MODEL.md`](./docs/guides/SECURITY_MODEL.md) (permission engine, compared to OpenCode's), [`llm-file-gguf-support.md`](./llm-file-gguf-support.md) (direct GGUF loading evaluation, conditional Go/No-Go), [`ccguf-managment-imrpoment-plan.md`](./ccguf-managment-imrpoment-plan.md) (GGUF model-management improvement plan, informed by a `llamastash` feature analysis — full design/rationale for the v0.5.3 milestone below)
 
 ---
 
@@ -101,6 +101,102 @@ whoever has a model and terminal to try it against.
 
 ## Upcoming Milestones
 
+### v0.5.3 — GGUF Model Management
+**Target:** Q3 2026
+
+**Full design/rationale:** [`ccguf-managment-imrpoment-plan.md`](./ccguf-managment-imrpoment-plan.md)
+— informed by a feature analysis of [`llamastash`](https://github.com/llamastash/llamastash),
+scoped to what's portable without adopting its daemon/launcher/proxy architecture (Crustly
+already runs inference in-process, see the "Unreleased" entry above). Follows the same
+point-release pattern as v0.4.2 (Native Ollama Integration) and v0.5.2 (Local-Model
+Reliability): focused follow-up hardening on a subsystem that just shipped, ahead of v0.6's
+unrelated stability/DX work. Items below are ordered by the plan's own priority (§4 gap
+analysis), not by phase number — highest-value/most-blocking first. Six execution milestones
+(DP1–DP6, ~29 dev-days total) map onto the groupings below; see the plan's §8 for file-level
+tasks and acceptance criteria per item.
+
+**Foundation — unblocks everything else below (DP1):**
+- [x] **Decouple GGUF file management from the `llama-cpp` build feature** — `list`/`pull`/`rm`
+  no longer require the cmake/C++ toolchain; new `gguf-management` feature carries just the
+  management code (plus `sha2`), joins both `default` and `all-llm`, and `llama-cpp` depends
+  on it so nothing regressed. Also decoupled the TUI Ctrl+G dialog's list/download/delete and
+  the Model Info panel's quantization hint, which the source plan hadn't originally scoped in
+  but turned out to need the same fix. Verified: zero `llama-cpp-2`/`-sys-2` in the dependency
+  tree under `--features gguf-management`; 834/834 tests pass there, 851/851 under
+  `--features llama-cpp`, 883/883 under `all-llm` — no regressions
+- [x] **Pure-Rust GGUF header metadata parser** (`src/llm/provider/gguf_metadata.rs`, zero new
+  dependencies) — real architecture/parameter-count/quantization (layered: precise
+  `general.file_type` → coarser tensor-type mode → filename guess as last resort)/context-length/
+  chat-template-presence, wired into `LocalGgufModel` and its TUI mirror. Hardened: every declared
+  string/array length validated against a cap before any allocation, a 256 MiB cumulative budget
+  backstops the per-value caps, any structural problem returns `None` for the whole file rather
+  than a panic or partial/corrupt result. 13 new tests, 847/847 total under `gguf-management`
+
+**Core management (DP2–DP4):**
+- [x] **Memory/VRAM footprint estimate** (`gguf_metadata::estimate_memory_bytes`) — weights + KV-cache
+  term when the header has enough attention geometry, weights-only (explicitly labeled) otherwise;
+  shown in `crustly llama-cpp list` as `"~4.9 GB"`/`"~4.9 GB (weights only)"`, advisory only
+- [x] **Multi-source discovery** — `providers.llama_cpp.extra_model_paths` (extra scanned
+  directories) and `scan_ollama_models` (reads Ollama's manifest tree —
+  `<dir>/manifests/{host}/{namespace}/{model}/{tag}` — verified against Ollama's own source rather
+  than assumed, resolving each manifest's model-weights layer to its blob and a real `name:tag`
+  display name, not a raw blob-store scan). HuggingFace/LM Studio well-known-cache auto-scan
+  explicitly deferred (both need a properly bounded recursive walker a flat scan can't provide —
+  see `ccguf-managment-imrpoment-plan.md` M3's scope note)
+- [x] **Deduplication** — canonical-path collapsing (symlinks, and two Ollama manifest tags sharing
+  one blob — names combine rather than one being dropped) and split-GGUF
+  (`-00001-of-00005.gguf`) unification with summed size, handling a partial/incomplete group
+  honestly
+- [x] **`mmproj` pairing** — vision/audio projector files (detected via the header's
+  `clip.has_vision_encoder`/`clip.has_audio_encoder`, verified against llama.cpp's own source;
+  filename fallback only when the header can't be read) shown attached to their base model
+  (`"model.gguf (+ mmproj)"`) via a conservative exact-core-name match within one directory —
+  ambiguous or cross-directory candidates are left standalone (`"[mmproj]"`) rather than guessed
+- [x] **Download hardening** — disk-space precheck (new `sysinfo` dependency — the one new Cargo
+  dependency across M0–M6, no stable stdlib API exists for free-space queries), `@revision`
+  pinning on the `hf:org/repo/file.gguf@revision` shorthand, and `Range`-header resume (checksum
+  verification correctly covers the whole file across a resume, not just the newly-streamed part)
+- [x] **Agent-facing `--json` CLI contract** — `crustly llama-cpp list --json` (versioned
+  `schema_version`, dedicated DTO decoupled from the internal `LocalGgufModel`) and documented exit
+  codes (10 no such file, 11 disk space, 12 checksum, 13 network, 14 feature not compiled in) on
+  `list`/`pull`/`rm`, scoped to `llama-cpp` subcommands only — reuses Crustly's own existing error
+  *messages* as the taxonomy rather than inventing new numeric meanings
+- [x] **TUI enhancements** — Ctrl+G dialog shows `display_name`/architecture/parameter-count/native
+  context/memory-estimate/mmproj pairing (previously showed the raw filename even for
+  Ollama-sourced/merged entries — fixed as part of this pass); Ctrl+O panel adds native
+  context-length and chat-template-present rows (its quantization row already used the
+  header-parsed value as of M1)
+
+**Hardware-aware local model selection (DP6 — new since the plan's Update 3):**
+- [x] **Hardware detection & display** — best-effort GPU vendor/VRAM + system RAM probe
+  (`nvidia-smi`/`rocm-smi`/`system_profiler`/`vulkaninfo`, subprocess-based, no SDK linkage;
+  each spawn/parse split so the parse half is unit-tested against captured sample output),
+  surfaced in `doctor` and a new host-info row on the Ctrl+G dialog (fetched once per TUI
+  session, cached process-wide in a `OnceLock`); display/advisory only, never auto-mutates
+  `providers.llama_cpp` config, including a real Windows AMD/Intel GPU probe via the Win32
+  DXGI API (`windows` crate, Windows-only target dependency) — cross-compile verified
+  (`cargo check`/`build --target x86_64-pc-windows-gnu`, producing a real linked PE32+
+  binary) since no Windows machine is available in this development environment to run it
+  against actual hardware/drivers; degrades cleanly to CPU-only if that's ever wrong. Its two
+  pure logic pieces (PCI vendor ID → vendor, UTF-16 description trimming) are unit-tested on
+  Linux directly. NVIDIA-on-Windows goes through the ordinary `nvidia-smi` subprocess path
+- [x] **Local hardware-fit filtering** — `Fits`/`Tight`/`Won't fit` labels (plus the context
+  length the estimate used, shown alongside) and a `crustly llama-cpp list --best-fit` sort
+  over models already on disk, using the memory estimate above against detected hardware;
+  same labels shown as a per-row tag in the Ctrl+G dialog. `doctor` gained a finding naming
+  the largest already-downloaded model the detected hardware can hold. Explicitly not a
+  HuggingFace catalog search
+
+**Diagnostics (DP5, lowest priority — cheap once the above exists):**
+- [x] **`crustly llama-cpp doctor`** — structured diagnostics (build feature/GPU backend, `models_dir`
+  existence/writability, disk space, `extra_model_paths`/`scan_ollama_models` sanity, and now
+  the detected-hardware + largest-fitting-model lines from the two items above), always exits
+  0 regardless of findings
+
+**Deferred — tracked in Backlog below, not this milestone:** catalog-based, benchmark-ranked
+`recommend` for models not yet downloaded (needs an external CI-maintained benchmark dataset;
+disproportionate maintenance burden for now — see the plan's §3 item 5 and Phase M10).
+
 ### v0.6 — Stability & Developer Experience
 **Target:** Q4 2026
 
@@ -196,6 +292,9 @@ are done; the rest are tracked here as they get picked up:
 | Telemetry (opt-in) | Anonymous usage stats; cost analytics charts in TUI |
 | Azure OpenAI provider | Azure-specific auth and endpoint routing |
 | `crustly run` pipelines | Chain multiple prompts with conditional logic in a YAML file |
+| Catalog-based, benchmark-ranked GGUF recommend | Rank models *not yet downloaded* against a benchmark dataset (llamastash's `recommend`, minus the VRAM-fit-only subset already covered by v0.5.3's hardware-aware local selection). Needs an external, CI-refreshed benchmark pipeline — deferred until a concrete need shows up; see `ccguf-managment-imrpoment-plan.md` Phase M10 |
+| Fix `crustly ollama rm`'s arg-parsing bug | `OllamaCommands::Rm`'s positional field is named `model`, identical to the top-level `global = true` `--model` flag's ident — clap silently routes the value into the wrong field (confirmed against the real binary while fixing the identical bug in `LlamaCppCommands::Rm` during v0.5.3 M7, which renamed its own field to `name`). Same one-line fix, deliberately left untouched here since it's Ollama's CLI, not `llama-cpp`'s — outside that phase's scope |
+| Runtime-verify Windows AMD/Intel GPU detection (DXGI) on real hardware | `hardware_detect::detect_windows_dxgi` (v0.5.3 M11) is implemented against the real Win32 DXGI API and cross-compile verified (`cargo check`/`build --target x86_64-pc-windows-gnu`, produces a real linked Windows binary), but has never run against actual Windows hardware/drivers — this project's development environment has no Windows machine. If it misbehaves on a real machine (wrong adapter picked, vendor ID mismatch, description string garbled), that's the first thing to check; the two pure logic pieces are unit-tested but the live `CreateDXGIFactory1`/`EnumAdapters1`/`GetDesc1` call chain itself isn't |
 
 ---
 

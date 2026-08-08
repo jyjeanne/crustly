@@ -21,11 +21,15 @@ pub mod anthropic;
 pub mod azure;
 pub mod factory;
 pub mod gemini;
+#[cfg(feature = "gguf-management")]
+pub mod gguf_metadata;
+#[cfg(feature = "gguf-management")]
+pub mod hardware_detect;
 #[cfg(feature = "llama-cpp")]
 pub mod llama_cpp;
 #[cfg(feature = "llama-cpp-llguidance")]
 pub mod llama_cpp_grammar;
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 pub mod llama_cpp_models;
 #[cfg(feature = "ollama")]
 pub mod ollama;

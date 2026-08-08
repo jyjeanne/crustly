@@ -268,19 +268,247 @@ pub enum OllamaCommands {
 
 #[derive(Subcommand, Debug)]
 pub enum LlamaCppCommands {
-    /// List .gguf files in the configured models directory
-    List,
-    /// Download a model: a direct URL, or an `hf:org/repo/file.gguf`
+    /// List .gguf files in the configured models directory, plus any
+    /// extra_model_paths/scan_ollama_models sources
+    ///
+    /// Exit codes: 0 success, 1 unrecognized error. `--json` output is a
+    /// stable, versioned schema (`schema_version` field) suitable for
+    /// scripting - see docs/guides/LLAMA_CPP_GUIDE.md.
+    List {
+        /// Print a stable, versioned JSON schema instead of a human-readable
+        /// table - no emoji header, just the JSON, for scripting/agents.
+        #[arg(long)]
+        json: bool,
+        /// Sort by fit against this machine's detected GPU VRAM/system RAM
+        /// (best-effort, best-effort-cached per invocation) instead of by
+        /// path, and annotate each entry Fits/Tight/Won't fit. Composable
+        /// with --json (adds `fit`/`estimated_memory_context_length`
+        /// fields). Never used for anything but already-downloaded models -
+        /// this does not search Hugging Face for new ones.
+        #[arg(long)]
+        best_fit: bool,
+    },
+    /// Download a model: a direct URL, or an `hf:org/repo/file.gguf[@revision]`
     /// shorthand resolved against Hugging Face
+    ///
+    /// Exit codes: 0 success, 11 not enough disk space, 12 checksum mismatch,
+    /// 13 network/download failure, 14 build missing the 'gguf-management'
+    /// feature, 1 any other error.
     Pull {
-        /// Direct URL or `hf:org/repo/file.gguf` shorthand
+        /// Direct URL or `hf:org/repo/file.gguf[@revision]` shorthand
         source: String,
     },
     /// Delete a local .gguf file by name or path
+    ///
+    /// Exit codes: 0 success, 10 no such file, 14 build missing the
+    /// 'gguf-management' feature, 1 any other error.
     Rm {
-        /// Filename (resolved inside the models directory) or full path
-        model: String,
+        /// Filename (resolved inside the models directory) or full path.
+        /// Named `name`, not `model` - a positional field sharing an ident
+        /// with the top-level `global = true` `--model` flag causes clap
+        /// to route the value into the wrong one (confirmed independently
+        /// of this plan's own changes - `ollama rm` has the identical
+        /// pre-existing bug via the same collision, left unfixed here as
+        /// out of this phase's scope, flagged separately).
+        name: String,
     },
+    /// Diagnose local .gguf model management setup: build features,
+    /// models directory, disk space, configured extra sources
+    ///
+    /// Always exits 0 - this reports findings as text, it never fails
+    /// the way `list`/`pull`/`rm` can.
+    Doctor,
+}
+
+/// `crustly llama-cpp list --json`'s schema version. Bump only on a
+/// breaking change to `LlamaCppModelJson`'s field set/types - additive
+/// fields don't need a bump, per the usual "additive is non-breaking"
+/// convention for a versioned JSON contract.
+#[cfg(feature = "gguf-management")]
+const LLAMA_CPP_LIST_JSON_SCHEMA_VERSION: u32 = 1;
+
+/// Stable, versioned wire format for `crustly llama-cpp list --json` -
+/// deliberately a separate type from `LocalGgufModel`
+/// (`src/llm/provider/llama_cpp_models.rs`), not `#[derive(Serialize)]` on
+/// it directly, so the internal struct can keep evolving without silently
+/// breaking this contract. snake_case field names, no `rename_all` needed -
+/// matches the dominant convention for Crustly's own domain types (e.g.
+/// `src/config/mod.rs`); camelCase in this codebase is reserved for structs
+/// mirroring an external API, which this isn't. Gated on `gguf-management`
+/// since it references `LocalGgufModel`, which is itself gated - the not-
+/// compiled-in build of `cmd_llama_cpp` never needs this type at all.
+#[cfg(feature = "gguf-management")]
+#[derive(Debug, Clone, serde::Serialize)]
+struct LlamaCppModelJson {
+    path: std::path::PathBuf,
+    display_name: Option<String>,
+    size_bytes: u64,
+    modified_at: String,
+    architecture: Option<String>,
+    parameter_count: Option<u64>,
+    quantization: Option<String>,
+    context_length: Option<u64>,
+    has_chat_template: bool,
+    estimated_memory_bytes: Option<u64>,
+    estimated_memory_includes_kv_cache: bool,
+    /// The context length `estimated_memory_bytes` was actually computed
+    /// at - see `LocalGgufModel::estimated_memory_context_length`.
+    estimated_memory_context_length: Option<u64>,
+    is_mmproj: bool,
+    mmproj_path: Option<std::path::PathBuf>,
+    /// Fit against this machine's detected hardware ("Fits"/"Tight"/"Won't
+    /// fit"/"unknown") - Phase M12. Only set (present in the serialized
+    /// JSON) when `--best-fit` was passed; omitted entirely on a plain
+    /// `list --json`, matching that flag's opt-in, detection-costs-a-
+    /// subprocess-spawn framing (`hardware_detect`'s own module doc).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fit: Option<String>,
+}
+
+#[cfg(feature = "gguf-management")]
+impl From<&crate::llm::provider::llama_cpp_models::LocalGgufModel> for LlamaCppModelJson {
+    fn from(m: &crate::llm::provider::llama_cpp_models::LocalGgufModel) -> Self {
+        // Destructured with every field named and no `..` rest pattern -
+        // deliberately, as a poor man's exhaustiveness check: a field added
+        // to `LocalGgufModel` fails to compile right here instead of
+        // silently never reaching the `--json` output. See
+        // `llama_cpp_download.rs`'s `list_local` for the identical
+        // safeguard on the TUI's own mirror of this same struct.
+        let crate::llm::provider::llama_cpp_models::LocalGgufModel {
+            path,
+            size_bytes,
+            modified_at,
+            quantization_hint,
+            architecture,
+            parameter_count,
+            context_length,
+            has_chat_template,
+            display_name,
+            estimated_memory_bytes,
+            estimated_memory_includes_kv_cache,
+            estimated_memory_context_length,
+            is_mmproj,
+            mmproj_path,
+        } = m;
+        Self {
+            path: path.clone(),
+            display_name: display_name.clone(),
+            size_bytes: *size_bytes,
+            modified_at: modified_at.clone(),
+            architecture: architecture.clone(),
+            parameter_count: *parameter_count,
+            quantization: quantization_hint.clone(),
+            context_length: *context_length,
+            has_chat_template: *has_chat_template,
+            estimated_memory_bytes: *estimated_memory_bytes,
+            estimated_memory_includes_kv_cache: *estimated_memory_includes_kv_cache,
+            estimated_memory_context_length: *estimated_memory_context_length,
+            is_mmproj: *is_mmproj,
+            mmproj_path: mmproj_path.clone(),
+            fit: None,
+        }
+    }
+}
+
+#[cfg(feature = "gguf-management")]
+#[derive(Debug, Clone, serde::Serialize)]
+struct LlamaCppListJson {
+    schema_version: u32,
+    models: Vec<LlamaCppModelJson>,
+}
+
+/// Human/JSON display label for a `HardwareFit` value - Phase M12. A
+/// standalone function (not a `Display` impl on `HardwareFit` itself,
+/// which lives in `llama_cpp_models.rs` and has no reason to know about
+/// this CLI's specific wording) so `--best-fit`'s human table and its
+/// `--json` `fit` field use one identical wording, not two that could
+/// drift apart.
+#[cfg(feature = "gguf-management")]
+fn hardware_fit_label(fit: crate::llm::provider::llama_cpp_models::HardwareFit) -> &'static str {
+    use crate::llm::provider::llama_cpp_models::HardwareFit;
+    match fit {
+        HardwareFit::Fits => "Fits",
+        HardwareFit::Tight => "Tight",
+        HardwareFit::WontFit => "Won't fit",
+        HardwareFit::Unknown => "unknown",
+    }
+}
+
+/// Error-message prefixes this file's own `bail!` sites produce, that
+/// `llama_cpp_exit_code` below matches against - declared once and
+/// referenced at both the producing and matching sites for the same
+/// single-source-of-truth reason as `llama_cpp_models`'s
+/// `DISK_SPACE_ERROR_PREFIX`/etc. (see that module's doc comment on those
+/// constants). `FEATURE_NOT_COMPILED_ERROR_PREFIX` is shared by every
+/// provider's "not compiled in" `bail!` (`cmd_ollama`'s included), not just
+/// `llama-cpp`'s - only the latter is reachable through this exit-code
+/// mapping today, but the wording itself is meant to stay identical across
+/// providers.
+const NO_SUCH_FILE_ERROR_PREFIX: &str = "No such file:";
+const FEATURE_NOT_COMPILED_ERROR_PREFIX: &str = "This build of crustly was compiled without";
+
+/// `llama_cpp_exit_code` below is deliberately *not* `#[cfg(feature =
+/// "gguf-management")]`-gated itself - it still has to run (and correctly
+/// return 14) against `cmd_llama_cpp`'s `not(gguf-management)` stub error.
+/// That means its body must compile either way, but
+/// `llama_cpp_models::{DISK_SPACE_ERROR_PREFIX, ...}` only exist when the
+/// module they live in is compiled in (`provider/mod.rs` gates the whole
+/// `mod llama_cpp_models;` declaration on this same feature) - so the
+/// import is gated, with a same-named, same-valued local fallback for the
+/// off build below. That fallback never actually matches anything real:
+/// codes 11-13 can only be produced by `download_model`, which doesn't
+/// exist without this feature either.
+#[cfg(feature = "gguf-management")]
+use crate::llm::provider::llama_cpp_models::{
+    CHECKSUM_MISMATCH_ERROR_PREFIX, DISK_SPACE_ERROR_PREFIX, DOWNLOAD_FAILED_ERROR_PREFIX,
+    DOWNLOAD_START_ERROR_PREFIX,
+};
+#[cfg(not(feature = "gguf-management"))]
+const DISK_SPACE_ERROR_PREFIX: &str = "Not enough disk space";
+#[cfg(not(feature = "gguf-management"))]
+const CHECKSUM_MISMATCH_ERROR_PREFIX: &str = "Checksum mismatch for";
+#[cfg(not(feature = "gguf-management"))]
+const DOWNLOAD_START_ERROR_PREFIX: &str = "Failed to start download from";
+#[cfg(not(feature = "gguf-management"))]
+const DOWNLOAD_FAILED_ERROR_PREFIX: &str = "Download failed for";
+
+/// Maps an error from a `crustly llama-cpp` subcommand to a specific,
+/// documented exit code, by matching known message prefixes anywhere in
+/// the error's context chain (`anyhow::Error::chain()`, not just
+/// `.to_string()`'s outermost layer - `Pull`'s errors are wrapped in
+/// `"Failed to download '...'"`, so the more specific cause is a layer
+/// deeper). Reuses Crustly's own existing error *messages* as the taxonomy
+/// (every prefix here is a string this codebase already produces
+/// elsewhere, unchanged by this function) rather than inventing new ones
+/// or importing llamastash's specific numeric meanings - see
+/// `ccguf-managment-imrpoment-plan.md` Phase M7.
+///
+/// An unmatched error falls back to `1`, identical to every other Crustly
+/// command's behavior today - this only adds finer-grained codes on top of
+/// that default for failure messages that already exist, it never changes
+/// what a *new*, unrecognized error does.
+fn llama_cpp_exit_code(err: &anyhow::Error) -> i32 {
+    for cause in err.chain() {
+        let msg = cause.to_string();
+        if msg.starts_with(NO_SUCH_FILE_ERROR_PREFIX) {
+            return 10; // model/file not found
+        }
+        if msg.starts_with(DISK_SPACE_ERROR_PREFIX) {
+            return 11;
+        }
+        if msg.starts_with(CHECKSUM_MISMATCH_ERROR_PREFIX) {
+            return 12;
+        }
+        if msg.starts_with(DOWNLOAD_START_ERROR_PREFIX)
+            || msg.starts_with(DOWNLOAD_FAILED_ERROR_PREFIX)
+        {
+            return 13; // network/HTTP failure
+        }
+        if msg.starts_with(FEATURE_NOT_COMPILED_ERROR_PREFIX) {
+            return 14; // feature not compiled in
+        }
+    }
+    1
 }
 
 #[derive(Subcommand, Debug)]
@@ -350,7 +578,7 @@ pub enum OutputFormat {
 }
 
 /// Main CLI entry point
-pub async fn run() -> Result<()> {
+pub async fn run() -> Result<std::process::ExitCode> {
     let cli = Cli::parse();
 
     // Set up logging level based on debug flag
@@ -380,7 +608,31 @@ pub async fn run() -> Result<()> {
     }
     let config = config;
 
-    match cli.command {
+    // `LlamaCpp` needs a documented, non-1 exit code on failure (10-14 -
+    // see `llama_cpp_exit_code`); every other command keeps Rust's default
+    // `Result<(), E>` `Termination` behavior (print `Error: {e:?}`, exit 1)
+    // completely unchanged below. `LlamaCpp` used to get its custom code via
+    // `std::process::exit()` directly - which terminates the process
+    // immediately, skipping every live destructor, including `main()`'s
+    // `_guard` (a `tracing_appender` `WorkerGuard`) that flushes buffered
+    // debug-mode log lines on drop. Returning a `std::process::ExitCode`
+    // instead (an early `return` here, not a `process::exit` call) lets
+    // `main()`'s async body finish and its locals drop normally before the
+    // process actually exits - the standard, destructor-safe way to produce
+    // a custom exit code, and the only change from before: the printed
+    // message and the exit code itself are identical to what
+    // `std::process::exit` produced.
+    if let Some(Commands::LlamaCpp { operation }) = cli.command {
+        return match cmd_llama_cpp(&config, operation).await {
+            Ok(()) => Ok(std::process::ExitCode::SUCCESS),
+            Err(e) => {
+                eprintln!("Error: {e:?}");
+                Ok(std::process::ExitCode::from(llama_cpp_exit_code(&e) as u8))
+            }
+        };
+    }
+
+    let result: Result<()> = match cli.command {
         None | Some(Commands::Chat { session: _ }) => {
             // Default: Interactive TUI mode
             let session = match &cli.command {
@@ -404,8 +656,9 @@ pub async fn run() -> Result<()> {
             max_iterations,
         }) => cmd_autoplan(&config, goal, max_iterations).await,
         Some(Commands::Ollama { operation }) => cmd_ollama(&config, operation).await,
-        Some(Commands::LlamaCpp { operation }) => cmd_llama_cpp(&config, operation).await,
-    }
+        Some(Commands::LlamaCpp { .. }) => unreachable!("handled by the early return above"),
+    };
+    result.map(|()| std::process::ExitCode::SUCCESS)
 }
 
 /// Load configuration from file or defaults
@@ -825,6 +1078,10 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
         app.set_ollama_config(ollama_cfg.clone());
     }
     app.set_llama_cpp_models_dir(config.providers.llama_cpp_models_dir());
+    app.set_llama_cpp_discovery_sources(
+        config.providers.llama_cpp_extra_model_paths(),
+        config.providers.llama_cpp_ollama_models_dir(),
+    );
     // Hand the [providers.llama_cpp] section to the TUI for the same reason
     // as ollama_config above: the Ctrl+G model switch needs the same
     // n_gpu_layers/n_ctx/sampling settings as the one built at startup, and
@@ -1229,7 +1486,7 @@ async fn cmd_ollama(config: &crate::config::Config, operation: OllamaCommands) -
 #[cfg(not(feature = "ollama"))]
 async fn cmd_ollama(_config: &crate::config::Config, _operation: OllamaCommands) -> Result<()> {
     anyhow::bail!(
-        "This build of crustly was compiled without the 'ollama' feature. \
+        "{FEATURE_NOT_COMPILED_ERROR_PREFIX} the 'ollama' feature. \
          Rebuild with `--features ollama` (or `all-llm`) to use `crustly ollama`."
     );
 }
@@ -1237,7 +1494,7 @@ async fn cmd_ollama(_config: &crate::config::Config, _operation: OllamaCommands)
 /// Resolve a user-supplied `model` argument (from `crustly llama-cpp rm`)
 /// to a path: an absolute path or one containing a separator is used as-is,
 /// otherwise it's treated as a filename inside `models_dir`.
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 fn resolve_llama_cpp_model_path(models_dir: &std::path::Path, model: &str) -> std::path::PathBuf {
     let candidate = std::path::Path::new(model);
     if candidate.is_absolute() || model.contains(std::path::MAIN_SEPARATOR) {
@@ -1247,31 +1504,122 @@ fn resolve_llama_cpp_model_path(models_dir: &std::path::Path, model: &str) -> st
     }
 }
 
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppCommands) -> Result<()> {
     use crate::llm::provider::llama_cpp_models;
 
     let models_dir = config.providers.llama_cpp_models_dir();
 
     match operation {
-        LlamaCppCommands::List => {
-            println!("🦙 Models in {}\n", models_dir.display());
-            let models = llama_cpp_models::list_local_models(&models_dir)?;
+        LlamaCppCommands::List { json, best_fit } => {
+            let extra_model_paths = config.providers.llama_cpp_extra_model_paths();
+            let ollama_models_dir = config.providers.llama_cpp_ollama_models_dir();
+            // `list_all_local_models` is a blocking synchronous scan
+            // (directory reads + a GGUF header parse per file, internally
+            // parallelized across its own OS threads via `std::thread::scope`)
+            // - dispatched through `spawn_blocking` here for the same reason
+            // `tui/llama_cpp_download.rs`'s `list_local` already does: it
+            // must not run directly on a Tokio worker thread.
+            let dir_for_scan = models_dir.clone();
+            let mut models = tokio::task::spawn_blocking(move || {
+                llama_cpp_models::list_all_local_models(
+                    &dir_for_scan,
+                    &extra_model_paths,
+                    ollama_models_dir.as_deref(),
+                )
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("Model scan task panicked: {e}"))??;
 
+            // Detection spawns subprocesses - only paid for when actually
+            // asked for (`hardware_detect`'s own module doc), never as a
+            // side effect of a plain `list`.
+            let budget_bytes = if best_fit {
+                crate::llm::provider::hardware_detect::detect_hardware().budget_bytes()
+            } else {
+                None
+            };
+            if best_fit {
+                llama_cpp_models::sort_by_fit(&mut models, budget_bytes);
+            }
+
+            if json {
+                let mut payload = LlamaCppListJson {
+                    schema_version: LLAMA_CPP_LIST_JSON_SCHEMA_VERSION,
+                    models: models.iter().map(LlamaCppModelJson::from).collect(),
+                };
+                if best_fit {
+                    for (m, j) in models.iter().zip(payload.models.iter_mut()) {
+                        j.fit = Some(
+                            hardware_fit_label(llama_cpp_models::hardware_fit(
+                                m.estimated_memory_bytes,
+                                budget_bytes,
+                            ))
+                            .to_string(),
+                        );
+                    }
+                }
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&payload)
+                        .context("Failed to serialize model list as JSON")?
+                );
+                return Ok(());
+            }
+
+            println!("🦙 Local .gguf models\n");
             if models.is_empty() {
                 println!("  (none) - pull one with: crustly llama-cpp pull <source>");
             } else {
                 for m in models {
                     let size_gb = m.size_bytes as f64 / 1_073_741_824.0;
                     let quant = m.quantization_hint.as_deref().unwrap_or("unknown");
-                    let name = m
-                        .path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_default();
+                    let mut name = m.display_name.clone().unwrap_or_else(|| {
+                        m.path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default()
+                    });
+                    // A paired base model's projector is folded into this
+                    // entry (its own row was removed by `pair_mmproj_files`);
+                    // an unpaired projector keeps its own row, labeled so
+                    // it's not just a mysteriously-named model.
+                    if m.mmproj_path.is_some() {
+                        name.push_str(" (+ mmproj)");
+                    } else if m.is_mmproj {
+                        name.push_str(" [mmproj]");
+                    }
+                    let memory = match m.estimated_memory_bytes {
+                        Some(bytes) => {
+                            let gb = bytes as f64 / 1_073_741_824.0;
+                            if m.estimated_memory_includes_kv_cache {
+                                format!("~{gb:.1} GB")
+                            } else {
+                                format!("~{gb:.1} GB (weights only)")
+                            }
+                        }
+                        None => "-".to_string(),
+                    };
+                    print!(
+                        "  {:<45} {:>7.2} GB   {:<10} {:<22} {}",
+                        name, size_gb, quant, memory, m.modified_at
+                    );
+                    if best_fit {
+                        let fit =
+                            llama_cpp_models::hardware_fit(m.estimated_memory_bytes, budget_bytes);
+                        match m.estimated_memory_context_length {
+                            Some(ctx) => {
+                                print!("   {} (ctx {ctx})", hardware_fit_label(fit))
+                            }
+                            None => print!("   {}", hardware_fit_label(fit)),
+                        }
+                    }
+                    println!();
+                }
+                if best_fit && budget_bytes.is_none() {
                     println!(
-                        "  {:<45} {:>7.2} GB   {:<10} {}",
-                        name, size_gb, quant, m.modified_at
+                        "\n  (hardware detection found no usable GPU/RAM reading on this \
+                         machine - every entry above is \"unknown\")"
                     );
                 }
             }
@@ -1327,10 +1675,10 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
             Ok(())
         }
 
-        LlamaCppCommands::Rm { model } => {
-            let path = resolve_llama_cpp_model_path(&models_dir, &model);
+        LlamaCppCommands::Rm { name } => {
+            let path = resolve_llama_cpp_model_path(&models_dir, &name);
             if !path.exists() {
-                anyhow::bail!("No such file: {}", path.display());
+                anyhow::bail!("{NO_SUCH_FILE_ERROR_PREFIX} {}", path.display());
             }
 
             let size_gb = std::fs::metadata(&path)
@@ -1350,17 +1698,309 @@ async fn cmd_llama_cpp(config: &crate::config::Config, operation: LlamaCppComman
             println!("✅ Deleted '{}'", path.display());
             Ok(())
         }
+
+        LlamaCppCommands::Doctor => {
+            println!("🩺 crustly llama-cpp doctor\n");
+            // `llama_cpp_doctor_findings` stays a plain sync fn (its own
+            // unit tests call it directly, synchronously) - dispatched
+            // through `spawn_blocking` at this one async call site instead,
+            // for the same reason `List` above is: it scans `models_dir`
+            // via `list_all_local_models`, the same blocking, internally-
+            // multi-threaded call. A panic inside it degrades to a single
+            // `Fail` finding rather than aborting `doctor` entirely,
+            // matching this command's own "always exits 0, reports
+            // findings rather than failing" contract.
+            let config_for_scan = config.clone();
+            let dir_for_scan = models_dir.clone();
+            let findings = tokio::task::spawn_blocking(move || {
+                llama_cpp_doctor_findings(&config_for_scan, &dir_for_scan)
+            })
+            .await
+            .unwrap_or_else(|e| {
+                vec![DoctorFinding {
+                    status: DoctorStatus::Fail,
+                    message: format!("doctor's diagnostic task panicked: {e}"),
+                }]
+            });
+            let (mut ok, mut warn, mut fail) = (0, 0, 0);
+            for f in &findings {
+                match f.status {
+                    DoctorStatus::Ok => ok += 1,
+                    DoctorStatus::Warn => warn += 1,
+                    DoctorStatus::Fail => fail += 1,
+                }
+                println!("  {} {}", f.status.icon(), f.message);
+            }
+            println!("\n{ok} ok, {warn} warning(s), {fail} failure(s)");
+            // Always exits 0 - this reports findings, it doesn't fail like
+            // `list`/`pull`/`rm` can (see the subcommand's own doc comment).
+            Ok(())
+        }
     }
 }
 
-#[cfg(not(feature = "llama-cpp"))]
+/// A single `crustly llama-cpp doctor` finding's severity - not a hard
+/// pass/fail gate, since `doctor` always exits 0 regardless (structured
+/// findings for a human/agent to read, not a check the process itself
+/// lives or dies by). Gated on `gguf-management`, same as `Doctor`'s real
+/// implementation - the not-compiled-in stub never constructs one.
+#[cfg(feature = "gguf-management")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DoctorStatus {
+    Ok,
+    Warn,
+    Fail,
+}
+
+#[cfg(feature = "gguf-management")]
+impl DoctorStatus {
+    fn icon(self) -> &'static str {
+        match self {
+            Self::Ok => "✅",
+            Self::Warn => "⚠️ ",
+            Self::Fail => "❌",
+        }
+    }
+}
+
+#[cfg(feature = "gguf-management")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DoctorFinding {
+    status: DoctorStatus,
+    message: String,
+}
+
+/// Computes `doctor`'s findings - a pure function over `config`/
+/// `models_dir` (plus the filesystem/disk they point at) so the checklist
+/// logic is testable without going through the CLI dispatch machinery.
+/// Every check degrades to a `Warn`, never panics or errors the whole
+/// function, on anything it can't determine - same "honest unknown, not a
+/// crash" posture the rest of this plan's phases already established.
+#[cfg(feature = "gguf-management")]
+fn llama_cpp_doctor_findings(
+    config: &crate::config::Config,
+    models_dir: &std::path::Path,
+) -> Vec<DoctorFinding> {
+    use crate::llm::provider::llama_cpp_models;
+
+    let mut findings = vec![DoctorFinding {
+        status: DoctorStatus::Ok,
+        message: "gguf-management feature compiled in - list/pull/rm/doctor available".to_string(),
+    }];
+
+    if cfg!(feature = "llama-cpp") {
+        findings.push(DoctorFinding {
+            status: DoctorStatus::Ok,
+            message: "llama-cpp feature compiled in - in-process inference available".to_string(),
+        });
+        let gpu_backend_compiled_in = cfg!(any(
+            feature = "llama-cpp-cuda",
+            feature = "llama-cpp-metal",
+            feature = "llama-cpp-vulkan",
+            feature = "llama-cpp-rocm",
+            feature = "llama-cpp-opencl",
+            feature = "llama-cpp-mkl",
+        ));
+        findings.push(if gpu_backend_compiled_in {
+            DoctorFinding {
+                status: DoctorStatus::Ok,
+                message: "a GPU backend feature is compiled in".to_string(),
+            }
+        } else {
+            DoctorFinding {
+                status: DoctorStatus::Warn,
+                message: "no GPU backend feature compiled in - n_gpu_layers > 0 in config \
+                          will be a silent no-op (CPU only)"
+                    .to_string(),
+            }
+        });
+    } else {
+        findings.push(DoctorFinding {
+            status: DoctorStatus::Warn,
+            message: "llama-cpp feature not compiled in - in-process inference unavailable; \
+                      management (list/pull/rm) still works"
+                .to_string(),
+        });
+    }
+
+    if !models_dir.exists() {
+        findings.push(DoctorFinding {
+            status: DoctorStatus::Warn,
+            message: format!(
+                "models_dir does not exist yet: {} (created automatically on first `pull`)",
+                models_dir.display()
+            ),
+        });
+    } else if !models_dir.is_dir() {
+        findings.push(DoctorFinding {
+            status: DoctorStatus::Fail,
+            message: format!(
+                "models_dir exists but is not a directory: {}",
+                models_dir.display()
+            ),
+        });
+    } else {
+        let probe = models_dir.join(".crustly-doctor-write-test");
+        match std::fs::write(&probe, b"x") {
+            Ok(()) => {
+                let _ = std::fs::remove_file(&probe);
+                findings.push(DoctorFinding {
+                    status: DoctorStatus::Ok,
+                    message: format!(
+                        "models_dir exists and is writable: {}",
+                        models_dir.display()
+                    ),
+                });
+            }
+            Err(e) => {
+                findings.push(DoctorFinding {
+                    status: DoctorStatus::Fail,
+                    message: format!(
+                        "models_dir exists but is not writable: {} ({e})",
+                        models_dir.display()
+                    ),
+                });
+            }
+        }
+    }
+
+    findings.push(match llama_cpp_models::available_space_at(models_dir) {
+        Some(bytes) => DoctorFinding {
+            status: DoctorStatus::Ok,
+            message: format!(
+                "~{:.1} GB free at models_dir's filesystem",
+                bytes as f64 / 1_073_741_824.0
+            ),
+        },
+        None => DoctorFinding {
+            status: DoctorStatus::Warn,
+            message: "could not determine free disk space at models_dir".to_string(),
+        },
+    });
+
+    for path in config.providers.llama_cpp_extra_model_paths() {
+        findings.push(if path.exists() {
+            DoctorFinding {
+                status: DoctorStatus::Ok,
+                message: format!("extra_model_paths entry exists: {}", path.display()),
+            }
+        } else {
+            DoctorFinding {
+                status: DoctorStatus::Warn,
+                message: format!(
+                    "extra_model_paths entry does not exist: {} (typo, or not mounted yet?)",
+                    path.display()
+                ),
+            }
+        });
+    }
+
+    if let Some(ollama_dir) = config.providers.llama_cpp_ollama_models_dir() {
+        findings.push(if ollama_dir.join("manifests").exists() {
+            DoctorFinding {
+                status: DoctorStatus::Ok,
+                message: format!(
+                    "scan_ollama_models is on and a manifest tree was found: {}",
+                    ollama_dir.display()
+                ),
+            }
+        } else {
+            DoctorFinding {
+                status: DoctorStatus::Warn,
+                message: format!(
+                    "scan_ollama_models is on but no manifests found at: {} (has Ollama \
+                     pulled anything, or is $OLLAMA_MODELS set correctly?)",
+                    ollama_dir.display()
+                ),
+            }
+        });
+    }
+
+    // Phase M11/M12: surface the detected hardware as text - this is the
+    // natural home for that output (M9's own doc comment already called it
+    // out), not a reason to duplicate detection logic here. Always `Ok` -
+    // "CPU-only, RAM unknown" is a legitimate, non-fatal reading on a
+    // machine/CI image with no vendor tools installed, same as every other
+    // "unknown" this function already reports without failing.
+    let hardware = crate::llm::provider::hardware_detect::detect_hardware();
+    let hardware_message = match &hardware.gpu {
+        Some(gpu) => {
+            let name = gpu.name.as_deref().unwrap_or("unknown GPU");
+            match gpu.vram_available_bytes() {
+                Some(vram) => format!(
+                    "detected GPU: {name} (~{:.1} GB VRAM available)",
+                    vram as f64 / 1_073_741_824.0
+                ),
+                None => format!("detected GPU: {name} (VRAM unknown)"),
+            }
+        }
+        None => "no GPU detected (or no supported vendor tool installed) - CPU-only".to_string(),
+    };
+    let ram_message = match hardware.system_ram_total_bytes {
+        Some(bytes) => format!("system RAM: ~{:.1} GB", bytes as f64 / 1_073_741_824.0),
+        None => "system RAM: unknown".to_string(),
+    };
+    findings.push(DoctorFinding {
+        status: DoctorStatus::Ok,
+        message: format!("{hardware_message}; {ram_message}"),
+    });
+
+    // Best-effort - a models scan failure here (e.g. models_dir genuinely
+    // unreadable, already reported above) just means this bonus finding is
+    // skipped, not that `doctor` itself fails.
+    if let Ok(models) = llama_cpp_models::list_all_local_models(
+        models_dir,
+        &config.providers.llama_cpp_extra_model_paths(),
+        config.providers.llama_cpp_ollama_models_dir().as_deref(),
+    ) {
+        if !models.is_empty() {
+            let budget_bytes = hardware.budget_bytes();
+            findings.push(
+                match llama_cpp_models::best_fitting_model(&models, budget_bytes) {
+                    Some(best) => {
+                        let name = best.display_name.clone().unwrap_or_else(|| {
+                            best.path
+                                .file_name()
+                                .map(|n| n.to_string_lossy().into_owned())
+                                .unwrap_or_default()
+                        });
+                        let gb = best.estimated_memory_bytes.unwrap_or(0) as f64 / 1_073_741_824.0;
+                        DoctorFinding {
+                            status: DoctorStatus::Ok,
+                            message: format!(
+                                "largest already-downloaded model this hardware can hold: \
+                             {name} (~{gb:.1} GB estimated)"
+                            ),
+                        }
+                    }
+                    None if budget_bytes.is_some() => DoctorFinding {
+                        status: DoctorStatus::Warn,
+                        message: "no already-downloaded model comfortably fits this hardware's \
+                              detected budget - consider a smaller quantization"
+                            .to_string(),
+                    },
+                    None => DoctorFinding {
+                        status: DoctorStatus::Warn,
+                        message: "could not determine a hardware budget to compare downloaded \
+                              models against"
+                            .to_string(),
+                    },
+                },
+            );
+        }
+    }
+
+    findings
+}
+
+#[cfg(not(feature = "gguf-management"))]
 async fn cmd_llama_cpp(
     _config: &crate::config::Config,
     _operation: LlamaCppCommands,
 ) -> Result<()> {
     anyhow::bail!(
-        "This build of crustly was compiled without the 'llama-cpp' feature. \
-         Rebuild with `--features llama-cpp` to use `crustly llama-cpp`."
+        "{FEATURE_NOT_COMPILED_ERROR_PREFIX} the 'gguf-management' feature. \
+         Rebuild with `--features gguf-management` to use `crustly llama-cpp`."
     );
 }
 
@@ -1703,20 +2343,319 @@ mod tests {
         assert!(matches!(
             cli.command,
             Some(Commands::LlamaCpp {
-                operation: LlamaCppCommands::List
+                operation: LlamaCppCommands::List {
+                    json: false,
+                    best_fit: false
+                }
+            })
+        ));
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "list", "--json"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::List {
+                    json: true,
+                    best_fit: false
+                }
+            })
+        ));
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "list", "--best-fit"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::List {
+                    json: false,
+                    best_fit: true
+                }
+            })
+        ));
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "list", "--json", "--best-fit"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::List {
+                    json: true,
+                    best_fit: true
+                }
             })
         ));
 
         let cli = Cli::parse_from(["crustly", "llama-cpp", "rm", "model.gguf"]);
         match cli.command {
             Some(Commands::LlamaCpp {
-                operation: LlamaCppCommands::Rm { model },
-            }) => assert_eq!(model, "model.gguf"),
+                operation: LlamaCppCommands::Rm { name },
+            }) => assert_eq!(name, "model.gguf"),
             other => panic!("expected LlamaCpp Rm command, got {other:?}"),
+        }
+
+        // Regression test for the actual bug this rename fixed: a bare
+        // positional value must resolve to `Rm.name`, not silently be
+        // captured by the global `--model` flag (which shares its ident
+        // with the *old* field name and confused clap's arg matching -
+        // reproduced independently of this test file, confirmed against
+        // the real built binary before this fix).
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "rm", "some-model.gguf"]);
+        assert!(
+            cli.model.is_none(),
+            "the positional Rm argument must not be captured by the global --model flag"
+        );
+
+        let cli = Cli::parse_from(["crustly", "llama-cpp", "doctor"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::LlamaCpp {
+                operation: LlamaCppCommands::Doctor
+            })
+        ));
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_list_json_round_trips_with_the_documented_schema() {
+        let model = LlamaCppModelJson {
+            path: std::path::PathBuf::from("/models/a.gguf"),
+            display_name: Some("qwen2.5-coder:7b".to_string()),
+            size_bytes: 4_294_967_296,
+            modified_at: "2026-08-07T13:38:28Z".to_string(),
+            architecture: Some("qwen2".to_string()),
+            parameter_count: Some(7_000_000_000),
+            quantization: Some("Q4_K_M".to_string()),
+            context_length: Some(32768),
+            has_chat_template: true,
+            estimated_memory_bytes: Some(5_200_000_000),
+            estimated_memory_includes_kv_cache: true,
+            estimated_memory_context_length: Some(8_192),
+            is_mmproj: false,
+            mmproj_path: None,
+            fit: None,
+        };
+        let payload = LlamaCppListJson {
+            schema_version: LLAMA_CPP_LIST_JSON_SCHEMA_VERSION,
+            models: vec![model],
+        };
+
+        let json = serde_json::to_value(&payload).expect("must serialize");
+        assert_eq!(json["schema_version"], 1);
+        assert_eq!(json["models"][0]["display_name"], "qwen2.5-coder:7b");
+        assert_eq!(json["models"][0]["parameter_count"], 7_000_000_000_u64);
+        assert_eq!(json["models"][0]["has_chat_template"], true);
+        assert_eq!(json["models"][0]["is_mmproj"], false);
+        assert!(json["models"][0]["mmproj_path"].is_null());
+        assert_eq!(json["models"][0]["estimated_memory_context_length"], 8192);
+        // `fit` is only present when `--best-fit` was passed - omitted
+        // entirely (not even `null`) on a plain `list --json`, per its
+        // `#[serde(skip_serializing_if = "Option::is_none")]`.
+        assert!(!json["models"][0].as_object().unwrap().contains_key("fit"));
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_model_json_from_local_gguf_model_carries_every_field() {
+        use crate::llm::provider::llama_cpp_models::LocalGgufModel;
+
+        let model = LocalGgufModel {
+            path: std::path::PathBuf::from("/models/a.gguf"),
+            size_bytes: 100,
+            modified_at: "now".to_string(),
+            quantization_hint: Some("Q4_K_M".to_string()),
+            architecture: Some("qwen2".to_string()),
+            parameter_count: Some(7_000_000_000),
+            context_length: Some(32768),
+            has_chat_template: true,
+            display_name: Some("nice-name".to_string()),
+            estimated_memory_bytes: Some(5_000_000_000),
+            estimated_memory_includes_kv_cache: true,
+            estimated_memory_context_length: Some(8_192),
+            is_mmproj: false,
+            mmproj_path: None,
+        };
+        let json = LlamaCppModelJson::from(&model);
+        assert_eq!(json.quantization.as_deref(), Some("Q4_K_M"));
+        assert_eq!(json.display_name.as_deref(), Some("nice-name"));
+        assert_eq!(json.parameter_count, Some(7_000_000_000));
+        assert_eq!(json.estimated_memory_context_length, Some(8_192));
+        assert_eq!(
+            json.fit, None,
+            "From<&LocalGgufModel> never sets `fit` - only --best-fit's own \
+             handler does, after conversion"
+        );
+    }
+
+    #[test]
+    fn llama_cpp_exit_code_maps_each_known_message_prefix() {
+        let cases: &[(&str, i32)] = &[
+            ("No such file: /models/x.gguf", 10),
+            ("Not enough disk space to download 'x.gguf': ...", 11),
+            ("Checksum mismatch for x.gguf: ...", 12),
+            ("Failed to start download from https://example.com", 13),
+            ("Download failed for https://example.com", 13),
+            (
+                "This build of crustly was compiled without the 'gguf-management' feature.",
+                14,
+            ),
+        ];
+        for (msg, expected) in cases {
+            let err = anyhow::anyhow!("{msg}");
+            assert_eq!(llama_cpp_exit_code(&err), *expected, "for message: {msg}");
         }
     }
 
-    #[cfg(feature = "llama-cpp")]
+    #[test]
+    fn llama_cpp_exit_code_checks_the_whole_chain_not_just_the_outermost_context() {
+        // Mirrors how `Pull` actually wraps its errors: the outermost
+        // context is always "Failed to download '...'", so the specific
+        // cause (checksum mismatch, here) is a layer deeper.
+        let root = anyhow::anyhow!("Checksum mismatch for model.gguf: expected a, got b.");
+        let wrapped: anyhow::Error = Err::<(), _>(root)
+            .context("Failed to download 'model.gguf'")
+            .unwrap_err();
+        assert_eq!(llama_cpp_exit_code(&wrapped), 12);
+    }
+
+    #[test]
+    fn llama_cpp_exit_code_falls_back_to_one_for_an_unrecognized_error() {
+        let err = anyhow::anyhow!("some entirely new failure mode nobody has seen before");
+        assert_eq!(llama_cpp_exit_code(&err), 1);
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_reports_a_writable_models_dir_as_ok() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config = crate::config::Config::default();
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        let models_dir_finding = findings
+            .iter()
+            .find(|f| f.message.contains("models_dir exists and is writable"))
+            .expect("must report the writable models_dir");
+        assert_eq!(models_dir_finding.status, DoctorStatus::Ok);
+        // The write-probe file must not be left behind.
+        assert!(!tmp.path().join(".crustly-doctor-write-test").exists());
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_warns_on_a_missing_models_dir() {
+        let config = crate::config::Config::default();
+        let missing = std::path::Path::new("/definitely/does/not/exist/crustly-doctor-test");
+
+        let findings = llama_cpp_doctor_findings(&config, missing);
+
+        let finding = findings
+            .iter()
+            .find(|f| f.message.contains("does not exist yet"))
+            .expect("must report the missing models_dir");
+        assert_eq!(finding.status, DoctorStatus::Warn);
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_reports_extra_model_paths_existence() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let mut config = crate::config::Config::default();
+        config.providers.llama_cpp = Some(crate::config::LlamaCppProviderConfig {
+            extra_model_paths: vec![
+                tmp.path().to_path_buf(),
+                std::path::PathBuf::from("/definitely/does/not/exist/crustly-extra"),
+            ],
+            ..Default::default()
+        });
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        assert!(findings.iter().any(|f| f.status == DoctorStatus::Ok
+            && f.message.contains("extra_model_paths entry exists")));
+        assert!(findings.iter().any(|f| f.status == DoctorStatus::Warn
+            && f.message.contains("extra_model_paths entry does not exist")));
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_says_nothing_about_ollama_when_not_opted_in() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config = crate::config::Config::default(); // scan_ollama_models defaults false
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.message.contains("scan_ollama_models")),
+            "opting out of Ollama scanning should produce no finding about it at all"
+        );
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_reports_build_features() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config = crate::config::Config::default();
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        assert!(findings.iter().any(
+            |f| f.message.contains("gguf-management feature compiled in")
+                && f.status == DoctorStatus::Ok
+        ));
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_always_reports_detected_hardware() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config = crate::config::Config::default();
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        // This sandbox has no nvidia-smi/rocm-smi/vulkaninfo installed, so
+        // this exercises the real "no vendor tool found" degrade-to-
+        // CPU-only path end-to-end, not a mocked one - the same "missing
+        // tool -> unknown, never fatal" contract `hardware_detect`'s own
+        // tests establish in isolation.
+        let hardware_finding = findings
+            .iter()
+            .find(|f| f.message.contains("system RAM"))
+            .expect("must report a hardware finding");
+        assert_eq!(hardware_finding.status, DoctorStatus::Ok);
+        assert!(
+            hardware_finding.message.contains("GPU"),
+            "expected the GPU half of the hardware finding, got: {}",
+            hardware_finding.message
+        );
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn llama_cpp_doctor_findings_skips_the_best_fit_finding_when_no_models_present() {
+        let tmp = tempfile::tempdir().expect("tempdir"); // empty - no .gguf files
+        let config = crate::config::Config::default();
+
+        let findings = llama_cpp_doctor_findings(&config, tmp.path());
+
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.message.contains("already-downloaded model")),
+            "no local models means no best-fit bonus finding at all, not a Warn about it"
+        );
+    }
+
+    #[cfg(feature = "gguf-management")]
+    #[test]
+    fn hardware_fit_label_matches_the_documented_wording() {
+        use crate::llm::provider::llama_cpp_models::HardwareFit;
+        assert_eq!(hardware_fit_label(HardwareFit::Fits), "Fits");
+        assert_eq!(hardware_fit_label(HardwareFit::Tight), "Tight");
+        assert_eq!(hardware_fit_label(HardwareFit::WontFit), "Won't fit");
+        assert_eq!(hardware_fit_label(HardwareFit::Unknown), "unknown");
+    }
+
+    #[cfg(feature = "gguf-management")]
     #[test]
     fn resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir() {
         let dir = std::path::Path::new("/models");

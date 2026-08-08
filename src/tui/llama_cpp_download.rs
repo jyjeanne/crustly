@@ -14,11 +14,16 @@
 //! runtime, while the dialog shows a "Loading model…" state.
 //!
 //! Every function is compiled unconditionally so `AppMode::LlamaCppModelPicker`
-//! always exists and always says something sensible; the actual filesystem
-//! scan / download / model construction only run when this crate is built
-//! with `--features llama-cpp` (`list_local`/`spawn_download`/`spawn_delete`
-//! degrade to "nothing found" / a clear "rebuild with..." error, mirroring
-//! `ollama_download.rs`'s not-compiled-in fallbacks).
+//! always exists and always says something sensible; the real implementations
+//! are split across two build-time gates
+//! (`ccguf-managment-imrpoment-plan.md` Phase M0). `list_local`/
+//! `spawn_download`/`spawn_delete` (pure filesystem/HTTP, no FFI) only need
+//! `--features gguf-management` (on by `default`); `build_llama_cpp_provider`/
+//! `spawn_switch` (loads model weights via `LlamaCppProvider::new()`) still
+//! need the heavier `--features llama-cpp`. Each not-compiled-in fallback
+//! degrades to "nothing found" / a clear "rebuild with..." error naming the
+//! specific feature it needs, mirroring `ollama_download.rs`'s not-compiled-in
+//! fallbacks.
 
 use super::events::TuiEvent;
 use std::path::PathBuf;
@@ -28,12 +33,31 @@ use tokio::task::JoinHandle;
 
 /// A locally-present `.gguf` file, decoupled from the `llama-cpp` feature so
 /// it can live on the always-compiled `TuiEvent`/`App` state - the TUI
-/// equivalent of `llama_cpp_models::LocalGgufModel`.
+/// equivalent of `llama_cpp_models::LocalGgufModel`. Field-for-field mirror
+/// (see `list_local`'s mapping) so header-parsed metadata added in
+/// `LocalGgufModel` (Phase M1) isn't dropped at this boundary even before a
+/// later phase renders it.
 #[derive(Debug, Clone)]
 pub struct LlamaCppModelSummary {
     pub path: PathBuf,
     pub size_bytes: u64,
     pub quantization_hint: Option<String>,
+    pub architecture: Option<String>,
+    pub parameter_count: Option<u64>,
+    pub context_length: Option<u64>,
+    pub has_chat_template: bool,
+    pub display_name: Option<String>,
+    pub estimated_memory_bytes: Option<u64>,
+    pub estimated_memory_includes_kv_cache: bool,
+    /// The context length `estimated_memory_bytes` was actually computed
+    /// at - see `LocalGgufModel::estimated_memory_context_length`. Appended
+    /// to the Ctrl+G dialog's fit tag (`render.rs`'s `llama_cpp_fit_tag`,
+    /// e.g. `"Fits (ctx 8192)"`) so the assumption behind an estimate is
+    /// never hidden - the same figure `crustly llama-cpp list --best-fit`
+    /// shows for the identical model.
+    pub estimated_memory_context_length: Option<u64>,
+    pub is_mmproj: bool,
+    pub mmproj_path: Option<PathBuf>,
 }
 
 /// One progress update from an in-flight download, decoupled from the
@@ -54,11 +78,15 @@ impl LlamaCppDownloadProgress {
 
 /// GPU offload / quantization details for the Model Info panel (Ctrl+O)
 /// when the active provider is `llama-cpp`. Context size is already shown
-/// generically via `App::provider_context_window()` - not duplicated here.
+/// generically via `App::provider_context_window()` - not duplicated here,
+/// though it can legitimately differ from `context_length` below (the
+/// *configured* `n_ctx` vs. the model's own *native/trained* context).
 #[derive(Debug, Clone)]
 pub struct LlamaCppModelDetails {
     pub n_gpu_layers: u32,
     pub quantization_hint: Option<String>,
+    pub context_length: Option<u64>,
+    pub has_chat_template: bool,
 }
 
 /// Shared slot the background switch task drops a freshly-built provider
@@ -67,27 +95,143 @@ pub struct LlamaCppModelDetails {
 /// the slot", the provider crosses the thread boundary through this instead.
 pub type PendingProvider = Arc<Mutex<Option<Arc<dyn crate::llm::provider::Provider>>>>;
 
-/// List `.gguf` files already present in `models_dir`. Returns an empty
-/// list (never an error) when the feature isn't compiled in or the
-/// directory can't be read - the dialog just shows "no local models" rather
-/// than surfacing a scan failure the user can't act on.
-#[cfg(feature = "llama-cpp")]
-pub async fn list_local(models_dir: PathBuf) -> Vec<LlamaCppModelSummary> {
-    use crate::llm::provider::llama_cpp_models;
-
-    llama_cpp_models::list_local_models(&models_dir)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|m| LlamaCppModelSummary {
-            path: m.path,
-            size_bytes: m.size_bytes,
-            quantization_hint: m.quantization_hint,
-        })
-        .collect()
+/// The Local Models dialog's (Ctrl+G) host-info row - the TUI equivalent of
+/// `hardware_detect::HardwareInfo`, decoupled from the `gguf-management`
+/// feature the same way `LlamaCppModelSummary` is decoupled from
+/// `LocalGgufModel` (Phase M11).
+#[derive(Debug, Clone)]
+pub struct HardwareSummary {
+    pub gpu_name: Option<String>,
+    pub vram_available_bytes: Option<u64>,
+    pub system_ram_total_bytes: Option<u64>,
 }
 
-#[cfg(not(feature = "llama-cpp"))]
-pub async fn list_local(_models_dir: PathBuf) -> Vec<LlamaCppModelSummary> {
+impl HardwareSummary {
+    /// Mirrors `hardware_detect::HardwareInfo::budget_bytes` - kept here
+    /// too (not just called through to it) since the not-compiled-in
+    /// variant of `detect_hardware_summary` below has no `HardwareInfo` to
+    /// call through to at all.
+    pub fn budget_bytes(&self) -> Option<u64> {
+        match (self.vram_available_bytes, self.system_ram_total_bytes) {
+            (None, None) => None,
+            (vram, ram) => Some(vram.unwrap_or(0) + ram.unwrap_or(0)),
+        }
+    }
+}
+
+/// Detects this machine's hardware for the dialog's host-info row - see
+/// `hardware_detect`'s own module doc for the "when this runs" rule this
+/// respects (only called once, the first time the dialog opens - see
+/// `App::open_llama_cpp_models`). Blocking (subprocess spawns), so this
+/// wraps the real detection in `spawn_blocking` rather than calling it
+/// directly on the async runtime.
+#[cfg(feature = "gguf-management")]
+pub async fn detect_hardware_summary() -> HardwareSummary {
+    tokio::task::spawn_blocking(|| {
+        let info = crate::llm::provider::hardware_detect::detect_hardware();
+        HardwareSummary {
+            gpu_name: info.gpu.as_ref().and_then(|g| g.name.clone()),
+            vram_available_bytes: info.gpu.as_ref().and_then(|g| g.vram_available_bytes()),
+            system_ram_total_bytes: info.system_ram_total_bytes,
+        }
+    })
+    .await
+    .unwrap_or(HardwareSummary {
+        gpu_name: None,
+        vram_available_bytes: None,
+        system_ram_total_bytes: None,
+    })
+}
+
+#[cfg(not(feature = "gguf-management"))]
+pub async fn detect_hardware_summary() -> HardwareSummary {
+    HardwareSummary {
+        gpu_name: None,
+        vram_available_bytes: None,
+        system_ram_total_bytes: None,
+    }
+}
+
+/// List `.gguf` files from `models_dir`, `extra_model_paths`, and (when
+/// `Some`) Ollama's manifest tree - see
+/// `llama_cpp_models::list_all_local_models` for the merge/dedup behavior.
+/// Returns an empty list (never an error) when the feature isn't compiled
+/// in or nothing could be scanned - the dialog just shows "no local
+/// models" rather than surfacing a scan failure the user can't act on.
+/// Blocking (synchronous directory scan + a GGUF header parse per file, and
+/// a possibly-large Ollama manifest tree walk), so - like
+/// `detect_hardware_summary` and `spawn_switch`'s model load just below -
+/// this runs the real work via `spawn_blocking` rather than directly on the
+/// calling task, so it can't stall other work sharing that runtime worker
+/// thread (event handling, streaming responses) while a large model
+/// directory scans.
+#[cfg(feature = "gguf-management")]
+pub async fn list_local(
+    models_dir: PathBuf,
+    extra_model_paths: Vec<PathBuf>,
+    ollama_models_dir: Option<PathBuf>,
+) -> Vec<LlamaCppModelSummary> {
+    use crate::llm::provider::llama_cpp_models::{self, LocalGgufModel};
+
+    tokio::task::spawn_blocking(move || {
+        llama_cpp_models::list_all_local_models(
+            &models_dir,
+            &extra_model_paths,
+            ollama_models_dir.as_deref(),
+        )
+        .unwrap_or_default()
+        .into_iter()
+        .map(|m| {
+            // Destructured with every field named and no `..` rest pattern
+            // - deliberately, as a poor man's exhaustiveness check: a field
+            // added to `LocalGgufModel` fails to compile right here instead
+            // of silently never reaching this TUI-side mirror. See
+            // `cli/mod.rs`'s `LlamaCppModelJson::from` for the identical
+            // safeguard on the `--json` side's own mirror of this struct.
+            let LocalGgufModel {
+                path,
+                size_bytes,
+                modified_at: _,
+                quantization_hint,
+                architecture,
+                parameter_count,
+                context_length,
+                has_chat_template,
+                display_name,
+                estimated_memory_bytes,
+                estimated_memory_includes_kv_cache,
+                estimated_memory_context_length,
+                is_mmproj,
+                mmproj_path,
+            } = m;
+            LlamaCppModelSummary {
+                path,
+                size_bytes,
+                quantization_hint,
+                architecture,
+                parameter_count,
+                context_length,
+                has_chat_template,
+                display_name,
+                estimated_memory_bytes,
+                estimated_memory_includes_kv_cache,
+                estimated_memory_context_length,
+                is_mmproj,
+                mmproj_path,
+            }
+        })
+        .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[cfg(not(feature = "gguf-management"))]
+pub async fn list_local(
+    _models_dir: PathBuf,
+    _extra_model_paths: Vec<PathBuf>,
+    _ollama_models_dir: Option<PathBuf>,
+) -> Vec<LlamaCppModelSummary> {
     Vec::new()
 }
 
@@ -159,7 +303,7 @@ pub async fn spawn_switch(
 /// Start downloading `source` (a direct URL or `hf:org/repo/file.gguf`
 /// shorthand) into `models_dir` in the background, forwarding progress and
 /// the final result through `event_sender`.
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 pub async fn spawn_download(
     source: String,
     models_dir: PathBuf,
@@ -208,7 +352,7 @@ pub async fn spawn_download(
     })
 }
 
-#[cfg(not(feature = "llama-cpp"))]
+#[cfg(not(feature = "gguf-management"))]
 pub async fn spawn_download(
     source: String,
     _models_dir: PathBuf,
@@ -218,8 +362,8 @@ pub async fn spawn_download(
         let _ = event_sender.send(TuiEvent::LlamaCppDownloadFinished {
             source,
             error: Some(
-                "This build of crustly was compiled without the 'llama-cpp' feature. \
-                 Rebuild with `--features llama-cpp`."
+                "This build of crustly was compiled without the 'gguf-management' feature. \
+                 Rebuild with `--features gguf-management`."
                     .to_string(),
             ),
         });
@@ -228,7 +372,7 @@ pub async fn spawn_download(
 
 /// Start deleting the `.gguf` file at `path` in the background, forwarding
 /// the result through `event_sender`.
-#[cfg(feature = "llama-cpp")]
+#[cfg(feature = "gguf-management")]
 pub async fn spawn_delete(
     path: PathBuf,
     event_sender: UnboundedSender<TuiEvent>,
@@ -244,7 +388,7 @@ pub async fn spawn_delete(
     })
 }
 
-#[cfg(not(feature = "llama-cpp"))]
+#[cfg(not(feature = "gguf-management"))]
 pub async fn spawn_delete(
     path: PathBuf,
     event_sender: UnboundedSender<TuiEvent>,
@@ -253,19 +397,24 @@ pub async fn spawn_delete(
         let _ = event_sender.send(TuiEvent::LlamaCppDeleteFinished {
             path,
             error: Some(
-                "This build of crustly was compiled without the 'llama-cpp' feature. \
-                 Rebuild with `--features llama-cpp`."
+                "This build of crustly was compiled without the 'gguf-management' feature. \
+                 Rebuild with `--features gguf-management`."
                     .to_string(),
             ),
         });
     })
 }
 
-/// Filter `models` to those whose file name contains `query`
-/// (case-insensitive substring). Empty query returns every model
-/// unfiltered - same shape as `ollama_download::filter_suggestions`, minus
-/// the curated-list/installed-merge logic Ollama needs and this dialog
-/// doesn't (there's only ever one source: the local directory scan).
+/// Filter `models` to those whose `display_name` (when set) or file name
+/// contains `query` (case-insensitive substring). Empty query returns every
+/// model unfiltered - same shape as `ollama_download::filter_suggestions`,
+/// minus the curated-list/installed-merge logic Ollama needs and this
+/// dialog doesn't (there's only ever one source: the local directory scan).
+/// Matching against `display_name` too (not just the raw filename) matters
+/// most for Ollama-sourced entries, whose file name is a meaningless
+/// `sha256-<hex>` blob name - `llama_cpp_model_lines` (`render.rs`) already
+/// prefers `display_name` for exactly that reason, so the search here must
+/// find what that row actually shows.
 pub fn filter_local(models: &[LlamaCppModelSummary], query: &str) -> Vec<LlamaCppModelSummary> {
     let query_lc = query.trim().to_lowercase();
     if query_lc.is_empty() {
@@ -274,10 +423,16 @@ pub fn filter_local(models: &[LlamaCppModelSummary], query: &str) -> Vec<LlamaCp
     models
         .iter()
         .filter(|m| {
-            m.path
+            let name_matches = m
+                .path
                 .file_name()
                 .map(|n| n.to_string_lossy().to_lowercase().contains(&query_lc))
-                .unwrap_or(false)
+                .unwrap_or(false);
+            let display_name_matches = m
+                .display_name
+                .as_deref()
+                .is_some_and(|n| n.to_lowercase().contains(&query_lc));
+            name_matches || display_name_matches
         })
         .cloned()
         .collect()
@@ -292,6 +447,16 @@ mod tests {
             path: PathBuf::from(name),
             size_bytes: 1_000_000,
             quantization_hint: Some("Q4_K_M".to_string()),
+            architecture: None,
+            parameter_count: None,
+            context_length: None,
+            has_chat_template: false,
+            display_name: None,
+            estimated_memory_bytes: None,
+            estimated_memory_includes_kv_cache: false,
+            estimated_memory_context_length: None,
+            is_mmproj: false,
+            mmproj_path: None,
         }
     }
 
@@ -336,10 +501,27 @@ mod tests {
         assert!(filter_local(&models, "mistral").is_empty());
     }
 
-    #[cfg(not(feature = "llama-cpp"))]
+    #[test]
+    fn filter_local_matches_display_name_even_when_filename_does_not() {
+        // Ollama-sourced entries have a meaningless `sha256-<hex>` file
+        // name; the display name is the only thing a user would type.
+        let mut ollama_model = model("sha256-3a8f9c2b1d.gguf");
+        ollama_model.display_name = Some("qwen2.5-coder:7b".to_string());
+        let models = vec![ollama_model, model("llama3.gguf")];
+        let filtered = filter_local(&models, "qwen");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(
+            filtered[0].display_name.as_deref(),
+            Some("qwen2.5-coder:7b")
+        );
+    }
+
+    #[cfg(not(feature = "gguf-management"))]
     #[tokio::test]
     async fn list_local_without_feature_is_empty() {
-        assert!(list_local(PathBuf::from("/tmp/anything")).await.is_empty());
+        assert!(list_local(PathBuf::from("/tmp/anything"), Vec::new(), None)
+            .await
+            .is_empty());
     }
 
     #[cfg(not(feature = "llama-cpp"))]

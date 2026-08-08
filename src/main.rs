@@ -3,7 +3,7 @@ use clap::Parser;
 use crustly::{cli, logging};
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<std::process::ExitCode> {
     // Parse CLI arguments first to check for debug flag
     let cli_args = cli::Cli::parse();
 

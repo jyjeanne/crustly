@@ -162,14 +162,21 @@ default_model = "qwen2.5-coder-7b-instruct"
 #   crustly ollama embed nomic-embed-text "some text to embed"
 
 # ========================================
-# llama.cpp (in-process, no external server) - requires building crustly
-# with `--features llama-cpp` (native C++ compilation, see
+# llama.cpp (in-process, no external server) - actually *loading* a model
+# via [providers.llama_cpp] below requires building crustly with
+# `--features llama-cpp` (native C++ compilation, see
 # docs/guides/LLAMA_CPP_GUIDE.md before enabling this). Loads a local
 # .gguf file directly into the crustly process - no Ollama/LM Studio
 # daemon to install or keep running, unlike every other local-inference
 # option above. Trade-off: switching models means unloading and reloading
 # a multi-GB file (seconds to tens of seconds), not the near-instant swap
 # Ollama's server gives you - see llama-cpp-2-integration-plan.md §4.5.
+#
+# The `crustly llama-cpp list|pull|rm` file-management commands documented
+# below are lighter-weight than the above: they need only the
+# `gguf-management` feature (on by `default`, no C++ toolchain required),
+# so they work even in a plain `cargo build` with no [providers.llama_cpp]
+# configured at all - see ccguf-managment-imrpoment-plan.md Phase M0.
 # ========================================
 # [providers.llama_cpp]
 # enabled = true
