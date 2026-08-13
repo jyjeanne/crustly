@@ -176,7 +176,7 @@ pprof = { version = "0.15", features = ["flamegraph", "frame-pointer"], optional
 # dependency tables and Cargo features compose independently, so this has
 # no effect at all on non-Windows targets regardless of which features are
 # enabled.
-windows = { version = "0.58", optional = true, features = [
+windows = { version = "0.62", optional = true, features = [
     "Win32_Graphics_Dxgi",
     "Win32_Graphics_Dxgi_Common",
     "Win32_Foundation",
