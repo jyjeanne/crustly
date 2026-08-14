@@ -1914,7 +1914,7 @@ dependencies = [
  "uuid",
  "viuer",
  "which",
- "windows 0.58.0",
+ "windows 0.62.2",
  "zeroize",
  "zip",
 ]
