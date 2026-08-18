@@ -1415,10 +1415,21 @@ impl App {
                 // before giving up and treating it as a plain chat message. When one
                 // resolves, the skill's SKILL.md body becomes the actual message sent
                 // to the agent, with any trailing text passed through as arguments.
-                let name = command.trim_start_matches('/');
-                let Some((prompt, _description)) =
-                    crate::llm::tools::skill::resolve_skill_content(name, &self.working_directory)
-                else {
+                //
+                // Resolution walks every ancestor directory of cwd (plus the user's
+                // home) doing blocking filesystem I/O - the same lookup SkillTool
+                // wraps in spawn_blocking. Run it off this task too: this fallback
+                // fires on every submitted "/word", and the TUI's draw/handle-key
+                // loop is sequential, so blocking here would stall rendering on a
+                // deep cwd or a slow/network-mounted HOME.
+                let name = command.trim_start_matches('/').to_string();
+                let cwd = self.working_directory.clone();
+                let resolved = tokio::task::spawn_blocking(move || {
+                    crate::llm::tools::skill::resolve_skill_content(&name, &cwd)
+                })
+                .await
+                .map_err(|e| anyhow::anyhow!("skill lookup task panicked: {e}"))?;
+                let Some((prompt, _description)) = resolved else {
                     return Ok(false);
                 };
                 let args = trimmed[command.len()..].trim();

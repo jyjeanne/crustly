@@ -155,7 +155,7 @@ impl Tool for SkillTool {
 
         let json = serde_json::to_string_pretty(&output).map_err(ToolError::Json)?;
 
-        Ok(ToolResult::success(json).with_metadata("path".to_string(), output.path.clone()))
+        Ok(ToolResult::success(json).with_metadata("path".to_string(), output.path))
     }
 }
 
