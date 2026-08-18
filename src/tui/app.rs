@@ -1409,7 +1409,27 @@ impl App {
                 self.switch_mode(AppMode::Help).await?;
                 Ok(true)
             }
-            _ => Ok(false),
+            _ => {
+                // Not a built-in UI command - check whether it names a discoverable
+                // skill (project-local, user-global, or a built-in like `/review`)
+                // before giving up and treating it as a plain chat message. When one
+                // resolves, the skill's SKILL.md body becomes the actual message sent
+                // to the agent, with any trailing text passed through as arguments.
+                let name = command.trim_start_matches('/');
+                let Some((prompt, _description)) =
+                    crate::llm::tools::skill::resolve_skill_content(name, &self.working_directory)
+                else {
+                    return Ok(false);
+                };
+                let args = trimmed[command.len()..].trim();
+                let message = if args.is_empty() {
+                    prompt
+                } else {
+                    format!("{prompt}\n\nAdditional arguments: {args}")
+                };
+                self.send_message(message).await?;
+                Ok(true)
+            }
         }
     }
 
@@ -4003,6 +4023,43 @@ mod tests {
 
         assert!(!handled);
         assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    /// `/review` isn't a built-in UI command like `/help` - it should resolve
+    /// through the generic skill-lookup fallback (to the built-in `review`
+    /// skill, since no `.crustly/skills/review` exists in the test cwd) and be
+    /// handled as a message to the agent, not fall through as literal chat text.
+    #[tokio::test]
+    async fn slash_review_resolves_to_the_builtin_skill() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+
+        let handled = app.try_handle_slash_command("/review").await.unwrap();
+
+        assert!(handled, "/review should resolve via the skill fallback");
+        let sent = app
+            .messages
+            .last()
+            .expect("send_message should have appended the user message");
+        assert_eq!(sent.role, "user");
+        assert!(
+            sent.content.contains("name: review"),
+            "the agent should receive the skill's SKILL.md content, not the literal \"/review\" text: {}",
+            sent.content
+        );
+    }
+
+    /// Trailing text after the skill name (e.g. `/review 42`) must reach the
+    /// agent too, not get silently dropped in favor of the bare skill body.
+    #[tokio::test]
+    async fn slash_review_with_arguments_appends_them_to_the_skill_prompt() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+
+        app.try_handle_slash_command("/review 42").await.unwrap();
+
+        let sent = app.messages.last().unwrap();
+        assert!(sent.content.contains("Additional arguments: 42"));
     }
 
     /// Regression: ratatui-textarea underlines the cursor line by default, so
