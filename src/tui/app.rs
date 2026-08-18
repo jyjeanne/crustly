@@ -4073,6 +4073,26 @@ mod tests {
         assert!(sent.content.contains("Additional arguments: 42"));
     }
 
+    /// Same fallback, different built-in: `/spec` should resolve to the SDD
+    /// workflow skill, with a new feature description passed through as args.
+    #[tokio::test]
+    async fn slash_spec_resolves_to_the_builtin_skill_with_arguments() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+
+        let handled = app
+            .try_handle_slash_command("/spec Add CSV export to reports")
+            .await
+            .unwrap();
+
+        assert!(handled, "/spec should resolve via the skill fallback");
+        let sent = app.messages.last().unwrap();
+        assert!(sent.content.contains("name: spec"));
+        assert!(sent
+            .content
+            .contains("Additional arguments: Add CSV export to reports"));
+    }
+
     /// Regression: ratatui-textarea underlines the cursor line by default, so
     /// everything typed into the chat input rendered underlined. All three
     /// paths that (re)build the textarea must clear that style - a fresh app,

@@ -26,7 +26,10 @@ use std::path::{Path, PathBuf};
 /// precedence — see `resolve_skill` — so these are defaults, not overrides.
 mod builtin {
     /// `(name, SKILL.md contents)` pairs, checked case-insensitively.
-    const SKILLS: &[(&str, &str)] = &[("review", include_str!("builtin_skills/review.md"))];
+    const SKILLS: &[(&str, &str)] = &[
+        ("review", include_str!("builtin_skills/review.md")),
+        ("spec", include_str!("builtin_skills/spec.md")),
+    ];
 
     pub(super) fn lookup(name: &str) -> Option<&'static str> {
         SKILLS
@@ -579,6 +582,22 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let skills = list_skills(tmp.path());
         assert!(skills.iter().any(|s| s.name == "review"));
+    }
+
+    #[test]
+    fn resolve_skill_content_falls_back_to_builtin_spec_skill() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (content, description) = resolve_skill_content("spec", tmp.path())
+            .expect("built-in spec skill should resolve with no project skill present");
+        assert!(content.contains("name: spec"));
+        assert!(description.is_some());
+    }
+
+    #[test]
+    fn list_skills_includes_builtin_spec_skill() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skills = list_skills(tmp.path());
+        assert!(skills.iter().any(|s| s.name == "spec"));
     }
 
     #[test]
