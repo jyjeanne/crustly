@@ -95,8 +95,8 @@ Stop here. The user reviews `spec.md` before `plan` runs against it.
 ## Step 4: Implement (`implement` argument)
 
 Build it directly in this session — there is no separate agent to hand off
-to. Use the `task` tool to track progress against `tasks.md`, and `write`/
-`edit`/`bash` to make the changes:
+to. Use the `task_manager` tool to track progress against `tasks.md`, and
+`write_file`/`edit_file`/`bash` to make the changes:
 
 1. Work phase by phase, in the order `tasks.md` lists them. Within a
    phase, tasks marked `[P]` may be done in either order; do not

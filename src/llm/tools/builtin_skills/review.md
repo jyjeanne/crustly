@@ -30,7 +30,7 @@ not review unrelated code just to have something to say.
 
 Use `glob` to find `CLAUDE.md` and `AGENTS.md` at the repo root and in any
 directory that contains a changed file (or one of its parents). Read the
-ones that exist with `read`. These are the compliance bar for Step 4 —
+ones that exist with `read_file`. These are the compliance bar for Step 4 —
 skip this step's findings entirely if no such files exist.
 
 ## Step 3: Summarize the change
@@ -96,7 +96,7 @@ dedicated GitHub review-comment tool.
 ## Optional: `--fix`
 
 For findings from Step 6 that have an unambiguous, self-contained fix, apply
-it with `edit` or `apply_patch` and note in the final summary which
+it with `edit_file` or `apply_patch` and note in the final summary which
 findings were fixed automatically versus left for manual attention.
 Findings that require an architectural decision are never auto-fixed —
 report them instead.
