@@ -38,6 +38,7 @@
 - [💡 Best Practices for Using Crustly](#-best-practices-for-using-crustly)
 - [👨‍💻 Why Crustly for Coding?](#-why-crustly-for-coding)
 - [📋 Plan Mode — Structured Task Planning](#-plan-mode--structured-task-planning)
+- [🧠 Native Skills — /review & /spec](#-native-skills--review--spec)
 - [🧪 Manual Testing Guide](#-manual-testing-guide)
 - [📊 Performance](#-performance)
 - [🏗️ Architecture](#️-architecture)
@@ -125,13 +126,53 @@ Crustly: [creates comprehensive docs]
 - ✅ **Debugging** - Error analysis and fixes with context
 - ✅ **Refactoring** - Improve code quality
 - ✅ **Documentation** - Generate docs, comments, READMEs
-- ✅ **Code Review** - Get feedback on your code
+- ✅ **Code Review** - Get feedback on your code, or run `/review` for a multi-pass automated audit
 - ✅ **Learning** - Understand complex concepts
 - ✅ **Terminal Workflow** - Stay in your flow, no browser tabs
 
 ---
 
 ## ✨ What's New
+
+### Unreleased — Native `/review` and `/spec` Skills
+
+Two new slash commands work in any project with zero setup, on top of a
+generic fix to how `/`-commands are handled. See
+[🧠 Native Skills](#-native-skills--review--spec) below for the full
+writeup, or the skill source directly at
+[src/llm/tools/builtin_skills/](src/llm/tools/builtin_skills/).
+
+- **`/review`** — multi-pass automated code review of the current diff, a
+  PR, a branch, or a path. Independent correctness/guideline-compliance/
+  security passes dispatch in parallel via the `agent` tool, then a
+  second, skeptical pass filters every finding by confidence before
+  anything is reported — a review that cries wolf gets ignored.
+  `--comment` posts a summary via `gh`, `--fix` applies the surviving
+  findings.
+- **`/spec`** — native Specification-Driven Development:
+  `specify → plan → tasks → implement → analyze`, writing versioned
+  artifacts to `specs/<NNN>-<slug>/`. One skill, phase inferred from
+  trailing args — `/spec "feature description"` starts a new feature,
+  `/spec plan` / `/spec tasks` / `/spec implement` / `/spec analyze`
+  advance it. Includes a constitution gate (simplicity / anti-abstraction
+  / integration-first) during planning. Modeled on the `spec-driven`
+  schema from the same author's external
+  [rustyspec](https://github.com/jyjeanne/rustyspec) and
+  [solidspec](https://github.com/jyjeanne/solidspec) projects — named the
+  polyvalent default among solidspec's 7 workflow schemas — but unlike
+  those (separate CLIs that must hand off to an external agent),
+  `implement` runs natively in this session: Crustly already is the
+  agent, so it drives `task_manager`/`write_file`/`edit_file`/`bash`
+  directly and checks off `tasks.md` as it builds.
+- **Fixed:** nothing previously routed a typed `/<name>` to the `skill`
+  tool that could load it — `/review`, `/spec`, or any project-defined
+  skill just sent literal text to the model instead of triggering. Slash
+  input now resolves any unmatched `/<name>` through the same lookup
+  order `SkillTool` uses (project `.crustly/skills/`, `.claude/skills/`,
+  user-global, then a small set of built-ins compiled into the binary)
+  before falling back to a plain chat message — off the blocking-safe
+  `spawn_blocking` path, so the filesystem walk never stalls TUI
+  rendering.
 
 ### Unreleased — In-Process llama.cpp Provider
 
@@ -871,6 +912,64 @@ into a reviewable, dependency-ordered set of steps you approve before
 anything executes. See **[docs/PLAN_MODE_USER_GUIDE.md](docs/PLAN_MODE_USER_GUIDE.md)**
 for the full workflow, keyboard shortcuts, `PLAN.md` format, plan lifecycle,
 sample prompts, troubleshooting, and FAQ.
+
+---
+
+## 🧠 Native Skills — /review & /spec
+
+Skills are `SKILL.md` prompt files the `skill` tool can load — Crustly
+ships two built into the binary so they work in any project with no setup,
+and any project can override either by dropping its own
+`.crustly/skills/<name>/SKILL.md` (or `.claude/skills/<name>/SKILL.md`)
+of the same name.
+
+### `/review` — multi-pass code review
+
+```
+/review                  # review the current diff / open PR
+/review 123               # review PR #123
+/review --comment         # also post a summary comment via gh
+/review --fix             # apply the surviving findings
+```
+
+Independent correctness, guideline-compliance, and security passes
+dispatch in parallel via the `agent` tool, each scoped to only the
+relevant diff and context. A second, skeptical pass then tries to
+disprove each finding before it's reported — findings that don't survive
+scrutiny are dropped rather than shown, on the theory that a review that
+cries wolf gets ignored.
+
+### `/spec` — Specification-Driven Development
+
+```
+/spec Add CSV export to reports   # start a new feature: specs/001-.../spec.md
+/spec plan                        # architecture plan + constitution gate
+/spec tasks                       # phased, traceable task breakdown
+/spec implement                   # builds it natively, checks off tasks.md
+/spec analyze                     # traceability + test verdict: READY / NEEDS WORK
+```
+
+One skill, phase inferred from the trailing argument. Every feature gets
+a versioned `spec.md` → `plan.md` → `tasks.md` under `specs/<NNN>-<slug>/`,
+so scope and requirements survive contact with an AI agent instead of
+being renegotiated silently mid-implementation.
+
+The workflow is modeled on the `spec-driven` schema from the same
+author's [rustyspec](https://github.com/jyjeanne/rustyspec) and
+[solidspec](https://github.com/jyjeanne/solidspec) — external CLI tools
+implementing several SDD methodologies, of which `spec-driven` is
+documented as the polyvalent default. The key difference here: those
+tools are separate processes that must shell out to an external agent's
+CLI for the `implement` phase. Crustly doesn't need to — `implement` runs
+natively in the same session, driving `task_manager`, `write_file`,
+`edit_file`, and `bash` directly against `tasks.md`.
+
+### Writing your own
+
+Any `.crustly/skills/<name>/SKILL.md` in your project (or
+`~/.config/crustly/skills/<name>/SKILL.md` globally) becomes a slash
+command automatically — no registration step. Run `/skills` to see every
+skill currently discoverable, project-local and built-in alike.
 
 ---
 

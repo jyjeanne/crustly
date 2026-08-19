@@ -1409,7 +1409,38 @@ impl App {
                 self.switch_mode(AppMode::Help).await?;
                 Ok(true)
             }
-            _ => Ok(false),
+            _ => {
+                // Not a built-in UI command - check whether it names a discoverable
+                // skill (project-local, user-global, or a built-in like `/review`)
+                // before giving up and treating it as a plain chat message. When one
+                // resolves, the skill's SKILL.md body becomes the actual message sent
+                // to the agent, with any trailing text passed through as arguments.
+                //
+                // Resolution walks every ancestor directory of cwd (plus the user's
+                // home) doing blocking filesystem I/O - the same lookup SkillTool
+                // wraps in spawn_blocking. Run it off this task too: this fallback
+                // fires on every submitted "/word", and the TUI's draw/handle-key
+                // loop is sequential, so blocking here would stall rendering on a
+                // deep cwd or a slow/network-mounted HOME.
+                let name = command.trim_start_matches('/').to_string();
+                let cwd = self.working_directory.clone();
+                let resolved = tokio::task::spawn_blocking(move || {
+                    crate::llm::tools::skill::resolve_skill_content(&name, &cwd)
+                })
+                .await
+                .map_err(|e| anyhow::anyhow!("skill lookup task panicked: {e}"))?;
+                let Some((prompt, _description)) = resolved else {
+                    return Ok(false);
+                };
+                let args = trimmed[command.len()..].trim();
+                let message = if args.is_empty() {
+                    prompt
+                } else {
+                    format!("{prompt}\n\nAdditional arguments: {args}")
+                };
+                self.send_message(message).await?;
+                Ok(true)
+            }
         }
     }
 
@@ -4003,6 +4034,63 @@ mod tests {
 
         assert!(!handled);
         assert_eq!(app.mode, AppMode::Chat);
+    }
+
+    /// `/review` isn't a built-in UI command like `/help` - it should resolve
+    /// through the generic skill-lookup fallback (to the built-in `review`
+    /// skill, since no `.crustly/skills/review` exists in the test cwd) and be
+    /// handled as a message to the agent, not fall through as literal chat text.
+    #[tokio::test]
+    async fn slash_review_resolves_to_the_builtin_skill() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+
+        let handled = app.try_handle_slash_command("/review").await.unwrap();
+
+        assert!(handled, "/review should resolve via the skill fallback");
+        let sent = app
+            .messages
+            .last()
+            .expect("send_message should have appended the user message");
+        assert_eq!(sent.role, "user");
+        assert!(
+            sent.content.contains("name: review"),
+            "the agent should receive the skill's SKILL.md content, not the literal \"/review\" text: {}",
+            sent.content
+        );
+    }
+
+    /// Trailing text after the skill name (e.g. `/review 42`) must reach the
+    /// agent too, not get silently dropped in favor of the bare skill body.
+    #[tokio::test]
+    async fn slash_review_with_arguments_appends_them_to_the_skill_prompt() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+
+        app.try_handle_slash_command("/review 42").await.unwrap();
+
+        let sent = app.messages.last().unwrap();
+        assert!(sent.content.contains("Additional arguments: 42"));
+    }
+
+    /// Same fallback, different built-in: `/spec` should resolve to the SDD
+    /// workflow skill, with a new feature description passed through as args.
+    #[tokio::test]
+    async fn slash_spec_resolves_to_the_builtin_skill_with_arguments() {
+        let mut app = test_app().await;
+        app.create_new_session().await.unwrap();
+
+        let handled = app
+            .try_handle_slash_command("/spec Add CSV export to reports")
+            .await
+            .unwrap();
+
+        assert!(handled, "/spec should resolve via the skill fallback");
+        let sent = app.messages.last().unwrap();
+        assert!(sent.content.contains("name: spec"));
+        assert!(sent
+            .content
+            .contains("Additional arguments: Add CSV export to reports"));
     }
 
     /// Regression: ratatui-textarea underlines the cursor line by default, so

@@ -10,6 +10,8 @@
 //!   3. `~/.config/crustly/skills/<name>/SKILL.md` — user-global
 //!   4. `~/.claude/skills/<name>/SKILL.md` — user-global (Claude Code compat)
 //!   5. Direct `.md` file in any of the above directories (legacy flat layout)
+//!   6. A built-in skill compiled into the binary (see [`builtin`]) — works with
+//!      no project setup at all, and is shadowed by any of the above.
 
 use super::error::{Result, ToolError};
 use super::r#trait::{Tool, ToolCapability, ToolExecutionContext, ToolResult};
@@ -17,6 +19,29 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+
+/// Skills shipped with crustly itself, embedded at compile time so `/review`
+/// (and future built-ins) work in any project without a `.crustly/skills/`
+/// directory. A project or user skill of the same name always takes
+/// precedence — see `resolve_skill` — so these are defaults, not overrides.
+mod builtin {
+    /// `(name, SKILL.md contents)` pairs, checked case-insensitively.
+    const SKILLS: &[(&str, &str)] = &[
+        ("review", include_str!("builtin_skills/review.md")),
+        ("spec", include_str!("builtin_skills/spec.md")),
+    ];
+
+    pub(super) fn lookup(name: &str) -> Option<&'static str> {
+        SKILLS
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+            .map(|(_, content)| *content)
+    }
+
+    pub(super) fn names() -> impl Iterator<Item = &'static str> {
+        SKILLS.iter().map(|(n, _)| *n)
+    }
+}
 
 pub struct SkillTool;
 
@@ -104,24 +129,28 @@ impl Tool for SkillTool {
             ));
         }
 
-        let skill_path = tokio::task::spawn_blocking({
+        let resolved = tokio::task::spawn_blocking({
             let name = name.clone();
             let cwd = context.working_directory.clone();
-            move || resolve_skill_path(&name, &cwd)
+            move || resolve_skill(&name, &cwd)
         })
         .await
         .map_err(|e| ToolError::Execution(format!("task panicked: {e}")))?
-        .map_err(ToolError::Execution)?;
+        .ok_or_else(|| ToolError::Execution(format!("unknown skill: {name}")))?;
 
-        let contents = tokio::fs::read_to_string(&skill_path)
-            .await
-            .map_err(ToolError::Io)?;
+        let path_display = resolved.display();
+        let contents = match resolved {
+            SkillSource::File(path) => tokio::fs::read_to_string(&path)
+                .await
+                .map_err(ToolError::Io)?,
+            SkillSource::Builtin(content) => content.to_string(),
+        };
 
         let description = parse_skill_frontmatter_value(&contents, "description");
 
         let output = SkillOutput {
             skill: name,
-            path: skill_path.display().to_string(),
+            path: path_display,
             args: input.args,
             description,
             prompt: contents,
@@ -131,6 +160,52 @@ impl Tool for SkillTool {
 
         Ok(ToolResult::success(json).with_metadata("path".to_string(), output.path))
     }
+}
+
+/// Where a resolved skill's content came from — a real file, or a built-in
+/// compiled into the binary. Kept alongside the borrowed `&'static str` so
+/// callers don't need to re-run resolution just to read the content.
+enum SkillSource {
+    File(PathBuf),
+    Builtin(&'static str),
+}
+
+impl SkillSource {
+    fn display(&self) -> String {
+        match self {
+            SkillSource::File(path) => path.display().to_string(),
+            SkillSource::Builtin(_) => "<builtin>".to_string(),
+        }
+    }
+}
+
+/// Resolve `name` to its content, trying file-based lookup first (project-local,
+/// then user-global) and falling back to a built-in skill. Returns `None` if
+/// neither has it.
+fn resolve_skill(name: &str, cwd: &Path) -> Option<SkillSource> {
+    if let Ok(path) = resolve_skill_path(name, cwd) {
+        return Some(SkillSource::File(path));
+    }
+    builtin::lookup(name).map(SkillSource::Builtin)
+}
+
+/// Synchronous convenience wrapper for non-tool callers (e.g. the TUI resolving
+/// a `/name` slash command directly) that just want the content and
+/// description, without going through the `Tool` trait. Reads file-based
+/// skills eagerly, so should not be called from a context where blocking I/O
+/// is unacceptable — the TUI's key-handling path already does equivalent
+/// synchronous reads for `list_skills`.
+pub(crate) fn resolve_skill_content(name: &str, cwd: &Path) -> Option<(String, Option<String>)> {
+    let name = name.trim().trim_start_matches('/');
+    if name.is_empty() || name.contains('\0') || name.split(['/', '\\']).any(|c| c == "..") {
+        return None;
+    }
+    let content = match resolve_skill(name, cwd)? {
+        SkillSource::File(path) => std::fs::read_to_string(path).ok()?,
+        SkillSource::Builtin(content) => content.to_string(),
+    };
+    let description = parse_skill_frontmatter_value(&content, "description");
+    Some((content, description))
 }
 
 /// Resolve the SKILL.md path for `name`, searching project-local then user-global roots.
@@ -262,6 +337,19 @@ pub(crate) fn list_skills(cwd: &Path) -> Vec<SkillListing> {
                     root: root.clone(),
                 });
             }
+        }
+    }
+
+    // Built-ins fill in any name not already provided by a project/user file,
+    // matching the precedence `resolve_skill` uses.
+    for name in builtin::names() {
+        if seen.insert(name.to_lowercase()) {
+            let content = builtin::lookup(name).unwrap_or_default();
+            skills.push(SkillListing {
+                description: parse_skill_frontmatter_value(content, "description"),
+                name: name.to_string(),
+                root: PathBuf::from("<builtin>"),
+            });
         }
     }
 
@@ -455,5 +543,81 @@ mod tests {
         // No .crustly/ or .claude/ under tmp.path() at all - just confirms
         // this doesn't panic when there's nothing to find.
         let _ = list_skills(tmp.path());
+    }
+
+    #[test]
+    fn resolve_skill_content_falls_back_to_builtin_review_skill() {
+        let tmp = tempfile::tempdir().unwrap();
+        // No .crustly/skills/review anywhere under tmp - only the built-in exists.
+        let (content, description) = resolve_skill_content("review", tmp.path())
+            .expect("built-in review skill should resolve with no project skill present");
+        assert!(content.contains("name: review"));
+        assert!(description.is_some());
+    }
+
+    #[test]
+    fn resolve_skill_content_prefers_project_file_over_builtin() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skill_dir = tmp.path().join(".crustly").join("skills").join("review");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\ndescription: Project override\n---\nCustom body.",
+        )
+        .unwrap();
+
+        let (content, description) = resolve_skill_content("review", tmp.path()).unwrap();
+        assert_eq!(description.as_deref(), Some("Project override"));
+        assert!(content.contains("Custom body."));
+    }
+
+    #[test]
+    fn resolve_skill_content_returns_none_for_unknown_skill() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(resolve_skill_content("not-a-real-skill", tmp.path()).is_none());
+    }
+
+    #[test]
+    fn list_skills_includes_builtin_review_skill() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skills = list_skills(tmp.path());
+        assert!(skills.iter().any(|s| s.name == "review"));
+    }
+
+    #[test]
+    fn resolve_skill_content_falls_back_to_builtin_spec_skill() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (content, description) = resolve_skill_content("spec", tmp.path())
+            .expect("built-in spec skill should resolve with no project skill present");
+        assert!(content.contains("name: spec"));
+        assert!(description.is_some());
+    }
+
+    #[test]
+    fn list_skills_includes_builtin_spec_skill() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skills = list_skills(tmp.path());
+        assert!(skills.iter().any(|s| s.name == "spec"));
+    }
+
+    #[test]
+    fn list_skills_lets_project_skill_shadow_builtin_of_same_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skill_dir = tmp.path().join(".crustly").join("skills").join("review");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\ndescription: Project override\n---\nCustom body.",
+        )
+        .unwrap();
+
+        let skills = list_skills(tmp.path());
+        let matches: Vec<_> = skills.iter().filter(|s| s.name == "review").collect();
+        assert_eq!(
+            matches.len(),
+            1,
+            "builtin should be shadowed, not duplicated"
+        );
+        assert_eq!(matches[0].description.as_deref(), Some("Project override"));
     }
 }

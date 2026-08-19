@@ -97,6 +97,47 @@ design/safety reasoning (documented in the plan's §0.0 Phase 4b entry) is
 judged sound enough to ship unverified, but a real run is the next step for
 whoever has a model and terminal to try it against.
 
+### Unreleased — Native `/review` and `/spec` Skills
+Closed a gap where the `skill` tool (Phase 4) could load a `SKILL.md` file
+but nothing actually routed a typed `/<name>` slash command to it — and
+shipped two built-in skills on top of the fix.
+
+- **Generic slash-command → skill routing** — `try_handle_slash_command`
+  now resolves any unmatched `/<name>` through the same lookup order
+  `SkillTool` uses (project `.crustly/skills/`, `.claude/skills/`,
+  user-global, then a built-in fallback tier) before falling through to a
+  plain chat message. Runs off `spawn_blocking` since it does filesystem
+  walks, matching `SkillTool::execute`'s existing pattern — a fix applied
+  after `/code-review` caught the first version blocking the TUI's
+  draw/handle-key loop on every submitted `/word`
+- **Built-in skill fallback tier** — a small set of skills ship compiled
+  into the binary via `include_str!`, so they work in any project with
+  zero setup; always overridable by a project/user file of the same name.
+  `list_skills()` surfaces them the same way it does file-based skills,
+  deduplicating against any shadowing override
+- **`/review`** — multi-pass automated code review of the current diff, a
+  PR, a branch, or a path: independent correctness/guideline-compliance/
+  security passes dispatched in parallel via the `agent` tool, then a
+  second, skeptical pass filters findings by confidence before anything
+  is reported. Optional `--comment` (posts a summary via `gh`) and
+  `--fix` (applies surviving findings via `edit_file`/`apply_patch`)
+- **`/spec`** — native Specification-Driven Development workflow
+  (`specify → plan → tasks → implement → analyze`), writing to
+  `specs/<NNN>-<slug>/`. Studied from the author's own external
+  [rustyspec](https://github.com/jyjeanne/rustyspec) and
+  [solidspec](https://github.com/jyjeanne/solidspec) projects and modeled
+  on solidspec's `spec-driven` schema — documented there as the
+  polyvalent default among its 7 workflow schemas (`minimal`,
+  `spec-driven`, `security-first`, `tdd-driven`, `intent-driven`,
+  `apex-driven`, `intent-apex`). Unlike those tools, which are separate
+  CLIs and must hand off `implement` to an external agent's CLI, Crustly's
+  `implement` phase runs natively in-session via its own
+  `task_manager`/`write_file`/`edit_file`/`bash` tools, checking off
+  `tasks.md` as it builds. Includes a constitution gate (simplicity /
+  anti-abstraction / integration-first) during `plan`
+- Content of both skills is original — written fresh for Crustly's own
+  tool names and architecture, not ported from any external source
+
 ---
 
 ## Upcoming Milestones
