@@ -114,7 +114,6 @@
 - [prompt_analyzer](../modules/src/tui/prompt_analyzer.md) — Rust Module
 - [render](../modules/src/tui/render.md) — Rust Module
 - [runner](../modules/src/tui/runner.md) — Rust Module
-- [splash](../modules/src/tui/splash.md) — Rust Module
 - [styles](../modules/src/tui/styles.md) — Rust Module
 - [utils](../modules/src/tui/utils.md) — Rust Module
 - [utils](../modules/src/utils.md) — Rust Module

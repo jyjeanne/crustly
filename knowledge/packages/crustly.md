@@ -122,7 +122,6 @@ generated:
 - [prompt_analyzer](../modules/src/tui/prompt_analyzer.md)
 - [render](../modules/src/tui/render.md)
 - [runner](../modules/src/tui/runner.md)
-- [splash](../modules/src/tui/splash.md)
 - [styles](../modules/src/tui/styles.md)
 - [utils](../modules/src/tui/utils.md)
 - [utils](../modules/src/utils.md)

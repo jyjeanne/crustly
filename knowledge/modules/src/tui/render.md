@@ -9,7 +9,6 @@ relationships:
   - external/super-app-app
   - external/super-events-appmode
   - external/super-markdown-parse-markdown-parse-plain-text
-  - external/super-splash
   - external/crate-config-planexecmode
   - external/ratatui-layout-alignment-constraint-direction-layout-rect-style-color-modifier-style-text-line-span-widgets-block-borders-paragraph-wrap-frame
   - external/super
@@ -130,7 +129,6 @@ relationships:
 - `super::app::App`
 - `super::events::AppMode`
 - `super::markdown::{parse_markdown, parse_plain_text}`
-- `super::splash`
 - `crate::config::PlanExecMode`
 - `ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
