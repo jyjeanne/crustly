@@ -1,5 +1,12 @@
 # Startup Splash Screen Feature
 
+> **Removed.** The splash screen described below was removed - it added a
+> mandatory delay before reaching the chat with no functional benefit, which
+> read as slowness on startup. The app now starts directly in `Chat` mode.
+> The version/author/tagline it showed now live in the Help screen's
+> "ABOUT" section (`help_about()` in `src/tui/render.rs`). This document is
+> kept for historical reference only.
+
 ## Overview
 Added a beautiful startup splash screen that displays when Crustly launches, featuring a Rust crab ASCII art logo, project information, and version details.
 

@@ -123,9 +123,6 @@ pub struct App {
     // Animation state
     pub animation_frame: usize,
 
-    // Splash screen state
-    splash_shown_at: Option<std::time::Instant>,
-
     // Approval state
     pub pending_approval: Option<ToolApprovalRequest>,
     pub show_approval_details: bool,
@@ -301,7 +298,7 @@ impl App {
             current_session: None,
             messages: Vec::new(),
             sessions: Vec::new(),
-            mode: AppMode::Splash,
+            mode: AppMode::Chat,
             textarea: plain_textarea(),
             input_history: Vec::new(),
             history_pos: None,
@@ -317,7 +314,6 @@ impl App {
             processing_session: None,
             error_message: None,
             animation_frame: 0,
-            splash_shown_at: Some(std::time::Instant::now()),
             pending_approval: None,
             show_approval_details: false,
             current_plan: None,
@@ -1174,16 +1170,6 @@ impl App {
         // Mode-specific handling
         tracing::trace!("Current mode: {:?}", self.mode);
         match self.mode {
-            AppMode::Splash => {
-                // Check if minimum display time (3 seconds) has elapsed
-                if let Some(shown_at) = self.splash_shown_at {
-                    if shown_at.elapsed() >= std::time::Duration::from_secs(3) {
-                        self.splash_shown_at = None;
-                        self.switch_mode(AppMode::Chat).await?;
-                    }
-                    // If not enough time has elapsed, ignore the key press
-                }
-            }
             AppMode::Chat => self.handle_chat_key(event).await?,
             AppMode::Plan => self.handle_plan_key(event).await?,
             AppMode::Sessions => self.handle_sessions_key(event).await?,
@@ -3539,8 +3525,8 @@ mod tests {
         use crossterm::event::{KeyEvent, KeyEventKind};
 
         let mut app = test_app().await;
-        // handle_event dispatches by mode (the app starts in Splash), unlike the
-        // other tests, which call handle_chat_key directly.
+        // handle_event dispatches by mode, unlike the other tests, which call
+        // handle_chat_key directly.
         app.mode = AppMode::Chat;
         app.push_input_history("first message");
         app.push_input_history("second message");
