@@ -6,7 +6,6 @@ generated:
   by: okf-rs/0.3.0
 relationships:
   calls:
-  - functions/src/tui/splash/render_splash
   - functions/src/tui/render/render_header
   - functions/src/tui/render/render_chat
   - functions/src/tui/render/render_input
@@ -35,7 +34,6 @@ relationships:
 
 # Calls
 
-- [render_splash](../../../../functions/src/tui/splash/render_splash.md)
 - [render_header](../../../../functions/src/tui/render/render_header.md)
 - [render_chat](../../../../functions/src/tui/render/render_chat.md)
 - [render_input](../../../../functions/src/tui/render/render_input.md)

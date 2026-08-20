@@ -29,7 +29,6 @@ relationships:
   - functions/src/tui/render/render_llama_cpp_confirm_delete
   - functions/src/tui/render/render_llama_cpp_deleting
   - functions/src/tui/render/render_llama_cpp_switching
-  - functions/src/tui/splash/render_splash_content
 ---
 
 # Signature
@@ -61,4 +60,3 @@ relationships:
 - [render_llama_cpp_confirm_delete](../../../../functions/src/tui/render/render_llama_cpp_confirm_delete.md)
 - [render_llama_cpp_deleting](../../../../functions/src/tui/render/render_llama_cpp_deleting.md)
 - [render_llama_cpp_switching](../../../../functions/src/tui/render/render_llama_cpp_switching.md)
-- [render_splash_content](../../../../functions/src/tui/splash/render_splash_content.md)

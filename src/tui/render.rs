@@ -5,7 +5,6 @@
 use super::app::App;
 use super::events::AppMode;
 use super::markdown::{parse_markdown, parse_plain_text};
-use super::splash;
 use crate::config::PlanExecMode;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -17,12 +16,6 @@ use ratatui::{
 
 /// Render the entire UI
 pub fn render(f: &mut Frame, app: &App) {
-    // Show splash screen if in splash mode
-    if app.mode == AppMode::Splash {
-        splash::render_splash(f, f.area(), app.provider_name(), app.provider_model());
-        return;
-    }
-
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -37,9 +30,6 @@ pub fn render(f: &mut Frame, app: &App) {
     render_header(f, app, chunks[0]);
 
     match app.mode {
-        AppMode::Splash => {
-            // Already handled above
-        }
         AppMode::Chat => {
             render_chat(f, app, chunks[1]);
             render_input(f, app, chunks[2]);
@@ -892,6 +882,36 @@ fn help_features() -> Vec<Line<'static>> {
     lines
 }
 
+/// "About" section: version, author, and tagline that used to live on the
+/// startup splash screen (removed - it just delayed getting to the chat).
+fn help_about() -> Vec<Line<'static>> {
+    let mut lines =
+        help_section_header("╭─ ABOUT ───────────────────────────────────────────────────╮")
+            .to_vec();
+    lines.extend([
+        Line::from(vec![
+            Span::styled("  🥐 Crustly ", Style::default().fg(Color::White)),
+            Span::styled(
+                format!("v{}", env!("CARGO_PKG_VERSION")),
+                Style::default()
+                    .fg(Color::Rgb(184, 134, 11))
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Author: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Jeremy JEANNE", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![Span::styled(
+            "  High-performance terminal AI assistant",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        )]),
+    ]);
+    lines
+}
+
 fn help_footer() -> Vec<Line<'static>> {
     vec![
         Line::from(""),
@@ -931,6 +951,7 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
     help_text.extend(help_session_list());
     help_text.extend(help_plan_mode());
     help_text.extend(help_features());
+    help_text.extend(help_about());
     help_text.extend(help_footer());
 
     let help = Paragraph::new(help_text)
@@ -2539,7 +2560,6 @@ fn render_llama_cpp_switching(f: &mut Frame, path: &std::path::Path, area: Rect)
 /// Render the status bar
 fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let mode_text = match app.mode {
-        AppMode::Splash => "WELCOME",
         AppMode::Chat => "CHAT",
         AppMode::Plan => "PLAN",
         AppMode::Sessions => "SESSIONS",

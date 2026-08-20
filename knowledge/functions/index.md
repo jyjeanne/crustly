@@ -2265,8 +2265,6 @@
 - [run_inner](../functions/src/tui/runner/run_inner.md) — Rust Function
 - [run_loop](../functions/src/tui/runner/run_loop.md) — Rust Function
 - [run_loop_exits_immediately_when_should_quit_is_set](../functions/src/tui/runner/run_loop_exits_immediately_when_should_quit_is_set.md) — Rust Function
-- [render_splash](../functions/src/tui/splash/render_splash.md) — Rust Function
-- [render_splash_content](../functions/src/tui/splash/render_splash_content.md) — Rust Function
 - [api](../functions/src/utils/retry/RetryConfig/api.md) — Rust Method
 - [api_aggressive](../functions/src/utils/retry/RetryConfig/api_aggressive.md) — Rust Method
 - [calculate_delay](../functions/src/utils/retry/RetryConfig/calculate_delay.md) — Rust Method
