@@ -149,7 +149,7 @@ base64 = "0.23"
 # Document Parsing
 pdf-extract = "0.12"
 zip = "8.6"
-quick-xml = "0.41"
+quick-xml = "0.42"
 
 [dev-dependencies]
 rstest = "0.26"
