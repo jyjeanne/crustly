@@ -330,6 +330,26 @@ impl DocParserTool {
         .map_err(|e| ToolError::Execution(format!("DOCX parsing task failed: {}", e)))?
     }
 
+    /// Resolve a `&name;` or `&#NNN;` general entity/character reference
+    /// event to its textual value.
+    ///
+    /// quick-xml 0.42 stopped inlining entity references into `Text`
+    /// events - `Hello &amp; World` now arrives as `Text("Hello ")`,
+    /// `GeneralRef("amp")`, `Text(" World")` - so callers must handle
+    /// `Event::GeneralRef` explicitly or silently lose the referenced
+    /// character. Only the five predefined XML entities and numeric
+    /// character references are resolved (XML has no built-in named
+    /// entities beyond those without a DTD); anything else is dropped,
+    /// matching `quick_xml::escape::unescape`'s own behavior for unknown
+    /// entities.
+    fn resolve_general_ref(r: &quick_xml::events::BytesRef<'_>) -> Option<String> {
+        if r.is_char_ref() {
+            r.resolve_char_ref().ok().flatten().map(|c| c.to_string())
+        } else {
+            quick_xml::escape::resolve_xml_entity(r.as_ref()).map(|s| s.to_string())
+        }
+    }
+
     /// Extract text from DOCX XML content
     fn extract_text_from_docx_xml(xml: &str) -> String {
         let mut text = String::new();
@@ -354,6 +374,11 @@ impl DocParserTool {
                         text.push_str(&t);
                     }
                 }
+                Ok(quick_xml::events::Event::GeneralRef(ref r)) if in_text => {
+                    if let Some(s) = Self::resolve_general_ref(r) {
+                        text.push_str(&s);
+                    }
+                }
                 Ok(quick_xml::events::Event::End(ref e)) if e.name().as_ref() == "w:t" => {
                     in_text = false;
                 }
@@ -374,20 +399,43 @@ impl DocParserTool {
         let mut reader = quick_xml::Reader::from_str(xml);
         let mut buf = Vec::new();
         let mut current_element = String::new();
+        let mut current_text = String::new();
 
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
                     current_element = e.name().as_ref().to_string();
+                    current_text.clear();
                 }
                 Ok(quick_xml::events::Event::Text(e)) => {
                     if let Some(t) = quick_xml::escape::unescape(&e).ok().map(|s| s.into_owned()) {
-                        match current_element.as_str() {
-                            "dc:title" => title = Some(t),
-                            "dc:creator" => author = Some(t),
-                            _ => {}
+                        current_text.push_str(&t);
+                    }
+                }
+                Ok(quick_xml::events::Event::GeneralRef(ref r)) => {
+                    if let Some(s) = Self::resolve_general_ref(r) {
+                        current_text.push_str(&s);
+                    }
+                }
+                Ok(quick_xml::events::Event::End(ref e)) => {
+                    // Only commit the buffered text if this closes the
+                    // element we were tracking - guards against a stray
+                    // whitespace-only Text event between `</dc:title>` and
+                    // the next tag being misattributed (current_element
+                    // used to never get cleared on End, so trailing
+                    // whitespace clobbered the value that was just read).
+                    if e.name().as_ref() == current_element {
+                        let value = current_text.trim();
+                        if !value.is_empty() {
+                            match current_element.as_str() {
+                                "dc:title" => title = Some(value.to_string()),
+                                "dc:creator" => author = Some(value.to_string()),
+                                _ => {}
+                            }
                         }
                     }
+                    current_element.clear();
+                    current_text.clear();
                 }
                 Ok(quick_xml::events::Event::Eof) => break,
                 Err(_) => break,
@@ -515,25 +563,48 @@ impl DocParserTool {
             .await
             .map_err(ToolError::Io)?;
 
-        // Extract text content from XML
+        // Extract text content from XML. Text and entity/character
+        // references (`Event::GeneralRef`, see `resolve_general_ref`) are
+        // buffered into `current_run` and flushed as one line whenever a
+        // non-text event breaks the run, so a value like `Tom &amp; Jerry`
+        // - split by quick-xml into `Text("Tom ")`, `GeneralRef("amp")`,
+        // `Text(" Jerry")` - stays on a single line instead of being torn
+        // across three.
         let mut text = String::new();
+        let mut current_run = String::new();
         let mut reader = quick_xml::Reader::from_str(&xml_text);
         let mut buf = Vec::new();
+
+        let flush = |text: &mut String, current_run: &mut String| {
+            let trimmed = current_run.trim();
+            if !trimmed.is_empty() {
+                text.push_str(trimmed);
+                text.push('\n');
+            }
+            current_run.clear();
+        };
 
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Text(e)) => {
                     if let Some(t) = quick_xml::escape::unescape(&e).ok().map(|s| s.into_owned()) {
-                        let trimmed = t.trim();
-                        if !trimmed.is_empty() {
-                            text.push_str(trimmed);
-                            text.push('\n');
-                        }
+                        current_run.push_str(&t);
                     }
                 }
-                Ok(quick_xml::events::Event::Eof) => break,
-                Err(_) => break,
-                _ => {}
+                Ok(quick_xml::events::Event::GeneralRef(ref r)) => {
+                    if let Some(s) = Self::resolve_general_ref(r) {
+                        current_run.push_str(&s);
+                    }
+                }
+                Ok(quick_xml::events::Event::Eof) => {
+                    flush(&mut text, &mut current_run);
+                    break;
+                }
+                Err(_) => {
+                    flush(&mut text, &mut current_run);
+                    break;
+                }
+                _ => flush(&mut text, &mut current_run),
             }
             buf.clear();
         }
@@ -763,5 +834,69 @@ mod tests {
         let html = "<html><head><title>My Document</title></head><body></body></html>";
         let title = DocParserTool::extract_html_title(html);
         assert_eq!(title, Some("My Document".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_parse_xml_file() {
+        let (_temp_dir, file_path, context) = context_with_file(
+            "test.xml",
+            "<root><item>Hello &amp; World</item><item>Second line</item></root>",
+        );
+
+        let tool = DocParserTool;
+        let input = serde_json::json!({
+            "path": file_path.to_str().unwrap()
+        });
+
+        let result = tool.execute(input, &context).await.unwrap();
+        assert!(result.success);
+        assert!(result.output.contains("Hello & World"));
+        assert!(result.output.contains("Second line"));
+    }
+
+    #[test]
+    fn test_extract_text_from_docx_xml_reads_paragraphs_and_unescapes_entities() {
+        let xml = "<w:document><w:body>\
+            <w:p><w:r><w:t>Hello &amp; welcome</w:t></w:r></w:p>\
+            <w:p><w:r><w:t>Second paragraph</w:t></w:r></w:p>\
+            </w:body></w:document>";
+
+        let text = DocParserTool::extract_text_from_docx_xml(xml);
+        assert!(text.contains("Hello & welcome"));
+        assert!(text.contains("Second paragraph"));
+        // w:p introduces a newline between paragraphs.
+        assert!(text.contains("Hello & welcome\nSecond paragraph"));
+    }
+
+    #[test]
+    fn test_extract_text_from_docx_xml_ignores_text_outside_w_t() {
+        let xml = "<w:document><w:body><w:p><w:pPr><w:ignored>skip me</w:ignored></w:pPr>\
+            <w:r><w:t>Kept text</w:t></w:r></w:p></w:body></w:document>";
+
+        let text = DocParserTool::extract_text_from_docx_xml(xml);
+        assert!(text.contains("Kept text"));
+        assert!(!text.contains("skip me"));
+    }
+
+    #[test]
+    fn test_extract_metadata_from_core_xml() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <cp:coreProperties xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:title>Quarterly Report</dc:title>
+                <dc:creator>Jane Doe &amp; Co</dc:creator>
+            </cp:coreProperties>"#;
+
+        let (title, author) = DocParserTool::extract_metadata_from_core_xml(xml);
+        assert_eq!(title, Some("Quarterly Report".to_string()));
+        assert_eq!(author, Some("Jane Doe & Co".to_string()));
+    }
+
+    #[test]
+    fn test_extract_metadata_from_core_xml_missing_fields() {
+        let xml = r#"<cp:coreProperties xmlns:dc="http://purl.org/dc/elements/1.1/"></cp:coreProperties>"#;
+
+        let (title, author) = DocParserTool::extract_metadata_from_core_xml(xml);
+        assert_eq!(title, None);
+        assert_eq!(author, None);
     }
 }
