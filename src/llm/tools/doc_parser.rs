@@ -341,24 +341,20 @@ impl DocParserTool {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
                     // w:t is the text element in DOCX
-                    if e.name().as_ref() == b"w:t" {
+                    if e.name().as_ref() == "w:t" {
                         in_text = true;
                     }
                     // w:p is paragraph - add newline after each
-                    if e.name().as_ref() == b"w:p" && !text.is_empty() {
+                    if e.name().as_ref() == "w:p" && !text.is_empty() {
                         text.push('\n');
                     }
                 }
                 Ok(quick_xml::events::Event::Text(e)) if in_text => {
-                    if let Some(t) = e
-                        .decode()
-                        .ok()
-                        .and_then(|t| quick_xml::escape::unescape(&t).ok().map(|s| s.into_owned()))
-                    {
+                    if let Some(t) = quick_xml::escape::unescape(&e).ok().map(|s| s.into_owned()) {
                         text.push_str(&t);
                     }
                 }
-                Ok(quick_xml::events::Event::End(ref e)) if e.name().as_ref() == b"w:t" => {
+                Ok(quick_xml::events::Event::End(ref e)) if e.name().as_ref() == "w:t" => {
                     in_text = false;
                 }
                 Ok(quick_xml::events::Event::Eof) => break,
@@ -382,14 +378,10 @@ impl DocParserTool {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
-                    current_element = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                    current_element = e.name().as_ref().to_string();
                 }
                 Ok(quick_xml::events::Event::Text(e)) => {
-                    if let Some(t) = e
-                        .decode()
-                        .ok()
-                        .and_then(|t| quick_xml::escape::unescape(&t).ok().map(|s| s.into_owned()))
-                    {
+                    if let Some(t) = quick_xml::escape::unescape(&e).ok().map(|s| s.into_owned()) {
                         match current_element.as_str() {
                             "dc:title" => title = Some(t),
                             "dc:creator" => author = Some(t),
@@ -531,11 +523,7 @@ impl DocParserTool {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(quick_xml::events::Event::Text(e)) => {
-                    if let Some(t) = e
-                        .decode()
-                        .ok()
-                        .and_then(|t| quick_xml::escape::unescape(&t).ok().map(|s| s.into_owned()))
-                    {
+                    if let Some(t) = quick_xml::escape::unescape(&e).ok().map(|s| s.into_owned()) {
                         let trimmed = t.trim();
                         if !trimmed.is_empty() {
                             text.push_str(trimmed);
