@@ -93,7 +93,7 @@ fn bench_session_get(c: &mut Criterion) {
                 black_box({
                     sqlx::query_as::<_, Session>(
                         r#"
-                        SELECT id, title, model, created_at, updated_at, archived_at, token_count, total_cost
+                        SELECT id, title, model, created_at, updated_at, archived_at, token_count, total_cost, provider
                         FROM sessions
                         WHERE id = ?
                         "#
@@ -149,7 +149,7 @@ fn bench_session_list(c: &mut Criterion) {
                     black_box({
                         sqlx::query_as::<_, Session>(
                             r#"
-                            SELECT id, title, model, created_at, updated_at, archived_at, token_count, total_cost
+                            SELECT id, title, model, created_at, updated_at, archived_at, token_count, total_cost, provider
                             FROM sessions
                             ORDER BY created_at DESC
                             "#

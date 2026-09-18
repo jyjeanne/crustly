@@ -1224,7 +1224,13 @@ impl QwenProvider {
             .get("retry-after")
             .and_then(|v| v.to_str().ok().and_then(|s| s.parse::<u64>().ok()));
 
-        if let Ok(error_body) = response.json::<QwenErrorResponse>().await {
+        // Read the body once so structured API errors retain their typed
+        // fields while non-standard local servers (such as vLLM) still
+        // expose a useful diagnostic instead of being collapsed to
+        // "Unknown error".
+        let body = response.text().await.unwrap_or_default();
+
+        if let Ok(error_body) = serde_json::from_str::<QwenErrorResponse>(&body) {
             let message = if status == 429 {
                 if let Some(secs) = retry_after {
                     format!(
@@ -1260,9 +1266,14 @@ impl QwenProvider {
             };
             ProviderError::RateLimitExceeded(message)
         } else {
+            let message = if body.trim().is_empty() {
+                "Unknown error".to_string()
+            } else {
+                body.chars().take(1024).collect()
+            };
             ProviderError::ApiError {
                 status,
-                message: "Unknown error".to_string(),
+                message,
                 error_type: None,
             }
         }
@@ -1579,7 +1590,12 @@ impl Provider for QwenProvider {
             "qwen-max" => Some(32_768),
             "qwen-plus" => Some(131_072),
             "qwen-turbo" => Some(131_072),
-            _ => Some(32_768), // Conservative default
+            // Local OpenAI-compatible servers commonly run with an 8K
+            // context unless explicitly configured otherwise. Keep the
+            // local fallback conservative so the agent's prompt-aware
+            // completion budget does not overrun vLLM's limit.
+            _ if self.is_local() => Some(8_192),
+            _ => Some(32_768), // Conservative cloud default
         }
     }
 

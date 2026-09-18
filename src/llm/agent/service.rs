@@ -3,12 +3,12 @@
 //! Core service for managing AI agent conversations, coordinating between
 //! LLM providers, context management, and data persistence.
 
-use super::context::AgentContext;
+use super::context::{token_count, AgentContext};
 use super::error::{AgentError, Result};
 use crate::llm::provider::router::ModelRouter;
 use crate::llm::provider::{
     ContentBlock, ContentDelta, LLMRequest, LLMResponse, Message, PerfMetrics, Provider,
-    ProviderStream, StopReason, StreamEvent, TokenUsage,
+    ProviderStream, StopReason, StreamEvent, TokenUsage, Tool,
 };
 use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
 use crate::llm::tools::{FileReadCache, ToolCapability, ToolExecutionContext, ToolRegistry};
@@ -54,6 +54,40 @@ fn has_mutating_capability(caps: &[ToolCapability]) -> bool {
                 | ToolCapability::SystemModification
         )
     })
+}
+
+/// Choose a completion budget that fits alongside the prompt and tool schema.
+///
+/// Providers reject requests when `prompt_tokens + max_tokens` exceeds their
+/// context window. The context tracker already estimates conversation tokens,
+/// but the system prompt and serialized tool definitions are added separately
+/// by providers (Qwen's Hermes adapter embeds the schemas in its system text),
+/// so include both here with a conservative framing margin.
+fn completion_token_budget(
+    context_window: u32,
+    context: &AgentContext,
+    system_prompt: Option<&str>,
+    tools: Option<&[Tool]>,
+) -> u32 {
+    const DEFAULT_MAX_COMPLETION: usize = 4096;
+    // Provider adapters may expand tool schemas (Qwen/Hermes does this in
+    // the system prompt), so the serialized-schema estimate needs a generous
+    // allowance for chat-template and framing tokens.
+    const PROMPT_FRAMING_MARGIN: usize = 1024;
+
+    let system_tokens = system_prompt.map(token_count).unwrap_or(0) as usize;
+    let tool_tokens = tools
+        .and_then(|defs| serde_json::to_string(defs).ok())
+        .map(|serialized| token_count(&serialized) as usize)
+        .unwrap_or(0);
+    let prompt_tokens = context
+        .token_count
+        .saturating_add(system_tokens)
+        .saturating_add(tool_tokens)
+        .saturating_add(PROMPT_FRAMING_MARGIN);
+    let available = (context_window as usize).saturating_sub(prompt_tokens);
+
+    available.min(DEFAULT_MAX_COMPLETION).max(1) as u32
 }
 
 /// Build a loop-detection signature for one tool call: `<name>:<distinguishing
@@ -932,9 +966,11 @@ impl AgentService {
         while iteration < self.max_tool_iterations {
             iteration += 1;
 
-            // Build LLM request with tools if available
-            let mut request =
-                LLMRequest::new(model_name.clone(), context.messages.clone()).with_max_tokens(4096);
+            // Build LLM request with tools if available. The final completion
+            // budget is calculated after tool definitions are attached so
+            // smaller local context windows (for example vLLM at 8K) do not
+            // receive an over-budget request.
+            let mut request = LLMRequest::new(model_name.clone(), context.messages.clone());
 
             if let Some(system) = &context.system_prompt {
                 request = request.with_system(system.clone());
@@ -946,9 +982,22 @@ impl AgentService {
             if tool_count > 0 {
                 let tool_defs = self.tool_registry.get_tool_definitions();
                 tracing::debug!("Adding {} tool definitions to request", tool_defs.len());
-                request = request.with_tools(tool_defs);
+                let max_tokens = completion_token_budget(
+                    context_window,
+                    &context,
+                    context.system_prompt.as_deref(),
+                    Some(&tool_defs),
+                );
+                request = request.with_tools(tool_defs).with_max_tokens(max_tokens);
             } else {
                 tracing::warn!("No tools registered in tool registry!");
+                let max_tokens = completion_token_budget(
+                    context_window,
+                    &context,
+                    context.system_prompt.as_deref(),
+                    None,
+                );
+                request = request.with_max_tokens(max_tokens);
             }
 
             // Send to provider — stream when chunk_tx is available, otherwise block.
@@ -1644,9 +1693,16 @@ impl AgentService {
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
-        // Build base LLM request
-        let request =
-            LLMRequest::new(model_name.clone(), context.messages.clone()).with_max_tokens(4096);
+        // Build base LLM request with a budget that fits the configured
+        // provider context window after accounting for the system prompt.
+        let max_tokens = completion_token_budget(
+            context_window,
+            &context,
+            context.system_prompt.as_deref(),
+            None,
+        );
+        let request = LLMRequest::new(model_name.clone(), context.messages.clone())
+            .with_max_tokens(max_tokens);
 
         let request = if let Some(system) = context.system_prompt {
             request.with_system(system)
