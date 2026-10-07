@@ -44,9 +44,10 @@ use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::{AddBos, LlamaChatMessage, LlamaChatTemplate, LlamaModel};
+use llama_cpp_2::model::{LlamaChatMessage, LlamaChatTemplate, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
 use llama_cpp_2::token::LlamaToken;
+use llama_cpp_2::vocab::LlamaVocab;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use tokio::sync::{mpsc, oneshot};
@@ -537,9 +538,7 @@ fn prepare_generation(
 ) -> Result<PreparedGeneration> {
     let prompt = build_prompt(model, chat_template, request)?;
 
-    let prompt_tokens = model
-        .str_to_token(&prompt, AddBos::Always)
-        .map_err(|e| ProviderError::InvalidRequest(format!("failed to tokenize prompt: {e}")))?;
+    let prompt_tokens = model.vocab().tokenize(prompt.as_bytes(), true, false);
 
     let n_ctx = context.n_ctx();
     if prompt_tokens.len() as u32 >= n_ctx {
@@ -646,17 +645,17 @@ fn run_complete(
     // trigger check would otherwise add for the rest of this response.
     let swap_possible = !offered_tools.is_empty() && grammar_env.is_some();
 
+    let vocab = model.vocab();
     for pos in (prompt_token_count as i32..).take(max_tokens as usize) {
         let token = sampler.sample(context, -1);
 
-        if model.is_eog_token(token) {
+        if vocab.is_eog(token) {
             stop_reason = StopReason::EndTurn;
             break;
         }
 
-        if let Ok(piece) = token_to_piece_bytes(model, token) {
-            generated_bytes.extend_from_slice(&piece);
-        }
+        let piece = token_to_piece_bytes(&vocab, token);
+        generated_bytes.extend_from_slice(&piece);
         if swap_possible && !grammar_swap_attempted {
             generated_tokens.push(token);
         }
@@ -836,17 +835,17 @@ fn run_stream(
     // check entirely for the rest of this response.
     let swap_possible = !offered_tools.is_empty() && grammar_env.is_some();
 
+    let vocab = model.vocab();
     'generate: for pos in (prompt_token_count as i32..).take(max_tokens as usize) {
         let token = sampler.sample(context, -1);
 
-        if model.is_eog_token(token) {
+        if vocab.is_eog(token) {
             stop_reason = StopReason::EndTurn;
             break;
         }
 
-        if let Ok(piece) = token_to_piece_bytes(model, token) {
-            pending_utf8.extend_from_slice(&piece);
-        }
+        let piece = token_to_piece_bytes(&vocab, token);
+        pending_utf8.extend_from_slice(&piece);
         if swap_possible && !grammar_swap_attempted {
             generated_tokens.push(token);
         }
@@ -1038,17 +1037,8 @@ fn drain_valid_utf8(buffer: &mut Vec<u8>) -> Option<String> {
 /// Convert a token to its raw UTF-8 bytes, retrying with a larger buffer if
 /// `llama.cpp` reports the initial one was too small (mirrors the retry
 /// pattern `LlamaModel::token_to_piece` itself uses internally).
-fn token_to_piece_bytes(
-    model: &LlamaModel,
-    token: LlamaToken,
-) -> std::result::Result<Vec<u8>, String> {
-    match model.token_to_piece_bytes(token, 8, false, None) {
-        Ok(bytes) => Ok(bytes),
-        Err(llama_cpp_2::TokenToStringError::InsufficientBufferSpace(needed)) => model
-            .token_to_piece_bytes(token, needed.unsigned_abs() as usize, false, None)
-            .map_err(|e| e.to_string()),
-        Err(e) => Err(e.to_string()),
-    }
+fn token_to_piece_bytes(vocab: &LlamaVocab<'_>, token: LlamaToken) -> Vec<u8> {
+    vocab.token_to_piece(token, false, None)
 }
 
 /// Build the sampler chain for one request: request-level overrides win,
