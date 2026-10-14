@@ -148,7 +148,7 @@ base64 = "0.23"
 
 # Document Parsing
 pdf-extract = "0.12"
-zip = "8.6"
+zip = "9.0"
 quick-xml = "0.42"
 
 [dev-dependencies]
