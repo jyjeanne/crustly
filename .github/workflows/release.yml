@@ -12,11 +12,6 @@ env:
   # -opencl/-mkl, each needing a GPU SDK/toolkit that GitHub-hosted runners
   # don't have, so it can't build on any of them.
   UNIX_FEATURES: openai,aws-bedrock,ollama,llama-cpp,llama-cpp-llguidance,profiling
-  # See ci.yml: keeps llama.cpp's vendored cpp-httplib from enabling HTTPS
-  # against a system OpenSSL whose headers aren't on the include path
-  # (macos-latest: "'openssl/err.h' file not found"). crustly never uses
-  # llama.cpp's own HTTP/download code.
-  CMAKE_DISABLE_FIND_PACKAGE_OpenSSL: "TRUE"
 
 jobs:
   create-release:
