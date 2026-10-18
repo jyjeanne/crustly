@@ -237,6 +237,12 @@ pub struct App {
 
     // Prompt analyzer
     prompt_analyzer: PromptAnalyzer,
+
+    /// How full the context window is: the last request's figures, or what
+    /// an empty conversation costs until the first answer arrives. Cached
+    /// because measuring it tokenizes every tool schema - far too slow for
+    /// the header, which redraws on every frame.
+    context_usage: Option<crate::llm::agent::ContextUsage>,
 }
 
 /// Build the chat input textarea with the widget's default cursor-line
@@ -294,7 +300,9 @@ fn llama_cpp_model_header_summary_for_path(
 impl App {
     /// Create a new app instance
     pub fn new(agent_service: Arc<AgentService>, context: ServiceContext) -> Self {
+        let context_usage = Some(agent_service.context_usage_preview());
         Self {
+            context_usage,
             current_session: None,
             messages: Vec::new(),
             sessions: Vec::new(),
@@ -391,6 +399,17 @@ impl App {
     /// if known.
     pub fn provider_context_window(&self) -> Option<u32> {
         self.agent_service.provider_context_window()
+    }
+
+    /// How full the context window is (see the `context_usage` field).
+    pub fn context_usage(&self) -> Option<crate::llm::agent::ContextUsage> {
+        self.context_usage
+    }
+
+    /// Re-measure what an empty conversation costs with the current provider,
+    /// model and tool profile. Called whenever any of those change.
+    fn refresh_context_usage(&mut self) {
+        self.context_usage = Some(self.agent_service.context_usage_preview());
     }
 
     /// Get the most recent assistant message, if any - used by the Model
@@ -573,6 +592,7 @@ impl App {
     /// Set agent service (used to inject configured agent after app creation)
     pub fn set_agent_service(&mut self, agent_service: Arc<AgentService>) {
         self.agent_service = agent_service;
+        self.refresh_context_usage();
     }
 
     /// Set the Ollama host used by the Model Download dialog (Ctrl+D).
@@ -1030,6 +1050,7 @@ impl App {
                             Some(provider) => match Arc::get_mut(&mut self.agent_service) {
                                 Some(service) => {
                                     service.set_provider(provider);
+                                    self.refresh_context_usage();
                                     self.llama_cpp_active_model_path = Some(model_path.clone());
                                     if let Some(cfg) = self.llama_cpp_config.as_mut() {
                                         cfg.model_path = model_path.clone();
@@ -1660,8 +1681,15 @@ impl App {
             self.processing_session = Some(session.id);
             self.error_message = None;
 
-            // Analyze and transform the prompt before sending to agent
-            let transformed_content = self.prompt_analyzer.analyze_and_transform(&content);
+            // Analyze and transform the prompt before sending to agent. Only
+            // hint at tools the model can actually call: the core tool
+            // profile leaves out `plan` and `web_search`.
+            let exposed_tools = self.agent_service.exposed_tool_names();
+            let transformed_content = self
+                .prompt_analyzer
+                .analyze_and_transform_for(&content, |tool| {
+                    exposed_tools.iter().any(|t| t == tool)
+                });
 
             // Log if the prompt was transformed
             if transformed_content != content {
@@ -1794,6 +1822,9 @@ impl App {
         self.is_processing = false;
         self.streaming_response = None;
         self.processing_session = None;
+        if response.context.is_some() {
+            self.context_usage = response.context;
+        }
 
         // Check task completion FIRST (before moving response.content)
         let task_failed = if self.executing_plan {
@@ -2817,6 +2848,7 @@ impl App {
             Ok(provider) => match Arc::get_mut(&mut self.agent_service) {
                 Some(service) => {
                     service.set_provider(provider);
+                    self.refresh_context_usage();
 
                     // Re-stamp the session: the header and every message bubble
                     // render the model from `session.model`, so without this the
@@ -4887,6 +4919,7 @@ mod tests {
             model: "test-model".to_string(),
             provider_name: "test-provider".to_string(),
             perf_metrics: None,
+            context: None,
         };
 
         app.handle_event(TuiEvent::ResponseComplete(session_a_id, stale_response))

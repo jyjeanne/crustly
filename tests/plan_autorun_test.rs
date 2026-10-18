@@ -89,12 +89,14 @@ fn high_risk_tools_pause_auto_execution() {
         mode: AutoRunMode::AutoPlan,
     };
 
+    // Registered tool names: the code-execution tool is `execute_code`.
     for high_risk_tool in &[
         "bash",
+        "powershell",
         "write_file",
         "edit_file",
         "apply_patch",
-        "code_exec",
+        "execute_code",
     ] {
         assert!(
             PlanModeState::is_high_risk_tool(high_risk_tool),

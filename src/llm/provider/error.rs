@@ -74,6 +74,27 @@ impl ProviderError {
         }
     }
 
+    /// Whether the provider rejected the request because the prompt did not
+    /// fit the model's context window. Besides [`Self::ContextLengthExceeded`]
+    /// (in-process llama.cpp), recognises the wording of OpenAI-compatible
+    /// servers (OpenAI, vLLM, llama.cpp server, LM Studio), Anthropic and
+    /// Gemini, which report an overflow as an ordinary API error.
+    pub fn is_context_overflow(&self) -> bool {
+        match self {
+            ProviderError::ContextLengthExceeded(_) => true,
+            ProviderError::ApiError {
+                message,
+                error_type,
+                ..
+            } => {
+                mentions_context_overflow(message)
+                    || error_type.as_deref().is_some_and(mentions_context_overflow)
+            }
+            ProviderError::InvalidRequest(message) => mentions_context_overflow(message),
+            _ => false,
+        }
+    }
+
     /// Get HTTP status code if available
     pub fn status_code(&self) -> Option<u16> {
         match self {
@@ -83,12 +104,59 @@ impl ProviderError {
     }
 }
 
+/// Whether an error text describes a prompt that did not fit the context window.
+fn mentions_context_overflow(text: &str) -> bool {
+    const PHRASES: &[&str] = &[
+        "context length",
+        "context_length",
+        "maximum context",
+        "context window",
+        "prompt is too long",
+        "too many tokens",
+        "exceeds the available context",
+        "exceeds the maximum number of tokens",
+    ];
+    let lower = text.to_lowercase();
+    PHRASES.iter().any(|p| lower.contains(p))
+}
+
 /// Result type for provider operations
 pub type Result<T> = std::result::Result<T, ProviderError>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recognises_context_overflow_from_each_provider() {
+        let api = |message: &str| ProviderError::ApiError {
+            status: 400,
+            message: message.to_string(),
+            error_type: None,
+        };
+        assert!(ProviderError::ContextLengthExceeded(9000).is_context_overflow());
+        // OpenAI / vLLM
+        assert!(api("This model's maximum context length is 8192 tokens").is_context_overflow());
+        // Anthropic
+        assert!(api("prompt is too long: 210000 tokens > 200000 maximum").is_context_overflow());
+        // llama.cpp server / LM Studio
+        assert!(api("the request exceeds the available context size").is_context_overflow());
+        // Gemini
+        assert!(
+            api("The input token count (40000) exceeds the maximum number of tokens allowed")
+                .is_context_overflow()
+        );
+        assert!(ProviderError::ApiError {
+            status: 400,
+            message: "bad request".to_string(),
+            error_type: Some("context_length_exceeded".to_string()),
+        }
+        .is_context_overflow());
+
+        assert!(!api("Bad Request").is_context_overflow());
+        assert!(!ProviderError::InvalidApiKey.is_context_overflow());
+        assert!(!ProviderError::Timeout(30).is_context_overflow());
+    }
 
     #[test]
     fn test_error_retryable() {

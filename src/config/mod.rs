@@ -190,6 +190,36 @@ impl ToolCacheConfig {
     }
 }
 
+/// Which tool schemas are sent to the model (`[tools] profile`).
+///
+/// Every tool schema rides along with every request, so on a small local
+/// context window the full set (about 4,800 tokens for the 23 built-in tools)
+/// leaves little room for the conversation itself.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolProfile {
+    /// `Core` when the model's context window is small, `Full` otherwise
+    /// (see `llm::agent::tool_profile` for the threshold).
+    #[default]
+    Auto,
+    /// Only the core file and shell tools, plus `extra` and MCP tools.
+    Core,
+    /// Every registered tool.
+    Full,
+}
+
+/// Tool exposure configuration (`[tools]` section).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToolsConfig {
+    /// Which tools the model sees. Defaults to `auto`.
+    #[serde(default)]
+    pub profile: ToolProfile,
+    /// Tools exposed on top of the core set, e.g. `["plan", "web_fetch"]`.
+    /// Ignored by the `full` profile, which already exposes everything.
+    #[serde(default)]
+    pub extra: Vec<String>,
+}
+
 /// MCP configuration (`[mcp]` section).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct McpConfig {
@@ -239,6 +269,10 @@ pub struct Config {
     /// Tool result cache settings
     #[serde(default)]
     pub tool_cache: ToolCacheConfig,
+
+    /// Which tools are exposed to the model
+    #[serde(default)]
+    pub tools: ToolsConfig,
 }
 
 /// Debug configuration options
@@ -812,6 +846,7 @@ impl Default for Config {
             memory: MemoryConfig::default(),
             mcp: McpConfig::default(),
             tool_cache: ToolCacheConfig::default(),
+            tools: ToolsConfig::default(),
         }
     }
 }
@@ -933,6 +968,7 @@ impl Config {
             memory: overlay.memory,
             mcp: overlay.mcp,
             tool_cache: overlay.tool_cache,
+            tools: overlay.tools,
         }
     }
 

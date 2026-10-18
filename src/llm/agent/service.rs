@@ -3,8 +3,14 @@
 //! Core service for managing AI agent conversations, coordinating between
 //! LLM providers, context management, and data persistence.
 
+use super::budget::{
+    calibration_from, tool_schema_tokens, ContextBudget, ContextUsage, DEFAULT_CONTEXT_WINDOW,
+};
+use super::compaction;
 use super::context::{token_count, AgentContext};
 use super::error::{AgentError, Result};
+use super::tool_profile::ToolSelection;
+use crate::config::ToolProfile;
 use crate::llm::provider::router::ModelRouter;
 use crate::llm::provider::{
     ContentBlock, ContentDelta, LLMRequest, LLMResponse, Message, PerfMetrics, Provider,
@@ -56,38 +62,22 @@ fn has_mutating_capability(caps: &[ToolCapability]) -> bool {
     })
 }
 
-/// Choose a completion budget that fits alongside the prompt and tool schema.
-///
-/// Providers reject requests when `prompt_tokens + max_tokens` exceeds their
-/// context window. The context tracker already estimates conversation tokens,
-/// but the system prompt and serialized tool definitions are added separately
-/// by providers (Qwen's Hermes adapter embeds the schemas in its system text),
-/// so include both here with a conservative framing margin.
-fn completion_token_budget(
-    context_window: u32,
-    context: &AgentContext,
-    system_prompt: Option<&str>,
-    tools: Option<&[Tool]>,
-) -> u32 {
-    const DEFAULT_MAX_COMPLETION: usize = 4096;
-    // Provider adapters may expand tool schemas (Qwen/Hermes does this in
-    // the system prompt), so the serialized-schema estimate needs a generous
-    // allowance for chat-template and framing tokens.
-    const PROMPT_FRAMING_MARGIN: usize = 1024;
+/// How many times one round is retried after the provider reports that the
+/// prompt overflowed its context window, each time after freeing more context.
+const MAX_OVERFLOW_RETRIES: usize = 2;
 
-    let system_tokens = system_prompt.map(token_count).unwrap_or(0) as usize;
-    let tool_tokens = tools
-        .and_then(|defs| serde_json::to_string(defs).ok())
-        .map(|serialized| token_count(&serialized) as usize)
-        .unwrap_or(0);
-    let prompt_tokens = context
-        .token_count
-        .saturating_add(system_tokens)
-        .saturating_add(tool_tokens)
-        .saturating_add(PROMPT_FRAMING_MARGIN);
-    let available = (context_window as usize).saturating_sub(prompt_tokens);
+/// The tool schemas of one request, counted once: they do not change while
+/// the request runs.
+struct RequestTools {
+    defs: Vec<Tool>,
+    tokens: u32,
+}
 
-    available.clamp(1, DEFAULT_MAX_COMPLETION) as u32
+impl RequestTools {
+    fn new(defs: Vec<Tool>) -> Self {
+        let tokens = tool_schema_tokens(&defs);
+        Self { defs, tokens }
+    }
 }
 
 /// Build a loop-detection signature for one tool call: `<name>:<distinguishing
@@ -332,13 +322,28 @@ pub struct AgentService {
     /// across every `send_message*` call on this instance.
     file_read_cache: Arc<FileReadCache>,
 
-    /// SQLite pool for compaction writes (T032)
+    /// SQLite pool for compaction records (T032). Defaults to the session
+    /// database in `context`; set only to write them elsewhere.
     pool: Option<Arc<sqlx::SqlitePool>>,
 
     /// Whether this service may wire a SubAgentLauncher into tool contexts.
     /// Always false for services created by AgentServiceLauncher to prevent
     /// recursive sub-agent spawning.
     allow_sub_agents: bool,
+
+    /// Which tool schemas requests carry (see `tool_profile`).
+    tool_profile: ToolProfile,
+
+    /// Tools exposed on top of the core set when the core profile applies.
+    extra_tools: Vec<String>,
+
+    /// Shorter system prompt used while only the core tools are exposed, so
+    /// the prompt does not describe tools the model cannot call.
+    core_system_prompt: Option<String>,
+
+    /// Provider prompt tokens per estimated token, learned from responses
+    /// (see `budget::calibration_from`). Reset when the provider changes.
+    token_calibration: std::sync::Mutex<f64>,
 }
 
 /// Route a streaming `TextDelta` through `<think>` tag detection.
@@ -582,7 +587,26 @@ impl AgentService {
             file_read_cache: Arc::new(FileReadCache::new()),
             pool: None,
             allow_sub_agents: true,
+            tool_profile: ToolProfile::Full,
+            extra_tools: Vec::new(),
+            core_system_prompt: None,
+            token_calibration: std::sync::Mutex::new(1.0),
         }
+    }
+
+    /// Choose which tool schemas requests carry (the `[tools]` config).
+    /// Defaults to every registered tool.
+    pub fn with_tool_profile(mut self, profile: ToolProfile, extra: Vec<String>) -> Self {
+        self.tool_profile = profile;
+        self.extra_tools = extra;
+        self
+    }
+
+    /// Set the system prompt used while only the core tools are exposed.
+    /// Without one, the default system prompt is used for every profile.
+    pub fn with_core_system_prompt(mut self, prompt: String) -> Self {
+        self.core_system_prompt = Some(prompt);
+        self
     }
 
     /// Enable tier-based model routing (T046)
@@ -591,7 +615,7 @@ impl AgentService {
         self
     }
 
-    /// Enable compaction with a DB pool (T032)
+    /// Write compaction records to `pool` instead of the session database (T032)
     pub fn with_pool(mut self, pool: Arc<sqlx::SqlitePool>) -> Self {
         self.pool = Some(pool);
         self
@@ -646,7 +670,22 @@ impl AgentService {
     /// because the directory is only known at runtime, and a sub-agent may be
     /// running in a different one.
     fn system_prompt_with_env(&self) -> Option<String> {
-        let base = self.default_system_prompt.as_ref()?;
+        self.with_env(self.default_system_prompt.as_deref())
+    }
+
+    /// The system prompt for `selection`: the core prompt while only the core
+    /// tools are exposed (when one is set), the default prompt otherwise,
+    /// with the environment appended.
+    fn system_prompt_for(&self, selection: &ToolSelection) -> Option<String> {
+        let base = match &self.core_system_prompt {
+            Some(core) if selection.is_core_only() => Some(core.as_str()),
+            _ => self.default_system_prompt.as_deref(),
+        };
+        self.with_env(base)
+    }
+
+    fn with_env(&self, base: Option<&str>) -> Option<String> {
+        let base = base?;
         Some(format!(
             "{base}\n\n## Environment\n\nCurrent working directory: {}\n\n\
              This is what \"the current directory/folder\" refers to. Paths you pass to \
@@ -670,6 +709,11 @@ impl AgentService {
     /// way constructing a fresh `AgentService` from scratch would.
     pub fn set_provider(&mut self, provider: Arc<dyn Provider>) {
         self.provider = provider;
+        // A different model has a different tokenizer: start over.
+        *self
+            .token_calibration
+            .get_mut()
+            .unwrap_or_else(|e| e.into_inner()) = 1.0;
     }
 
     /// Get the provider name
@@ -688,6 +732,181 @@ impl AgentService {
         self.provider.context_window(self.provider.default_model())
     }
 
+    /// Resolve the tool profile for a model with `context_window` tokens.
+    fn tool_selection(&self, context_window: u32) -> ToolSelection {
+        ToolSelection::resolve(self.tool_profile, &self.extra_tools, context_window)
+    }
+
+    /// Definitions of the registered tools that `selection` exposes.
+    fn exposed_tool_definitions(&self, selection: &ToolSelection) -> Vec<Tool> {
+        self.tool_registry
+            .get_tool_definitions()
+            .into_iter()
+            .filter(|t| selection.exposes(&t.name))
+            .collect()
+    }
+
+    fn default_context_window(&self) -> u32 {
+        self.provider_context_window()
+            .unwrap_or(DEFAULT_CONTEXT_WINDOW)
+    }
+
+    /// Names of the tools the model currently sees, sorted. The TUI uses this
+    /// to avoid hinting at tools the core profile does not send.
+    pub fn exposed_tool_names(&self) -> Vec<String> {
+        let selection = self.tool_selection(self.default_context_window());
+        let mut names: Vec<String> = self
+            .exposed_tool_definitions(&selection)
+            .into_iter()
+            .map(|t| t.name)
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Context usage of an empty conversation with the current provider,
+    /// model and tool profile: what every request costs before the user says
+    /// anything.
+    pub fn context_usage_preview(&self) -> ContextUsage {
+        let window = self.default_context_window();
+        let selection = self.tool_selection(window);
+        let tools = self.exposed_tool_definitions(&selection);
+        let system = self.system_prompt_for(&selection);
+        ContextBudget::measure(window, system.as_deref(), &tools, 0, self.calibration())
+            .usage(selection.is_core_only())
+    }
+
+    fn calibration(&self) -> f64 {
+        *self
+            .token_calibration
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Learn from the provider's own prompt token count for `budget`'s
+    /// request. Skipped when the provider served part of the prompt from its
+    /// cache: its input count then leaves the cached tokens out.
+    fn record_calibration(&self, response: &LLMResponse, budget: &ContextBudget) {
+        if response.cache_metrics.is_some() {
+            return;
+        }
+        if let Some(factor) =
+            calibration_from(response.usage.input_tokens, budget.raw_prompt_tokens())
+        {
+            *self
+                .token_calibration
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = factor;
+        }
+    }
+
+    /// Budget of the request `context` would produce with `tools`.
+    fn measure_budget(&self, context: &AgentContext, tools: &RequestTools) -> ContextBudget {
+        let system_tokens = context
+            .effective_system_prompt()
+            .as_deref()
+            .map(token_count)
+            .unwrap_or(0);
+        ContextBudget::from_counts(
+            context.max_tokens as u32,
+            system_tokens,
+            tools.tokens,
+            tools.defs.len() as u32,
+            context.token_count,
+            self.calibration(),
+        )
+    }
+
+    /// Free context until the answer has room, cheapest step first, and
+    /// return whether anything was freed.
+    ///
+    /// `level` 0 is the check before every round: it acts only when the
+    /// budget is tight. Levels 1 and 2 follow a provider overflow error, when
+    /// the estimate has already proved too low, and cut deeper each time.
+    async fn make_room(
+        &self,
+        context: &mut AgentContext,
+        tools: &RequestTools,
+        level: usize,
+    ) -> bool {
+        if level == 0 && !self.measure_budget(context, tools).is_tight() {
+            return false;
+        }
+
+        // Step 1: drop the output of older tool calls.
+        let keep_results = 2usize.saturating_sub(level);
+        let freed = compaction::elide_tool_results(context, keep_results);
+        let mut freed_any = freed > 0;
+        if freed_any {
+            tracing::info!(
+                "Elided old tool output, freeing ~{} tokens of context",
+                freed
+            );
+            if level == 0 && !self.measure_budget(context, tools).is_tight() {
+                return true;
+            }
+        }
+
+        // Step 2: summarize and drop older messages. The compaction record
+        // goes to the session database, which every service already holds;
+        // `with_pool` only overrides it.
+        let pool: &sqlx::SqlitePool = self.pool.as_deref().unwrap_or(&self.context.pool);
+        let keeps: &[usize] = match level {
+            0 => &[compaction::DEFAULT_KEEP_MESSAGES, 4],
+            1 => &[4],
+            _ => &[2],
+        };
+        for &keep in keeps {
+            match compaction::compact_keeping(context, pool, keep).await {
+                Ok(record) => {
+                    tracing::info!(
+                        "Compacted context: {} -> {} tokens (kept ~{} messages)",
+                        record.tokens_before,
+                        record.tokens_after,
+                        keep
+                    );
+                    freed_any = true;
+                    if !self.measure_budget(context, tools).is_tight() {
+                        break;
+                    }
+                }
+                Err(e) => tracing::debug!("Compaction skipped: {}", e),
+            }
+        }
+
+        let budget = self.measure_budget(context, tools);
+        if budget.is_tight() {
+            tracing::warn!(
+                "Only {} of {} context tokens are left for the answer; the system prompt \
+                 and {} tool schemas take {}. Raise the model's context window or set \
+                 [tools] profile = \"core\".",
+                budget.available(),
+                budget.window,
+                budget.tool_count,
+                budget.fixed_overhead()
+            );
+        }
+        freed_any
+    }
+
+    /// Build the provider request for the current context.
+    fn build_request(
+        model_name: &str,
+        context: &AgentContext,
+        tools: &RequestTools,
+        max_tokens: u32,
+    ) -> LLMRequest {
+        let mut request = LLMRequest::new(model_name.to_string(), context.messages.clone())
+            .with_max_tokens(max_tokens);
+        if let Some(system) = context.effective_system_prompt() {
+            request = request.with_system(system);
+        }
+        if !tools.defs.is_empty() {
+            request = request.with_tools(tools.defs.clone());
+        }
+        request
+    }
+
     /// Send a message and get a response
     ///
     /// This will:
@@ -703,7 +922,7 @@ impl AgentService {
         model: Option<String>,
     ) -> Result<AgentResponse> {
         // Prepare message context (common setup logic)
-        let (_model_name, request, message_service, session_service) = self
+        let (_model_name, request, message_service, session_service, budget) = self
             .prepare_message_context(session_id, user_message, model)
             .await?;
 
@@ -713,6 +932,7 @@ impl AgentService {
             .complete(request)
             .await
             .map_err(AgentError::Provider)?;
+        self.record_calibration(&response, &budget);
 
         // Resolve text: `stored` is persisted/replayed to the model, `display`
         // is shown to the user (they differ only for the reasoning-only notice).
@@ -766,6 +986,7 @@ impl AgentService {
             model: response.model,
             provider_name: self.provider.name().to_string(),
             perf_metrics: response.perf_metrics,
+            context: Some(budget.usage(false)),
         })
     }
 
@@ -779,7 +1000,7 @@ impl AgentService {
         model: Option<String>,
     ) -> Result<AgentStreamResponse> {
         // Prepare message context (common setup logic)
-        let (model_name, request, _message_service, _session_service) = self
+        let (model_name, request, _message_service, _session_service, _budget) = self
             .prepare_message_context(session_id, user_message, model)
             .await?;
 
@@ -875,14 +1096,25 @@ impl AgentService {
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
         let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
+        let context_window = self
+            .provider
+            .context_window(&model_name)
+            .unwrap_or(DEFAULT_CONTEXT_WINDOW);
 
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
 
+        // Which tools the model sees on this window, counted once: the
+        // schemas ride along with every round of the loop.
+        let selection = self.tool_selection(context_window);
+        let tools = RequestTools::new(self.exposed_tool_definitions(&selection));
+        if tools.defs.is_empty() {
+            tracing::warn!("No tools registered in tool registry!");
+        }
+
         // Add system prompt if available, with the working directory appended so
         // the model knows where "the current directory" actually is.
-        if let Some(system_prompt) = self.system_prompt_with_env() {
+        if let Some(system_prompt) = self.system_prompt_for(&selection) {
             context.system_prompt = Some(system_prompt);
         }
 
@@ -938,13 +1170,20 @@ impl AgentService {
             .with_read_only_mode(read_only_mode)
             .with_file_read_cache(self.file_read_cache.clone());
         if self.allow_sub_agents {
-            let launcher = Arc::new(AgentServiceLauncher::new(
-                self.provider.clone(),
-                self.context.clone(),
-                self.tool_registry.clone(),
-                self.working_directory.clone(),
-                self.default_system_prompt.clone(),
-            ));
+            let launcher = Arc::new(
+                AgentServiceLauncher::new(
+                    self.provider.clone(),
+                    self.context.clone(),
+                    self.tool_registry.clone(),
+                    self.working_directory.clone(),
+                    self.default_system_prompt.clone(),
+                )
+                .with_tool_settings(
+                    self.tool_profile,
+                    self.extra_tools.clone(),
+                    self.core_system_prompt.clone(),
+                ),
+            );
             tool_context = tool_context.with_sub_agent_launcher(launcher);
         }
 
@@ -962,53 +1201,60 @@ impl AgentService {
         // success=true requires evidence of work; each accepted completion
         // resets the counter so the NEXT task needs fresh evidence.
         let mut mutating_evidence: usize = 0;
+        // Context figures of the last request sent, reported with the answer.
+        let mut last_budget: Option<ContextBudget> = None;
 
         while iteration < self.max_tool_iterations {
             iteration += 1;
 
-            // Build LLM request with tools if available. The final completion
-            // budget is calculated after tool definitions are attached so
-            // smaller local context windows (for example vLLM at 8K) do not
-            // receive an over-budget request.
-            let mut request = LLMRequest::new(model_name.clone(), context.messages.clone());
+            // Free context before sending when too little is left for the
+            // answer: a small local window fills up within a few tool rounds.
+            self.make_room(&mut context, &tools, 0).await;
 
-            if let Some(system) = &context.system_prompt {
-                request = request.with_system(system.clone());
-            }
-
-            // Add tools if registry has any
-            let tool_count = self.tool_registry.count();
-            tracing::debug!("Tool registry contains {} tools", tool_count);
-            if tool_count > 0 {
-                let tool_defs = self.tool_registry.get_tool_definitions();
-                tracing::debug!("Adding {} tool definitions to request", tool_defs.len());
-                let max_tokens = completion_token_budget(
-                    context_window,
-                    &context,
-                    context.system_prompt.as_deref(),
-                    Some(&tool_defs),
+            // Send to provider — stream when chunk_tx is available, otherwise
+            // block. When the provider reports that the prompt overflowed its
+            // window, free more context and retry the same round instead of
+            // failing the whole request.
+            let mut overflow_retries = 0;
+            let (response, budget) = loop {
+                let budget = self.measure_budget(&context, &tools);
+                tracing::debug!(
+                    "Sending {} tool definitions; {} of {} context tokens left for the answer",
+                    tools.defs.len(),
+                    budget.available(),
+                    budget.window
                 );
-                request = request.with_tools(tool_defs).with_max_tokens(max_tokens);
-            } else {
-                tracing::warn!("No tools registered in tool registry!");
-                let max_tokens = completion_token_budget(
-                    context_window,
-                    &context,
-                    context.system_prompt.as_deref(),
-                    None,
-                );
-                request = request.with_max_tokens(max_tokens);
-            }
-
-            // Send to provider — stream when chunk_tx is available, otherwise block.
-            let response = Self::call_provider_streaming(
-                &self.provider,
-                request,
-                chunk_tx.as_ref(),
-                &model_name,
-            )
-            .await
-            .map_err(AgentError::Provider)?;
+                let request =
+                    Self::build_request(&model_name, &context, &tools, budget.completion_budget());
+                match Self::call_provider_streaming(
+                    &self.provider,
+                    request,
+                    chunk_tx.as_ref(),
+                    &model_name,
+                )
+                .await
+                {
+                    Ok(response) => break (response, budget),
+                    Err(e)
+                        if e.is_context_overflow() && overflow_retries < MAX_OVERFLOW_RETRIES =>
+                    {
+                        overflow_retries += 1;
+                        tracing::warn!(
+                            "Prompt overflowed the context window ({}); freeing context and \
+                             retrying ({}/{})",
+                            e,
+                            overflow_retries,
+                            MAX_OVERFLOW_RETRIES
+                        );
+                        if !self.make_room(&mut context, &tools, overflow_retries).await {
+                            return Err(AgentError::Provider(e));
+                        }
+                    }
+                    Err(e) => return Err(AgentError::Provider(e)),
+                }
+            };
+            self.record_calibration(&response, &budget);
+            last_budget = Some(budget);
 
             // Track token usage
             total_input_tokens += response.usage.input_tokens;
@@ -1040,12 +1286,21 @@ impl AgentService {
                 }
             }
 
+            // Resolve aliases (`Bash`, `shell`, `run_shell_command`...) to the
+            // registered name up front, so the approval gate, the plan checks,
+            // parallel classification and the result cache all see the same
+            // name `ToolRegistry::execute` will run. An alias used to skip
+            // AutoPlan's high-risk check, which matches registered names only.
             let tool_uses: Vec<_> = response
                 .content
                 .iter()
                 .filter_map(|block| {
                     if let ContentBlock::ToolUse { id, name, input } = block {
-                        Some((id.clone(), name.clone(), input.clone()))
+                        Some((
+                            id.clone(),
+                            self.tool_registry.resolve_name(name),
+                            input.clone(),
+                        ))
                     } else {
                         None
                     }
@@ -1207,14 +1462,13 @@ impl AgentService {
                     context.add_message(Message::user(hint));
 
                     // Ask LLM to recover without tools so it is forced to produce a text answer.
+                    let no_tools = RequestTools::new(Vec::new());
+                    let max_tokens = self
+                        .measure_budget(&context, &no_tools)
+                        .completion_budget()
+                        .min(2048);
                     let recovery_request =
-                        LLMRequest::new(model_name.clone(), context.messages.clone())
-                            .with_max_tokens(2048);
-                    let recovery_request = if let Some(system) = &context.system_prompt {
-                        recovery_request.with_system(system.clone())
-                    } else {
-                        recovery_request
-                    };
+                        Self::build_request(&model_name, &context, &no_tools, max_tokens);
 
                     match self.provider.complete(recovery_request).await {
                         Ok(recovery_response) => {
@@ -1233,6 +1487,31 @@ impl AgentService {
             // Tool results are cached per-session to avoid redundant calls (T037 / T049).
             let mut tool_results: Vec<ContentBlock> = Vec::new();
 
+            // A tool the profile does not expose gets an error result instead
+            // of running: the model only learned its name some other way (an
+            // earlier turn, a hallucination), and the core profile exists to
+            // keep it out of the conversation.
+            let (tool_uses, hidden_uses): (Vec<_>, Vec<_>) = tool_uses
+                .into_iter()
+                .partition(|(_, name, _)| selection.exposes(name));
+            for (tool_id, tool_name, _) in hidden_uses {
+                tracing::warn!(
+                    "Model called '{}', which the {} tool profile does not expose",
+                    tool_name,
+                    selection.label()
+                );
+                let available: Vec<&str> = tools.defs.iter().map(|t| t.name.as_str()).collect();
+                tool_results.push(ContentBlock::ToolResult {
+                    tool_use_id: tool_id,
+                    content: format!(
+                        "Tool '{}' is not available in this session. Use one of: {}.",
+                        tool_name,
+                        available.join(", ")
+                    ),
+                    is_error: Some(true),
+                });
+            }
+
             // Partition tool uses
             let (parallel_uses, sequential_uses): (Vec<_>, Vec<_>) = tool_uses
                 .into_iter()
@@ -1247,13 +1526,19 @@ impl AgentService {
                     let ctx = tool_context.clone();
                     async move {
                         let cache_key = CacheKey::from_tool(&tool_name, &tool_input);
-                        if let Some(cached) = cache.get(&cache_key) {
-                            tracing::debug!("Cache hit for tool '{}'", tool_name);
-                            return ContentBlock::ToolResult {
-                                tool_use_id: tool_id,
-                                content: cached,
-                                is_error: Some(false),
-                            };
+                        // A cached result answers the call without running the
+                        // tool, so check the permission policy here as well:
+                        // every call faces the policy, not only the ones that
+                        // reach `ToolRegistry::execute`.
+                        if !registry.is_denied(&tool_name, &tool_input) {
+                            if let Some(cached) = cache.get(&cache_key) {
+                                tracing::debug!("Cache hit for tool '{}'", tool_name);
+                                return ContentBlock::ToolResult {
+                                    tool_use_id: tool_id,
+                                    content: cached,
+                                    is_error: Some(false),
+                                };
+                            }
                         }
                         match registry.execute(&tool_name, tool_input, &ctx).await {
                             Ok(result) => {
@@ -1533,28 +1818,9 @@ impl AgentService {
             };
             context.add_message(tool_result_msg);
 
-            // Trigger compaction if token budget is >80% full (T032)
-            if context.should_compact() {
-                if let Some(ref pool) = self.pool {
-                    tracing::info!("Context at >80% token budget — triggering compaction");
-                    match crate::llm::agent::compaction::compact(&mut context, pool).await {
-                        Ok(record) => {
-                            tracing::info!(
-                                "Compaction complete: {} → {} tokens",
-                                record.tokens_before,
-                                record.tokens_after
-                            );
-                        }
-                        Err(e) => {
-                            tracing::warn!("Compaction failed (context unchanged): {}", e);
-                        }
-                    }
-                } else {
-                    tracing::warn!(
-                        "Context at >80% token budget but no DB pool — compaction skipped"
-                    );
-                }
-            }
+            // Compaction is not triggered here: `make_room` at the top of the
+            // next round checks the full request - system prompt and tool
+            // schemas included - against the window before anything is sent.
 
             // Check if we've hit max iterations
             if iteration >= self.max_tool_iterations {
@@ -1618,6 +1884,7 @@ impl AgentService {
             model: response.model,
             provider_name: self.provider.name().to_string(),
             perf_metrics: response.perf_metrics,
+            context: last_budget.map(|b| b.usage(selection.is_core_only())),
         })
     }
 
@@ -1648,7 +1915,13 @@ impl AgentService {
         session_id: Uuid,
         user_message: String,
         model: Option<String>,
-    ) -> Result<(String, LLMRequest, MessageService, SessionService)> {
+    ) -> Result<(
+        String,
+        LLMRequest,
+        MessageService,
+        SessionService,
+        ContextBudget,
+    )> {
         // Get or create session
         let session_service = SessionService::new(self.context.clone());
         let _session = session_service
@@ -1665,7 +1938,10 @@ impl AgentService {
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
         let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
+        let context_window = self
+            .provider
+            .context_window(&model_name)
+            .unwrap_or(DEFAULT_CONTEXT_WINDOW);
 
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
@@ -1695,22 +1971,18 @@ impl AgentService {
 
         // Build base LLM request with a budget that fits the configured
         // provider context window after accounting for the system prompt.
-        let max_tokens = completion_token_budget(
-            context_window,
-            &context,
-            context.system_prompt.as_deref(),
-            None,
-        );
-        let request = LLMRequest::new(model_name.clone(), context.messages.clone())
-            .with_max_tokens(max_tokens);
+        let no_tools = RequestTools::new(Vec::new());
+        let budget = self.measure_budget(&context, &no_tools);
+        let request =
+            Self::build_request(&model_name, &context, &no_tools, budget.completion_budget());
 
-        let request = if let Some(system) = context.system_prompt {
-            request.with_system(system)
-        } else {
-            request
-        };
-
-        Ok((model_name, request, message_service, session_service))
+        Ok((
+            model_name,
+            request,
+            message_service,
+            session_service,
+            budget,
+        ))
     }
 
     /// Extract text content from an LLM response.
@@ -1822,6 +2094,9 @@ pub struct AgentResponse {
     /// Runtime performance metrics, if the provider exposes them
     /// (currently only the native Ollama provider).
     pub perf_metrics: Option<crate::llm::provider::PerfMetrics>,
+
+    /// How full the context window was for the last request of this turn.
+    pub context: Option<ContextUsage>,
 }
 
 /// Streaming response from the agent
@@ -1850,6 +2125,9 @@ pub struct AgentServiceLauncher {
     tool_registry: Arc<ToolRegistry>,
     working_directory: std::path::PathBuf,
     system_prompt: Option<String>,
+    tool_profile: ToolProfile,
+    extra_tools: Vec<String>,
+    core_system_prompt: Option<String>,
 }
 
 impl std::fmt::Debug for AgentServiceLauncher {
@@ -1874,7 +2152,24 @@ impl AgentServiceLauncher {
             tool_registry,
             working_directory,
             system_prompt,
+            tool_profile: ToolProfile::Full,
+            extra_tools: Vec::new(),
+            core_system_prompt: None,
         }
+    }
+
+    /// Give sub-agents the parent's tool profile and core system prompt, so
+    /// they fit the same context window.
+    pub fn with_tool_settings(
+        mut self,
+        profile: ToolProfile,
+        extra: Vec<String>,
+        core_system_prompt: Option<String>,
+    ) -> Self {
+        self.tool_profile = profile;
+        self.extra_tools = extra;
+        self.core_system_prompt = core_system_prompt;
+        self
     }
 }
 
@@ -1901,10 +2196,14 @@ impl crate::llm::tools::SubAgentLauncher for AgentServiceLauncher {
             .with_tool_registry(self.tool_registry.clone())
             .with_max_tool_iterations(20)
             .with_working_directory(self.working_directory.clone())
-            .with_allow_sub_agents(false);
+            .with_allow_sub_agents(false)
+            .with_tool_profile(self.tool_profile, self.extra_tools.clone());
 
         if let Some(sp) = &self.system_prompt {
             svc = svc.with_system_prompt(sp.clone());
+        }
+        if let Some(sp) = &self.core_system_prompt {
+            svc = svc.with_core_system_prompt(sp.clone());
         }
 
         let prompt = prompt.to_string();
@@ -2677,5 +2976,442 @@ mod tests {
             serde_json::json!({"file_path": "src/main.rs"}),
             "input_json_delta fragments must be assembled into the tool input"
         );
+    }
+
+    // ── Context budget, tool profile and overflow recovery ──────────────────
+
+    /// Provider that answers from a script, one entry per call, and records
+    /// every request it receives.
+    struct ScriptedProvider {
+        window: u32,
+        script:
+            std::sync::Mutex<std::collections::VecDeque<crate::llm::provider::Result<LLMResponse>>>,
+        requests: std::sync::Mutex<Vec<LLMRequest>>,
+    }
+
+    impl ScriptedProvider {
+        fn new(window: u32, script: Vec<crate::llm::provider::Result<LLMResponse>>) -> Self {
+            Self {
+                window,
+                script: std::sync::Mutex::new(script.into()),
+                requests: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        fn requests(&self) -> Vec<LLMRequest> {
+            self.requests.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl Provider for ScriptedProvider {
+        async fn complete(&self, request: LLMRequest) -> crate::llm::provider::Result<LLMResponse> {
+            self.requests.lock().unwrap().push(request);
+            self.script
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or_else(|| Ok(text_reply("done")))
+        }
+
+        async fn stream(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<ProviderStream> {
+            unimplemented!("tests use the non-streaming path")
+        }
+
+        fn name(&self) -> &str {
+            "scripted"
+        }
+
+        fn default_model(&self) -> &str {
+            "scripted-model"
+        }
+
+        fn supported_models(&self) -> Vec<String> {
+            vec!["scripted-model".to_string()]
+        }
+
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(self.window)
+        }
+
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    fn text_reply(text: &str) -> LLMResponse {
+        LLMResponse {
+            id: "r".to_string(),
+            model: "scripted-model".to_string(),
+            content: vec![ContentBlock::Text {
+                text: text.to_string(),
+            }],
+            stop_reason: Some(StopReason::EndTurn),
+            usage: TokenUsage {
+                input_tokens: 0,
+                output_tokens: 1,
+            },
+            cache_metrics: None,
+            perf_metrics: None,
+        }
+    }
+
+    fn tool_call(name: &str, input: serde_json::Value) -> LLMResponse {
+        LLMResponse {
+            id: "r".to_string(),
+            model: "scripted-model".to_string(),
+            content: vec![ContentBlock::ToolUse {
+                id: "call-1".to_string(),
+                name: name.to_string(),
+                input,
+            }],
+            stop_reason: Some(StopReason::ToolUse),
+            usage: TokenUsage {
+                input_tokens: 0,
+                output_tokens: 1,
+            },
+            cache_metrics: None,
+            perf_metrics: None,
+        }
+    }
+
+    /// Tool with a configurable name and approval requirement.
+    struct NamedTool {
+        name: &'static str,
+        requires_approval: bool,
+    }
+
+    #[async_trait]
+    impl crate::llm::tools::Tool for NamedTool {
+        fn name(&self) -> &str {
+            self.name
+        }
+
+        fn description(&self) -> &str {
+            "A named test tool"
+        }
+
+        fn input_schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object", "properties": {}})
+        }
+
+        fn capabilities(&self) -> Vec<ToolCapability> {
+            vec![]
+        }
+
+        fn requires_approval(&self) -> bool {
+            self.requires_approval
+        }
+
+        async fn execute(
+            &self,
+            _input: serde_json::Value,
+            _context: &ToolExecutionContext,
+        ) -> crate::llm::tools::Result<crate::llm::tools::ToolResult> {
+            Ok(crate::llm::tools::ToolResult::success(format!(
+                "{} ran",
+                self.name
+            )))
+        }
+    }
+
+    fn registry_of(tools: &[(&'static str, bool)]) -> Arc<ToolRegistry> {
+        let mut registry = ToolRegistry::new();
+        for &(name, requires_approval) in tools {
+            registry.register(Arc::new(NamedTool {
+                name,
+                requires_approval,
+            }));
+        }
+        Arc::new(registry)
+    }
+
+    async fn session_for(context: &ServiceContext) -> Uuid {
+        SessionService::new(context.clone())
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap()
+            .id
+    }
+
+    async fn test_context() -> ServiceContext {
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        ServiceContext::new(db.pool().clone())
+    }
+
+    fn tool_names(request: &LLMRequest) -> Vec<String> {
+        let mut names: Vec<String> = request
+            .tools
+            .iter()
+            .flatten()
+            .map(|t| t.name.clone())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// With the auto profile on a small window, requests carry only the core
+    /// tools, and a call to a tool outside them gets an error result instead
+    /// of running.
+    #[tokio::test]
+    async fn auto_profile_sends_core_tools_on_a_small_window() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![
+                Ok(tool_call("web_fetch", serde_json::json!({}))),
+                Ok(text_reply("answer")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[
+                ("read_file", false),
+                ("grep", false),
+                ("web_fetch", false),
+            ]))
+            .with_tool_profile(ToolProfile::Auto, Vec::new())
+            .with_system_prompt("full prompt".to_string())
+            .with_core_system_prompt("core prompt".to_string());
+
+        let response = service
+            .send_message_with_tools(session, "fetch it".to_string(), None)
+            .await
+            .unwrap();
+
+        let requests = provider.requests();
+        assert_eq!(tool_names(&requests[0]), vec!["grep", "read_file"]);
+        assert!(requests[0]
+            .system
+            .as_deref()
+            .unwrap()
+            .starts_with("core prompt"));
+
+        // The hidden tool did not run: its result is an error naming the
+        // tools that are available.
+        let result = requests[1]
+            .messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .find_map(|b| match b {
+                ContentBlock::ToolResult {
+                    content, is_error, ..
+                } => Some((content, *is_error)),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(result.1, Some(true));
+        assert!(result.0.contains("not available"), "got: {}", result.0);
+        assert!(!result.0.contains("web_fetch ran"));
+
+        let usage = response.context.expect("context usage is reported");
+        assert!(usage.core_tools_only);
+        assert_eq!(usage.tool_count, 2);
+        assert_eq!(usage.window, 8192);
+    }
+
+    #[tokio::test]
+    async fn auto_profile_sends_every_tool_on_a_large_window() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(128_000, vec![Ok(text_reply("hi"))]));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[("read_file", false), ("web_fetch", false)]))
+            .with_tool_profile(ToolProfile::Auto, Vec::new());
+
+        service
+            .send_message_with_tools(session, "hi".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            tool_names(&provider.requests()[0]),
+            vec!["read_file", "web_fetch"]
+        );
+        assert_eq!(service.exposed_tool_names(), vec!["read_file", "web_fetch"]);
+    }
+
+    /// A model that calls a tool by an alias (`Bash`) must reach the approval
+    /// gate under the registered name: AutoPlan's high-risk check matches
+    /// registered names only, so the alias used to skip it.
+    #[tokio::test]
+    async fn approval_callback_sees_the_canonical_tool_name() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call("Bash", serde_json::json!({}))),
+                Ok(text_reply("done")),
+            ],
+        ));
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen_in_callback = seen.clone();
+        let callback: ApprovalCallback = Arc::new(move |info: ToolApprovalInfo| {
+            seen_in_callback.lock().unwrap().push(info.tool_name);
+            Box::pin(async { Ok(true) })
+        });
+        let service = AgentService::new(provider, context)
+            .with_tool_registry(registry_of(&[("bash", true)]))
+            .with_approval_callback(Some(callback));
+
+        service
+            .send_message_with_tools(session, "run it".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(*seen.lock().unwrap(), vec!["bash".to_string()]);
+    }
+
+    /// When the provider says the prompt overflowed its window, the loop
+    /// compacts the history and retries the same round instead of failing.
+    #[tokio::test]
+    async fn context_overflow_compacts_and_retries_the_round() {
+        use crate::llm::provider::ProviderError;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let messages = MessageService::new(context.clone());
+        for i in 0..6 {
+            messages
+                .create_message(session, "user".to_string(), format!("question {i}"))
+                .await
+                .unwrap();
+            messages
+                .create_message(session, "assistant".to_string(), format!("answer {i}"))
+                .await
+                .unwrap();
+        }
+
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Err(ProviderError::ContextLengthExceeded(200_000)),
+                Ok(text_reply("fits now")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context.clone());
+
+        let response = service
+            .send_message_with_tools(session, "next question".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "fits now");
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 2, "one failed attempt, one retry");
+        assert!(
+            requests[1].messages.len() < requests[0].messages.len(),
+            "the retry must carry less history"
+        );
+        // The retried request opens with a user message and carries the
+        // summary of what was dropped in its system prompt.
+        assert!(matches!(
+            requests[1].messages[0].role,
+            crate::llm::provider::Role::User
+        ));
+        assert!(requests[1]
+            .system
+            .as_deref()
+            .unwrap()
+            .contains("Earlier in this conversation (compacted)"));
+
+        let records: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM compaction_records")
+            .fetch_one(&*context.pool)
+            .await
+            .unwrap();
+        assert_eq!(records, 1);
+    }
+
+    /// An overflow that compaction cannot fix (nothing left to drop) is
+    /// reported, not retried forever.
+    #[tokio::test]
+    async fn context_overflow_with_nothing_to_free_is_an_error() {
+        use crate::llm::provider::ProviderError;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![
+                Err(ProviderError::ContextLengthExceeded(9000)),
+                Ok(text_reply("unreachable")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context);
+
+        let result = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await;
+
+        assert!(matches!(result, Err(AgentError::Provider(_))));
+        assert_eq!(provider.requests().len(), 1);
+    }
+
+    /// Before each round, a tight budget elides old tool output first.
+    #[tokio::test]
+    async fn make_room_elides_old_tool_output_when_the_budget_is_tight() {
+        let context = test_context().await;
+        let service = AgentService::new(Arc::new(MockProvider), context);
+        let mut agent_context = AgentContext::new(Uuid::new_v4(), 8192);
+        agent_context.add_message(Message::user("read everything"));
+        let big = "fn f() {}\n".repeat(300);
+        for i in 0..6 {
+            agent_context.add_message(Message {
+                role: crate::llm::provider::Role::Assistant,
+                content: vec![ContentBlock::ToolUse {
+                    id: format!("c{i}"),
+                    name: "read_file".to_string(),
+                    input: serde_json::json!({}),
+                }],
+            });
+            agent_context.add_message(Message {
+                role: crate::llm::provider::Role::User,
+                content: vec![ContentBlock::ToolResult {
+                    tool_use_id: format!("c{i}"),
+                    content: big.clone(),
+                    is_error: None,
+                }],
+            });
+        }
+        let tools = RequestTools::new(Vec::new());
+        assert!(service.measure_budget(&agent_context, &tools).is_tight());
+        let before = agent_context.token_count;
+
+        assert!(service.make_room(&mut agent_context, &tools, 0).await);
+
+        assert!(agent_context.token_count < before);
+        assert!(!service.measure_budget(&agent_context, &tools).is_tight());
+    }
+
+    /// The provider's own prompt count corrects later estimates upward, and a
+    /// provider switch starts over.
+    #[tokio::test]
+    async fn calibration_learns_from_the_provider_and_resets_on_switch() {
+        let context = test_context().await;
+        let mut service = AgentService::new(Arc::new(MockProvider), context);
+        let budget = ContextBudget::from_counts(4096, 500, 500, 2, 0, 1.0);
+        let mut response = text_reply("x");
+        response.usage.input_tokens = 1500;
+
+        service.record_calibration(&response, &budget);
+        assert!((service.calibration() - 1.5).abs() < 1e-9);
+
+        // A response served partly from the provider's prompt cache says
+        // nothing reliable about the prompt size.
+        response.usage.input_tokens = 1900;
+        response.cache_metrics = Some(crate::llm::provider::types::CacheMetrics {
+            read_tokens: 1000,
+            creation_tokens: 0,
+        });
+        service.record_calibration(&response, &budget);
+        assert!((service.calibration() - 1.5).abs() < 1e-9);
+
+        service.set_provider(Arc::new(MockProvider));
+        assert_eq!(service.calibration(), 1.0);
     }
 }

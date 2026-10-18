@@ -123,13 +123,26 @@ impl PromptAnalyzer {
         Regex::new(&format!(r"(?i)\b({})\b", pattern)).expect("Failed to compile keyword regex")
     }
 
-    /// Analyze a prompt and transform it if needed
+    /// Analyze a prompt and transform it if needed, assuming every tool is
+    /// available.
     pub fn analyze_and_transform(&self, prompt: &str) -> String {
+        self.analyze_and_transform_for(prompt, |_| true)
+    }
+
+    /// Analyze a prompt and append hints, but only for tools that
+    /// `available` says the model can call. A hint naming a tool the request
+    /// does not carry (the `plan` tool under the core tool profile) would
+    /// push the model into calling a tool that is not there.
+    pub fn analyze_and_transform_for(
+        &self,
+        prompt: &str,
+        available: impl Fn(&str) -> bool,
+    ) -> String {
         let mut transformations = Vec::new();
         let lower_prompt = prompt.to_lowercase();
 
         // Check for plan keywords
-        if self.plan_regex.is_match(&lower_prompt) {
+        if available("plan") && self.plan_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected PLAN intent in prompt");
             transformations.push(
                 "\n\n**CRITICAL**: You MUST use the `plan` tool now! \
@@ -142,14 +155,14 @@ impl PromptAnalyzer {
         }
 
         // Check for read_file keywords
-        if self.read_file_regex.is_match(&lower_prompt) {
+        if available("read_file") && self.read_file_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected READ_FILE intent in prompt");
             transformations
                 .push("\n\n**TOOL HINT**: Use the `read_file` tool to read the contents of files.");
         }
 
         // Check for search keywords
-        if self.search_regex.is_match(&lower_prompt) {
+        if available("grep") && self.search_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected SEARCH/GREP intent in prompt");
             transformations.push(
                 "\n\n**TOOL HINT**: Use the `grep` tool to search for patterns in files, \
@@ -158,28 +171,28 @@ impl PromptAnalyzer {
         }
 
         // Check for write_file keywords
-        if self.write_file_regex.is_match(&lower_prompt) {
+        if available("write_file") && self.write_file_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected WRITE_FILE intent in prompt");
             transformations
                 .push("\n\n**TOOL HINT**: Use the `write_file` tool to create new files.");
         }
 
         // Check for edit_file keywords
-        if self.edit_file_regex.is_match(&lower_prompt) {
+        if available("edit_file") && self.edit_file_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected EDIT_FILE intent in prompt");
             transformations
                 .push("\n\n**TOOL HINT**: Use the `edit_file` tool to modify existing files.");
         }
 
         // Check for bash keywords
-        if self.bash_regex.is_match(&lower_prompt) {
+        if available("bash") && self.bash_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected BASH intent in prompt");
             transformations
                 .push("\n\n**TOOL HINT**: Use the `bash` tool to execute shell commands.");
         }
 
         // Check for web_search keywords
-        if self.web_search_regex.is_match(&lower_prompt) {
+        if available("web_search") && self.web_search_regex.is_match(&lower_prompt) {
             tracing::info!("🔍 Detected WEB_SEARCH intent in prompt");
             transformations.push(
                 "\n\n**TOOL HINT**: Use the `web_search` tool to search the internet for \
@@ -290,6 +303,22 @@ mod tests {
         let result = analyzer.analyze_and_transform(prompt);
         assert!(result.contains("CRITICAL") || result.contains("TOOL HINT"));
         assert!(result.contains("`plan` tool"));
+    }
+
+    /// Under the core tool profile the `plan` tool is not sent, so the
+    /// analyzer must not tell the model to call it.
+    #[test]
+    fn hints_skip_tools_that_are_not_available() {
+        let analyzer = PromptAnalyzer::new();
+        let core = |tool: &str| crate::llm::agent::tool_profile::CORE_TOOLS.contains(&tool);
+
+        let prompt = "read file config.toml and make a plan to update it";
+        let result = analyzer.analyze_and_transform_for(prompt, core);
+        assert!(!result.contains("`plan` tool"), "got: {result}");
+        assert!(result.contains("`read_file` tool"), "got: {result}");
+
+        let result = analyzer.analyze_and_transform_for("search the web for tokio docs", core);
+        assert!(!result.contains("`web_search` tool"), "got: {result}");
     }
 
     #[test]

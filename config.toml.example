@@ -216,6 +216,24 @@ default_model = "qwen2.5-coder-7b-instruct"
 # - QWEN_ENABLE_THINKING: Enable/disable thinking mode (true/false)
 
 # ========================================
+# Tools the Model Sees
+# ========================================
+# Every request carries the schema of each tool the model may call. The 23
+# built-in tools take about 4,800 tokens per request - most of the 8,192-token
+# default window of the local providers (Ollama num_ctx, llama.cpp n_ctx).
+#
+# [tools]
+# profile = "auto"   # "auto" (default): core tools below a 32,768-token window,
+#                    #   every tool at or above it
+#                    # "core": read_file, edit_file, write_file, bash, grep, glob,
+#                    #   ls, plus `extra` and any MCP tools
+#                    # "full": every tool
+# extra = ["plan", "web_fetch"]   # tools added to the core set
+#
+# The TUI header shows how much of the window a request uses ("Ctx"), and
+# Ctrl+O shows the fixed cost of the system prompt and tool schemas.
+
+# ========================================
 # Tips for Using Local LLMs
 # ========================================
 # 1. Make sure LM Studio is running before starting Crustly

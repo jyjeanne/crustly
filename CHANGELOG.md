@@ -5,6 +5,24 @@ For the forward-looking plan, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
+### Unreleased — Fitting Local Context Windows
+
+On the 8,192-token default window of the local providers, the system prompt and the 23 tool schemas took 7,607 tokens of every request (counting the framing margin), leaving 585 for the conversation and the answer.
+
+#### Core Tool Profile
+A new `[tools]` section chooses which tool schemas requests carry. The default `auto` profile sends only the core tools (`read_file`, `edit_file`, `write_file`, `bash`, `grep`, `glob`, `ls`) when the model's window is under 32,768 tokens, together with a shorter system prompt that does not describe the missing tools. The system prompt and tool schemas drop from 6,583 to 1,745 tokens, leaving 5,423 tokens of an 8,192 window instead of 585. `profile = "core"` or `"full"` forces either set, and `extra = [...]` adds tools back. MCP tools are always sent. Prompt hints no longer point a model at tools it was not given.
+
+#### Context Budget Shown
+The TUI header shows how much of the context window the last request used (`🧠 Ctx`), and the Model Info panel (`Ctrl+O`) shows the tool profile and the fixed cost per request. `crustly run` reports the same figures, and warns before sending when the fixed cost leaves the model almost no room. Estimates are corrected upward from the provider's own prompt token counts.
+
+#### Compaction That Runs
+Context compaction now runs - it was never wired in before. Before each round, when too little of the window is left for the answer, the oldest tool output is replaced with a one-line stub, then older turns are summarized. The check counts the system prompt and tool schemas, not just the messages. When the provider still reports a context overflow, the round is compacted and retried instead of failing. The summary now rides in the system prompt (a mid-conversation system message is rejected by Anthropic), lists the tool calls that were dropped, and the kept turns always start with the user's request.
+
+#### AutoPlan Approval Gaps Closed
+AutoPlan now prompts for `execute_code` (the high-risk list said `code_exec`, a name no tool has), `powershell`, and any tool whose declared capabilities include shell execution or file writes. Tool aliases such as `Bash` or `shell` are resolved to the registered name before the approval check, so they can no longer slip past it. Cached read results are checked against the permission policy too.
+
+---
+
 ### v0.5.2 — Local-Model Reliability & Per-Model Tuning
 
 A hardening pass driven by end-to-end testing of the full agentic tool loop against local Ollama models (qwen2.5-coder, gemma4, ornith).

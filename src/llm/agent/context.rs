@@ -32,6 +32,13 @@ pub struct AgentContext {
 
     /// Accumulated prompt-cache metrics across all LLM calls in this session.
     pub accumulated_cache_metrics: CacheMetrics,
+
+    /// Summary of turns dropped by compaction. Sent as part of the system
+    /// prompt (see [`Self::effective_system_prompt`]) rather than as a
+    /// message: a `system`-role message in the middle of `messages` is
+    /// rejected by some providers (Anthropic), while every provider accepts a
+    /// longer system prompt.
+    pub compacted_summary: Option<String>,
 }
 
 /// A file tracked in the conversation
@@ -54,7 +61,39 @@ impl AgentContext {
             token_count: 0,
             max_tokens,
             accumulated_cache_metrics: CacheMetrics::default(),
+            compacted_summary: None,
         }
+    }
+
+    /// The system prompt to send: the configured prompt plus, after a
+    /// compaction, the summary of the turns that were dropped.
+    pub fn effective_system_prompt(&self) -> Option<String> {
+        match (&self.system_prompt, &self.compacted_summary) {
+            (prompt, None) => prompt.clone(),
+            (prompt, Some(summary)) => {
+                let section = format!(
+                    "## Earlier in this conversation (compacted)\n\n\
+                     Older turns were removed to fit the context window. This is \
+                     what they contained:\n\n{summary}"
+                );
+                Some(match prompt {
+                    Some(prompt) => format!("{prompt}\n\n{section}"),
+                    None => section,
+                })
+            }
+        }
+    }
+
+    /// Recompute `token_count` from the current messages, after an in-place
+    /// edit (compaction, elided tool output) made the running total stale.
+    /// Counts messages only; the agent loop budgets the system prompt and
+    /// tool schemas separately.
+    pub fn recount_tokens(&mut self) {
+        self.token_count = self
+            .messages
+            .iter()
+            .map(|m| self.estimate_message_tokens(m))
+            .sum();
     }
 
     /// Set the system prompt
@@ -152,10 +191,11 @@ impl AgentContext {
         (self.token_count as f64 / self.max_tokens as f64) * 100.0
     }
 
-    /// Returns true when token usage has exceeded the compaction threshold (default 80%).
+    /// Returns true when the messages alone exceed 80% of the window.
     ///
-    /// Callers should invoke `compaction::compact(ctx, pool)` when this returns true.
-    /// Checked after every `add_message` call in the service layer.
+    /// The agent loop does not use this: it ignores the system prompt and tool
+    /// schemas, which can take most of a small window. The loop checks
+    /// `budget::ContextBudget::is_tight` instead.
     pub fn should_compact(&self) -> bool {
         const COMPACTION_THRESHOLD: f64 = 0.80;
         self.token_count as f64 / self.max_tokens as f64 > COMPACTION_THRESHOLD

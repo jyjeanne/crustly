@@ -92,6 +92,28 @@ fn provider_icon(provider_name: &str) -> &'static str {
 }
 
 /// Render the header with session info
+/// `7607` -> `"7.6k"`, `585` -> `"585"`: header-sized token counts.
+fn short_token_count(tokens: u32) -> String {
+    if tokens < 1000 {
+        tokens.to_string()
+    } else {
+        format!("{:.1}k", tokens as f64 / 1000.0)
+    }
+}
+
+/// Green while the context window has room, yellow past 70%, red past 90%
+/// or when the fixed overhead alone leaves a model almost nothing.
+fn context_usage_color(usage: &crate::llm::agent::ContextUsage) -> Color {
+    let fill = usage.used as f64 / usage.window.max(1) as f64;
+    if fill >= 0.9 || usage.overhead_is_tight() {
+        Color::Red
+    } else if fill >= 0.7 {
+        Color::Yellow
+    } else {
+        Color::Green
+    }
+}
+
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let session_name = app
         .current_session
@@ -149,6 +171,20 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("💰 Cost: $", Style::default().fg(Color::DarkGray)),
         Span::styled(format!("{:.4}", cost), Style::default().fg(Color::Magenta)),
     ]);
+    if let Some(usage) = app.context_usage() {
+        header_spans.extend([
+            Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("🧠 Ctx: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(
+                    "{}/{}",
+                    short_token_count(usage.used),
+                    short_token_count(usage.window)
+                ),
+                Style::default().fg(context_usage_color(&usage)),
+            ),
+        ]);
+    }
     if let Some(tps) = tokens_per_second {
         header_spans.extend([
             Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
@@ -1612,6 +1648,33 @@ fn render_model_info(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("Context:  ", Style::default().fg(Color::DarkGray)),
         Span::styled(context_window, Style::default().fg(Color::White)),
     ]));
+    if let Some(usage) = app.context_usage() {
+        lines.push(Line::from(vec![
+            Span::styled("Tools:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(
+                    "{} profile, {} tools",
+                    if usage.core_tools_only {
+                        "core"
+                    } else {
+                        "full"
+                    },
+                    usage.tool_count
+                ),
+                Style::default().fg(Color::White),
+            ),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("Overhead: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(
+                    "{} tokens per request (system prompt + tool schemas), {} used last",
+                    usage.fixed_overhead, usage.used
+                ),
+                Style::default().fg(context_usage_color(&usage)),
+            ),
+        ]));
+    }
 
     if let Some(details) = app.llama_cpp_model_details() {
         lines.push(Line::from(vec![

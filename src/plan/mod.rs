@@ -934,10 +934,16 @@ impl PlanModeState {
     }
 
     /// Classify a tool call as high-risk for auto-run threshold checks.
+    ///
+    /// Matches registered (canonical) tool names only: callers must resolve
+    /// aliases such as `Bash` or `shell` through the tool registry first.
+    /// The code-execution tool is registered as `execute_code`; the old
+    /// `code_exec` spelling never matched a real call, so AutoPlan ran code
+    /// without asking.
     pub fn is_high_risk_tool(tool_name: &str) -> bool {
         matches!(
             tool_name,
-            "bash" | "write_file" | "edit_file" | "apply_patch" | "code_exec"
+            "bash" | "powershell" | "write_file" | "edit_file" | "apply_patch" | "execute_code"
         )
     }
 }
