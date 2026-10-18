@@ -29,6 +29,16 @@ env:
   # behind `llama-cpp`, which Windows CI has never enabled, since it has no
   # `cmake` install step for it), and now it does, with no toolchain cost.
   CI_FEATURES: openai,aws-bedrock,ollama,llama-cpp,llama-cpp-llguidance,profiling
+  # llama.cpp's vendored cpp-httplib (linked into its `common` lib) enables
+  # HTTPS whenever CMake's find_package(OpenSSL) succeeds. On macos-latest it
+  # "finds" an OpenSSL whose headers aren't on the compile include path, so
+  # httplib.cpp fails with "'openssl/err.h' file not found". crustly never
+  # uses llama.cpp's own HTTP/download code (.gguf downloads go through
+  # reqwest in llama_cpp_models.rs), so skip the lookup entirely - the
+  # llama-cpp-sys-2 build script forwards every CMAKE_* env var to CMake as
+  # a -D define, and httplib then builds without SSL (llama.cpp's supported
+  # "OpenSSL not found, HTTPS support disabled" path).
+  CMAKE_DISABLE_FIND_PACKAGE_OpenSSL: "TRUE"
 
 jobs:
   test:
