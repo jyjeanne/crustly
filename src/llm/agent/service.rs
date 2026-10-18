@@ -87,7 +87,7 @@ fn completion_token_budget(
         .saturating_add(PROMPT_FRAMING_MARGIN);
     let available = (context_window as usize).saturating_sub(prompt_tokens);
 
-    available.min(DEFAULT_MAX_COMPLETION).max(1) as u32
+    available.clamp(1, DEFAULT_MAX_COMPLETION) as u32
 }
 
 /// Build a loop-detection signature for one tool call: `<name>:<distinguishing
