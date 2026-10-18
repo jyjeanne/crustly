@@ -46,12 +46,12 @@ toml = "1.1"
 
 # Configuration
 config = "0.15"
-dirs = "6.0"
+dirs = "7.0"
 shellexpand = "3.1"
 
 # HTTP & LLM Clients
 reqwest = { version = "0.13", features = ["json", "native-tls", "stream", "query"], default-features = false }
-async-openai = { version = "0.41", optional = true }
+async-openai = { version = "0.42", optional = true }
 aws-sdk-bedrockruntime = { version = "1.15", optional = true }
 # Native Ollama provider. Pulls its own reqwest 0.12 client internally (ollama-rs
 # is built against reqwest 0.12, incompatible with the reqwest 0.11 client used
@@ -148,11 +148,11 @@ base64 = "0.23"
 
 # Document Parsing
 pdf-extract = "0.12"
-zip = "8.6"
+zip = "9.0"
 quick-xml = "0.42"
 
 [dev-dependencies]
-rstest = "0.26"
+rstest = "0.27"
 proptest = "1.4"
 mockall = "0.15"
 criterion = { version = "0.8", features = ["html_reports"] }
