@@ -47,5 +47,8 @@ pub mod web_fetch;
 // Re-exports
 pub use error::{Result, ToolError};
 pub use file_read_cache::{FileFingerprint, FileReadCache, ReadGate};
-pub use r#trait::{SubAgentLauncher, Tool, ToolCapability, ToolExecutionContext, ToolResult};
+pub use r#trait::{
+    SubAgentLauncher, SubAgentReport, SubAgentStatus, SubAgentTask, Tool, ToolCapability,
+    ToolExecutionContext, ToolResult,
+};
 pub use registry::ToolRegistry;

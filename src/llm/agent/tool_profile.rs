@@ -27,6 +27,8 @@ pub const AUTO_FULL_MIN_WINDOW: u32 = 32_768;
 pub struct ToolSelection {
     core_only: bool,
     extra: Vec<String>,
+    /// When set, exactly these tools and nothing else (a sub-agent profile).
+    only: Option<Vec<String>>,
 }
 
 impl ToolSelection {
@@ -35,6 +37,17 @@ impl ToolSelection {
         Self {
             core_only: false,
             extra: Vec::new(),
+            only: None,
+        }
+    }
+
+    /// Exactly the tools in `names`. Uses the short system prompt, like the
+    /// core profile.
+    pub fn only(names: &[String]) -> Self {
+        Self {
+            core_only: true,
+            extra: Vec::new(),
+            only: Some(names.to_vec()),
         }
     }
 
@@ -52,6 +65,7 @@ impl ToolSelection {
             } else {
                 Vec::new()
             },
+            only: None,
         }
     }
 
@@ -63,6 +77,9 @@ impl ToolSelection {
     /// Whether the tool registered as `name` is exposed. `name` must be the
     /// canonical registered name, not an alias.
     pub fn exposes(&self, name: &str) -> bool {
+        if let Some(only) = &self.only {
+            return only.iter().any(|n| n == name);
+        }
         !self.core_only
             || CORE_TOOLS.contains(&name)
             || name.starts_with("mcp__")
@@ -71,7 +88,9 @@ impl ToolSelection {
 
     /// `"core"` or `"full"`, for messages to the model and the user.
     pub fn label(&self) -> &'static str {
-        if self.core_only {
+        if self.only.is_some() {
+            "sub-agent"
+        } else if self.core_only {
             "core"
         } else {
             "full"
@@ -111,6 +130,19 @@ mod tests {
         );
         assert!(!s.exposes("web_fetch"));
         assert!(!s.exposes("execute_code"));
+    }
+
+    #[test]
+    fn an_allow_list_exposes_exactly_its_tools() {
+        let s = ToolSelection::only(&["read_file".to_string(), "grep".to_string()]);
+        assert!(s.exposes("read_file"));
+        assert!(s.exposes("grep"));
+        assert!(
+            !s.exposes("edit_file"),
+            "core tools outside the list are hidden"
+        );
+        assert!(!s.exposes("mcp__github__list_issues"), "MCP tools too");
+        assert!(s.is_core_only(), "uses the short system prompt");
     }
 
     #[test]

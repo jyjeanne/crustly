@@ -262,6 +262,58 @@ default_model = "qwen2.5-coder-7b-instruct"
 #                             # rounds to .crustly/progress.md
 
 # ========================================
+# Sub-agents
+# ========================================
+# The `agent` tool hands a focused task to a sub-agent with its own context
+# window and returns only its answer. Built-in profiles: explorer (read-only
+# search), implementer (makes a change and checks it), reviewer (read-only
+# review), general. Sub-agents are asked about tools through the same
+# approval prompt as the main agent. Under the core tool profile, add
+# "agent" to [tools] extra to use them.
+#
+# [subagents]
+# max_concurrent = 1          # one local GPU runs one model at a time
+#
+# [subagents.profiles.explorer]
+# model = "qwen2.5-coder:3b"  # a small fast model for searching
+#
+# [subagents.profiles.implementer]
+# model = "qwen2.5-coder:14b"
+# max_rounds = 25
+#
+# [subagents.profiles.tester]  # a new profile
+# tools = ["bash", "read_file", "grep"]
+# read_only = false
+# instructions = "Run the test suite and report each failure with its cause."
+
+# ========================================
+# Model Routing
+# ========================================
+# Sends each request to a model chosen from its wording: fast for lookups,
+# balanced for ordinary work, powerful for refactors and debugging. Off by
+# default - on a local server, each switch loads another model.
+#
+# [router]
+# enabled = true
+# fast = "qwen2.5-coder:3b"
+# balanced = "qwen2.5-coder:7b"
+# powerful = "qwen2.5-coder:32b"
+
+# ========================================
+# Fallback Provider
+# ========================================
+# When the main provider is unreachable, rate-limited, times out or fails,
+# or a prompt overflows its window and compaction cannot help, the rest of
+# the request goes to this provider (with its own default model). The answer
+# says when this happened. Off unless set: it sends the conversation
+# elsewhere.
+#
+# [fallback]
+# provider = "anthropic"      # a provider configured under [providers.*]
+# on_error = true
+# on_overflow = true
+
+# ========================================
 # Tips for Using Local LLMs
 # ========================================
 # 1. Make sure LM Studio is running before starting Crustly

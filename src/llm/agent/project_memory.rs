@@ -140,6 +140,7 @@ fn call_target(input: &Value) -> Option<String> {
         "url",
         "query",
         "operation",
+        "description",
     ];
     let value = KEYS
         .iter()

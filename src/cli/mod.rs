@@ -149,13 +149,52 @@ RULES
 
 /// Apply the agent-loop config to an agent service: which tools the model
 /// sees (`[tools]`, with the shorter system prompt for the core set), the
-/// request limits (`[agent]`), edit verification (`[verification]`) and
-/// project memory (`[memory]`).
+/// request limits (`[agent]`), edit verification (`[verification]`),
+/// project memory (`[memory]`), sub-agents (`[subagents]`), model routing
+/// (`[router]`) and the fallback provider (`[fallback]`).
 ///
 /// `can_approve_shell` says whether a shell command the model runs can be
 /// approved at all; verification is skipped when it cannot, since the model
 /// would be sent back to run a check that is then refused.
 fn configure_agent(
+    service: crate::llm::agent::AgentService,
+    config: &crate::config::Config,
+    can_approve_shell: bool,
+) -> Result<crate::llm::agent::AgentService> {
+    let mut service = configure_agent_loop(service, config, can_approve_shell).with_subagents(
+        config.subagents.max_concurrent,
+        crate::llm::agent::profiles::resolve_profiles(&config.subagents.profiles),
+    );
+
+    if config.router.enabled {
+        let provider = service.provider_name().to_string();
+        let default = service.provider_model().to_string();
+        let model = |tier: &Option<String>| tier.clone().unwrap_or_else(|| default.clone());
+        service = service.with_model_router(crate::llm::provider::router::ModelRouter::new(
+            &provider,
+            &model(&config.router.fast),
+            &provider,
+            &model(&config.router.balanced),
+            &provider,
+            &model(&config.router.powerful),
+        ));
+    }
+
+    if let Some(name) = &config.fallback.provider {
+        println!("☁  Fallback provider (used only when the main one fails):");
+        let provider = crate::llm::provider::create_named_provider(config, name)
+            .with_context(|| format!("[fallback] provider = \"{name}\""))?;
+        service = service.with_fallback(crate::llm::agent::Fallback {
+            provider,
+            on_error: config.fallback.on_error,
+            on_overflow: config.fallback.on_overflow,
+        });
+    }
+
+    Ok(service)
+}
+
+fn configure_agent_loop(
     service: crate::llm::agent::AgentService,
     config: &crate::config::Config,
     can_approve_shell: bool,
@@ -1107,7 +1146,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     let working_directory = std::env::current_dir().unwrap_or_default();
 
     // Create agent service with system prompt and working directory
-    let agent_service = Arc::new(configure_agent(
+    let agent_service = Arc::new(configure_agent_loop(
         AgentService::new(provider.clone(), service_context.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_working_directory(working_directory.clone()),
@@ -1168,7 +1207,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
             .with_working_directory(working_directory),
         config,
         true,
-    ));
+    )?);
 
     // Update app with the configured agent service (preserve event channels!)
     app.set_agent_service(agent_service);
@@ -1305,7 +1344,7 @@ async fn cmd_run(
             .with_auto_approve_tools(auto_approve),
         config,
         auto_approve,
-    );
+    )?;
 
     // Warn up front when the system prompt and tool schemas leave a local
     // model almost no room: the answer would otherwise just come back cut off.

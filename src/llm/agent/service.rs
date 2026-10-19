@@ -35,6 +35,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 mod run;
+mod subagents;
 mod tool_round;
 
 /// Prefixed to the answer when a response carried no visible text and its
@@ -278,6 +279,32 @@ pub struct AgentService {
     /// Whether requests that edited files or ran several tool rounds are
     /// logged to `.crustly/progress.md` (see `project_memory`).
     progress_file: bool,
+
+    /// When set, the only tools the model may use (a sub-agent profile),
+    /// overriding `tool_profile`.
+    tool_allowlist: Option<Vec<String>>,
+
+    /// Provider a round falls back to when the main one fails or overflows.
+    fallback: Option<Fallback>,
+
+    /// The sub-agents started through the `agent` tool, and how many may
+    /// run at once.
+    subagents: Arc<subagents::SubAgentManager>,
+
+    /// Sub-agent profiles by name (see `profiles`).
+    profiles: Arc<std::collections::BTreeMap<String, super::profiles::AgentProfile>>,
+}
+
+/// A provider to fall back to (`[fallback]` config).
+#[derive(Clone)]
+pub struct Fallback {
+    pub provider: Arc<dyn Provider>,
+    /// Fall back when the main provider is unreachable, rate-limited, times
+    /// out or returns a server error.
+    pub on_error: bool,
+    /// Fall back when the prompt overflows the main model's window and
+    /// compaction cannot free enough of it.
+    pub on_overflow: bool,
 }
 
 /// Route a streaming `TextDelta` through `<think>` tag detection.
@@ -531,7 +558,34 @@ impl AgentService {
             verification_command: None,
             project_notes: false,
             progress_file: false,
+            tool_allowlist: None,
+            fallback: None,
+            subagents: Arc::new(subagents::SubAgentManager::new(1)),
+            profiles: Arc::new(super::profiles::builtin_profiles()),
         }
+    }
+
+    /// Limit the model to exactly these tools (a sub-agent profile).
+    pub fn with_tool_allowlist(mut self, tools: Vec<String>) -> Self {
+        self.tool_allowlist = Some(tools);
+        self
+    }
+
+    /// Fall back to another provider when the main one fails or overflows.
+    pub fn with_fallback(mut self, fallback: Fallback) -> Self {
+        self.fallback = Some(fallback);
+        self
+    }
+
+    /// Run at most `max_concurrent` sub-agents at a time, with `profiles`.
+    pub fn with_subagents(
+        mut self,
+        max_concurrent: usize,
+        profiles: std::collections::BTreeMap<String, super::profiles::AgentProfile>,
+    ) -> Self {
+        self.subagents = Arc::new(subagents::SubAgentManager::new(max_concurrent));
+        self.profiles = Arc::new(profiles);
+        self
     }
 
     /// Cap one request's wall-clock time and tokens. When a cap is reached
@@ -718,7 +772,10 @@ impl AgentService {
 
     /// Resolve the tool profile for a model with `context_window` tokens.
     fn tool_selection(&self, context_window: u32) -> ToolSelection {
-        ToolSelection::resolve(self.tool_profile, &self.extra_tools, context_window)
+        match &self.tool_allowlist {
+            Some(tools) => ToolSelection::only(tools),
+            None => ToolSelection::resolve(self.tool_profile, &self.extra_tools, context_window),
+        }
     }
 
     /// Definitions of the registered tools that `selection` exposes.
@@ -1028,6 +1085,7 @@ impl AgentService {
             provider_name: self.provider.name().to_string(),
             perf_metrics: response.perf_metrics,
             context: Some(budget.usage(false)),
+            tool_summary: None,
         })
     }
 
@@ -1099,6 +1157,48 @@ impl AgentService {
         .await
     }
 
+    /// Non-streaming variant that stops with [`AgentError::Cancelled`] when
+    /// `cancel` is cancelled (sub-agents).
+    pub(crate) async fn send_message_with_tools_cancellable(
+        &self,
+        session_id: Uuid,
+        user_message: String,
+        model: Option<String>,
+        read_only_mode: bool,
+        cancel: CancellationToken,
+    ) -> Result<AgentResponse> {
+        self.send_message_with_tools_inner(
+            session_id,
+            user_message,
+            model,
+            read_only_mode,
+            None,
+            cancel,
+        )
+        .await
+    }
+
+    /// What a sub-agent of this service inherits from it.
+    fn child_template(&self) -> subagents::ChildTemplate {
+        subagents::ChildTemplate {
+            provider: self.provider.clone(),
+            fallback: self.fallback.clone(),
+            context: self.context.clone(),
+            tool_registry: self.tool_registry.clone(),
+            working_directory: self.working_directory.clone(),
+            system_prompt: self.default_system_prompt.clone(),
+            core_system_prompt: self.core_system_prompt.clone(),
+            tool_profile: self.tool_profile,
+            extra_tools: self.extra_tools.clone(),
+            approval_callback: self.approval_callback.clone(),
+            auto_approve_tools: self.auto_approve_tools,
+            verification: self.verification,
+            verification_command: self.verification_command.clone(),
+            project_notes: self.project_notes,
+            profiles: self.profiles.clone(),
+        }
+    }
+
     /// Streaming variant — identical to [`send_message_with_tools_and_mode`] but forwards
     /// each LLM text delta to `chunk_tx` so the TUI can render incremental output.
     /// Cancelling `cancel` ends the request with [`AgentError::Cancelled`] at
@@ -1148,7 +1248,21 @@ impl AgentService {
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
-        let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
+        // Resolve the model first, so the context window and tool profile
+        // below are those of the model that will answer. An explicit model
+        // (a sub-agent profile) wins; otherwise the router, when enabled,
+        // picks the tier's model from the request's wording (T046).
+        let model_name = match (model, &self.model_router) {
+            (Some(model), _) => model,
+            (None, Some(router)) => {
+                let tier =
+                    crate::tui::prompt_analyzer::PromptAnalyzer::new().classify_tier(&user_message);
+                let (_, model_id) = router.resolve(tier);
+                tracing::info!("Model router: {:?} request -> {}", tier, model_id);
+                model_id.to_string()
+            }
+            (None, None) => self.provider.default_model().to_string(),
+        };
         let context_window = self
             .provider
             .context_window(&model_name)
@@ -1196,55 +1310,20 @@ impl AgentService {
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
-        // Resolve model: router picks tier-appropriate model when available (T046)
-        let model_name = if let Some(ref router) = self.model_router {
-            let last_text = context
-                .messages
-                .last()
-                .map(|m| {
-                    m.content
-                        .iter()
-                        .filter_map(|b| {
-                            if let ContentBlock::Text { text } = b {
-                                Some(text.as_str())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                })
-                .unwrap_or_default();
-            let tier = crate::tui::prompt_analyzer::PromptAnalyzer::new().classify_tier(&last_text);
-            let (_, model_id) = router.resolve(tier);
-            model_id.to_string()
-        } else {
-            model_name
-        };
-
         // Create tool execution context.
-        // Only wire a SubAgentLauncher for top-level services; sub-agents started by
-        // AgentServiceLauncher have allow_sub_agents=false to prevent recursive spawning.
+        // Only wire a SubAgentLauncher for top-level services; sub-agents are
+        // built with allow_sub_agents=false to prevent recursive spawning.
         let mut tool_context = ToolExecutionContext::new(session_id)
             .with_auto_approve(self.auto_approve_tools)
             .with_working_directory(self.working_directory.clone())
             .with_read_only_mode(read_only_mode)
-            .with_file_read_cache(self.file_read_cache.clone());
+            .with_file_read_cache(self.file_read_cache.clone())
+            .with_cancel(cancel.clone());
         if self.allow_sub_agents {
-            let launcher = Arc::new(
-                AgentServiceLauncher::new(
-                    self.provider.clone(),
-                    self.context.clone(),
-                    self.tool_registry.clone(),
-                    self.working_directory.clone(),
-                    self.default_system_prompt.clone(),
-                )
-                .with_tool_settings(
-                    self.tool_profile,
-                    self.extra_tools.clone(),
-                    self.core_system_prompt.clone(),
-                ),
-            );
+            let launcher = Arc::new(subagents::AgentServiceLauncher::new(
+                self.subagents.clone(),
+                self.child_template(),
+            ));
             tool_context = tool_context.with_sub_agent_launcher(launcher);
         }
 
@@ -1253,6 +1332,7 @@ impl AgentService {
         let pipeline = self.round_pipeline(&selection, read_only_mode);
         let outcome = run::AgentRun {
             service: self,
+            provider: self.provider.clone(),
             model_name,
             context,
             selection: &selection,
@@ -1303,13 +1383,12 @@ impl AgentService {
             read_only_mode,
         );
 
-        // Calculate total cost
+        // Each model call was priced by the provider that made it (the run
+        // may have fallen back part-way).
         let total_input_tokens = outcome.input_tokens;
         let total_output_tokens = outcome.output_tokens;
         let total_tokens = total_input_tokens + total_output_tokens;
-        let cost =
-            self.provider
-                .calculate_cost(&response.model, total_input_tokens, total_output_tokens);
+        let cost = outcome.cost;
 
         // Update message with usage info
         message_service
@@ -1321,7 +1400,7 @@ impl AgentService {
         message_service
             .update_message_metrics(
                 assistant_db_msg.id,
-                self.provider.name(),
+                &outcome.provider_name,
                 response.perf_metrics.as_ref(),
             )
             .await
@@ -1344,11 +1423,12 @@ impl AgentService {
             },
             cost,
             model: response.model.clone(),
-            provider_name: self.provider.name().to_string(),
+            provider_name: outcome.provider_name.clone(),
             perf_metrics: response.perf_metrics.clone(),
             context: outcome
                 .last_budget
                 .map(|b| b.usage(selection.is_core_only())),
+            tool_summary,
         })
     }
 
@@ -1561,6 +1641,9 @@ pub struct AgentResponse {
 
     /// How full the context window was for the last request of this turn.
     pub context: Option<ContextUsage>,
+
+    /// One-line summary of the tool calls behind this answer, if any.
+    pub tool_summary: Option<String>,
 }
 
 /// Streaming response from the agent
@@ -1576,122 +1659,6 @@ pub struct AgentStreamResponse {
 
     /// Model being used
     pub model: String,
-}
-
-/// Implements [`SubAgentLauncher`] by creating a fresh [`AgentService`] and
-/// running the sub-agent prompt in a detached Tokio task.
-///
-/// Wired into [`ToolExecutionContext`] so the `AgentTool` can fire sub-agents
-/// without depending directly on `AgentService` internals.
-pub struct AgentServiceLauncher {
-    provider: Arc<dyn Provider>,
-    context: ServiceContext,
-    tool_registry: Arc<ToolRegistry>,
-    working_directory: std::path::PathBuf,
-    system_prompt: Option<String>,
-    tool_profile: ToolProfile,
-    extra_tools: Vec<String>,
-    core_system_prompt: Option<String>,
-}
-
-impl std::fmt::Debug for AgentServiceLauncher {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AgentServiceLauncher")
-            .field("working_directory", &self.working_directory)
-            .finish_non_exhaustive()
-    }
-}
-
-impl AgentServiceLauncher {
-    pub fn new(
-        provider: Arc<dyn Provider>,
-        context: ServiceContext,
-        tool_registry: Arc<ToolRegistry>,
-        working_directory: std::path::PathBuf,
-        system_prompt: Option<String>,
-    ) -> Self {
-        Self {
-            provider,
-            context,
-            tool_registry,
-            working_directory,
-            system_prompt,
-            tool_profile: ToolProfile::Full,
-            extra_tools: Vec::new(),
-            core_system_prompt: None,
-        }
-    }
-
-    /// Give sub-agents the parent's tool profile and core system prompt, so
-    /// they fit the same context window.
-    pub fn with_tool_settings(
-        mut self,
-        profile: ToolProfile,
-        extra: Vec<String>,
-        core_system_prompt: Option<String>,
-    ) -> Self {
-        self.tool_profile = profile;
-        self.extra_tools = extra;
-        self.core_system_prompt = core_system_prompt;
-        self
-    }
-}
-
-#[async_trait::async_trait]
-impl crate::llm::tools::SubAgentLauncher for AgentServiceLauncher {
-    async fn launch(
-        &self,
-        _agent_id: uuid::Uuid,
-        description: &str,
-        prompt: &str,
-    ) -> std::result::Result<(), String> {
-        // Sub-agents run detached in a background task with no UI to prompt,
-        // so there's no `approval_callback` to wire up here - but that must
-        // NOT mean auto-approving every tool call. With the default
-        // `AllowAll` sandbox policy (no `security.allow_bash`/`deny_tools`
-        // configured), that would let a sub-agent run any bash command or
-        // write any file with zero human-in-the-loop check, regardless of
-        // the parent session's approval mode. Leaving `auto_approve_tools`
-        // at its default `false` (and no callback) means tools that don't
-        // require approval (read, glob, grep, etc.) still run freely, while
-        // approval-requiring tools (bash, write, edit) are denied with a
-        // clear error instead of silently executing.
-        let mut svc = AgentService::new(self.provider.clone(), self.context.clone())
-            .with_tool_registry(self.tool_registry.clone())
-            .with_max_tool_iterations(20)
-            .with_working_directory(self.working_directory.clone())
-            .with_allow_sub_agents(false)
-            .with_tool_profile(self.tool_profile, self.extra_tools.clone());
-
-        if let Some(sp) = &self.system_prompt {
-            svc = svc.with_system_prompt(sp.clone());
-        }
-        if let Some(sp) = &self.core_system_prompt {
-            svc = svc.with_core_system_prompt(sp.clone());
-        }
-
-        let prompt = prompt.to_string();
-        let description = description.to_string();
-        let context = self.context.clone();
-        tokio::spawn(async move {
-            let session_svc = crate::services::SessionService::new(context);
-            let session = match session_svc
-                .create_session(Some(format!("sub-agent: {description}")))
-                .await
-            {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::warn!(%description, error = %e, "Sub-agent failed to create session");
-                    return;
-                }
-            };
-            if let Err(e) = svc.send_message_with_tools(session.id, prompt, None).await {
-                tracing::warn!(%description, error = %e, "Sub-agent failed");
-            }
-        });
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -2057,31 +2024,8 @@ mod tests {
         assert!(agent_service.system_prompt_with_env().is_none());
     }
 
-    /// Regression: `AgentServiceLauncher::launch` used to build the
-    /// sub-agent's `AgentService` with `.with_auto_approve_tools(true)`,
-    /// which skipped the human-approval gate entirely for every tool call a
-    /// sub-agent made. It must build with approval left at its safe default
-    /// (`false`, no callback) instead, so approval-requiring tools are
-    /// denied rather than silently auto-approved.
-    #[tokio::test]
-    async fn sub_agent_launcher_does_not_auto_approve_tools() {
-        use crate::llm::tools::SubAgentLauncher;
-
-        let db = Database::connect_in_memory().await.unwrap();
-        db.run_migrations().await.unwrap();
-        let pool = db.pool().clone();
-        let context = ServiceContext::new(pool);
-        let provider = Arc::new(MockProvider);
-        let registry = Arc::new(crate::llm::tools::ToolRegistry::new());
-
-        let launcher =
-            AgentServiceLauncher::new(provider, context, registry, std::env::temp_dir(), None);
-
-        let result = launcher
-            .launch(Uuid::new_v4(), "test sub-agent", "do something")
-            .await;
-        assert!(result.is_ok());
-    }
+    // Sub-agent approval: see `sub_agents_without_an_approval_prompt_cannot_run_gated_tools`
+    // and `sub_agent_tool_calls_are_approved_through_the_parent_s_prompt`.
 
     /// Mock provider that simulates tool use
     struct MockProviderWithTools {
@@ -2448,6 +2392,8 @@ mod tests {
     /// Provider that answers from a script, one entry per call, and records
     /// every request it receives.
     struct ScriptedProvider {
+        name: &'static str,
+        model: &'static str,
         window: u32,
         script:
             std::sync::Mutex<std::collections::VecDeque<crate::llm::provider::Result<LLMResponse>>>,
@@ -2457,10 +2403,18 @@ mod tests {
     impl ScriptedProvider {
         fn new(window: u32, script: Vec<crate::llm::provider::Result<LLMResponse>>) -> Self {
             Self {
+                name: "scripted",
+                model: "scripted-model",
                 window,
                 script: std::sync::Mutex::new(script.into()),
                 requests: std::sync::Mutex::new(Vec::new()),
             }
+        }
+
+        fn named(mut self, name: &'static str, model: &'static str) -> Self {
+            self.name = name;
+            self.model = model;
+            self
         }
 
         fn requests(&self) -> Vec<LLMRequest> {
@@ -2487,15 +2441,15 @@ mod tests {
         }
 
         fn name(&self) -> &str {
-            "scripted"
+            self.name
         }
 
         fn default_model(&self) -> &str {
-            "scripted-model"
+            self.model
         }
 
         fn supported_models(&self) -> Vec<String> {
-            vec!["scripted-model".to_string()]
+            vec![self.model.to_string()]
         }
 
         fn context_window(&self, _model: &str) -> Option<u32> {
@@ -3345,5 +3299,499 @@ mod tests {
             results[1]
         );
         assert!(results[1].contains("Expected arguments for read_file: path (string, required)"));
+    }
+
+    // ── Sub-agents, profiles, router, fallback (P2) ──────────────────────────
+
+    /// A registry with the `agent` tool plus named test tools.
+    fn agent_registry(tools: &[(&'static str, bool)]) -> Arc<ToolRegistry> {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(crate::llm::tools::agent::AgentTool));
+        for &(name, requires_approval) in tools {
+            registry.register(Arc::new(NamedTool {
+                name,
+                requires_approval,
+            }));
+        }
+        Arc::new(registry)
+    }
+
+    /// The sub-agent's answer comes back to the parent as the tool result;
+    /// the explorer profile only sees its read-only tools; the task and the
+    /// answer are kept under .crustly/agents.
+    #[tokio::test]
+    async fn a_sub_agent_s_answer_comes_back_to_the_parent() {
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "agent",
+                    serde_json::json!({
+                        "description": "find usages",
+                        "prompt": "Where is parse_config used?",
+                        "profile": "explorer"
+                    }),
+                )),
+                Ok(text_reply("parse_config is called in src/main.rs:12")),
+                Ok(text_reply("It is called from src/main.rs.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(agent_registry(&[
+                ("read_file", false),
+                ("grep", false),
+                ("edit_file", false),
+            ]))
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_system_prompt("parent prompt".to_string());
+
+        let response = service
+            .send_message_with_tools(session, "where is parse_config used?".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "It is called from src/main.rs.");
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 3, "parent, sub-agent, parent");
+        assert_eq!(tool_names(&requests[1]), vec!["grep", "read_file"]);
+        let child_system = requests[1].system.clone().unwrap();
+        assert!(child_system.contains("## Your role"), "{child_system}");
+        assert!(child_system.contains("explorer sub-agent"));
+        let results = tool_results(&requests[2]);
+        assert!(
+            results[0].contains("parse_config is called in src/main.rs:12"),
+            "{}",
+            results[0]
+        );
+
+        let dir = workdir.path().join(".crustly/agents");
+        let files: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(files.len(), 2, "{files:?}");
+        let md = files.iter().find(|f| f.ends_with(".md")).unwrap();
+        let task = std::fs::read_to_string(dir.join(md)).unwrap();
+        assert!(task.contains("Where is parse_config used?"));
+        assert!(task.contains("## Answer\n\nparse_config is called in src/main.rs:12"));
+    }
+
+    /// Without an approval prompt (crustly run without --auto-approve), a
+    /// sub-agent's approval-requiring tools are refused, never run.
+    #[tokio::test]
+    async fn sub_agents_without_an_approval_prompt_cannot_run_gated_tools() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "agent",
+                    serde_json::json!({
+                        "description": "run tests",
+                        "prompt": "Run the tests",
+                        "profile": "implementer"
+                    }),
+                )),
+                Ok(tool_call(
+                    "bash",
+                    serde_json::json!({"command": "cargo test"}),
+                )),
+                Ok(text_reply("I could not run the tests.")),
+                Ok(text_reply("The sub-agent could not run them.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(agent_registry(&[("bash", true)]));
+
+        service
+            .send_message_with_tools(session, "test it".to_string(), None)
+            .await
+            .unwrap();
+
+        let child_results = tool_results(&provider.requests()[2]);
+        assert!(
+            child_results[0].contains("requires approval"),
+            "{}",
+            child_results[0]
+        );
+    }
+
+    /// With an approval prompt, a sub-agent's gated tool calls go through it,
+    /// labelled with the sub-agent's task.
+    #[tokio::test]
+    async fn sub_agent_tool_calls_are_approved_through_the_parent_s_prompt() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "agent",
+                    serde_json::json!({
+                        "description": "run tests",
+                        "prompt": "Run the tests",
+                        "profile": "implementer"
+                    }),
+                )),
+                Ok(tool_call(
+                    "bash",
+                    serde_json::json!({"command": "cargo test"}),
+                )),
+                Ok(text_reply("All tests pass.")),
+                Ok(text_reply("Tests pass.")),
+            ],
+        ));
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen_in_callback = seen.clone();
+        let callback: ApprovalCallback = Arc::new(move |info: ToolApprovalInfo| {
+            seen_in_callback
+                .lock()
+                .unwrap()
+                .push(info.tool_description.clone());
+            Box::pin(async { Ok(true) })
+        });
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(agent_registry(&[("bash", true)]))
+            .with_approval_callback(Some(callback));
+
+        service
+            .send_message_with_tools(session, "test it".to_string(), None)
+            .await
+            .unwrap();
+
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert!(seen[0].starts_with("[sub-agent: run tests]"), "{}", seen[0]);
+        assert!(tool_results(&provider.requests()[2])[0].contains("bash ran"));
+    }
+
+    fn task(description: &str, profile: Option<&str>) -> crate::llm::tools::SubAgentTask {
+        crate::llm::tools::SubAgentTask {
+            id: Uuid::new_v4(),
+            description: description.to_string(),
+            prompt: format!("Please {description}"),
+            profile: profile.map(str::to_string),
+            read_only: false,
+        }
+    }
+
+    fn launcher_for(service: &AgentService) -> subagents::AgentServiceLauncher {
+        subagents::AgentServiceLauncher::new(service.subagents.clone(), service.child_template())
+    }
+
+    #[tokio::test]
+    async fn a_background_sub_agent_is_collected_with_its_report() {
+        use crate::llm::tools::{SubAgentLauncher, SubAgentStatus};
+
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![Ok(text_reply("Done in the background."))],
+        ));
+        let service = AgentService::new(provider, context)
+            .with_working_directory(workdir.path().to_path_buf());
+        let launcher = launcher_for(&service);
+        let task = task("summarize the readme", None);
+        let id = task.id;
+
+        launcher
+            .start(task, CancellationToken::new())
+            .await
+            .unwrap();
+        let report = launcher.report(id, true).await.unwrap();
+
+        assert_eq!(report.status, SubAgentStatus::Completed);
+        assert_eq!(report.answer.as_deref(), Some("Done in the background."));
+        assert_eq!(report.profile, "general");
+        assert_eq!(launcher.list().len(), 1);
+        assert!(!launcher.cancel(id), "a finished sub-agent is not running");
+    }
+
+    #[tokio::test]
+    async fn an_unknown_profile_fails_with_the_available_ones() {
+        use crate::llm::tools::{SubAgentLauncher, SubAgentStatus};
+
+        let context = test_context().await;
+        let provider = Arc::new(ScriptedProvider::new(128_000, vec![]));
+        let service = AgentService::new(provider.clone(), context)
+            .with_working_directory(tempfile::tempdir().unwrap().path().to_path_buf());
+
+        let report = launcher_for(&service)
+            .run(task("x", Some("wizard")), CancellationToken::new())
+            .await;
+
+        assert_eq!(report.status, SubAgentStatus::Failed);
+        let error = report.error.unwrap();
+        assert!(error.contains("unknown profile 'wizard'"), "{error}");
+        assert!(error.contains("explorer"));
+        assert!(provider.requests().is_empty());
+    }
+
+    /// Provider whose calls wait until the test lets them through.
+    struct GatedProvider {
+        gate: Arc<tokio::sync::Semaphore>,
+    }
+
+    #[async_trait]
+    impl Provider for GatedProvider {
+        async fn complete(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<LLMResponse> {
+            self.gate.acquire().await.unwrap().forget();
+            Ok(text_reply("released"))
+        }
+        async fn stream(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<ProviderStream> {
+            unimplemented!()
+        }
+        fn name(&self) -> &str {
+            "gated"
+        }
+        fn default_model(&self) -> &str {
+            "gated-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["gated-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(128_000)
+        }
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    async fn wait_for_status(
+        launcher: &subagents::AgentServiceLauncher,
+        id: Uuid,
+        status: crate::llm::tools::SubAgentStatus,
+    ) {
+        use crate::llm::tools::SubAgentLauncher;
+        for _ in 0..200 {
+            if launcher.report(id, false).await.map(|r| r.status) == Some(status) {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        panic!("sub-agent {id} never reached {status:?}");
+    }
+
+    /// With one slot (the default), a second sub-agent waits until the
+    /// first is done: one local GPU serializes inference anyway.
+    #[tokio::test]
+    async fn sub_agents_run_one_at_a_time_by_default() {
+        use crate::llm::tools::{SubAgentLauncher, SubAgentStatus};
+
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let gate = Arc::new(tokio::sync::Semaphore::new(0));
+        let service = AgentService::new(Arc::new(GatedProvider { gate: gate.clone() }), context)
+            .with_working_directory(workdir.path().to_path_buf());
+        let launcher = launcher_for(&service);
+        let first = task("first", None);
+        let second = task("second", None);
+        let (first_id, second_id) = (first.id, second.id);
+
+        launcher
+            .start(first, CancellationToken::new())
+            .await
+            .unwrap();
+        wait_for_status(&launcher, first_id, SubAgentStatus::Running).await;
+        launcher
+            .start(second, CancellationToken::new())
+            .await
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert_eq!(
+            launcher.report(second_id, false).await.unwrap().status,
+            SubAgentStatus::Queued
+        );
+
+        gate.add_permits(2);
+        assert_eq!(
+            launcher.report(first_id, true).await.unwrap().status,
+            SubAgentStatus::Completed
+        );
+        assert_eq!(
+            launcher.report(second_id, true).await.unwrap().status,
+            SubAgentStatus::Completed
+        );
+    }
+
+    #[tokio::test]
+    async fn a_running_sub_agent_can_be_cancelled() {
+        use crate::llm::tools::{SubAgentLauncher, SubAgentStatus};
+
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let gate = Arc::new(tokio::sync::Semaphore::new(0));
+        let service = AgentService::new(Arc::new(GatedProvider { gate }), context)
+            .with_working_directory(workdir.path().to_path_buf());
+        let launcher = launcher_for(&service);
+        let task = task("never finishes", None);
+        let id = task.id;
+
+        launcher
+            .start(task, CancellationToken::new())
+            .await
+            .unwrap();
+        wait_for_status(&launcher, id, SubAgentStatus::Running).await;
+        assert!(launcher.cancel(id));
+
+        let report =
+            tokio::time::timeout(std::time::Duration::from_secs(5), launcher.report(id, true))
+                .await
+                .expect("cancellation must not hang")
+                .unwrap();
+        assert_eq!(report.status, SubAgentStatus::Cancelled);
+    }
+
+    fn fallback_to(provider: Arc<ScriptedProvider>, on_overflow: bool) -> Fallback {
+        Fallback {
+            provider,
+            on_error: true,
+            on_overflow,
+        }
+    }
+
+    /// When the main provider is unreachable or failing, the round goes to
+    /// the fallback, with the fallback's own model, and the user is told.
+    #[tokio::test]
+    async fn a_failing_provider_falls_back_and_says_so() {
+        use crate::llm::provider::ProviderError;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let local = Arc::new(
+            ScriptedProvider::new(8192, vec![Err(ProviderError::Timeout(120))])
+                .named("ollama", "qwen2.5-coder:7b"),
+        );
+        let cloud = Arc::new(
+            ScriptedProvider::new(200_000, vec![Ok(text_reply("Answer from the cloud."))])
+                .named("anthropic", "claude-sonnet"),
+        );
+        let service = AgentService::new(local.clone(), context)
+            .with_fallback(fallback_to(cloud.clone(), true));
+
+        let response = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await
+            .unwrap();
+
+        assert!(response.content.starts_with("Answer from the cloud."));
+        assert!(
+            response
+                .content
+                .contains("Answered by the fallback provider anthropic"),
+            "{}",
+            response.content
+        );
+        assert_eq!(response.provider_name, "anthropic");
+        let sent = cloud.requests();
+        assert_eq!(
+            sent[0].model, "claude-sonnet",
+            "never the local model's name"
+        );
+    }
+
+    /// An overflow is first handled locally by compaction; only when
+    /// nothing can be freed does the round go to the fallback, and only if
+    /// `on_overflow` allows it.
+    #[tokio::test]
+    async fn an_overflow_falls_back_only_when_allowed() {
+        use crate::llm::provider::ProviderError;
+
+        for on_overflow in [true, false] {
+            let context = test_context().await;
+            let session = session_for(&context).await;
+            let local = Arc::new(ScriptedProvider::new(
+                8192,
+                vec![Err(ProviderError::ContextLengthExceeded(9000))],
+            ));
+            let cloud = Arc::new(
+                ScriptedProvider::new(200_000, vec![Ok(text_reply("Fits in the cloud."))])
+                    .named("anthropic", "claude-sonnet"),
+            );
+            let service = AgentService::new(local, context)
+                .with_fallback(fallback_to(cloud.clone(), on_overflow));
+
+            let result = service
+                .send_message_with_tools(session, "hello".to_string(), None)
+                .await;
+
+            if on_overflow {
+                assert!(result.unwrap().content.starts_with("Fits in the cloud."));
+            } else {
+                assert!(matches!(result, Err(AgentError::Provider(_))));
+                assert!(cloud.requests().is_empty());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn errors_that_a_retry_cannot_fix_do_not_fall_back() {
+        use crate::llm::provider::ProviderError;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let local = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![Err(ProviderError::InvalidApiKey)],
+        ));
+        let cloud = Arc::new(ScriptedProvider::new(200_000, vec![]));
+        let service =
+            AgentService::new(local, context).with_fallback(fallback_to(cloud.clone(), true));
+
+        let result = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await;
+
+        assert!(matches!(result, Err(AgentError::Provider(_))));
+        assert!(cloud.requests().is_empty());
+    }
+
+    /// With the router on, the request's wording picks the tier's model; an
+    /// explicit model (a sub-agent profile) wins.
+    #[tokio::test]
+    async fn the_router_picks_the_model_for_the_request() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(128_000, vec![]));
+        let service = AgentService::new(provider.clone(), context).with_model_router(
+            ModelRouter::new("p", "small-model", "p", "mid-model", "p", "big-model"),
+        );
+
+        for prompt in [
+            "what is a trait?",
+            "refactor the parser module",
+            "explain this",
+        ] {
+            service
+                .send_message_with_tools(session, prompt.to_string(), None)
+                .await
+                .unwrap();
+        }
+        service
+            .send_message_with_tools(
+                session,
+                "what is x?".to_string(),
+                Some("pinned".to_string()),
+            )
+            .await
+            .unwrap();
+
+        let models: Vec<String> = provider.requests().into_iter().map(|r| r.model).collect();
+        assert_eq!(
+            models,
+            vec!["small-model", "big-model", "mid-model", "pinned"]
+        );
     }
 }

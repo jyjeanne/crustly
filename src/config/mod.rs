@@ -169,6 +169,105 @@ impl AgentConfig {
     }
 }
 
+/// Sub-agents (`[subagents]` section): how many run at once, and the
+/// profiles they can be started with.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubAgentsConfig {
+    /// Sub-agents running at the same time. One local GPU serializes
+    /// inference anyway, so the default is 1: sub-agents isolate context,
+    /// they do not add speed.
+    #[serde(default = "default_max_concurrent_subagents")]
+    pub max_concurrent: usize,
+    /// Profiles by name (`[subagents.profiles.<name>]`). A profile named
+    /// like a built-in one (`explorer`, `implementer`, `reviewer`,
+    /// `general`) overrides only the fields it sets.
+    #[serde(default)]
+    pub profiles: std::collections::HashMap<String, AgentProfileConfig>,
+}
+
+impl Default for SubAgentsConfig {
+    fn default() -> Self {
+        Self {
+            max_concurrent: default_max_concurrent_subagents(),
+            profiles: std::collections::HashMap::new(),
+        }
+    }
+}
+
+fn default_max_concurrent_subagents() -> usize {
+    1
+}
+
+/// One sub-agent profile (`[subagents.profiles.<name>]`). Unset fields keep
+/// the built-in profile's value, or the parent agent's setting.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AgentProfileConfig {
+    /// Model to run the sub-agent on, from the active provider (for
+    /// example a small fast model for exploration).
+    #[serde(default)]
+    pub model: Option<String>,
+    /// The only tools the sub-agent may use.
+    #[serde(default)]
+    pub tools: Option<Vec<String>>,
+    /// Whether the sub-agent is limited to read-only actions.
+    #[serde(default)]
+    pub read_only: Option<bool>,
+    /// Rounds of tool calls before it must answer.
+    #[serde(default)]
+    pub max_rounds: Option<usize>,
+    /// Role instructions added to its system prompt.
+    #[serde(default)]
+    pub instructions: Option<String>,
+}
+
+/// Model routing by request complexity (`[router]` section): each request is
+/// classified fast / balanced / powerful from its wording and sent to that
+/// tier's model on the active provider. Off by default: on a local server,
+/// switching models means loading another one.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RouterConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Model for simple lookups; defaults to the provider's default model.
+    #[serde(default)]
+    pub fast: Option<String>,
+    /// Model for ordinary edits and explanations.
+    #[serde(default)]
+    pub balanced: Option<String>,
+    /// Model for refactors and deep debugging.
+    #[serde(default)]
+    pub powerful: Option<String>,
+}
+
+/// Fallback provider (`[fallback]` section): when the main provider fails or
+/// its context window overflows, the round is sent to this one instead. Off
+/// unless a provider is named, since it sends the conversation elsewhere.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FallbackConfig {
+    /// A configured provider: `anthropic`, `openai`, `gemini`, `azure`,
+    /// `qwen`, `ollama` or `llama_cpp`.
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// Fall back when the main provider is unreachable, rate-limited, times
+    /// out or returns a server error.
+    #[serde(default = "default_true")]
+    pub on_error: bool,
+    /// Fall back when the prompt overflows the main model's context window
+    /// and compaction cannot free enough of it.
+    #[serde(default = "default_true")]
+    pub on_overflow: bool,
+}
+
+impl Default for FallbackConfig {
+    fn default() -> Self {
+        Self {
+            provider: None,
+            on_error: true,
+            on_overflow: true,
+        }
+    }
+}
+
 /// Edit verification (`[verification]` section): after the agent edits
 /// files, it must run a check command and see it pass before answering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -355,6 +454,18 @@ pub struct Config {
     /// Edit verification
     #[serde(default)]
     pub verification: VerificationConfig,
+
+    /// Sub-agents and their profiles
+    #[serde(default)]
+    pub subagents: SubAgentsConfig,
+
+    /// Model routing by request complexity
+    #[serde(default)]
+    pub router: RouterConfig,
+
+    /// Fallback provider
+    #[serde(default)]
+    pub fallback: FallbackConfig,
 }
 
 /// Debug configuration options
@@ -931,6 +1042,9 @@ impl Default for Config {
             tools: ToolsConfig::default(),
             agent: AgentConfig::default(),
             verification: VerificationConfig::default(),
+            subagents: SubAgentsConfig::default(),
+            router: RouterConfig::default(),
+            fallback: FallbackConfig::default(),
         }
     }
 }
@@ -1055,6 +1169,9 @@ impl Config {
             tools: overlay.tools,
             agent: overlay.agent,
             verification: overlay.verification,
+            subagents: overlay.subagents,
+            router: overlay.router,
+            fallback: overlay.fallback,
         }
     }
 

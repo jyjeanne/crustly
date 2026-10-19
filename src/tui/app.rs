@@ -4949,6 +4949,7 @@ mod tests {
             provider_name: "test-provider".to_string(),
             perf_metrics: None,
             context: None,
+            tool_summary: None,
         };
 
         app.handle_event(TuiEvent::ResponseComplete(session_a_id, stale_response))

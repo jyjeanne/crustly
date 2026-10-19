@@ -3,26 +3,91 @@
 use super::error::Result;
 use super::file_read_cache::FileReadCache;
 use async_trait::async_trait;
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-/// Trait for spawning background sub-agent sessions.
+/// A focused task for a sub-agent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubAgentTask {
+    pub id: Uuid,
+    /// Short description (3-5 words), shown in reports and approval prompts.
+    pub description: String,
+    /// The full task.
+    pub prompt: String,
+    /// Profile to run it with (`explorer`, `implementer`, `reviewer`,
+    /// `general`, or one from `[subagents.profiles]`); `None` = `general`.
+    pub profile: Option<String>,
+    /// Force read-only, whatever the profile says (the parent is in plan mode).
+    pub read_only: bool,
+}
+
+/// Where a sub-agent is in its life.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SubAgentStatus {
+    /// Waiting for a free slot (`[subagents] max_concurrent`).
+    Queued,
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+impl SubAgentStatus {
+    /// Whether the sub-agent has stopped for good.
+    pub fn is_finished(self) -> bool {
+        matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
+    }
+}
+
+/// What a sub-agent produced, or where it is.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SubAgentReport {
+    pub id: Uuid,
+    pub description: String,
+    pub profile: String,
+    pub status: SubAgentStatus,
+    /// Its final answer, once completed.
+    pub answer: Option<String>,
+    /// What went wrong, if it failed.
+    pub error: Option<String>,
+    /// One-line summary of the tool calls it made.
+    pub tools_used: Option<String>,
+}
+
+/// Runs sub-agents for the `agent` tool and keeps track of them.
 ///
 /// Implementors must be `Send + Sync` so they can be stored in `Arc` and
-/// moved into tokio tasks.  The `Debug` bound keeps `ToolExecutionContext`
+/// moved into tokio tasks. The `Debug` bound keeps `ToolExecutionContext`
 /// derivable.
 #[async_trait]
 pub trait SubAgentLauncher: Send + Sync + std::fmt::Debug {
-    /// Launch a new sub-agent session with `agent_id` as its session UUID.
-    /// Returns when the sub-agent has been *submitted* (not necessarily finished).
-    async fn launch(
+    /// Run `task` and wait for its report. Cancelling `cancel` stops it.
+    async fn run(&self, task: SubAgentTask, cancel: CancellationToken) -> SubAgentReport;
+
+    /// Start `task` in the background; collect it later with [`Self::report`].
+    async fn start(
         &self,
-        agent_id: Uuid,
-        description: &str,
-        prompt: &str,
+        task: SubAgentTask,
+        cancel: CancellationToken,
     ) -> std::result::Result<(), String>;
+
+    /// The report of a sub-agent started in this session; with `wait`, once
+    /// it has finished. `None` for an unknown id.
+    async fn report(&self, id: Uuid, wait: bool) -> Option<SubAgentReport>;
+
+    /// Stop a sub-agent. Returns whether it was still running.
+    fn cancel(&self, id: Uuid) -> bool;
+
+    /// Every sub-agent started in this session, oldest first.
+    fn list(&self) -> Vec<SubAgentReport>;
+
+    /// The profile names sub-agents can be started with.
+    fn profiles(&self) -> Vec<String>;
 }
 
 /// Execution context for tools
@@ -61,6 +126,10 @@ pub struct ToolExecutionContext {
     /// context built for that session, so a read recorded by one tool call
     /// is visible to the next (see `AgentService`).
     pub file_read_cache: Arc<FileReadCache>,
+
+    /// Cancelled when the user cancels the request this call belongs to.
+    /// Long-running tools (sub-agents) stop with it.
+    pub cancel: CancellationToken,
 }
 
 impl ToolExecutionContext {
@@ -75,7 +144,14 @@ impl ToolExecutionContext {
             read_only_mode: false,
             sub_agent_launcher: None,
             file_read_cache: Arc::new(FileReadCache::new()),
+            cancel: CancellationToken::new(),
         }
+    }
+
+    /// Tie this context to the cancellation of the request it belongs to.
+    pub fn with_cancel(mut self, cancel: CancellationToken) -> Self {
+        self.cancel = cancel;
+        self
     }
 
     /// Set working directory

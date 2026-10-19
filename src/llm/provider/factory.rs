@@ -21,7 +21,12 @@ use std::sync::Arc;
 /// A `Provider` wrapper that retries with secondary providers on transient errors.
 ///
 /// On `RateLimitExceeded`, `Timeout`, or 5xx `ApiError`, it logs `[FAILOVER]`
-/// and calls the next provider in the chain.
+/// and calls the next provider in the chain, with that provider's own
+/// default model.
+///
+/// The agent loop does not use this: its `[fallback]` (see
+/// `AgentService::with_fallback`) also covers context overflows, after
+/// compaction has had its chance, which a provider wrapper cannot see.
 pub struct FailoverProvider {
     chain: Vec<Arc<dyn Provider>>,
 }
@@ -31,6 +36,21 @@ impl FailoverProvider {
     pub fn new(chain: Vec<Arc<dyn Provider>>) -> Self {
         assert!(!chain.is_empty(), "failover chain must not be empty");
         Self { chain }
+    }
+
+    /// `request` as provider `index` of the chain should receive it: a
+    /// secondary provider gets its own model, never the primary's (a local
+    /// model name means nothing to a cloud API).
+    fn request_for(
+        &self,
+        index: usize,
+        request: &super::types::LLMRequest,
+    ) -> super::types::LLMRequest {
+        let mut request = request.clone();
+        if index > 0 {
+            request.model = self.chain[index].default_model().to_string();
+        }
+        request
     }
 
     fn is_failover_error(err: &ProviderError) -> bool {
@@ -51,7 +71,7 @@ impl Provider for FailoverProvider {
     ) -> super::error::Result<super::types::LLMResponse> {
         let mut last_err = ProviderError::InvalidRequest("empty failover chain".to_string());
         for (i, provider) in self.chain.iter().enumerate() {
-            match provider.complete(request.clone()).await {
+            match provider.complete(self.request_for(i, &request)).await {
                 Ok(resp) => return Ok(resp),
                 Err(e) if Self::is_failover_error(&e) => {
                     tracing::warn!(
@@ -74,7 +94,7 @@ impl Provider for FailoverProvider {
     ) -> super::error::Result<super::r#trait::ProviderStream> {
         let mut last_err = ProviderError::InvalidRequest("empty failover chain".to_string());
         for (i, provider) in self.chain.iter().enumerate() {
-            match provider.stream(request.clone()).await {
+            match provider.stream(self.request_for(i, &request)).await {
                 Ok(s) => return Ok(s),
                 Err(e) if Self::is_failover_error(&e) => {
                     tracing::warn!(
@@ -171,6 +191,32 @@ pub fn create_provider(config: &Config) -> Result<Arc<dyn Provider>> {
 
     // Fall back to Anthropic
     create_anthropic(config)
+}
+
+/// Create the provider named `name` from its `[providers.<name>]` section,
+/// for roles other than the main provider (the `[fallback]` provider).
+///
+/// Unlike [`create_provider`], which takes the first configured provider in
+/// priority order, this builds exactly the one asked for, and fails when it
+/// is not configured.
+pub fn create_named_provider(config: &Config, name: &str) -> Result<Arc<dyn Provider>> {
+    let key = name.trim().to_ascii_lowercase().replace('-', "_");
+    let provider = match key.as_str() {
+        "anthropic" => return create_anthropic(config),
+        "openai" => try_create_openai(config)?,
+        "gemini" => try_create_gemini(config)?,
+        "azure" => try_create_azure(config)?,
+        "qwen" => try_create_qwen(config)?,
+        "ollama" => try_create_ollama(config)?,
+        "llama_cpp" | "llamacpp" => try_create_llama_cpp(config)?,
+        _ => anyhow::bail!(
+            "unknown provider '{name}'; use anthropic, openai, gemini, azure, qwen, ollama \
+             or llama_cpp"
+        ),
+    };
+    provider.with_context(|| {
+        format!("provider '{name}' is not configured (add an enabled [providers.{key}] section)")
+    })
 }
 
 /// Try to create the Azure OpenAI provider if configured and enabled.
@@ -654,6 +700,77 @@ mod tests {
             1,
             "secondary must be called once"
         );
+    }
+
+    /// Provider that records the model each request names.
+    struct ModelRecorder {
+        models: std::sync::Mutex<Vec<String>>,
+    }
+
+    #[async_trait]
+    impl Provider for ModelRecorder {
+        async fn complete(&self, req: LLMRequest) -> ProviderResult<LLMResponse> {
+            self.models.lock().unwrap().push(req.model.clone());
+            SucceedingProvider {
+                calls: Arc::new(AtomicUsize::new(0)),
+            }
+            .complete(req)
+            .await
+        }
+        async fn stream(&self, _req: LLMRequest) -> ProviderResult<ProviderStream> {
+            Err(ProviderError::InvalidRequest("no streaming".to_string()))
+        }
+        fn name(&self) -> &str {
+            "cloud"
+        }
+        fn default_model(&self) -> &str {
+            "cloud-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["cloud-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(200_000)
+        }
+        fn calculate_cost(&self, _model: &str, _in: u32, _out: u32) -> f64 {
+            0.0
+        }
+    }
+
+    /// A secondary provider gets its own model: the primary's local model
+    /// name means nothing to it.
+    #[tokio::test]
+    async fn test_failover_sends_the_secondary_its_own_model() {
+        let secondary = Arc::new(ModelRecorder {
+            models: std::sync::Mutex::new(Vec::new()),
+        });
+        let failover = FailoverProvider::new(vec![
+            Arc::new(RateLimitedProvider) as Arc<dyn Provider>,
+            secondary.clone(),
+        ]);
+
+        failover
+            .complete(LLMRequest::new("qwen2.5-coder:7b", vec![]))
+            .await
+            .unwrap();
+
+        assert_eq!(*secondary.models.lock().unwrap(), vec!["cloud-model"]);
+    }
+
+    #[test]
+    fn named_providers_must_be_known_and_configured() {
+        let config = Config::default();
+        let unknown = create_named_provider(&config, "skynet")
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(unknown.contains("unknown provider 'skynet'"), "{unknown}");
+
+        let missing = format!(
+            "{:#}",
+            create_named_provider(&config, "gemini").err().unwrap()
+        );
+        assert!(missing.contains("not configured"), "{missing}");
     }
 
     #[tokio::test]

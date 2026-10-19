@@ -14,8 +14,9 @@ use crate::llm::agent::context::AgentContext;
 use crate::llm::agent::error::{AgentError, Result};
 use crate::llm::agent::middleware::{Decision, Pipeline, RunState, ToolCallRecord, ToolCallView};
 use crate::llm::agent::tool_profile::ToolSelection;
-use crate::llm::provider::{ContentBlock, LLMResponse, Message, Role};
+use crate::llm::provider::{ContentBlock, LLMResponse, Message, Provider, ProviderError, Role};
 use crate::llm::tools::ToolExecutionContext;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -23,6 +24,9 @@ use tokio_util::sync::CancellationToken;
 /// Everything one request needs to run its loop.
 pub(super) struct AgentRun<'a> {
     pub service: &'a AgentService,
+    /// The provider answering this request: the service's own, or its
+    /// fallback once the run has fallen back.
+    pub provider: Arc<dyn Provider>,
     pub model_name: String,
     pub context: AgentContext,
     pub selection: &'a ToolSelection,
@@ -39,9 +43,14 @@ pub(super) struct RunOutcome {
     pub response: LLMResponse,
     pub input_tokens: u32,
     pub output_tokens: u32,
+    /// Cost of every model call, each priced by the provider that made it.
+    pub cost: f64,
+    /// The provider that produced the answer.
+    pub provider_name: String,
     /// Context figures of the last request sent to the model.
     pub last_budget: Option<ContextBudget>,
-    /// Shown to the user under the answer (for example, a limit was hit).
+    /// Shown to the user under the answer (a limit was hit, the answer came
+    /// from the fallback provider).
     pub notice: Option<String>,
     /// Every tool call handled during the request, in order.
     pub tool_log: Vec<ToolCallRecord>,
@@ -49,14 +58,23 @@ pub(super) struct RunOutcome {
     pub tool_rounds: usize,
 }
 
+/// What the run has used so far.
+#[derive(Default)]
+struct Totals {
+    input_tokens: u32,
+    output_tokens: u32,
+    cost: f64,
+    last_budget: Option<ContextBudget>,
+    tool_log: Vec<ToolCallRecord>,
+    tool_rounds: usize,
+    /// Set once the run fell back: why, for the notice.
+    fallback_reason: Option<String>,
+}
+
 impl AgentRun<'_> {
     pub async fn run(mut self) -> Result<RunOutcome> {
         let started = Instant::now();
-        let mut input_tokens = 0u32;
-        let mut output_tokens = 0u32;
-        let mut last_budget = None;
-        let mut tool_log = Vec::new();
-        let mut tool_rounds = 0usize;
+        let mut totals = Totals::default();
         // Successful mutating tool calls since the previous plan task
         // completion. Backs `plan_completion_rejection`: marking a plan task
         // success=true requires evidence of work; each accepted completion
@@ -71,23 +89,13 @@ impl AgentRun<'_> {
             let state = RunState {
                 round,
                 started,
-                tokens_used: input_tokens + output_tokens,
+                tokens_used: totals.input_tokens + totals.output_tokens,
                 produced_text: false,
                 tool_calls: &[],
             };
             if let Decision::Finish { reason, notice } = self.pipeline.before_round(&state) {
-                let response = self
-                    .finish(&reason, None, &mut input_tokens, &mut output_tokens)
-                    .await?;
-                return Ok(RunOutcome {
-                    response,
-                    input_tokens,
-                    output_tokens,
-                    last_budget,
-                    notice,
-                    tool_log,
-                    tool_rounds,
-                });
+                let response = self.finish(&reason, None, &mut totals).await?;
+                return Ok(self.outcome(response, notice, totals));
             }
 
             // Free context before sending when too little is left for the
@@ -96,11 +104,14 @@ impl AgentRun<'_> {
                 .make_room(&mut self.context, self.tools, 0)
                 .await;
 
-            let (response, budget) = self.call_model().await?;
-            self.service.record_calibration(&response, &budget);
-            last_budget = Some(budget);
-            input_tokens += response.usage.input_tokens;
-            output_tokens += response.usage.output_tokens;
+            let (response, budget) = self.call_model(&mut totals).await?;
+            // A fallback provider counts tokens its own way: only learn from
+            // the provider whose window the budget is about.
+            if totals.fallback_reason.is_none() {
+                self.service.record_calibration(&response, &budget);
+            }
+            totals.last_budget = Some(budget);
+            self.add_usage(&response, &mut totals);
 
             // Accumulate prompt-cache metrics (T065)
             if let Some(ref cm) = response.cache_metrics {
@@ -138,7 +149,7 @@ impl AgentRun<'_> {
                 let state = RunState {
                     round,
                     started,
-                    tokens_used: input_tokens + output_tokens,
+                    tokens_used: totals.input_tokens + totals.output_tokens,
                     produced_text,
                     tool_calls: &[],
                 };
@@ -152,15 +163,7 @@ impl AgentRun<'_> {
                     continue;
                 }
                 tracing::debug!("No tool uses found, completing with final response");
-                return Ok(RunOutcome {
-                    response,
-                    input_tokens,
-                    output_tokens,
-                    last_budget,
-                    notice: None,
-                    tool_log,
-                    tool_rounds,
-                });
+                return Ok(self.outcome(response, None, totals));
             }
 
             let views: Vec<ToolCallView> = tool_uses
@@ -179,28 +182,13 @@ impl AgentRun<'_> {
             let state = RunState {
                 round,
                 started,
-                tokens_used: input_tokens + output_tokens,
+                tokens_used: totals.input_tokens + totals.output_tokens,
                 produced_text,
                 tool_calls: &views,
             };
             if let Decision::Finish { reason, notice } = self.pipeline.on_tool_calls(&state) {
-                let response = self
-                    .finish(
-                        &reason,
-                        Some(response),
-                        &mut input_tokens,
-                        &mut output_tokens,
-                    )
-                    .await?;
-                return Ok(RunOutcome {
-                    response,
-                    input_tokens,
-                    output_tokens,
-                    last_budget,
-                    notice,
-                    tool_log,
-                    tool_rounds,
-                });
+                let response = self.finish(&reason, Some(response), &mut totals).await?;
+                return Ok(self.outcome(response, notice, totals));
             }
 
             let tool_round = self
@@ -215,9 +203,9 @@ impl AgentRun<'_> {
                     self.cancel,
                 )
                 .await;
-            tool_rounds += 1;
+            totals.tool_rounds += 1;
             self.pipeline.after_tools(&tool_round.records);
-            tool_log.extend(tool_round.records);
+            totals.tool_log.extend(tool_round.records);
 
             self.context.add_message(Message {
                 role: Role::Assistant,
@@ -234,6 +222,42 @@ impl AgentRun<'_> {
         }
     }
 
+    fn outcome(&self, response: LLMResponse, notice: Option<String>, totals: Totals) -> RunOutcome {
+        let fallback_notice = totals.fallback_reason.as_ref().map(|reason| {
+            format!(
+                "_☁ Answered by the fallback provider {} ({}): {}._",
+                self.provider.name(),
+                response.model,
+                reason
+            )
+        });
+        let notice = match (notice, fallback_notice) {
+            (Some(a), Some(b)) => Some(format!("{a}\n\n{b}")),
+            (a, b) => a.or(b),
+        };
+        RunOutcome {
+            response,
+            input_tokens: totals.input_tokens,
+            output_tokens: totals.output_tokens,
+            cost: totals.cost,
+            provider_name: self.provider.name().to_string(),
+            last_budget: totals.last_budget,
+            notice,
+            tool_log: totals.tool_log,
+            tool_rounds: totals.tool_rounds,
+        }
+    }
+
+    fn add_usage(&self, response: &LLMResponse, totals: &mut Totals) {
+        totals.input_tokens += response.usage.input_tokens;
+        totals.output_tokens += response.usage.output_tokens;
+        totals.cost += self.provider.calculate_cost(
+            &response.model,
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+        );
+    }
+
     fn check_cancelled(&self) -> Result<()> {
         if self.cancel.is_cancelled() {
             tracing::info!("Request cancelled by the user");
@@ -242,10 +266,13 @@ impl AgentRun<'_> {
         Ok(())
     }
 
-    /// Call the model for one round. Streams when `chunk_tx` is set. When
-    /// the provider reports that the prompt overflowed its window, free more
-    /// context and retry the same round instead of failing the request.
-    async fn call_model(&mut self) -> Result<(LLMResponse, ContextBudget)> {
+    /// Call the model for one round. Streams when `chunk_tx` is set.
+    ///
+    /// When the provider reports that the prompt overflowed its window, free
+    /// more context and retry the same round instead of failing. When that
+    /// cannot free enough, or the provider is unreachable or failing, fall
+    /// back to the configured fallback provider for the rest of the request.
+    async fn call_model(&mut self, totals: &mut Totals) -> Result<(LLMResponse, ContextBudget)> {
         let mut overflow_retries = 0;
         loop {
             let budget = self.service.measure_budget(&self.context, self.tools);
@@ -262,7 +289,7 @@ impl AgentRun<'_> {
                 budget.completion_budget(),
             );
             let call = AgentService::call_provider_streaming(
-                &self.service.provider,
+                &self.provider,
                 request,
                 self.chunk_tx,
                 &self.model_name,
@@ -271,28 +298,79 @@ impl AgentRun<'_> {
                 outcome = call => outcome,
                 _ = self.cancel.cancelled() => return Err(AgentError::Cancelled),
             };
-            match outcome {
+            let error = match outcome {
                 Ok(response) => return Ok((response, budget)),
-                Err(e) if e.is_context_overflow() && overflow_retries < MAX_OVERFLOW_RETRIES => {
+                Err(e) => e,
+            };
+
+            if error.is_context_overflow() {
+                if overflow_retries < MAX_OVERFLOW_RETRIES {
                     overflow_retries += 1;
                     tracing::warn!(
                         "Prompt overflowed the context window ({}); freeing context and \
                          retrying ({}/{})",
-                        e,
+                        error,
                         overflow_retries,
                         MAX_OVERFLOW_RETRIES
                     );
-                    if !self
+                    if self
                         .service
                         .make_room(&mut self.context, self.tools, overflow_retries)
                         .await
                     {
-                        return Err(AgentError::Provider(e));
+                        continue;
                     }
                 }
-                Err(e) => return Err(AgentError::Provider(e)),
+                if self.fall_back(true, &error, totals) {
+                    continue;
+                }
+            } else if error.is_retryable() && self.fall_back(false, &error, totals) {
+                continue;
             }
+            return Err(AgentError::Provider(error));
         }
+    }
+
+    /// Switch the rest of the request to the fallback provider, when one is
+    /// configured for this kind of failure and the run has not already
+    /// fallen back. Returns whether it did.
+    fn fall_back(&mut self, overflow: bool, error: &ProviderError, totals: &mut Totals) -> bool {
+        let Some(fallback) = &self.service.fallback else {
+            return false;
+        };
+        let allowed = if overflow {
+            fallback.on_overflow
+        } else {
+            fallback.on_error
+        };
+        if !allowed || totals.fallback_reason.is_some() {
+            return false;
+        }
+
+        let reason = if overflow {
+            format!(
+                "the prompt did not fit {}'s context window",
+                self.provider.name()
+            )
+        } else {
+            format!("{} failed ({})", self.provider.name(), error)
+        };
+        // The fallback answers with its own model, never the local model's
+        // name, and budgets against its own (usually much larger) window.
+        let model = fallback.provider.default_model().to_string();
+        tracing::warn!(
+            "[FAILOVER] {}; sending the rest of this request to {} ({})",
+            reason,
+            fallback.provider.name(),
+            model
+        );
+        if let Some(window) = fallback.provider.context_window(&model) {
+            self.context.max_tokens = self.context.max_tokens.max(window as usize);
+        }
+        self.provider = fallback.provider.clone();
+        self.model_name = model;
+        totals.fallback_reason = Some(reason);
+        true
     }
 
     /// Stop calling tools: tell the model `reason` and ask it, with no tools
@@ -308,8 +386,7 @@ impl AgentRun<'_> {
         &mut self,
         reason: &str,
         pending: Option<LLMResponse>,
-        input_tokens: &mut u32,
-        output_tokens: &mut u32,
+        totals: &mut Totals,
     ) -> Result<LLMResponse> {
         if let Some(pending) = &pending {
             let not_run: Vec<ContentBlock> = pending
@@ -347,13 +424,12 @@ impl AgentRun<'_> {
         let request =
             AgentService::build_request(&self.model_name, &self.context, &no_tools, max_tokens);
         let outcome = tokio::select! {
-            outcome = self.service.provider.complete(request) => outcome,
+            outcome = self.provider.complete(request) => outcome,
             _ = self.cancel.cancelled() => return Err(AgentError::Cancelled),
         };
         match (outcome, pending) {
             (Ok(response), _) => {
-                *input_tokens += response.usage.input_tokens;
-                *output_tokens += response.usage.output_tokens;
+                self.add_usage(&response, totals);
                 Ok(response)
             }
             (Err(e), Some(pending)) => {

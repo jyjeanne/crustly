@@ -5,6 +5,20 @@ For the forward-looking plan, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
+### Unreleased — Sub-Agents, Profiles and Fallback
+
+#### Sub-Agents That Report Back
+The `agent` tool now waits for the sub-agent and returns its answer to the parent (`action: "run"`, the default), so a long exploration costs the parent only its findings. Sub-agents can also be started in the background and collected later (`start`, `status`, `result`, `cancel`, `list`). At most `[subagents] max_concurrent` run at once (default 1: one local GPU serializes inference). Cancelling a request cancels its sub-agents. Sub-agents now ask for approval through the same prompt as the main agent, labelled with their task; before, every approval-requiring tool was refused. Each one leaves its task, answer and report under `.crustly/agents/` (the answer was never written before).
+
+#### Agent Profiles
+Built-in `explorer` (read-only search), `implementer` (makes a change and checks it), `reviewer` (read-only review) and `general` profiles set a sub-agent's tools, model, round limit and role. `[subagents.profiles.<name>]` overrides their fields or adds profiles, for example an explorer on a small fast model. A sub-agent of a plan-mode parent is always read-only.
+
+#### Model Routing
+`[router]` sends each request to a fast, balanced or powerful model chosen from its wording. The router existed but was never switched on, and it only knew Claude models.
+
+#### Fallback Provider
+`[fallback] provider = "..."` sends the rest of a request to another configured provider when the main one is unreachable, rate-limited, times out or fails, or when a prompt overflows its window and compaction cannot free enough. The fallback uses its own model and window, each call is priced by the provider that made it, and the answer says when the fallback was used. `FailoverProvider` also no longer sends the primary's model name to the secondary provider.
+
 ### Unreleased — Local-Model Quality
 
 #### Agent Runtime and Middleware
