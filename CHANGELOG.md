@@ -5,21 +5,29 @@ For the forward-looking plan, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
-### Unreleased — Sub-Agents, Profiles and Fallback
+### v0.5.3 — In-Process llama.cpp, GGUF Management & a Local-Model Harness
 
-#### Sub-Agents That Report Back
-The `agent` tool now waits for the sub-agent and returns its answer to the parent (`action: "run"`, the default), so a long exploration costs the parent only its findings. Sub-agents can also be started in the background and collected later (`start`, `status`, `result`, `cancel`, `list`). At most `[subagents] max_concurrent` run at once (default 1: one local GPU serializes inference). Cancelling a request cancels its sub-agents. Sub-agents now ask for approval through the same prompt as the main agent, labelled with their task; before, every approval-requiring tool was refused. Each one leaves its task, answer and report under `.crustly/agents/` (the answer was never written before).
+This release is about running Crustly on a model on your own machine: a third local backend that needs no server, tools to find and manage `.gguf` files, and an agent loop reworked for small context windows. The terminal UI also got faster: pasting no longer crawls on Windows. On the 8,192-token default window of the local providers, the system prompt and the 23 tool schemas used to take 7,607 tokens of every request (counting the framing margin), leaving 585 for the conversation and the answer. They now take 2,769, leaving 5,423.
 
-#### Agent Profiles
-Built-in `explorer` (read-only search), `implementer` (makes a change and checks it), `reviewer` (read-only review) and `general` profiles set a sub-agent's tools, model, round limit and role. `[subagents.profiles.<name>]` overrides their fields or adds profiles, for example an explorer on a small fast model. A sub-agent of a plan-mode parent is always read-only.
+#### In-Process llama.cpp Provider
+`providers.llama_cpp` (`--features llama-cpp`, which compiles native C++) loads a `.gguf` file directly into the Crustly process through [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs): no Ollama daemon, no LM Studio server, no port. It streams, and calls tools through the same printed-JSON recovery as native Ollama. Once the model starts a tool call, grammar-constrained decoding holds it to valid JSON for a tool that was offered (built into `llama-cpp`; `llama-cpp-llguidance` remains as an alias). Each agent round keeps the part of the KV cache that matches the new prompt and decodes only the rest, in batches. Six optional GPU backend features (`llama-cpp-cuda`, `-metal`, `-vulkan`, `-rocm`, `-opencl`, `-mkl`) control offload, and `idle_unload_secs` frees the model after an idle period. See [docs/guides/LLAMA_CPP_GUIDE.md](docs/guides/LLAMA_CPP_GUIDE.md). The provider builds in CI but has not yet been run end-to-end against a real model.
 
-#### Model Routing
-`[router]` sends each request to a fast, balanced or powerful model chosen from its wording. The router existed but was never switched on, and it only knew Claude models.
+#### GGUF Model Management
+- The `Ctrl+G` Local Models dialog picks, downloads (a URL or `hf:org/repo/file.gguf`, with a progress bar and a SHA-256 check) and deletes `.gguf` files; `crustly llama-cpp list|pull|rm` does the same from the command line. Neither needs the llama.cpp build: they come with the default `gguf-management` feature.
+- Model details are read from the GGUF header (architecture, parameter count, quantization, native context length, chat template), with an estimate of the memory the model needs.
+- Models are also found in `extra_model_paths` and in Ollama's model store (`scan_ollama_models`). Duplicates and split files are merged, and `mmproj` projector files are paired with their base model.
+- Downloads check free disk space first, accept a `@revision` pin, and resume where they stopped.
+- GPU and RAM detection labels each model Fits, Tight or Won't fit, and `crustly llama-cpp list --best-fit` sorts by it.
+- `crustly llama-cpp list --json` and documented exit codes serve scripts and agents; `crustly llama-cpp doctor` checks the setup.
 
-#### Fallback Provider
-`[fallback] provider = "..."` sends the rest of a request to another configured provider when the main one is unreachable, rate-limited, times out or fails, or when a prompt overflows its window and compaction cannot free enough. The fallback uses its own model and window, each call is priced by the provider that made it, and the answer says when the fallback was used. `FailoverProvider` also no longer sends the primary's model name to the secondary provider.
+#### Core Tool Profile
+A new `[tools]` section chooses which tool schemas requests carry. The default `auto` profile sends only the core tools (`read_file`, `edit_file`, `write_file`, `bash`, `grep`, `glob`, `ls`) when the model's window is under 32,768 tokens, together with a shorter system prompt that does not describe the missing tools. The system prompt and tool schemas drop from 6,583 to 1,745 tokens, leaving 5,423 tokens of an 8,192 window instead of 585. `profile = "core"` or `"full"` forces either set, and `extra = [...]` adds tools back. MCP tools are always sent. Prompt hints no longer point a model at tools it was not given.
 
-### Unreleased — Local-Model Quality
+#### Context Budget Shown
+The TUI header shows how much of the context window the last request used (`🧠 Ctx`), and the Model Info panel (`Ctrl+O`) shows the tool profile and the fixed cost per request. `crustly run` reports the same figures, and warns before sending when the fixed cost leaves the model almost no room. Estimates are corrected upward from the provider's own prompt token counts.
+
+#### Compaction That Runs
+Context compaction now runs - it was never wired in before. Before each round, when too little of the window is left for the answer, the oldest tool output is replaced with a one-line stub, then older turns are summarized. The check counts the system prompt and tool schemas, not just the messages. When the provider still reports a context overflow, the round is compacted and retried instead of failing. The summary now rides in the system prompt (a mid-conversation system message is rejected by Anthropic), lists the tool calls that were dropped, and the kept turns always start with the user's request.
 
 #### Agent Runtime and Middleware
 The 700-line agent loop is split into `AgentRun` (one request's state and loop), a round executor for tool calls, and middleware consulted at fixed points of every round. Loop guards, limits and verification are middleware; new rules no longer mean more branches inside the loop. Behavior is unchanged except where noted below.
@@ -34,26 +42,42 @@ After editing files, the agent must run a check command - `cargo check`, `go bui
 Each answer now stores a one-line summary of the tool calls behind it, shown to the model in later requests, so a follow-up knows what was read, changed or run. Requests that edited files or ran three or more tool rounds are logged to `.crustly/progress.md`. Project notes - `AGENTS.md`, `CLAUDE.md`, `CRUSTLY.md` and `.crustly/memory.md` (where `save_memory` writes) - are added to the system prompt within a token budget. Both are on by default under `[memory]`.
 
 #### Tool-Call Repair
-Tool arguments that cannot match the tool's schema (a list where a path is expected, no object at all) are refused with the expected arguments listed. When a tool rejects its input, the expected arguments are appended to the error. Grammar-constrained tool-call decoding is now part of the `llama-cpp` feature; `llama-cpp-llguidance` remains as an alias.
+Tool arguments that cannot match the tool's schema (a list where a path is expected, no object at all) are refused with the expected arguments listed. When a tool rejects its input, the expected arguments are appended to the error.
 
-#### In-Process llama.cpp: Prompt Reuse and Two Fixes
-The provider now keeps the part of its KV cache that matches the next prompt and decodes only the rest, so each agent round processes its new tokens instead of the whole prompt. This also fixes two bugs: every request after the first failed ("inconsistent sequence positions", since the cache was never cleared), and a prompt longer than 2,048 tokens aborted the process (the whole prompt was decoded in one batch, past llama.cpp's batch size).
+#### Sub-Agents That Report Back
+The `agent` tool now waits for the sub-agent and returns its answer to the parent (`action: "run"`, the default), so a long exploration costs the parent only its findings. Sub-agents can also be started in the background and collected later (`start`, `status`, `result`, `cancel`, `list`). At most `[subagents] max_concurrent` run at once (default 1: one local GPU serializes inference). Cancelling a request cancels its sub-agents. Sub-agents now ask for approval through the same prompt as the main agent, labelled with their task; before, every approval-requiring tool was refused. Each one leaves its task, answer and report under `.crustly/agents/` (the answer was never written before).
 
-### Unreleased — Fitting Local Context Windows
+#### Agent Profiles
+Built-in `explorer` (read-only search), `implementer` (makes a change and checks it), `reviewer` (read-only review) and `general` profiles set a sub-agent's tools, model, round limit and role. `[subagents.profiles.<name>]` overrides their fields or adds profiles, for example an explorer on a small fast model. A sub-agent of a plan-mode parent is always read-only.
 
-On the 8,192-token default window of the local providers, the system prompt and the 23 tool schemas took 7,607 tokens of every request (counting the framing margin), leaving 585 for the conversation and the answer.
+#### Model Routing
+`[router]` sends each request to a fast, balanced or powerful model chosen from its wording. The router existed but was never switched on, and it only knew Claude models.
 
-#### Core Tool Profile
-A new `[tools]` section chooses which tool schemas requests carry. The default `auto` profile sends only the core tools (`read_file`, `edit_file`, `write_file`, `bash`, `grep`, `glob`, `ls`) when the model's window is under 32,768 tokens, together with a shorter system prompt that does not describe the missing tools. The system prompt and tool schemas drop from 6,583 to 1,745 tokens, leaving 5,423 tokens of an 8,192 window instead of 585. `profile = "core"` or `"full"` forces either set, and `extra = [...]` adds tools back. MCP tools are always sent. Prompt hints no longer point a model at tools it was not given.
-
-#### Context Budget Shown
-The TUI header shows how much of the context window the last request used (`🧠 Ctx`), and the Model Info panel (`Ctrl+O`) shows the tool profile and the fixed cost per request. `crustly run` reports the same figures, and warns before sending when the fixed cost leaves the model almost no room. Estimates are corrected upward from the provider's own prompt token counts.
-
-#### Compaction That Runs
-Context compaction now runs - it was never wired in before. Before each round, when too little of the window is left for the answer, the oldest tool output is replaced with a one-line stub, then older turns are summarized. The check counts the system prompt and tool schemas, not just the messages. When the provider still reports a context overflow, the round is compacted and retried instead of failing. The summary now rides in the system prompt (a mid-conversation system message is rejected by Anthropic), lists the tool calls that were dropped, and the kept turns always start with the user's request.
+#### Fallback Provider
+`[fallback] provider = "..."` sends the rest of a request to another configured provider when the main one is unreachable, rate-limited, times out or fails, or when a prompt overflows its window and compaction cannot free enough. The fallback uses its own model and window, each call is priced by the provider that made it, and the answer says when the fallback was used. `FailoverProvider` also no longer sends the primary's model name to the secondary provider.
 
 #### AutoPlan Approval Gaps Closed
 AutoPlan now prompts for `execute_code` (the high-risk list said `code_exec`, a name no tool has), `powershell`, and any tool whose declared capabilities include shell execution or file writes. Tool aliases such as `Bash` or `shell` are resolved to the registered name before the approval check, so they can no longer slip past it. Cached read results are checked against the permission policy too.
+
+#### Native `/review` and `/spec` Skills
+A typed `/<name>` now loads the matching skill (project `.crustly/skills/`, `.claude/skills/`, user-global, then built-in); before, it was sent to the model as plain text. Two built-in skills work in any project. `/review` reviews a diff, PR, branch or path in parallel correctness, guideline and security passes, then drops low-confidence findings; `--comment` posts a summary with `gh` and `--fix` applies what is left. `/spec` runs Specification-Driven Development (`specify → plan → tasks → implement → analyze`) and writes to `specs/<NNN>-<slug>/`.
+
+#### A Faster, Friendlier Terminal UI
+- **Paste at full speed.** The input loop paused 50ms after every key event, and Windows terminals deliver a paste one key event per character, so a paste crawled. Worse, a pasted line break pressed Enter and sent the message half-written, an `@` opened the file picker, and a leading `t` toggled the thinking block. Input is now read on its own thread without the pause, and keys that arrive together are read as one paste: it lands at once, line breaks included. Pasting also works in the `Ctrl+D` and `Ctrl+G` download dialogs, and `Ctrl+Z` / `Ctrl+Shift+Z` undo and redo edits to the input.
+- **Copy that sticks.** Crustly keeps one clipboard handle open instead of opening one per copy, so on X11 and Wayland the copied text stays available while Crustly runs. `Ctrl+Y` says what it copied in the status bar.
+- **Smoother long sessions.** Each message is rendered once, instead of the whole transcript being re-parsed and re-highlighted ten times a second.
+- **The end of a reply stays visible.** Scrolling counted lines rather than wrapped rows, so the end of a reply with long paragraphs could sit below the bottom edge. Page Up stops at the top, and the chat title says when you are scrolled up.
+- **Ferris.** An animated Ferris welcomes you in an empty chat, with the shortcuts worth knowing first, and scuttles while the model thinks, next to how long the request has been running.
+- **Ctrl+C asks twice.** The first press cancels the request in flight or clears the input; a second press within two seconds quits.
+- **Smaller fixes.** The input box grows with a long message, up to 10 lines; the help screen scrolls; a working directory path with an accented letter near the cut no longer crashes the header; a new session's cost reads `$0.0000`, not `$-0.0000`.
+
+#### Local OpenAI-Compatible Servers
+For local servers such as vLLM, the answer's token budget now fits beside the prompt and tool schemas, the window of an unrecognized local Qwen model defaults to 8,192 tokens instead of 32,768, and errors show the server's message instead of "Unknown error".
+
+#### Other Changes
+- The startup splash screen is gone: Crustly opens straight into the chat, and the version and author moved to the Help screen.
+- Linux arm64 release binaries are built natively on an arm64 runner instead of cross-compiled.
+- Dependency updates, including `async-openai` 0.42, `dirs` 7, `quick-xml` 0.42, `tree-sitter` 0.27 and `zip` 9.
 
 ---
 
