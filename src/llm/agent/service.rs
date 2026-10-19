@@ -3003,27 +3003,28 @@ mod tests {
             128_000,
             vec![Ok(tool_call("bash", serde_json::json!({"command": "ls"})))],
         ));
-        let callback: ApprovalCallback =
-            Arc::new(|_info: ToolApprovalInfo| Box::pin(std::future::pending()));
-        let service = AgentService::new(provider, context.clone())
-            .with_tool_registry(registry_of(&[("bash", true)]))
-            .with_approval_callback(Some(callback));
+        // The user cancels while the prompt is open, and never answers it.
+        // Cancelling from inside the callback, rather than on a timer, makes
+        // sure the request really reached the prompt: on a timer it could
+        // be cancelled before the first model call and pass without testing
+        // anything.
         let cancel = CancellationToken::new();
         let canceller = cancel.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let callback: ApprovalCallback = Arc::new(move |_info: ToolApprovalInfo| {
             canceller.cancel();
+            Box::pin(std::future::pending())
         });
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let service = AgentService::new(provider.clone(), context.clone())
+            .with_tool_registry(registry_of(&[("bash", true)]))
+            .with_approval_callback(Some(callback));
 
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            service.send_message_with_tools_and_mode_streaming(
+            service.send_message_with_tools_cancellable(
                 session,
                 "list".to_string(),
                 None,
                 false,
-                tx,
                 cancel,
             ),
         )
@@ -3031,6 +3032,7 @@ mod tests {
         .expect("cancellation must not hang");
 
         assert!(matches!(result, Err(AgentError::Cancelled)));
+        assert_eq!(provider.requests.lock().unwrap().len(), 1);
     }
 
     /// With verification on, a reply after a file edit is held back until a

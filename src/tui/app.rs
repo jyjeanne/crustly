@@ -246,6 +246,58 @@ pub struct App {
 
     /// Cancels the request in flight; Esc in the chat view triggers it.
     request_cancel: Option<tokio_util::sync::CancellationToken>,
+
+    /// When the request in flight was sent, for the elapsed time shown while
+    /// it runs. A local model can take minutes.
+    processing_started: Option<std::time::Instant>,
+
+    /// The system clipboard, opened on first use and kept open: opening one
+    /// per copy is slow on Linux, and on X11 and Wayland the copied text
+    /// lives only as long as the handle that set it.
+    clipboard: Option<arboard::Clipboard>,
+
+    /// A short confirmation for the status bar ("Copied 12 lines"), and when
+    /// it was set. Shown for [`NOTICE_DURATION`].
+    notice: Option<(String, std::time::Instant)>,
+
+    /// When Ctrl+C was last pressed without quitting. A second press within
+    /// [`QUIT_CONFIRM_WINDOW`] quits.
+    quit_armed_at: Option<std::time::Instant>,
+
+    /// Each message's rendered lines, so a frame does not re-parse and
+    /// re-highlight the whole transcript (see `render::MessageLineCache`).
+    pub(super) message_lines: super::render::MessageLineCache,
+
+    /// How far the chat can scroll up, as of the last frame. Keeps Page Up
+    /// from scrolling past the top, where Page Down then seemed to do nothing.
+    pub(super) chat_max_scroll: std::cell::Cell<usize>,
+
+    /// Rows the help screen is scrolled down; it is taller than most
+    /// terminals.
+    pub help_scroll: usize,
+
+    /// How far the help screen can scroll, as of the last frame.
+    pub(super) help_max_scroll: std::cell::Cell<usize>,
+}
+
+/// How long a status-bar notice stays up.
+pub const NOTICE_DURATION: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// How soon a second Ctrl+C must follow the first to quit.
+pub const QUIT_CONFIRM_WINDOW: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// `"1 line"`, `"12 lines"`.
+fn plural(count: usize, noun: &str) -> String {
+    if count == 1 {
+        format!("1 {noun}")
+    } else {
+        format!("{count} {noun}s")
+    }
+}
+
+/// The first line of `text`, for single-line inputs.
+fn first_line(text: &str) -> &str {
+    text.lines().next().unwrap_or_default().trim_end()
 }
 
 /// Build the chat input textarea with the widget's default cursor-line
@@ -307,6 +359,14 @@ impl App {
         Self {
             context_usage,
             request_cancel: None,
+            processing_started: None,
+            clipboard: None,
+            notice: None,
+            quit_armed_at: None,
+            message_lines: Default::default(),
+            chat_max_scroll: std::cell::Cell::new(0),
+            help_scroll: 0,
+            help_max_scroll: std::cell::Cell::new(0),
             current_session: None,
             messages: Vec::new(),
             sessions: Vec::new(),
@@ -555,10 +615,18 @@ impl App {
             return;
         };
 
-        let text = super::markdown::last_code_block(&content).unwrap_or(content);
+        let (text, what) = match super::markdown::last_code_block(&content) {
+            Some(block) => (block, "code block"),
+            None => (content, "response"),
+        };
+        let lines = text.lines().count().max(1);
 
-        if let Err(e) = arboard::Clipboard::new().and_then(|mut cb| cb.set_text(text)) {
-            self.error_message = Some(format!("Couldn't copy to clipboard: {e}"));
+        match self.clipboard().and_then(|cb| cb.set_text(text)) {
+            Ok(()) => self.notify(format!(
+                "Copied the last {what} ({})",
+                plural(lines, "line")
+            )),
+            Err(e) => self.error_message = Some(format!("Couldn't copy to clipboard: {e}")),
         }
     }
 
@@ -566,14 +634,97 @@ impl App {
     /// alongside bracketed paste (`TuiEvent::Paste`) for terminals/
     /// multiplexers where bracketed paste doesn't work.
     fn paste_from_clipboard(&mut self) {
-        match arboard::Clipboard::new().and_then(|mut cb| cb.get_text()) {
-            Ok(text) => {
-                self.textarea.insert_str(&text);
-            }
+        match self.clipboard().and_then(|cb| cb.get_text()) {
+            Ok(text) => self.paste_text(&text),
             Err(e) => {
                 self.error_message = Some(format!("Couldn't read clipboard: {e}"));
             }
         }
+    }
+
+    /// The system clipboard, opened on first use.
+    fn clipboard(&mut self) -> std::result::Result<&mut arboard::Clipboard, arboard::Error> {
+        if self.clipboard.is_none() {
+            self.clipboard = Some(arboard::Clipboard::new()?);
+        }
+        Ok(self.clipboard.as_mut().expect("clipboard was just opened"))
+    }
+
+    /// Insert pasted text where it belongs in the current view: at the cursor
+    /// in the chat input, or as one line in a download dialog's input. Other
+    /// views take no text, and a paste must not press their keys.
+    fn paste_text(&mut self, text: &str) {
+        match self.mode {
+            AppMode::Chat => {
+                self.textarea.insert_str(text);
+                let lines = text.lines().count();
+                if lines > 1 {
+                    self.notify(format!("Pasted {}", plural(lines, "line")));
+                }
+            }
+            AppMode::ModelDownload
+                if self.model_download_confirm_delete.is_none()
+                    && !self.model_download_running
+                    && self.model_download_deleting.is_none() =>
+            {
+                self.model_download_input.push_str(first_line(text));
+                self.refresh_model_download_suggestions();
+            }
+            AppMode::LlamaCppModelPicker
+                if self.llama_cpp_confirm_delete.is_none()
+                    && !self.llama_cpp_download_running
+                    && self.llama_cpp_deleting.is_none()
+                    && self.llama_cpp_switching.is_none() =>
+            {
+                self.llama_cpp_download_input.push_str(first_line(text));
+            }
+            _ => {}
+        }
+    }
+
+    /// Show `text` in the status bar for a few seconds.
+    fn notify(&mut self, text: impl Into<String>) {
+        self.notice = Some((text.into(), std::time::Instant::now()));
+    }
+
+    /// The status-bar notice, while it is fresh.
+    pub fn notice(&self) -> Option<&str> {
+        self.notice
+            .as_ref()
+            .filter(|(_, at)| at.elapsed() < NOTICE_DURATION)
+            .map(|(text, _)| text.as_str())
+    }
+
+    /// How long the request in flight has been running.
+    pub fn processing_elapsed(&self) -> Option<std::time::Duration> {
+        self.processing_started
+            .filter(|_| self.is_processing)
+            .map(|started| started.elapsed())
+    }
+
+    /// Ctrl+C: undo the obvious thing first - cancel the request in flight,
+    /// or clear the typed message - and quit only on a second press within
+    /// [`QUIT_CONFIRM_WINDOW`]. Quitting on the first press lost a long
+    /// draft to a stray Ctrl+C meant as "copy".
+    fn handle_ctrl_c(&mut self) {
+        if self
+            .quit_armed_at
+            .is_some_and(|at| at.elapsed() < QUIT_CONFIRM_WINDOW)
+        {
+            self.should_quit = true;
+            return;
+        }
+        self.quit_armed_at = Some(std::time::Instant::now());
+
+        let done = if self.mode == AppMode::Chat && self.is_processing && self.cancel_request() {
+            "Request cancelled. "
+        } else if self.mode == AppMode::Chat && !self.textarea.is_empty() {
+            self.clear_input();
+            "Input cleared. "
+        } else {
+            ""
+        };
+        self.notify(format!("{done}Press Ctrl+C again to quit"));
     }
 
     /// Initialize the app by loading or creating a session
@@ -760,11 +911,7 @@ impl App {
                     text.chars().count(),
                     text.matches('\\').count()
                 );
-                // Handle paste events - only in Chat mode. Inserted at the
-                // cursor position rather than blindly appended.
-                if self.mode == AppMode::Chat {
-                    self.textarea.insert_str(&text);
-                }
+                self.paste_text(&text);
             }
             TuiEvent::MessageSubmitted(content) => {
                 self.send_message(content).await?;
@@ -830,6 +977,9 @@ impl App {
             TuiEvent::Tick => {
                 // Update animation frame for spinner
                 self.animation_frame = self.animation_frame.wrapping_add(1);
+                if self.notice().is_none() {
+                    self.notice = None;
+                }
 
                 // Check for approval timeout
                 if let Some(ref approval_request) = self.pending_approval {
@@ -1137,7 +1287,7 @@ impl App {
 
         // Global shortcuts
         if keys::is_quit(&event) {
-            self.should_quit = true;
+            self.handle_ctrl_c();
             return Ok(());
         }
 
@@ -1152,6 +1302,7 @@ impl App {
         }
 
         if keys::is_help(&event) {
+            self.help_scroll = 0;
             self.switch_mode(AppMode::Help).await?;
             return Ok(());
         }
@@ -1220,7 +1371,21 @@ impl App {
             AppMode::LlamaCppModelPicker => self.handle_llama_cpp_models_key(event).await?,
             AppMode::Skills => self.handle_skills_key(event).await?,
             AppMode::Mcp => self.handle_mcp_key(event).await?,
-            AppMode::Help | AppMode::Settings | AppMode::ModelInfo => {
+            AppMode::Help => {
+                let max = self.help_max_scroll.get();
+                if keys::is_cancel(&event) {
+                    self.switch_mode(AppMode::Chat).await?;
+                } else if keys::is_up(&event) {
+                    self.help_scroll = self.help_scroll.saturating_sub(1);
+                } else if keys::is_down(&event) {
+                    self.help_scroll = (self.help_scroll + 1).min(max);
+                } else if keys::is_page_up(&event) {
+                    self.help_scroll = self.help_scroll.saturating_sub(10);
+                } else if keys::is_page_down(&event) {
+                    self.help_scroll = (self.help_scroll + 10).min(max);
+                }
+            }
+            AppMode::Settings | AppMode::ModelInfo => {
                 if keys::is_cancel(&event) {
                     self.switch_mode(AppMode::Chat).await?;
                 }
@@ -1253,8 +1418,12 @@ impl App {
             self.clear_input();
             self.error_message = None;
         } else if keys::is_page_up(&event) {
-            // Scroll up (away from bottom) to see older messages
-            self.scroll_offset = self.scroll_offset.saturating_add(10);
+            // Scroll up (away from bottom) to see older messages, no further
+            // than the top of the transcript.
+            self.scroll_offset = self
+                .scroll_offset
+                .saturating_add(10)
+                .min(self.chat_max_scroll.get());
         } else if keys::is_page_down(&event) {
             // Scroll down (toward bottom) to see newer messages
             // When we reach 0, we're at the bottom (auto-scroll mode)
@@ -1304,6 +1473,14 @@ impl App {
                 // because its Emacs-style Ctrl+<letter> bindings collide with
                 // crustly's own global shortcuts (Ctrl+W, Ctrl+P, etc.), so
                 // navigation is wired explicitly here instead.
+                // Undo and redo, for a paste or a deletion that went wrong.
+                KeyCode::Char('z' | 'Z') if ctrl => {
+                    if event.modifiers.contains(KeyModifiers::SHIFT) {
+                        self.textarea.redo();
+                    } else {
+                        self.textarea.undo();
+                    }
+                }
                 KeyCode::Left if ctrl => self.textarea.move_cursor(CursorMove::WordBack),
                 KeyCode::Right if ctrl => self.textarea.move_cursor(CursorMove::WordForward),
                 KeyCode::Left => self.textarea.move_cursor(CursorMove::Back),
@@ -1703,6 +1880,7 @@ impl App {
         if let Some(session) = &self.current_session {
             self.is_processing = true;
             self.processing_session = Some(session.id);
+            self.processing_started = Some(std::time::Instant::now());
             self.error_message = None;
 
             // Analyze and transform the prompt before sending to agent. Only
@@ -2500,9 +2678,13 @@ impl App {
         self.messages.iter().filter_map(|m| m.token_count).sum()
     }
 
-    /// Get total cost for current session
+    /// Get total cost for current session. Folded from `0.0`: `sum()` of no
+    /// floats is `-0.0`, which the header printed as "$-0.0000".
     pub fn total_cost(&self) -> f64 {
-        self.messages.iter().filter_map(|m| m.cost).sum()
+        self.messages
+            .iter()
+            .filter_map(|m| m.cost)
+            .fold(0.0, |total, cost| total + cost)
     }
 
     /// Handle tool approval request
@@ -3956,8 +4138,155 @@ mod tests {
                 if let Ok(copied) = arboard::Clipboard::new().and_then(|mut cb| cb.get_text()) {
                     assert_eq!(copied, "fn main() {}");
                 }
+                assert_eq!(app.notice(), Some("Copied the last code block (1 line)"));
             }
         }
+    }
+
+    #[tokio::test]
+    async fn ctrl_c_clears_the_input_first_and_quits_on_a_second_press() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.textarea.insert_str("a long draft");
+        let ctrl_c = || TuiEvent::Key(key_mod(KeyCode::Char('c'), KeyModifiers::CONTROL));
+
+        app.handle_event(ctrl_c()).await.unwrap();
+        assert!(!app.should_quit);
+        assert!(app.textarea.is_empty());
+        assert_eq!(
+            app.notice(),
+            Some("Input cleared. Press Ctrl+C again to quit")
+        );
+
+        app.handle_event(ctrl_c()).await.unwrap();
+        assert!(app.should_quit);
+    }
+
+    #[tokio::test]
+    async fn ctrl_c_quits_only_if_the_second_press_comes_soon() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        let ctrl_c = || TuiEvent::Key(key_mod(KeyCode::Char('c'), KeyModifiers::CONTROL));
+
+        app.handle_event(ctrl_c()).await.unwrap();
+        assert!(!app.should_quit);
+        assert_eq!(app.notice(), Some("Press Ctrl+C again to quit"));
+
+        // The first press has gone stale: this one arms again instead.
+        app.quit_armed_at = Some(std::time::Instant::now() - QUIT_CONFIRM_WINDOW);
+        app.handle_event(ctrl_c()).await.unwrap();
+        assert!(!app.should_quit);
+    }
+
+    #[tokio::test]
+    async fn a_multi_line_paste_is_inserted_whole_without_sending() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        app.handle_event(TuiEvent::Paste("@first\nsecond\nthird".to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(app.input_text(), "@first\nsecond\nthird");
+        assert_eq!(app.mode, AppMode::Chat, "an @ in a paste opens no picker");
+        assert!(
+            app.messages.is_empty(),
+            "a line break in a paste sends nothing"
+        );
+        assert_eq!(app.notice(), Some("Pasted 3 lines"));
+    }
+
+    #[tokio::test]
+    async fn a_paste_in_the_download_dialog_fills_its_input_with_one_line() {
+        let mut app = test_app().await;
+        app.mode = AppMode::ModelDownload;
+
+        app.handle_event(TuiEvent::Paste("qwen2.5-coder:7b\nignored".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(app.model_download_input, "qwen2.5-coder:7b");
+
+        // While a delete waits for confirmation, a paste must not answer it.
+        app.model_download_confirm_delete = Some("old-model".to_string());
+        app.handle_event(TuiEvent::Paste("yy".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(
+            app.model_download_confirm_delete.as_deref(),
+            Some("old-model")
+        );
+        assert_eq!(app.model_download_input, "qwen2.5-coder:7b");
+    }
+
+    #[tokio::test]
+    async fn ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        for c in "keep ".chars() {
+            app.handle_chat_key(key(KeyCode::Char(c))).await.unwrap();
+        }
+        app.handle_event(TuiEvent::Paste("wrong paste".to_string()))
+            .await
+            .unwrap();
+
+        app.handle_chat_key(key_mod(KeyCode::Char('z'), KeyModifiers::CONTROL))
+            .await
+            .unwrap();
+        assert_eq!(app.input_text(), "keep ");
+
+        app.handle_chat_key(key_mod(
+            KeyCode::Char('z'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        ))
+        .await
+        .unwrap();
+        assert_eq!(app.input_text(), "keep wrong paste");
+    }
+
+    #[tokio::test]
+    async fn a_paste_in_a_view_without_text_input_does_nothing() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Sessions;
+        app.handle_event(TuiEvent::Paste("some text".to_string()))
+            .await
+            .unwrap();
+        assert!(app.textarea.is_empty());
+        assert_eq!(app.mode, AppMode::Sessions);
+    }
+
+    #[tokio::test]
+    async fn page_up_stops_at_the_top_of_the_transcript() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.chat_max_scroll.set(15);
+
+        for _ in 0..5 {
+            app.handle_chat_key(key(KeyCode::PageUp)).await.unwrap();
+        }
+        assert_eq!(app.scroll_offset, 15);
+
+        app.handle_chat_key(key(KeyCode::PageDown)).await.unwrap();
+        assert_eq!(app.scroll_offset, 5, "one Page Down moves back at once");
+    }
+
+    #[tokio::test]
+    async fn help_scrolls_within_its_height() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Help;
+        app.help_max_scroll.set(12);
+
+        app.handle_event(TuiEvent::Key(key(KeyCode::PageDown)))
+            .await
+            .unwrap();
+        app.handle_event(TuiEvent::Key(key(KeyCode::PageDown)))
+            .await
+            .unwrap();
+        assert_eq!(app.help_scroll, 12);
+
+        app.handle_event(TuiEvent::Key(key(KeyCode::Up)))
+            .await
+            .unwrap();
+        assert_eq!(app.help_scroll, 11);
     }
 
     #[tokio::test]

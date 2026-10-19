@@ -412,7 +412,7 @@ pub struct App {
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+Enter` | Submit message |
-| `Ctrl+C` | Quit |
+| `Ctrl+C` | Cancel the request or clear the input; twice to quit |
 | `Ctrl+N` | New session |
 | `Ctrl+L` | List sessions |
 | `Ctrl+P` | Toggle plan mode |

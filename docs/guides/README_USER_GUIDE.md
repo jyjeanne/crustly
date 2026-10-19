@@ -53,7 +53,7 @@ crustly --debug chat
 - `Ctrl+N` - New session
 - `Ctrl+L` - List sessions
 - `Ctrl+H` - Show help
-- `Ctrl+C` - Quit
+- `Ctrl+C` - Cancel the request or clear the input; press twice to quit
 - `Page Up/Down` - Scroll chat history
 - `↑/↓` - Navigate sessions list
 

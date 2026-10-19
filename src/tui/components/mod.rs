@@ -1,4 +1,5 @@
 /// Logo and branding components
+pub mod ferris;
 pub mod logo;
 
 // Re-export commonly used items

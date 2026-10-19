@@ -100,7 +100,7 @@ terminal query on the startup path (now timeout-bounded via
   - [ ] 3.4 (new, optional) Client-side "~N tok/s (live)" estimate during
         active streaming, derived from chunk arrival timing, replaced by
         the authoritative number once the response completes.
-- [ ] **Phase 2 — Copy / Paste Ergonomics**
+- [x] **Phase 2 — Copy / Paste Ergonomics**
   - [x] 2.1 Migrate chat input from `String` to `tui-textarea::TextArea`.
         **Found and fixed a blocking dependency issue first**: `Cargo.lock`
         was gitignored despite this being a binary crate, and a fresh
@@ -141,6 +141,24 @@ terminal query on the startup path (now timeout-bounded via
         empirically in this headless sandbox (no X11/Wayland) that
         `arboard::Clipboard::new()` fails in ~3ms, not a multi-second
         hang, so there's no need for a timeout wrapper around it.
+  - [x] 2.4 Paste and copy speed (v0.5.3). Pasting crawled on Windows:
+        crossterm never reports bracketed paste there, so a paste arrives
+        as one key event per character, and the terminal listener slept
+        50ms after every event. A pasted line break also pressed Enter and
+        sent the message half-written, an `@` opened the file picker, and a
+        leading `t` toggled the thinking block. The listener now runs on
+        its own OS thread with no per-event delay, and
+        `events::coalesce_input` turns text keys read back-to-back into a
+        single `Paste` (a person types one key at a time; 15ms of grace
+        keeps a paste delivered in several writes together). `Paste` is
+        routed by view: the chat input, the single-line inputs of the
+        `Ctrl+D`/`Ctrl+G` download dialogs, nowhere else. The clipboard
+        handle is now opened once and kept (arboard drops copied text with
+        its last handle on X11/Wayland), `Ctrl+Y`/multi-line pastes confirm
+        in the status bar, and `Ctrl+Z`/`Ctrl+Shift+Z` undo/redo input
+        edits - the last open item of this phase. `Ctrl+C` now cancels or
+        clears first and quits on a second press, since a stray `Ctrl+C`
+        meant as "copy" used to quit outright.
 - [ ] **Phase 4b — Auto Mode TUI toggle** *(depends on 1.2 for the
       finalized keybinding scheme)*
   - [x] 4b.1 `Shift+Tab` mode-cycle wired to a new `App` field +

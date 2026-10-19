@@ -567,7 +567,7 @@ Crustly validates dependencies before finalization:
 | `Page Up` / `Page Down` | Fast scroll |
 | `Ctrl+P` | Toggle to Chat Mode |
 | `Ctrl+H` | Show help |
-| `Ctrl+C` | Quit Crustly |
+| `Ctrl+C` | Press twice to quit Crustly |
 
 ### In Chat Mode (with pending plan)
 

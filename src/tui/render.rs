@@ -2,7 +2,8 @@
 //!
 //! Main rendering logic for the terminal interface.
 
-use super::app::App;
+use super::app::{App, DisplayMessage};
+use super::components::ferris;
 use super::events::AppMode;
 use super::markdown::{parse_markdown, parse_plain_text};
 use crate::config::PlanExecMode;
@@ -13,16 +14,25 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
+use uuid::Uuid;
 
 /// Render the entire UI
 pub fn render(f: &mut Frame, app: &App) {
+    let input_height = if app.mode == AppMode::Chat {
+        input_box_height(app)
+    } else {
+        5
+    };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4), // Header (now has 2 lines)
-            Constraint::Min(10),   // Main content
-            Constraint::Length(5), // Input
-            Constraint::Length(1), // Status bar
+            Constraint::Length(4),            // Header (now has 2 lines)
+            Constraint::Min(10),              // Main content
+            Constraint::Length(input_height), // Input
+            Constraint::Length(1),            // Status bar
         ])
         .split(f.area());
 
@@ -75,6 +85,77 @@ pub fn render(f: &mut Frame, app: &App) {
     }
 
     render_status_bar(f, app, chunks[3]);
+}
+
+/// Rows the chat input box takes: its text, from 3 lines up to 10, plus
+/// borders. It grows as a message gets longer, so a pasted block shows.
+fn input_box_height(app: &App) -> u16 {
+    app.textarea.lines().len().clamp(3, 10) as u16 + 2
+}
+
+/// The last `max_chars` characters of `text`, after an ellipsis, or all of
+/// it if it fits. Cuts on a character boundary: slicing bytes panicked on a
+/// long path with an accented letter near the cut.
+fn tail_chars(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    let keep = max_chars.saturating_sub(3);
+    let start = text
+        .char_indices()
+        .rev()
+        .nth(keep.saturating_sub(1))
+        .map_or(0, |(i, _)| i);
+    format!("...{}", &text[start..])
+}
+
+/// Each message's rendered lines, keyed by message id and checked against
+/// what they were rendered from. Parsing markdown and highlighting code for
+/// the whole transcript on every frame - ten a second while anything
+/// animates - made long sessions sluggish; now a message is rendered once,
+/// and again only if it changes (its thinking block toggled, say).
+#[derive(Default)]
+pub struct MessageLineCache {
+    entries: RefCell<HashMap<Uuid, (u64, Vec<Line<'static>>)>>,
+}
+
+impl MessageLineCache {
+    /// `msg`'s lines, from the cache when it holds them for `msg` as it is.
+    fn lines_for(&self, msg: &DisplayMessage, model_name: &str) -> Vec<Line<'static>> {
+        let key = render_key(msg, model_name);
+        let mut entries = self.entries.borrow_mut();
+        if let Some((cached_key, lines)) = entries.get(&msg.id) {
+            if *cached_key == key {
+                return lines.clone();
+            }
+        }
+        let lines = render_message_lines(msg, model_name);
+        entries.insert(msg.id, (key, lines.clone()));
+        lines
+    }
+
+    /// Drop the entries of messages no longer shown, after a session switch.
+    fn retain(&self, messages: &[DisplayMessage]) {
+        let mut entries = self.entries.borrow_mut();
+        if entries.len() > messages.len() {
+            let shown: HashSet<Uuid> = messages.iter().map(|m| m.id).collect();
+            entries.retain(|id, _| shown.contains(id));
+        }
+    }
+}
+
+/// A fingerprint of everything a message's rendering depends on.
+fn render_key(msg: &DisplayMessage, model_name: &str) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    msg.role.hash(&mut hasher);
+    msg.content.hash(&mut hasher);
+    msg.thinking_text.hash(&mut hasher);
+    msg.thinking_expanded.hash(&mut hasher);
+    msg.timestamp.hash(&mut hasher);
+    msg.token_count.hash(&mut hasher);
+    msg.tokens_per_second.map(f64::to_bits).hash(&mut hasher);
+    model_name.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Purely cosmetic icon shown next to the provider name in the header.
@@ -138,12 +219,8 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let tokens_per_second = app.messages.iter().rev().find_map(|m| m.tokens_per_second);
 
     // Format working directory - show relative or full path
-    let working_dir = app.working_directory.to_string_lossy().to_string();
-    let display_dir = if working_dir.len() > 60 {
-        format!("...{}", &working_dir[working_dir.len() - 57..])
-    } else {
-        working_dir
-    };
+    let working_dir = app.working_directory.to_string_lossy();
+    let display_dir = tail_chars(&working_dir, 60);
 
     let mut header_spans = vec![
         Span::styled(" 📝 Session: ", Style::default().fg(Color::DarkGray)),
@@ -422,8 +499,18 @@ fn render_streaming_response(app: &App, model_name: &str) -> Vec<Line<'static>> 
     lines
 }
 
-/// Animated "model is thinking" spinner, shown while waiting for the first
-/// streamed token.
+/// `95s` -> `"1m 35s"`, `12s` -> `"12s"`.
+fn format_elapsed(elapsed: std::time::Duration) -> String {
+    let secs = elapsed.as_secs();
+    if secs < 60 {
+        format!("{secs}s")
+    } else {
+        format!("{}m {:02}s", secs / 60, secs % 60)
+    }
+}
+
+/// Ferris at work, with a spinner and how long the request has run, shown
+/// while waiting for the first streamed token.
 fn render_processing_indicator(app: &App, model_name: &str) -> Vec<Line<'static>> {
     if !app.is_processing || app.streaming_response.is_some() {
         return Vec::new();
@@ -431,37 +518,88 @@ fn render_processing_indicator(app: &App, model_name: &str) -> Vec<Line<'static>
 
     let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     let frame = spinner_frames[app.animation_frame % spinner_frames.len()];
+    let elapsed = app
+        .processing_elapsed()
+        .map(|d| format!(" {}", format_elapsed(d)))
+        .unwrap_or_default();
 
-    vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                format!("{} ", frame),
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("{} is thinking...", model_name),
-                Style::default().fg(Color::Yellow),
-            ),
-        ]),
-    ]
+    let mut lines = vec![Line::from("")];
+    lines.extend(ferris::walking_lines(
+        app.animation_frame,
+        36,
+        ferris::Mood::Thinking,
+    ));
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("{} ", frame),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{} is thinking...", model_name),
+            Style::default().fg(Color::Yellow),
+        ),
+        Span::styled(
+            format!("{elapsed} · Esc to cancel"),
+            Style::default().fg(Color::DarkGray),
+        ),
+    ]));
+    lines
 }
 
-/// `app.scroll_offset` is "lines scrolled up from the bottom" (0 = auto-scroll
-/// showing the latest messages); ratatui's `Paragraph::scroll` wants an
-/// absolute offset from the top, so convert between the two here.
-fn compute_scroll_offset(total_lines: usize, visible_height: usize, scroll_offset: usize) -> u16 {
-    let max_scroll = total_lines.saturating_sub(visible_height);
-    max_scroll.saturating_sub(scroll_offset) as u16
+/// The chat panel's border, with a reminder of how to get back to the
+/// newest output while scrolled up.
+fn chat_block(scrolled_up: bool) -> Block<'static> {
+    let title = if scrolled_up {
+        " 💬 Chat · scrolled up, Page Down for newer "
+    } else {
+        " 💬 Chat "
+    };
+    Block::default()
+        .borders(Borders::ALL)
+        .title(Span::styled(
+            title,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ))
+        .border_style(Style::default().fg(Color::Cyan))
+}
+
+/// Drop whole lines from the front of `lines` until scrolling `top` rows
+/// down fits `Paragraph::scroll`'s `u16`, and return the rows still to
+/// scroll. Only a transcript taller than 65,535 wrapped rows needs it;
+/// before, such a session could not scroll to its newest output at all.
+fn fit_scroll(lines: Vec<Line<'static>>, mut top: usize, width: u16) -> (Vec<Line<'static>>, u16) {
+    let max = u16::MAX as usize;
+    let mut skip = 0;
+    for line in &lines {
+        if top <= max {
+            break;
+        }
+        let rows = Paragraph::new(line.clone())
+            .wrap(Wrap { trim: false })
+            .line_count(width);
+        if rows > top {
+            break;
+        }
+        top -= rows;
+        skip += 1;
+    }
+    (lines.into_iter().skip(skip).collect(), top.min(max) as u16)
 }
 
 /// Render the chat messages
 fn render_chat(f: &mut Frame, app: &App, area: Rect) {
-    let mut lines: Vec<Line> = Vec::new();
-
-    lines.extend(render_pending_plan_banner(app));
+    if app.messages.is_empty()
+        && !app.is_processing
+        && app.streaming_response.is_none()
+        && render_pending_plan_banner(app).is_empty()
+    {
+        render_welcome(f, app, area);
+        return;
+    }
 
     // Get the model name from the current session
     let model_name = app
@@ -470,34 +608,106 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
         .and_then(|s| s.model.as_deref())
         .unwrap_or("AI");
 
-    for msg in &app.messages {
-        lines.extend(render_message_lines(msg, model_name));
+    app.message_lines.retain(&app.messages);
+    let transcript = || {
+        let mut lines = render_pending_plan_banner(app);
+        for msg in &app.messages {
+            lines.extend(app.message_lines.lines_for(msg, model_name));
+        }
+        lines.extend(render_streaming_response(app, model_name));
+        lines.extend(render_processing_indicator(app, model_name));
+        lines
+    };
+
+    // `app.scroll_offset` counts rows up from the bottom (0 follows the
+    // newest output); `Paragraph::scroll` counts down from the top. Count
+    // rows after wrapping: counting lines, as this used to, left the end of
+    // any reply with long paragraphs below the bottom edge.
+    let width = area.width.saturating_sub(2);
+    let visible_height = area.height.saturating_sub(2) as usize;
+    let chat = Paragraph::new(transcript()).wrap(Wrap { trim: false });
+    let total_rows = chat.line_count(width);
+    let max_scroll = total_rows.saturating_sub(visible_height);
+    app.chat_max_scroll.set(max_scroll);
+    let scroll_offset = app.scroll_offset.min(max_scroll);
+    let top = max_scroll - scroll_offset;
+
+    let chat = match u16::try_from(top) {
+        Ok(top) => chat.scroll((top, 0)),
+        Err(_) => {
+            let (lines, top) = fit_scroll(transcript(), top, width);
+            Paragraph::new(lines)
+                .wrap(Wrap { trim: false })
+                .scroll((top, 0))
+        }
+    };
+
+    f.render_widget(chat.block(chat_block(scroll_offset > 0)), area);
+}
+
+/// The empty chat: Ferris strolling above a welcome and the shortcuts worth
+/// knowing first.
+fn render_welcome(f: &mut Frame, app: &App, area: Rect) {
+    let inner_width = area.width.saturating_sub(2) as usize;
+    let mut lines =
+        ferris::walking_lines(app.animation_frame, inner_width.min(40), ferris::Mood::Idle);
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(
+            "Welcome to Crustly ",
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("v{}", env!("CARGO_PKG_VERSION")),
+            Style::default()
+                .fg(ferris::FERRIS_ORANGE)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]));
+    lines.push(Line::from(Span::styled(
+        "Ask a question, or describe a change to make.",
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::ITALIC),
+    )));
+    lines.push(Line::from(""));
+
+    let newline_key = if app.kitty_keyboard_protocol_active {
+        "Shift+Enter"
+    } else {
+        "Alt+Enter"
+    };
+    let tips = [
+        ("Enter", "send your message"),
+        (newline_key, "start a new line"),
+        ("@", "attach a file"),
+        ("/review /spec", "run a built-in skill"),
+        ("Ctrl+Y", "copy the last answer"),
+        ("Ctrl+H", "every shortcut"),
+    ];
+    // Padded to one width so the centered rows line up as a column.
+    for (key, what) in tips {
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{key:<15}"),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!("{what:<22}"), Style::default().fg(Color::Gray)),
+        ]));
     }
 
-    lines.extend(render_streaming_response(app, model_name));
-    lines.extend(render_processing_indicator(app, model_name));
+    let free_rows = (area.height.saturating_sub(2) as usize).saturating_sub(lines.len());
+    let mut centered = vec![Line::from(""); free_rows / 2];
+    centered.extend(lines);
 
-    let total_lines = lines.len();
-    let visible_height = area.height.saturating_sub(2) as usize; // Subtract borders
-    let actual_scroll_offset =
-        compute_scroll_offset(total_lines, visible_height, app.scroll_offset);
-
-    let chat = Paragraph::new(lines)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(Span::styled(
-                    " 💬 Chat ",
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ))
-                .border_style(Style::default().fg(Color::Cyan)),
-        )
-        .wrap(Wrap { trim: false })
-        .scroll((actual_scroll_offset, 0));
-
-    f.render_widget(chat, area);
+    let welcome = Paragraph::new(centered)
+        .block(chat_block(false))
+        .alignment(Alignment::Center);
+    f.render_widget(welcome, area);
 }
 
 /// Render the input box. Clones `app.textarea` rather than mutating it in
@@ -766,7 +976,11 @@ fn help_global_commands() -> Vec<Line<'static>> {
         help_section_header("╭─ GLOBAL COMMANDS ─────────────────────────────────────────╮")
             .to_vec();
     lines.extend([
-        help_row("  Ctrl+C       ", "Quit application", Color::Yellow),
+        help_row(
+            "  Ctrl+C       ",
+            "Cancel the request or clear the input; press twice to quit",
+            Color::Yellow,
+        ),
         help_row("  Ctrl+N       ", "Create new chat session", Color::Yellow),
         help_row(
             "  Ctrl+L       ",
@@ -852,12 +1066,31 @@ fn help_chat_mode(app: &App) -> Vec<Line<'static>> {
             Color::Green,
         ),
         help_row(
+            "  Ctrl+Z       ",
+            "Undo the last edit to the input (Ctrl+Shift+Z: redo)",
+            Color::Green,
+        ),
+        help_row(
             "  Escape       ",
             "Clear input buffer, or cancel the request in flight",
             Color::Green,
         ),
         help_row("  Page Up      ", "Scroll chat history up", Color::Green),
-        help_row("  Page Down    ", "Scroll chat history down", Color::Green),
+        help_row(
+            "  Page Down    ",
+            "Scroll chat history down, back to the newest output",
+            Color::Green,
+        ),
+        help_row(
+            "  @            ",
+            "Attach a file to the message",
+            Color::Green,
+        ),
+        help_row(
+            "  t            ",
+            "Expand or collapse the last reply's thinking (empty input)",
+            Color::Green,
+        ),
     ]);
     lines
 }
@@ -967,7 +1200,10 @@ fn help_footer() -> Vec<Line<'static>> {
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" to return to chat", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                " to return to chat, ↑/↓ or Page Up/Down to scroll",
+                Style::default().fg(Color::DarkGray),
+            ),
         ]),
     ]
 }
@@ -994,7 +1230,15 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
     help_text.extend(help_about());
     help_text.extend(help_footer());
 
+    // Taller than most terminals: scroll with ↑/↓ and Page Up/Down, never
+    // past the last row.
+    let visible = area.height.saturating_sub(2) as usize;
+    let max_scroll = help_text.len().saturating_sub(visible);
+    app.help_max_scroll.set(max_scroll);
+    let scroll = app.help_scroll.min(max_scroll).min(u16::MAX as usize) as u16;
+
     let help = Paragraph::new(help_text)
+        .scroll((scroll, 0))
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -2649,22 +2893,31 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         PlanExecMode::FullAuto => "⚡⚡ FullAuto",
     };
 
+    let notice = app.notice();
     let status = if let Some(ref error) = app.error_message {
         format!(" [{}] {} │ ERROR: {}", mode_text, auto_mode_label, error)
+    } else if let Some(notice) = notice {
+        format!(" [{}] {} │ ✓ {}", mode_text, auto_mode_label, notice)
     } else if app.is_processing {
+        let elapsed = app
+            .processing_elapsed()
+            .map(|d| format!(" {}", format_elapsed(d)))
+            .unwrap_or_default();
         format!(
-            " [{}] {} │ Processing... (Esc to cancel)",
-            mode_text, auto_mode_label
+            " [{}] {} │ Processing...{} (Esc to cancel)",
+            mode_text, auto_mode_label, elapsed
         )
     } else {
         format!(
-            " [{}] {} │ Shift+Tab: Auto Mode │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+G: Local Models │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",
+            " [{}] {} │ Shift+Tab: Auto Mode │ Ctrl+H: Help │ Ctrl+Y: Copy │ Ctrl+D: Download Model │ Ctrl+G: Local Models │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C twice: Quit",
             mode_text, auto_mode_label
         )
     };
 
     let status_color = if app.error_message.is_some() {
         Color::Red
+    } else if notice.is_some() {
+        Color::Cyan
     } else if app.is_processing {
         Color::Yellow
     } else {
@@ -3328,7 +3581,7 @@ mod tests {
         let screen = render_to_string(&app, 100, 100);
         // GLOBAL COMMANDS
         assert!(screen.contains("Ctrl+C"));
-        assert!(screen.contains("Quit application"));
+        assert!(screen.contains("press twice to quit"));
         // CHAT MODE (non-kitty terminal falls back to Alt+Enter)
         assert!(screen.contains("Alt+Enter"));
         assert!(screen.contains("New line in message"));
@@ -3448,6 +3701,120 @@ mod tests {
         assert!(screen.contains("partial reply"));
         // The spinner only shows up before the first token arrives.
         assert!(!screen.contains("is thinking..."));
+    }
+
+    fn assistant_message(content: &str) -> DisplayMessage {
+        DisplayMessage {
+            id: uuid::Uuid::new_v4(),
+            role: "assistant".to_string(),
+            content: content.to_string(),
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn chat_follows_the_end_of_a_reply_whose_paragraphs_wrap() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        // Each paragraph is one line that wraps to several rows at 40 columns;
+        // counting lines instead of rows left the last one below the edge.
+        let paragraph = "word ".repeat(40);
+        app.messages.push(assistant_message(&format!(
+            "{paragraph}\n\n{paragraph}\n\n{paragraph}\n\nTHE-END"
+        )));
+
+        let screen = render_to_string(&app, 40, 24);
+        assert!(screen.contains("THE-END"), "{screen}");
+        assert!(app.chat_max_scroll.get() > 0);
+    }
+
+    #[tokio::test]
+    async fn scrolling_up_hides_the_end_and_says_how_to_return() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        let body: Vec<String> = (0..60).map(|i| format!("line {i}")).collect();
+        app.messages.push(assistant_message(&format!(
+            "{}\n\nTHE-END",
+            body.join("\n\n")
+        )));
+
+        let screen = render_to_string(&app, 60, 24);
+        assert!(screen.contains("THE-END"));
+        assert!(!screen.contains("Page Down for newer"));
+
+        app.scroll_offset = 30;
+        let screen = render_to_string(&app, 60, 24);
+        assert!(!screen.contains("THE-END"));
+        assert!(screen.contains("Page Down for newer"));
+    }
+
+    #[tokio::test]
+    async fn an_empty_chat_shows_ferris_and_a_welcome() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+
+        let screen = render_to_string(&app, 100, 30);
+        assert!(screen.contains("Welcome to Crustly"));
+        assert!(screen.contains("_~^~^~_"), "Ferris is on screen:\n{screen}");
+        assert!(screen.contains("attach a file"));
+
+        app.messages.push(assistant_message("hello"));
+        let screen = render_to_string(&app, 100, 30);
+        assert!(!screen.contains("Welcome to Crustly"));
+    }
+
+    #[tokio::test]
+    async fn ferris_works_while_the_model_thinks() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.messages.push(assistant_message("earlier answer"));
+        app.is_processing = true;
+
+        let screen = render_to_string(&app, 100, 30);
+        assert!(screen.contains("_~^~^~_"));
+        assert!(screen.contains("Esc to cancel"));
+    }
+
+    #[tokio::test]
+    async fn the_input_box_grows_with_its_text() {
+        let mut app = test_app().await;
+        assert_eq!(input_box_height(&app), 5);
+        app.textarea.insert_str("1\n2\n3\n4\n5\n6");
+        assert_eq!(input_box_height(&app), 8);
+        app.textarea.insert_str("\nmore".repeat(30));
+        assert_eq!(input_box_height(&app), 12);
+    }
+
+    #[test]
+    fn long_paths_are_cut_on_a_character_boundary() {
+        let path = format!("C:\\Users\\jérémy\\{}\\été", "dossier".repeat(10));
+        let short = tail_chars(&path, 60);
+        assert!(short.starts_with("..."));
+        assert_eq!(short.chars().count(), 60);
+        assert!(short.ends_with("été"));
+        assert_eq!(tail_chars("short", 60), "short");
+    }
+
+    #[test]
+    fn elapsed_time_reads_naturally() {
+        use std::time::Duration;
+        assert_eq!(format_elapsed(Duration::from_secs(12)), "12s");
+        assert_eq!(format_elapsed(Duration::from_secs(95)), "1m 35s");
+    }
+
+    #[tokio::test]
+    async fn a_new_session_costs_zero_not_minus_zero() {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        let screen = render_to_string(&app, 120, 20);
+        assert!(screen.contains("Cost: $0.0000"), "{screen}");
     }
 
     #[tokio::test]
