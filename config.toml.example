@@ -234,6 +234,34 @@ default_model = "qwen2.5-coder-7b-instruct"
 # Ctrl+O shows the fixed cost of the system prompt and tool schemas.
 
 # ========================================
+# Agent Loop
+# ========================================
+# When a limit is reached the agent stops calling tools and answers from the
+# work done so far (instead of failing). Esc cancels a request in the TUI.
+#
+# [agent]
+# max_tool_rounds = 20        # rounds of tool calls per request
+# max_wall_time_secs = 0      # 0 = no limit (try 600 for slow local models)
+# max_request_tokens = 0      # input + output tokens per request; 0 = no limit
+#
+# After editing files the agent must run a check command and see it pass
+# before answering (at most two reminders per request). The command goes
+# through the normal approval prompt.
+#
+# [verification]
+# enabled = true
+# command = "cargo check"     # default: inferred - cargo check (Cargo.toml),
+#                             # go build ./... (go.mod), npx tsc --noEmit
+#                             # (tsconfig.json); otherwise no check
+#
+# [memory]
+# project_notes = true        # add AGENTS.md, CLAUDE.md, CRUSTLY.md and
+#                             # .crustly/memory.md to the system prompt, within
+#                             # an eighth of the context window (max 2,000 tokens)
+# progress_file = true        # log requests that edited files or ran 3+ tool
+#                             # rounds to .crustly/progress.md
+
+# ========================================
 # Tips for Using Local LLMs
 # ========================================
 # 1. Make sure LM Studio is running before starting Crustly

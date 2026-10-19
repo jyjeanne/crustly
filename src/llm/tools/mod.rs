@@ -9,6 +9,7 @@ pub mod error;
 pub mod file_read_cache;
 pub mod registry;
 pub mod sandbox;
+pub mod schema_check;
 pub mod ssrf_guard;
 mod r#trait;
 

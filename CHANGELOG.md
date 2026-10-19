@@ -5,6 +5,26 @@ For the forward-looking plan, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
+### Unreleased — Local-Model Quality
+
+#### Agent Runtime and Middleware
+The 700-line agent loop is split into `AgentRun` (one request's state and loop), a round executor for tool calls, and middleware consulted at fixed points of every round. Loop guards, limits and verification are middleware; new rules no longer mean more branches inside the loop. Behavior is unchanged except where noted below.
+
+#### Limits and Cancellation
+Reaching the round limit no longer fails the request with "Maximum tool iterations exceeded": the agent stops calling tools and answers from the work done so far, with a notice. A new `[agent]` section sets the round limit plus optional wall-clock and token limits. Esc in the chat view cancels the request in flight; the agent stops at its next model call, approval prompt or round boundary. When a request is stopped mid-round, every pending tool call now gets a result, so the final request stays valid for strict providers (OpenAI, Anthropic).
+
+#### Verify Before Answering
+After editing files, the agent must run a check command - `cargo check`, `go build ./...` or `npx tsc --noEmit`, inferred from the project, or `[verification] command` - and see it pass before its answer is accepted (at most two reminders per request). The check runs through the normal approval prompt.
+
+#### Memory Across Requests
+Each answer now stores a one-line summary of the tool calls behind it, shown to the model in later requests, so a follow-up knows what was read, changed or run. Requests that edited files or ran three or more tool rounds are logged to `.crustly/progress.md`. Project notes - `AGENTS.md`, `CLAUDE.md`, `CRUSTLY.md` and `.crustly/memory.md` (where `save_memory` writes) - are added to the system prompt within a token budget. Both are on by default under `[memory]`.
+
+#### Tool-Call Repair
+Tool arguments that cannot match the tool's schema (a list where a path is expected, no object at all) are refused with the expected arguments listed. When a tool rejects its input, the expected arguments are appended to the error. Grammar-constrained tool-call decoding is now part of the `llama-cpp` feature; `llama-cpp-llguidance` remains as an alias.
+
+#### In-Process llama.cpp: Prompt Reuse and Two Fixes
+The provider now keeps the part of its KV cache that matches the next prompt and decodes only the rest, so each agent round processes its new tokens instead of the whole prompt. This also fixes two bugs: every request after the first failed ("inconsistent sequence positions", since the cache was never cleared), and a prompt longer than 2,048 tokens aborted the process (the whole prompt was decoded in one batch, past llama.cpp's batch size).
+
 ### Unreleased — Fitting Local Context Windows
 
 On the 8,192-token default window of the local providers, the system prompt and the 23 tool schemas took 7,607 tokens of every request (counting the framing margin), leaving 585 for the conversation and the answer.

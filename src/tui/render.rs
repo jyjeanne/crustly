@@ -851,7 +851,11 @@ fn help_chat_mode(app: &App) -> Vec<Line<'static>> {
             "Paste from system clipboard at cursor",
             Color::Green,
         ),
-        help_row("  Escape       ", "Clear input buffer", Color::Green),
+        help_row(
+            "  Escape       ",
+            "Clear input buffer, or cancel the request in flight",
+            Color::Green,
+        ),
         help_row("  Page Up      ", "Scroll chat history up", Color::Green),
         help_row("  Page Down    ", "Scroll chat history down", Color::Green),
     ]);
@@ -2648,7 +2652,10 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let status = if let Some(ref error) = app.error_message {
         format!(" [{}] {} │ ERROR: {}", mode_text, auto_mode_label, error)
     } else if app.is_processing {
-        format!(" [{}] {} │ Processing...", mode_text, auto_mode_label)
+        format!(
+            " [{}] {} │ Processing... (Esc to cancel)",
+            mode_text, auto_mode_label
+        )
     } else {
         format!(
             " [{}] {} │ Shift+Tab: Auto Mode │ Ctrl+H: Help │ Ctrl+D: Download Model │ Ctrl+G: Local Models │ Ctrl+O: Model Info │ Ctrl+W: Switch Model │ Ctrl+K: Clear │ Ctrl+L: Sessions │ Ctrl+N: New │ Ctrl+C: Quit",

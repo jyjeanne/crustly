@@ -147,15 +147,33 @@ RULES
 - If a tool fails or is denied, say what failed and stop. Do not switch to unrelated work.
 - Keep answers short: the result first, then only the detail the user needs."#;
 
-/// Apply the `[tools]` config to an agent service: which tools the model
-/// sees, and the shorter system prompt used with the core set.
-fn configure_tools(
+/// Apply the agent-loop config to an agent service: which tools the model
+/// sees (`[tools]`, with the shorter system prompt for the core set), the
+/// request limits (`[agent]`), edit verification (`[verification]`) and
+/// project memory (`[memory]`).
+///
+/// `can_approve_shell` says whether a shell command the model runs can be
+/// approved at all; verification is skipped when it cannot, since the model
+/// would be sent back to run a check that is then refused.
+fn configure_agent(
     service: crate::llm::agent::AgentService,
     config: &crate::config::Config,
+    can_approve_shell: bool,
 ) -> crate::llm::agent::AgentService {
     service
         .with_core_system_prompt(CORE_SYSTEM_PROMPT.to_string())
         .with_tool_profile(config.tools.profile, config.tools.extra.clone())
+        .with_max_tool_iterations(config.agent.max_tool_rounds)
+        .with_request_limits(
+            config.agent.max_wall_time(),
+            config.agent.max_request_tokens(),
+        )
+        .with_verification(
+            config.verification.enabled && can_approve_shell,
+            config.verification.command.clone(),
+        )
+        .with_project_notes(config.memory.project_notes)
+        .with_progress_file(config.memory.progress_file)
 }
 
 /// Crustly - High-Performance Terminal AI Assistant
@@ -1089,12 +1107,12 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     let working_directory = std::env::current_dir().unwrap_or_default();
 
     // Create agent service with system prompt and working directory
-    let agent_service = Arc::new(configure_tools(
+    let agent_service = Arc::new(configure_agent(
         AgentService::new(provider.clone(), service_context.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
-            .with_max_tool_iterations(20)
             .with_working_directory(working_directory.clone()),
         config,
+        true,
     ));
 
     // Create TUI app first (so we can get the event sender)
@@ -1142,14 +1160,14 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
 
     // Create agent service with approval callback
     tracing::debug!("Creating agent service with approval callback");
-    let agent_service = Arc::new(configure_tools(
+    let agent_service = Arc::new(configure_agent(
         AgentService::new(provider.clone(), service_context.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_tool_registry(Arc::new(tool_registry))
             .with_approval_callback(Some(approval_callback))
-            .with_max_tool_iterations(20)
             .with_working_directory(working_directory),
         config,
+        true,
     ));
 
     // Update app with the configured agent service (preserve event channels!)
@@ -1280,13 +1298,13 @@ async fn cmd_run(
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());
-    let agent_service = configure_tools(
+    let agent_service = configure_agent(
         AgentService::new(provider.clone(), service_context.clone())
             .with_tool_registry(Arc::new(tool_registry))
             .with_system_prompt(SYSTEM_PROMPT.to_string())
-            .with_max_tool_iterations(20)
             .with_auto_approve_tools(auto_approve),
         config,
+        auto_approve,
     );
 
     // Warn up front when the system prompt and tool schemas leave a local

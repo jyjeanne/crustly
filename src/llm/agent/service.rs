@@ -9,6 +9,11 @@ use super::budget::{
 use super::compaction;
 use super::context::{token_count, AgentContext};
 use super::error::{AgentError, Result};
+#[cfg(test)]
+use super::middleware::tool_call_signature;
+use super::middleware::{
+    has_mutating_capability, Limits, LoopGuard, Pipeline, ToolCallRecord, Verification,
+};
 use super::tool_profile::ToolSelection;
 use crate::config::ToolProfile;
 use crate::llm::provider::router::ModelRouter;
@@ -16,17 +21,21 @@ use crate::llm::provider::{
     ContentBlock, ContentDelta, LLMRequest, LLMResponse, Message, PerfMetrics, Provider,
     ProviderStream, StopReason, StreamEvent, TokenUsage, Tool,
 };
-use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
-use crate::llm::tools::{FileReadCache, ToolCapability, ToolExecutionContext, ToolRegistry};
+use crate::llm::tools::cache::{ToolResultCache, ToolTtlConfig};
+use crate::llm::tools::{FileReadCache, ToolExecutionContext, ToolRegistry};
 use crate::services::{MessageService, ServiceContext, SessionService};
-use futures::future::join_all;
 use futures::StreamExt as _;
 use serde_json::Value;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+
+mod run;
+mod tool_round;
 
 /// Prefixed to the answer when a response carried no visible text and its
 /// reasoning was surfaced as a fallback (see `final_text_and_thinking`). Makes
@@ -49,19 +58,6 @@ struct FinalText {
     thinking: Option<String>,
 }
 
-/// True when the capabilities can change files or system state, meaning
-/// cached read results may be stale after a tool with them runs.
-fn has_mutating_capability(caps: &[ToolCapability]) -> bool {
-    caps.iter().any(|c| {
-        matches!(
-            c,
-            ToolCapability::WriteFiles
-                | ToolCapability::ExecuteShell
-                | ToolCapability::SystemModification
-        )
-    })
-}
-
 /// How many times one round is retried after the provider reports that the
 /// prompt overflowed its context window, each time after freeing more context.
 const MAX_OVERFLOW_RETRIES: usize = 2;
@@ -77,89 +73,6 @@ impl RequestTools {
     fn new(defs: Vec<Tool>) -> Self {
         let tokens = tool_schema_tokens(&defs);
         Self { defs, tokens }
-    }
-}
-
-/// Build a loop-detection signature for one tool call: `<name>:<distinguishing
-/// args>`. Two calls with the same signature seen back-to-back are treated as a
-/// stuck loop. The signature MUST include whatever argument distinguishes one
-/// legitimate call from another (path, command, pattern...), or genuinely
-/// different calls collide and the loop detector aborts the second before it
-/// runs.
-///
-/// For path-based tools the canonical input key is `path`, with `file_path` as
-/// an alias (see the read/edit/write tool schemas). Reading only `file_path`
-/// here yielded a bare `read_file:`/`edit_file:`/`write_file:` for every normal
-/// call, so two operations on *different* paths shared a signature and the
-/// second was falsely aborted as a loop.
-fn tool_call_signature(name: &str, input: &Value) -> String {
-    // First string-valued input under any of `keys`, path-normalized.
-    let first_str = |keys: &[&str]| -> Option<String> {
-        keys.iter()
-            .find_map(|k| input.get(*k).and_then(|v| v.as_str()))
-            .map(|s| s.replace('\\', "/"))
-    };
-
-    match name {
-        "plan" => {
-            if let Some(operation) = input.get("operation").and_then(|v| v.as_str()) {
-                if operation == "add_task" {
-                    if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
-                        format!("{name}:{operation}:{title}")
-                    } else {
-                        format!("{name}:{operation}")
-                    }
-                } else {
-                    format!("{name}:{operation}")
-                }
-            } else {
-                name.to_string()
-            }
-        }
-
-        // File system exploration tools - include path to distinguish calls.
-        "ls" => format!("ls:{}", first_str(&["path"]).unwrap_or_default()),
-        "glob" => format!(
-            "glob:{}",
-            input
-                .get("pattern")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-        ),
-        "grep" => {
-            let pattern = input.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
-            let path = input.get("path").and_then(|v| v.as_str()).unwrap_or("");
-            format!("grep:{pattern}:{path}")
-        }
-
-        // Path-based tools: canonical key `path`, alias `file_path`.
-        "read_file" => format!(
-            "read_file:{}",
-            first_str(&["path", "file_path"]).unwrap_or_default()
-        ),
-        "write_file" | "edit_file" => {
-            format!(
-                "{name}:{}",
-                first_str(&["path", "file_path"]).unwrap_or_default()
-            )
-        }
-
-        // Command execution - include (truncated) command.
-        "bash" => {
-            let cmd = first_str(&["command"]).unwrap_or_default();
-            let cmd_short: String = cmd.chars().take(100).collect();
-            format!("bash:{cmd_short}")
-        }
-
-        // Other tools: name plus an input hash, so different calls to the same
-        // tool never share a signature.
-        _ => {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            let mut h = DefaultHasher::new();
-            input.to_string().hash(&mut h);
-            format!("{name}:{:016x}", h.finish())
-        }
     }
 }
 
@@ -344,6 +257,27 @@ pub struct AgentService {
     /// Provider prompt tokens per estimated token, learned from responses
     /// (see `budget::calibration_from`). Reset when the provider changes.
     token_calibration: std::sync::Mutex<f64>,
+
+    /// Wall-clock cap for one request (`[agent] max_wall_time_secs`).
+    max_wall_time: Option<Duration>,
+
+    /// Input + output token cap for one request (`[agent] max_request_tokens`).
+    max_request_tokens: Option<u32>,
+
+    /// Whether the model must check its file edits before answering
+    /// (`middleware::Verification`).
+    verification: bool,
+
+    /// The check command; inferred from the project's build files when unset.
+    verification_command: Option<String>,
+
+    /// Whether project notes (AGENTS.md, CLAUDE.md, `.crustly/memory.md`...)
+    /// are added to the system prompt (see `project_memory`).
+    project_notes: bool,
+
+    /// Whether requests that edited files or ran several tool rounds are
+    /// logged to `.crustly/progress.md` (see `project_memory`).
+    progress_file: bool,
 }
 
 /// Route a streaming `TextDelta` through `<think>` tag detection.
@@ -591,7 +525,45 @@ impl AgentService {
             extra_tools: Vec::new(),
             core_system_prompt: None,
             token_calibration: std::sync::Mutex::new(1.0),
+            max_wall_time: None,
+            max_request_tokens: None,
+            verification: false,
+            verification_command: None,
+            project_notes: false,
+            progress_file: false,
         }
+    }
+
+    /// Cap one request's wall-clock time and tokens. When a cap is reached
+    /// the model is asked to answer from the work done so far.
+    pub fn with_request_limits(
+        mut self,
+        max_wall_time: Option<Duration>,
+        max_tokens: Option<u32>,
+    ) -> Self {
+        self.max_wall_time = max_wall_time;
+        self.max_request_tokens = max_tokens;
+        self
+    }
+
+    /// Require the model to check file edits before it answers, with
+    /// `command` or one inferred from the project's build files.
+    pub fn with_verification(mut self, enabled: bool, command: Option<String>) -> Self {
+        self.verification = enabled;
+        self.verification_command = command;
+        self
+    }
+
+    /// Add the project's notes files to the system prompt.
+    pub fn with_project_notes(mut self, enabled: bool) -> Self {
+        self.project_notes = enabled;
+        self
+    }
+
+    /// Log finished tool work to `.crustly/progress.md`.
+    pub fn with_progress_file(mut self, enabled: bool) -> Self {
+        self.progress_file = enabled;
+        self
     }
 
     /// Choose which tool schemas requests carry (the `[tools]` config).
@@ -673,15 +645,27 @@ impl AgentService {
         self.with_env(self.default_system_prompt.as_deref())
     }
 
-    /// The system prompt for `selection`: the core prompt while only the core
-    /// tools are exposed (when one is set), the default prompt otherwise,
-    /// with the environment appended.
-    fn system_prompt_for(&self, selection: &ToolSelection) -> Option<String> {
+    /// The system prompt for `selection` on a model with `window` tokens: the
+    /// core prompt while only the core tools are exposed (when one is set),
+    /// the default prompt otherwise, with the environment and - when enabled -
+    /// the project notes appended.
+    fn system_prompt_for(&self, selection: &ToolSelection, window: u32) -> Option<String> {
         let base = match &self.core_system_prompt {
             Some(core) if selection.is_core_only() => Some(core.as_str()),
             _ => self.default_system_prompt.as_deref(),
         };
-        self.with_env(base)
+        let prompt = self.with_env(base)?;
+        if !self.project_notes {
+            return Some(prompt);
+        }
+        let notes = super::project_memory::load_project_notes(
+            &self.working_directory,
+            super::project_memory::notes_budget(window),
+        );
+        Some(match notes {
+            Some(notes) => format!("{prompt}\n\n{notes}"),
+            None => prompt,
+        })
     }
 
     fn with_env(&self, base: Option<&str>) -> Option<String> {
@@ -771,7 +755,7 @@ impl AgentService {
         let window = self.default_context_window();
         let selection = self.tool_selection(window);
         let tools = self.exposed_tool_definitions(&selection);
-        let system = self.system_prompt_for(&selection);
+        let system = self.system_prompt_for(&selection, window);
         ContextBudget::measure(window, system.as_deref(), &tools, 0, self.calibration())
             .usage(selection.is_core_only())
     }
@@ -887,6 +871,63 @@ impl AgentService {
             );
         }
         freed_any
+    }
+
+    /// The middleware for one request (see `middleware`): limits, loop
+    /// guards, and - when enabled, the shell tool is offered and the request
+    /// may change files - verification of edits.
+    fn round_pipeline(&self, selection: &ToolSelection, read_only: bool) -> Pipeline {
+        let mut pipeline = Pipeline::new()
+            .with(Limits {
+                max_rounds: self.max_tool_iterations,
+                max_wall_time: self.max_wall_time,
+                max_tokens: self.max_request_tokens,
+            })
+            .with(LoopGuard::new());
+        if self.verification
+            && !read_only
+            && selection.exposes("bash")
+            && self.tool_registry.has_tool("bash")
+        {
+            if let Some(command) = Verification::detect_command(
+                &self.working_directory,
+                self.verification_command.as_deref(),
+            ) {
+                pipeline = pipeline.with(Verification::new(command));
+            }
+        }
+        pipeline
+    }
+
+    /// Log a request that edited files or ran several tool rounds to
+    /// `.crustly/progress.md`. Failures are logged, not returned: the answer
+    /// matters more than the log.
+    fn log_progress(
+        &self,
+        request: &str,
+        tools: Option<&str>,
+        answer: &str,
+        outcome: &run::RunOutcome,
+        read_only: bool,
+    ) {
+        let Some(tools) = tools else {
+            return;
+        };
+        let edited = outcome
+            .tool_log
+            .iter()
+            .any(|r: &ToolCallRecord| r.success && super::middleware::is_file_edit(&r.name));
+        if !self.progress_file || read_only || !(edited || outcome.tool_rounds >= 3) {
+            return;
+        }
+        let entry = super::project_memory::ProgressEntry {
+            request,
+            tools,
+            result: answer,
+        };
+        if let Err(e) = super::project_memory::append_progress(&self.working_directory, &entry) {
+            tracing::warn!("Could not update the progress log: {}", e);
+        }
     }
 
     /// Build the provider request for the current context.
@@ -1047,12 +1088,21 @@ impl AgentService {
         model: Option<String>,
         read_only_mode: bool,
     ) -> Result<AgentResponse> {
-        self.send_message_with_tools_inner(session_id, user_message, model, read_only_mode, None)
-            .await
+        self.send_message_with_tools_inner(
+            session_id,
+            user_message,
+            model,
+            read_only_mode,
+            None,
+            CancellationToken::new(),
+        )
+        .await
     }
 
     /// Streaming variant — identical to [`send_message_with_tools_and_mode`] but forwards
     /// each LLM text delta to `chunk_tx` so the TUI can render incremental output.
+    /// Cancelling `cancel` ends the request with [`AgentError::Cancelled`] at
+    /// the next model call, approval prompt or round boundary.
     pub async fn send_message_with_tools_and_mode_streaming(
         &self,
         session_id: Uuid,
@@ -1060,6 +1110,7 @@ impl AgentService {
         model: Option<String>,
         read_only_mode: bool,
         chunk_tx: mpsc::UnboundedSender<String>,
+        cancel: CancellationToken,
     ) -> Result<AgentResponse> {
         self.send_message_with_tools_inner(
             session_id,
@@ -1067,6 +1118,7 @@ impl AgentService {
             model,
             read_only_mode,
             Some(chunk_tx),
+            cancel,
         )
         .await
     }
@@ -1079,6 +1131,7 @@ impl AgentService {
         model: Option<String>,
         read_only_mode: bool,
         chunk_tx: Option<mpsc::UnboundedSender<String>>,
+        cancel: CancellationToken,
     ) -> Result<AgentResponse> {
         // Get or create session
         let session_service = SessionService::new(self.context.clone());
@@ -1114,9 +1167,17 @@ impl AgentService {
 
         // Add system prompt if available, with the working directory appended so
         // the model knows where "the current directory" actually is.
-        if let Some(system_prompt) = self.system_prompt_for(&selection) {
+        if let Some(system_prompt) = self.system_prompt_for(&selection, context_window) {
             context.system_prompt = Some(system_prompt);
         }
+
+        // What the user asked, for the progress log.
+        let request_line = user_message
+            .trim()
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .to_string();
 
         // Auto-inject PDF content when the user message references a .pdf file
         let user_message = crate::llm::pdf_context::augment_message_with_pdf(
@@ -1187,663 +1248,64 @@ impl AgentService {
             tool_context = tool_context.with_sub_agent_launcher(launcher);
         }
 
-        // Tool execution loop
-        let mut iteration = 0;
-        let mut total_input_tokens = 0u32;
-        let mut total_output_tokens = 0u32;
-        let mut final_response: Option<LLMResponse> = None;
-        let mut recent_tool_calls: Vec<String> = Vec::new(); // Track tool calls to detect loops
-                                                             // Consecutive tool-calling turns in which the model said nothing to the
-                                                             // user. Reset by any turn that produces text. See MAX_SILENT_TOOL_CALLS.
-        let mut silent_tool_calls: usize = 0;
-        // Successful mutating tool calls since the previous plan task
-        // completion. Backs `plan_completion_rejection`: marking a plan task
-        // success=true requires evidence of work; each accepted completion
-        // resets the counter so the NEXT task needs fresh evidence.
-        let mut mutating_evidence: usize = 0;
-        // Context figures of the last request sent, reported with the answer.
-        let mut last_budget: Option<ContextBudget> = None;
-
-        while iteration < self.max_tool_iterations {
-            iteration += 1;
-
-            // Free context before sending when too little is left for the
-            // answer: a small local window fills up within a few tool rounds.
-            self.make_room(&mut context, &tools, 0).await;
-
-            // Send to provider — stream when chunk_tx is available, otherwise
-            // block. When the provider reports that the prompt overflowed its
-            // window, free more context and retry the same round instead of
-            // failing the whole request.
-            let mut overflow_retries = 0;
-            let (response, budget) = loop {
-                let budget = self.measure_budget(&context, &tools);
-                tracing::debug!(
-                    "Sending {} tool definitions; {} of {} context tokens left for the answer",
-                    tools.defs.len(),
-                    budget.available(),
-                    budget.window
-                );
-                let request =
-                    Self::build_request(&model_name, &context, &tools, budget.completion_budget());
-                match Self::call_provider_streaming(
-                    &self.provider,
-                    request,
-                    chunk_tx.as_ref(),
-                    &model_name,
-                )
-                .await
-                {
-                    Ok(response) => break (response, budget),
-                    Err(e)
-                        if e.is_context_overflow() && overflow_retries < MAX_OVERFLOW_RETRIES =>
-                    {
-                        overflow_retries += 1;
-                        tracing::warn!(
-                            "Prompt overflowed the context window ({}); freeing context and \
-                             retrying ({}/{})",
-                            e,
-                            overflow_retries,
-                            MAX_OVERFLOW_RETRIES
-                        );
-                        if !self.make_room(&mut context, &tools, overflow_retries).await {
-                            return Err(AgentError::Provider(e));
-                        }
-                    }
-                    Err(e) => return Err(AgentError::Provider(e)),
-                }
-            };
-            self.record_calibration(&response, &budget);
-            last_budget = Some(budget);
-
-            // Track token usage
-            total_input_tokens += response.usage.input_tokens;
-            total_output_tokens += response.usage.output_tokens;
-
-            // Accumulate prompt-cache metrics (T065)
-            if let Some(ref cm) = response.cache_metrics {
-                context.accumulated_cache_metrics.read_tokens += cm.read_tokens;
-                context.accumulated_cache_metrics.creation_tokens += cm.creation_tokens;
-            }
-
-            // Check if response contains tool use
-            tracing::debug!("Response has {} content blocks", response.content.len());
-            for (i, block) in response.content.iter().enumerate() {
-                match block {
-                    ContentBlock::Text { text } => {
-                        tracing::debug!(
-                            "Block {}: Text ({}...)",
-                            i,
-                            &text.chars().take(50).collect::<String>()
-                        );
-                    }
-                    ContentBlock::ToolUse { id, name, input: _ } => {
-                        tracing::debug!("Block {}: ToolUse {{ name: {}, id: {} }}", i, name, id);
-                    }
-                    _ => {
-                        tracing::debug!("Block {}: Other content block", i);
-                    }
-                }
-            }
-
-            // Resolve aliases (`Bash`, `shell`, `run_shell_command`...) to the
-            // registered name up front, so the approval gate, the plan checks,
-            // parallel classification and the result cache all see the same
-            // name `ToolRegistry::execute` will run. An alias used to skip
-            // AutoPlan's high-risk check, which matches registered names only.
-            let tool_uses: Vec<_> = response
-                .content
-                .iter()
-                .filter_map(|block| {
-                    if let ContentBlock::ToolUse { id, name, input } = block {
-                        Some((
-                            id.clone(),
-                            self.tool_registry.resolve_name(name),
-                            input.clone(),
-                        ))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            tracing::debug!("Found {} tool uses to execute", tool_uses.len());
-
-            if tool_uses.is_empty() {
-                // No tool use - we're done
-                tracing::debug!("No tool uses found, completing with final response");
-                final_response = Some(response);
-                break;
-            }
-
-            // Detect tool loops: Track the current batch of tool calls
-            // Include arguments in signature to distinguish different calls
-            // For example: ls(./src) vs ls(./src/cli) should be different
-            let current_call_signature = tool_uses
-                .iter()
-                .map(|(_, name, input)| tool_call_signature(name, input))
-                .collect::<Vec<_>>()
-                .join(",");
-
-            recent_tool_calls.push(current_call_signature.clone());
-
-            // Keep only last 15 iterations for loop detection (increased for deep exploration)
-            if recent_tool_calls.len() > 15 {
-                recent_tool_calls.remove(0);
-            }
-
-            // Drift guard. The identical-call check below only fires when the
-            // model repeats the *same* call, so a model that keeps picking
-            // *different* tools sails past it and burns all 20 iterations. That
-            // is the common failure: the very first `bash` returns the answer,
-            // the model ignores it and wanders off through ls, glob, write_file,
-            // task_manager..., ending in "Maximum tool iterations exceeded".
-            //
-            // Any turn where the model emits text is making progress, so the
-            // counter resets. Only an unbroken run of tool calls with nothing
-            // said to the user counts as drift.
-            const MAX_SILENT_TOOL_CALLS: usize = 6;
-            let produced_text = response
-                .content
-                .iter()
-                .any(|b| matches!(b, ContentBlock::Text { text } if !text.trim().is_empty()));
-            // Building a plan is an intentionally silent chain: create +
-            // one add_task per step + finalize is 7+ consecutive tool calls
-            // with nothing to say in between - the drift guard used to fire
-            // mid-plan and force a text response, cutting the plan off after
-            // its first tasks. Plan-tool turns are therefore neutral: they
-            // neither count toward drift nor reset it. A model genuinely
-            // stuck repeating one plan call is still caught by the
-            // identical-call loop breaker below.
-            let all_plan_calls =
-                !tool_uses.is_empty() && tool_uses.iter().all(|(_, name, _)| name == "plan");
-            if produced_text {
-                silent_tool_calls = 0;
-            } else if !all_plan_calls {
-                silent_tool_calls += 1;
-            }
-            let drifting = silent_tool_calls >= MAX_SILENT_TOOL_CALLS;
-            if drifting {
-                tracing::warn!(
-                    "⚠️ {} consecutive tool calls with no answer to the user \
-                     (last: '{}'). Forcing a text response.",
-                    silent_tool_calls,
-                    current_call_signature
-                );
-            }
-
-            // Check for repeated patterns with tool-specific thresholds
-            // This will only trigger for truly identical calls (same tool + same arguments)
-
-            // Determine loop threshold from the first tool's declared
-            // capabilities, so the classification cannot drift from the
-            // registry's actual tool names the way hardcoded strings did.
-            let first_tool_caps = tool_uses
-                .first()
-                .and_then(|(_, name, _)| self.tool_registry.get(name))
-                .map(|t| t.capabilities())
-                .unwrap_or_default();
-            let is_modification_tool = has_mutating_capability(&first_tool_caps);
-            let is_exploration_tool = !is_modification_tool
-                && first_tool_caps
-                    .iter()
-                    .any(|c| matches!(c, ToolCapability::ReadFiles | ToolCapability::Network));
-
-            // Higher threshold for exploration tools (allow deep directory traversal)
-            // Lower threshold for modification tools (dangerous if looping)
-            let loop_threshold = if is_exploration_tool {
-                10 // Allow up to 10 identical calls for exploration
-            } else if is_modification_tool {
-                2 // Only 2 identical calls for modification tools
-            } else {
-                3 // Default: 3 identical calls
-            };
-
-            // The model is repeating one identical call.
-            let repeating = recent_tool_calls.len() >= loop_threshold
-                && recent_tool_calls[recent_tool_calls.len() - loop_threshold..]
-                    .iter()
-                    .all(|call| call == &current_call_signature);
-
-            // Either failure mode lands in the same recovery: re-ask with no
-            // tools, forcing the model to answer from what it already has.
-            if repeating || drifting {
-                {
-                    tracing::warn!(
-                        "⚠️ Detected tool loop: '{}' called {} times in a row. Breaking loop.",
-                        current_call_signature,
-                        loop_threshold
-                    );
-
-                    if is_exploration_tool {
-                        tracing::info!(
-                            "💡 Hint: The model is stuck trying to access the same path {} times. \
-                             This often means the path doesn't exist or the model is confused about the directory structure.",
-                            loop_threshold
-                        );
-                    } else if is_modification_tool {
-                        tracing::warn!(
-                            "⚠️ Modification tool loop detected! This could be dangerous. \
-                             The model tried to modify the same file/run the same command {} times.",
-                            loop_threshold
-                        );
-                    }
-
-                    // T052: Instead of silently breaking, inject a recovery hint and let the
-                    // LLM self-correct via a follow-up turn (no tools = forced text response).
-                    tracing::warn!(
-                        "⚠️ Detected tool loop: '{}' called {} times in a row. Injecting recovery hint.",
-                        current_call_signature,
-                        loop_threshold
-                    );
-
-                    let hint = if repeating {
-                        format!(
-                            "⚠️ Loop detected: you called '{}' {} times in a row without making progress. \
-                             Please reassess your approach. Summarise what you have found so far and \
-                             explain what the next step should be without repeating the same tool call.",
-                            current_call_signature, loop_threshold
-                        )
-                    } else {
-                        format!(
-                            "⚠️ You have made {} tool calls without answering the user. The results you \
-                             already have are enough. Do NOT call any more tools. Answer the user's \
-                             original question now, using only what those tools returned.",
-                            silent_tool_calls
-                        )
-                    };
-
-                    // Add the assistant's last response and a user recovery message to context.
-                    let assistant_msg = Message {
-                        role: crate::llm::provider::Role::Assistant,
-                        content: response.content.clone(),
-                    };
-                    context.add_message(assistant_msg);
-                    context.add_message(Message::user(hint));
-
-                    // Ask LLM to recover without tools so it is forced to produce a text answer.
-                    let no_tools = RequestTools::new(Vec::new());
-                    let max_tokens = self
-                        .measure_budget(&context, &no_tools)
-                        .completion_budget()
-                        .min(2048);
-                    let recovery_request =
-                        Self::build_request(&model_name, &context, &no_tools, max_tokens);
-
-                    match self.provider.complete(recovery_request).await {
-                        Ok(recovery_response) => {
-                            final_response = Some(recovery_response);
-                        }
-                        Err(_) => {
-                            final_response = Some(response);
-                        }
-                    }
-                    break;
-                }
-            }
-
-            // Execute tools and build response message.
-            // Parallelizable tools (read-only, idempotent) run concurrently; others sequentially.
-            // Tool results are cached per-session to avoid redundant calls (T037 / T049).
-            let mut tool_results: Vec<ContentBlock> = Vec::new();
-
-            // A tool the profile does not expose gets an error result instead
-            // of running: the model only learned its name some other way (an
-            // earlier turn, a hallucination), and the core profile exists to
-            // keep it out of the conversation.
-            let (tool_uses, hidden_uses): (Vec<_>, Vec<_>) = tool_uses
-                .into_iter()
-                .partition(|(_, name, _)| selection.exposes(name));
-            for (tool_id, tool_name, _) in hidden_uses {
-                tracing::warn!(
-                    "Model called '{}', which the {} tool profile does not expose",
-                    tool_name,
-                    selection.label()
-                );
-                let available: Vec<&str> = tools.defs.iter().map(|t| t.name.as_str()).collect();
-                tool_results.push(ContentBlock::ToolResult {
-                    tool_use_id: tool_id,
-                    content: format!(
-                        "Tool '{}' is not available in this session. Use one of: {}.",
-                        tool_name,
-                        available.join(", ")
-                    ),
-                    is_error: Some(true),
-                });
-            }
-
-            // Partition tool uses
-            let (parallel_uses, sequential_uses): (Vec<_>, Vec<_>) = tool_uses
-                .into_iter()
-                .partition(|(_, name, _)| is_parallelizable(name));
-
-            // --- Parallel execution ---
-            let parallel_futures: Vec<_> = parallel_uses
-                .into_iter()
-                .map(|(tool_id, tool_name, tool_input)| {
-                    let registry = Arc::clone(&self.tool_registry);
-                    let cache = Arc::clone(&self.tool_cache);
-                    let ctx = tool_context.clone();
-                    async move {
-                        let cache_key = CacheKey::from_tool(&tool_name, &tool_input);
-                        // A cached result answers the call without running the
-                        // tool, so check the permission policy here as well:
-                        // every call faces the policy, not only the ones that
-                        // reach `ToolRegistry::execute`.
-                        if !registry.is_denied(&tool_name, &tool_input) {
-                            if let Some(cached) = cache.get(&cache_key) {
-                                tracing::debug!("Cache hit for tool '{}'", tool_name);
-                                return ContentBlock::ToolResult {
-                                    tool_use_id: tool_id,
-                                    content: cached,
-                                    is_error: Some(false),
-                                };
-                            }
-                        }
-                        match registry.execute(&tool_name, tool_input, &ctx).await {
-                            Ok(result) => {
-                                let content = if result.success {
-                                    result.output
-                                } else {
-                                    result
-                                        .error
-                                        .unwrap_or_else(|| "Tool execution failed".to_string())
-                                };
-                                if result.success {
-                                    cache.insert_for_tool(cache_key, content.clone());
-                                }
-                                ContentBlock::ToolResult {
-                                    tool_use_id: tool_id,
-                                    content,
-                                    is_error: Some(!result.success),
-                                }
-                            }
-                            Err(e) => ContentBlock::ToolResult {
-                                tool_use_id: tool_id,
-                                content: format!("Tool execution error: {}", e),
-                                is_error: Some(true),
-                            },
-                        }
-                    }
-                })
-                .collect();
-
-            let parallel_results = join_all(parallel_futures).await;
-            tool_results.extend(parallel_results);
-
-            // --- Sequential execution (tools requiring approval or non-idempotent) ---
-            // Set when a tool with a mutating capability actually executes
-            // (approved or auto), so read caches can be invalidated below.
-            let mut mutating_tool_ran = false;
-            for (tool_id, tool_name, tool_input) in sequential_uses {
-                tracing::info!(
-                    "Executing tool '{}' (iteration {}/{})",
-                    tool_name,
-                    iteration,
-                    self.max_tool_iterations
-                );
-
-                // A plan task may only be marked success=true with evidence
-                // that its work happened (see plan_completion_rejection).
-                if tool_name == "plan" {
-                    if let Some(reason) = plan_completion_rejection(
-                        &tool_input,
-                        mutating_evidence,
-                        &tool_context.working_directory,
-                        tool_context.session_id,
-                    ) {
-                        tracing::warn!(
-                            "⚠️ Blocked a plan complete_task without evidence of work \
-                             (mutating calls since last completion: {})",
-                            mutating_evidence
-                        );
-                        tool_results.push(ContentBlock::ToolResult {
-                            tool_use_id: tool_id,
-                            content: reason,
-                            is_error: Some(true),
-                        });
-                        continue;
-                    }
-                }
-
-                // Check if approval is needed. `requires_approval` is a static
-                // property of the tool (bash always returns true), so it alone
-                // would re-prompt for every `ls`. Defer to the permission policy
-                // too: if it explicitly vouches for this exact command - the
-                // program is on `security.allow_bash` and there is no active
-                // shell operator to smuggle another one in - that stands in for
-                // the user's approval. Anything not allowlisted still prompts.
-                let needs_approval = if let Some(tool) = self.tool_registry.get(&tool_name) {
-                    tool.requires_approval()
-                        && !self.auto_approve_tools
-                        && !tool_context.auto_approve
-                        && !self.tool_registry.is_trusted(&tool_name, &tool_input)
-                } else {
-                    false
-                };
-
-                // Request approval if needed
-                if needs_approval {
-                    if let Some(ref approval_callback) = self.approval_callback {
-                        // Get tool details for approval request
-                        let tool_info = if let Some(tool) = self.tool_registry.get(&tool_name) {
-                            ToolApprovalInfo {
-                                tool_name: tool_name.clone(),
-                                tool_description: tool.description().to_string(),
-                                tool_input: tool_input.clone(),
-                                capabilities: tool
-                                    .capabilities()
-                                    .iter()
-                                    .map(|c| format!("{:?}", c))
-                                    .collect(),
-                            }
-                        } else {
-                            // Tool not found, skip approval
-                            tool_results.push(ContentBlock::ToolResult {
-                                tool_use_id: tool_id,
-                                content: format!("Tool not found: {}", tool_name),
-                                is_error: Some(true),
-                            });
-                            continue;
-                        };
-
-                        // Call approval callback. Log the inputs: for `bash` the
-                        // command decides whether the allowlist trusts it, and
-                        // without it a prompt here is impossible to explain.
-                        tracing::info!(
-                            "Requesting user approval for tool '{}' with input {}",
-                            tool_name,
-                            tool_input
-                        );
-                        match approval_callback(tool_info).await {
-                            Ok(approved) => {
-                                if !approved {
-                                    tracing::warn!("User denied approval for tool '{}'", tool_name);
-                                    tool_results.push(ContentBlock::ToolResult {
-                                        tool_use_id: tool_id,
-                                        content: "User denied permission to execute this tool"
-                                            .to_string(),
-                                        is_error: Some(true),
-                                    });
-                                    continue;
-                                }
-                                tracing::info!("User approved tool '{}'", tool_name);
-                                // Create approved context for this tool execution
-                                let approved_tool_context = ToolExecutionContext {
-                                    session_id: tool_context.session_id,
-                                    working_directory: tool_context.working_directory.clone(),
-                                    env_vars: tool_context.env_vars.clone(),
-                                    auto_approve: true, // User approved this execution
-                                    timeout_secs: tool_context.timeout_secs,
-                                    read_only_mode: tool_context.read_only_mode,
-                                    sub_agent_launcher: tool_context.sub_agent_launcher.clone(),
-                                    file_read_cache: tool_context.file_read_cache.clone(),
-                                };
-
-                                // Execute the tool with approved context
-                                let is_mutating = self
-                                    .tool_registry
-                                    .get(&tool_name)
-                                    .is_some_and(|t| has_mutating_capability(&t.capabilities()));
-                                mutating_tool_ran |= is_mutating;
-                                match self
-                                    .tool_registry
-                                    .execute(&tool_name, tool_input, &approved_tool_context)
-                                    .await
-                                {
-                                    Ok(result) => {
-                                        if result.success && is_mutating {
-                                            mutating_evidence += 1;
-                                        }
-                                        tool_results.push(ContentBlock::ToolResult {
-                                            tool_use_id: tool_id,
-                                            content: if result.success {
-                                                result.output
-                                            } else {
-                                                result.error.unwrap_or_else(|| {
-                                                    "Tool execution failed".to_string()
-                                                })
-                                            },
-                                            is_error: Some(!result.success),
-                                        });
-                                    }
-                                    Err(e) => {
-                                        tool_results.push(ContentBlock::ToolResult {
-                                            tool_use_id: tool_id,
-                                            content: format!("Tool execution error: {}", e),
-                                            is_error: Some(true),
-                                        });
-                                    }
-                                }
-                                continue; // Skip the normal execution path below
-                            }
-                            Err(e) => {
-                                tracing::error!("Approval callback error: {}", e);
-                                tool_results.push(ContentBlock::ToolResult {
-                                    tool_use_id: tool_id,
-                                    content: format!("Approval request failed: {}", e),
-                                    is_error: Some(true),
-                                });
-                                continue;
-                            }
-                        }
-                    } else {
-                        // No approval callback configured, deny execution
-                        tracing::warn!(
-                            "Tool '{}' requires approval but no approval callback configured",
-                            tool_name
-                        );
-                        tool_results.push(ContentBlock::ToolResult {
-                            tool_use_id: tool_id,
-                            content: "Tool requires approval but no approval mechanism configured"
-                                .to_string(),
-                            is_error: Some(true),
-                        });
-                        continue;
-                    }
-                }
-
-                // Execute the tool
-                let is_mutating = self
-                    .tool_registry
-                    .get(&tool_name)
-                    .is_some_and(|t| has_mutating_capability(&t.capabilities()));
-                mutating_tool_ran |= is_mutating;
-                let completes_plan_task = tool_name == "plan"
-                    && tool_input.get("operation").and_then(|v| v.as_str())
-                        == Some("complete_task");
-                match self
-                    .tool_registry
-                    .execute(&tool_name, tool_input, &tool_context)
-                    .await
-                {
-                    Ok(result) => {
-                        if result.success {
-                            if is_mutating {
-                                mutating_evidence += 1;
-                            }
-                            // Checkpoint: an accepted completion consumes the
-                            // evidence, so the NEXT task needs its own.
-                            if completes_plan_task {
-                                mutating_evidence = 0;
-                            }
-                        }
-                        tool_results.push(ContentBlock::ToolResult {
-                            tool_use_id: tool_id,
-                            content: if result.success {
-                                result.output
-                            } else {
-                                result
-                                    .error
-                                    .unwrap_or_else(|| "Tool execution failed".to_string())
-                            },
-                            is_error: Some(!result.success),
-                        });
-                    }
-                    Err(e) => {
-                        tool_results.push(ContentBlock::ToolResult {
-                            tool_use_id: tool_id,
-                            content: format!("Tool execution error: {}", e),
-                            is_error: Some(true),
-                        });
-                    }
-                }
-            }
-
-            // A mutating tool (write_file, edit_file, bash, …) may have
-            // changed the filesystem — drop cached results of every tool
-            // that reads it, so the next read sees the current state
-            // instead of a stale entry within its TTL. Which tools count
-            // as reads comes from their declared capabilities, not a
-            // hardcoded name list; unknown tools are invalidated too.
-            if mutating_tool_ran {
-                self.tool_cache.invalidate_matching(|tool_name| {
-                    self.tool_registry.get(tool_name).map_or(true, |t| {
-                        t.capabilities().contains(&ToolCapability::ReadFiles)
-                    })
-                });
-            }
-
-            // Add assistant message with tool use to context
-            let assistant_msg = Message {
-                role: crate::llm::provider::Role::Assistant,
-                content: response.content.clone(),
-            };
-            context.add_message(assistant_msg);
-
-            // Add user message with tool results to context
-            let tool_result_msg = Message {
-                role: crate::llm::provider::Role::User,
-                content: tool_results,
-            };
-            context.add_message(tool_result_msg);
-
-            // Compaction is not triggered here: `make_room` at the top of the
-            // next round checks the full request - system prompt and tool
-            // schemas included - against the window before anything is sent.
-
-            // Check if we've hit max iterations
-            if iteration >= self.max_tool_iterations {
-                return Err(AgentError::MaxIterationsExceeded(self.max_tool_iterations));
-            }
+        // Run rounds of model and tool calls until the model answers (see
+        // `run`); the middleware decides when to stop early.
+        let pipeline = self.round_pipeline(&selection, read_only_mode);
+        let outcome = run::AgentRun {
+            service: self,
+            model_name,
+            context,
+            selection: &selection,
+            tools: &tools,
+            tool_context,
+            chunk_tx: chunk_tx.as_ref(),
+            cancel: &cancel,
+            pipeline,
         }
-
-        let response = final_response.ok_or_else(|| {
-            AgentError::Internal("Tool loop completed without final response".to_string())
-        })?;
+        .run()
+        .await?;
+        let response = &outcome.response;
 
         // Resolve text: `stored` is persisted/replayed to the model, `display`
-        // is shown to the user (they differ only for the reasoning-only notice).
-        let final_text = Self::final_text_and_thinking(&response);
+        // is shown to the user (they differ only by UI notices).
+        let final_text = Self::final_text_and_thinking(response);
         let thinking_text = final_text.thinking;
+        let display = match &outcome.notice {
+            Some(notice) => format!("{}\n\n{}", final_text.display, notice),
+            None => final_text.display,
+        };
 
         // Save final assistant response to database (raw text, no UI notice).
         let assistant_db_msg = message_service
-            .create_message(session_id, "assistant".to_string(), final_text.stored)
+            .create_message(
+                session_id,
+                "assistant".to_string(),
+                final_text.stored.clone(),
+            )
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
+        // Tool calls and their results are not stored, so record which tools
+        // produced this answer: a later request then knows what this one
+        // read, changed or ran (see `AgentContext::from_db_messages`).
+        let tool_summary = super::project_memory::summarize_tool_calls(&outcome.tool_log);
+        if let Some(summary) = &tool_summary {
+            message_service
+                .update_message_tool_log(assistant_db_msg.id, summary)
+                .await
+                .map_err(|e| AgentError::Database(e.to_string()))?;
+        }
+        self.log_progress(
+            &request_line,
+            tool_summary.as_deref(),
+            &final_text.stored,
+            &outcome,
+            read_only_mode,
+        );
+
         // Calculate total cost
+        let total_input_tokens = outcome.input_tokens;
+        let total_output_tokens = outcome.output_tokens;
         let total_tokens = total_input_tokens + total_output_tokens;
         let cost =
             self.provider
@@ -1873,18 +1335,20 @@ impl AgentService {
 
         Ok(AgentResponse {
             message_id: assistant_db_msg.id,
-            content: final_text.display,
+            content: display,
             thinking_text,
-            stop_reason: response.stop_reason,
+            stop_reason: response.stop_reason.clone(),
             usage: crate::llm::provider::TokenUsage {
                 input_tokens: total_input_tokens,
                 output_tokens: total_output_tokens,
             },
             cost,
-            model: response.model,
+            model: response.model.clone(),
             provider_name: self.provider.name().to_string(),
-            perf_metrics: response.perf_metrics,
-            context: last_budget.map(|b| b.usage(selection.is_core_only())),
+            perf_metrics: response.perf_metrics.clone(),
+            context: outcome
+                .last_budget
+                .map(|b| b.usage(selection.is_core_only())),
         })
     }
 
@@ -2235,6 +1699,7 @@ mod tests {
     use super::*;
     use crate::db::Database;
     use crate::llm::provider::{LLMRequest, LLMResponse, TokenUsage};
+    use crate::llm::tools::ToolCapability;
     use async_trait::async_trait;
 
     /// Mock provider for testing
@@ -3413,5 +2878,472 @@ mod tests {
 
         service.set_provider(Arc::new(MockProvider));
         assert_eq!(service.calibration(), 1.0);
+    }
+
+    // ── Middleware, cancellation, tool log, project memory (P1) ──────────────
+
+    fn last_user_text(request: &LLMRequest) -> String {
+        request
+            .messages
+            .iter()
+            .rev()
+            .find(|m| matches!(m.role, crate::llm::provider::Role::User))
+            .and_then(|m| {
+                m.content.iter().find_map(|b| match b {
+                    ContentBlock::Text { text } => Some(text.clone()),
+                    _ => None,
+                })
+            })
+            .unwrap_or_default()
+    }
+
+    /// At the round limit the loop no longer fails with
+    /// `MaxIterationsExceeded`: the pending tool calls get "not run" results
+    /// and the model answers, without tools, from the work done so far.
+    #[tokio::test]
+    async fn round_limit_ends_with_an_answer_instead_of_an_error() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call("read_file", serde_json::json!({"path": "a.rs"}))),
+                Ok(text_reply("Here is what I found so far.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[("read_file", false)]))
+            .with_max_tool_iterations(1);
+
+        let response = service
+            .send_message_with_tools(session, "read the files".to_string(), None)
+            .await
+            .unwrap();
+
+        assert!(response.content.starts_with("Here is what I found so far."));
+        assert!(
+            response
+                .content
+                .contains("Stopped at the limit of 1 tool rounds"),
+            "the user is told why: {}",
+            response.content
+        );
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 2, "one tool round, then the final answer");
+        assert!(
+            requests[1].tools.is_none(),
+            "the final call offers no tools"
+        );
+        assert!(last_user_text(&requests[1]).contains("reached the limit"));
+    }
+
+    /// When the loop guard stops a stuck model, every pending tool use still
+    /// gets a result, so the final request is valid for strict providers.
+    #[tokio::test]
+    async fn stopping_mid_round_answers_every_pending_tool_call() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let call = || Ok(tool_call("write_file", serde_json::json!({"path": "a.rs"})));
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![call(), call(), Ok(text_reply("Stopping."))],
+        ));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(WritingTool));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(Arc::new(registry))
+            .with_auto_approve_tools(true);
+
+        let response = service
+            .send_message_with_tools(session, "write it".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "Stopping.");
+        let final_request = provider.requests().pop().unwrap();
+        let uses: Vec<&String> = final_request
+            .messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .filter_map(|b| match b {
+                ContentBlock::ToolUse { id, .. } => Some(id),
+                _ => None,
+            })
+            .collect();
+        let results: Vec<&String> = final_request
+            .messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .filter_map(|b| match b {
+                ContentBlock::ToolResult { tool_use_id, .. } => Some(tool_use_id),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(uses.len(), results.len(), "every tool use has its result");
+        assert!(last_user_text(&final_request).contains("Loop detected"));
+    }
+
+    /// Tool that writes files (for the loop guard's modification threshold).
+    struct WritingTool;
+
+    #[async_trait]
+    impl crate::llm::tools::Tool for WritingTool {
+        fn name(&self) -> &str {
+            "write_file"
+        }
+        fn description(&self) -> &str {
+            "Writes a file"
+        }
+        fn input_schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object", "properties": {"path": {"type": "string"}}})
+        }
+        fn capabilities(&self) -> Vec<ToolCapability> {
+            vec![ToolCapability::WriteFiles]
+        }
+        fn requires_approval(&self) -> bool {
+            false
+        }
+        async fn execute(
+            &self,
+            _input: serde_json::Value,
+            _context: &ToolExecutionContext,
+        ) -> crate::llm::tools::Result<crate::llm::tools::ToolResult> {
+            Ok(crate::llm::tools::ToolResult::success(
+                "written".to_string(),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_request_stops_with_cancelled() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(128_000, vec![Ok(text_reply("hi"))]));
+        let service = AgentService::new(provider.clone(), context);
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        let result = service
+            .send_message_with_tools_and_mode_streaming(
+                session,
+                "hello".to_string(),
+                None,
+                false,
+                tx,
+                cancel,
+            )
+            .await;
+
+        assert!(matches!(result, Err(AgentError::Cancelled)));
+        assert!(provider.requests().is_empty(), "nothing was sent");
+    }
+
+    /// Cancelling while an approval prompt is open ends the request; it does
+    /// not wait for an answer that will never come.
+    #[tokio::test]
+    async fn cancelling_during_an_approval_prompt_ends_the_request() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![Ok(tool_call("bash", serde_json::json!({"command": "ls"})))],
+        ));
+        let callback: ApprovalCallback =
+            Arc::new(|_info: ToolApprovalInfo| Box::pin(std::future::pending()));
+        let service = AgentService::new(provider, context.clone())
+            .with_tool_registry(registry_of(&[("bash", true)]))
+            .with_approval_callback(Some(callback));
+        let cancel = CancellationToken::new();
+        let canceller = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            canceller.cancel();
+        });
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            service.send_message_with_tools_and_mode_streaming(
+                session,
+                "list".to_string(),
+                None,
+                false,
+                tx,
+                cancel,
+            ),
+        )
+        .await
+        .expect("cancellation must not hang");
+
+        assert!(matches!(result, Err(AgentError::Cancelled)));
+    }
+
+    /// With verification on, a reply after a file edit is held back until a
+    /// check command has passed.
+    #[tokio::test]
+    async fn verification_sends_the_model_back_to_check_its_edit() {
+        let workdir = tempfile::tempdir().unwrap();
+        std::fs::write(workdir.path().join("Cargo.toml"), "[package]").unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "edit_file",
+                    serde_json::json!({"path": "src/lib.rs"}),
+                )),
+                Ok(text_reply("Done, I fixed it.")),
+                Ok(tool_call(
+                    "bash",
+                    serde_json::json!({"command": "cargo check"}),
+                )),
+                Ok(text_reply("Fixed, and cargo check passes.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[("edit_file", false), ("bash", false)]))
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_verification(true, None);
+
+        let response = service
+            .send_message_with_tools(session, "fix the bug".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "Fixed, and cargo check passes.");
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 4);
+        let nudge = last_user_text(&requests[2]);
+        assert!(nudge.contains("cargo check"), "{nudge}");
+        assert!(nudge.contains("src/lib.rs"), "{nudge}");
+    }
+
+    /// Without verification, the first reply after an edit is the answer.
+    #[tokio::test]
+    async fn verification_is_off_unless_enabled() {
+        let workdir = tempfile::tempdir().unwrap();
+        std::fs::write(workdir.path().join("Cargo.toml"), "[package]").unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call("edit_file", serde_json::json!({"path": "a.rs"}))),
+                Ok(text_reply("Done.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[("edit_file", false), ("bash", false)]))
+            .with_working_directory(workdir.path().to_path_buf());
+
+        let response = service
+            .send_message_with_tools(session, "fix".to_string(), None)
+            .await
+            .unwrap();
+        assert_eq!(response.content, "Done.");
+        assert_eq!(provider.requests().len(), 2);
+    }
+
+    /// The tool calls behind an answer are stored with it and shown to the
+    /// model on the next request; requests that edit files are logged to the
+    /// progress file.
+    #[tokio::test]
+    async fn tool_work_is_remembered_across_requests() {
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "edit_file",
+                    serde_json::json!({"path": "src/main.rs"}),
+                )),
+                Ok(text_reply("Renamed the function.")),
+                Ok(text_reply("It was in src/main.rs.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context.clone())
+            .with_tool_registry(registry_of(&[("edit_file", false)]))
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_progress_file(true);
+
+        service
+            .send_message_with_tools(session, "rename main_loop".to_string(), None)
+            .await
+            .unwrap();
+        service
+            .send_message_with_tools(session, "where was it?".to_string(), None)
+            .await
+            .unwrap();
+
+        let stored = MessageService::new(context)
+            .list_messages_for_session(session)
+            .await
+            .unwrap();
+        let answer = stored.iter().find(|m| m.role == "assistant").unwrap();
+        assert_eq!(answer.tool_log.as_deref(), Some("edit_file src/main.rs"));
+
+        let second = provider.requests().pop().unwrap();
+        let replayed = second
+            .messages
+            .iter()
+            .filter_map(|m| match &m.content[0] {
+                ContentBlock::Text { text }
+                    if matches!(m.role, crate::llm::provider::Role::Assistant) =>
+                {
+                    Some(text.clone())
+                }
+                _ => None,
+            })
+            .next()
+            .unwrap();
+        assert!(
+            replayed.starts_with("(Tools used before this answer: edit_file src/main.rs)"),
+            "{replayed}"
+        );
+
+        let log = std::fs::read_to_string(
+            workdir
+                .path()
+                .join(super::super::project_memory::PROGRESS_FILE),
+        )
+        .unwrap();
+        assert!(log.contains("rename main_loop"));
+        assert!(log.contains("- Tools: edit_file src/main.rs"));
+        assert!(log.contains("- Result: Renamed the function."));
+    }
+
+    #[tokio::test]
+    async fn project_notes_are_added_to_the_system_prompt_when_enabled() {
+        let workdir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            workdir.path().join("AGENTS.md"),
+            "Run cargo fmt before committing.",
+        )
+        .unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![Ok(text_reply("ok")), Ok(text_reply("ok"))],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_system_prompt("base prompt".to_string())
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_project_notes(true);
+
+        service
+            .send_message_with_tools(session, "hi".to_string(), None)
+            .await
+            .unwrap();
+        let system = provider.requests()[0].system.clone().unwrap();
+        assert!(system.contains("## Project notes"), "{system}");
+        assert!(system.contains("Run cargo fmt before committing."));
+
+        let service = service.with_project_notes(false);
+        service
+            .send_message_with_tools(session, "hi".to_string(), None)
+            .await
+            .unwrap();
+        let system = provider.requests()[1].system.clone().unwrap();
+        assert!(!system.contains("## Project notes"));
+    }
+
+    /// Tool with a typed schema that rejects input missing its `path`.
+    struct StrictTool;
+
+    #[async_trait]
+    impl crate::llm::tools::Tool for StrictTool {
+        fn name(&self) -> &str {
+            "read_file"
+        }
+        fn description(&self) -> &str {
+            "Reads a file"
+        }
+        fn input_schema(&self) -> serde_json::Value {
+            serde_json::json!({
+                "type": "object",
+                "properties": {"path": {"type": "string"}, "limit": {"type": "integer"}},
+                "required": ["path"]
+            })
+        }
+        fn capabilities(&self) -> Vec<ToolCapability> {
+            vec![ToolCapability::ReadFiles]
+        }
+        fn requires_approval(&self) -> bool {
+            false
+        }
+        async fn execute(
+            &self,
+            input: serde_json::Value,
+            _context: &ToolExecutionContext,
+        ) -> crate::llm::tools::Result<crate::llm::tools::ToolResult> {
+            match input.get("path").and_then(|p| p.as_str()) {
+                Some(path) => Ok(crate::llm::tools::ToolResult::success(format!(
+                    "read {path}"
+                ))),
+                None => Err(crate::llm::tools::ToolError::InvalidInput(
+                    "missing field `path`".to_string(),
+                )),
+            }
+        }
+    }
+
+    fn tool_results(request: &LLMRequest) -> Vec<String> {
+        request
+            .messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .filter_map(|b| match b {
+                ContentBlock::ToolResult { content, .. } => Some(content.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Malformed arguments get an error that lists the expected arguments,
+    /// whether the check catches them first or the tool rejects them.
+    #[tokio::test]
+    async fn bad_tool_arguments_get_the_expected_arguments_back() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "read_file",
+                    serde_json::json!({"path": ["a.rs"]}),
+                )),
+                Ok(tool_call("read_file", serde_json::json!({"limit": 5}))),
+                Ok(text_reply("done")),
+            ],
+        ));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(StrictTool));
+        let service =
+            AgentService::new(provider.clone(), context).with_tool_registry(Arc::new(registry));
+
+        service
+            .send_message_with_tools(session, "read".to_string(), None)
+            .await
+            .unwrap();
+
+        let results = tool_results(&provider.requests()[2]);
+        assert_eq!(results.len(), 2);
+        assert!(
+            results[0].contains("field 'path' must be string, got a list"),
+            "{}",
+            results[0]
+        );
+        assert!(results[0].contains("path (string, required)"));
+        assert!(
+            results[1].contains("missing field `path`"),
+            "{}",
+            results[1]
+        );
+        assert!(results[1].contains("Expected arguments for read_file: path (string, required)"));
     }
 }

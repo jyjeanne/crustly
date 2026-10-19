@@ -105,6 +105,14 @@ pub struct MemoryConfig {
     /// Context compaction threshold (0.0–1.0).
     #[serde(default = "default_compaction_threshold")]
     pub compaction_threshold: f64,
+    /// Add the project's notes files (AGENTS.md, CLAUDE.md, CRUSTLY.md,
+    /// `.crustly/memory.md`) to the system prompt, within a token budget.
+    #[serde(default = "default_true")]
+    pub project_notes: bool,
+    /// Log requests that edited files or ran several tool rounds to
+    /// `.crustly/progress.md` in the working directory.
+    #[serde(default = "default_true")]
+    pub progress_file: bool,
 }
 
 impl Default for MemoryConfig {
@@ -113,6 +121,72 @@ impl Default for MemoryConfig {
             episodic_budget_tokens: default_episodic_budget(),
             enable_codebase_index: true,
             compaction_threshold: default_compaction_threshold(),
+            project_notes: true,
+            progress_file: true,
+        }
+    }
+}
+
+/// Agent loop limits (`[agent]` section). When a limit is reached the agent
+/// stops calling tools and answers from the work done so far.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConfig {
+    /// Rounds of tool calls per request.
+    #[serde(default = "default_max_tool_rounds")]
+    pub max_tool_rounds: usize,
+    /// Wall-clock seconds per request; 0 = no limit.
+    #[serde(default)]
+    pub max_wall_time_secs: u64,
+    /// Input + output tokens per request; 0 = no limit.
+    #[serde(default)]
+    pub max_request_tokens: u32,
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            max_tool_rounds: default_max_tool_rounds(),
+            max_wall_time_secs: 0,
+            max_request_tokens: 0,
+        }
+    }
+}
+
+fn default_max_tool_rounds() -> usize {
+    20
+}
+
+impl AgentConfig {
+    /// The wall-clock limit, `None` when unlimited.
+    pub fn max_wall_time(&self) -> Option<std::time::Duration> {
+        (self.max_wall_time_secs > 0)
+            .then(|| std::time::Duration::from_secs(self.max_wall_time_secs))
+    }
+
+    /// The token limit, `None` when unlimited.
+    pub fn max_request_tokens(&self) -> Option<u32> {
+        (self.max_request_tokens > 0).then_some(self.max_request_tokens)
+    }
+}
+
+/// Edit verification (`[verification]` section): after the agent edits
+/// files, it must run a check command and see it pass before answering.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// The check command. When unset it is inferred from the project:
+    /// `cargo check` (Cargo.toml), `go build ./...` (go.mod) or
+    /// `npx tsc --noEmit` (tsconfig.json); with none of those, no check.
+    #[serde(default)]
+    pub command: Option<String>,
+}
+
+impl Default for VerificationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            command: None,
         }
     }
 }
@@ -273,6 +347,14 @@ pub struct Config {
     /// Which tools are exposed to the model
     #[serde(default)]
     pub tools: ToolsConfig,
+
+    /// Agent loop limits
+    #[serde(default)]
+    pub agent: AgentConfig,
+
+    /// Edit verification
+    #[serde(default)]
+    pub verification: VerificationConfig,
 }
 
 /// Debug configuration options
@@ -847,6 +929,8 @@ impl Default for Config {
             mcp: McpConfig::default(),
             tool_cache: ToolCacheConfig::default(),
             tools: ToolsConfig::default(),
+            agent: AgentConfig::default(),
+            verification: VerificationConfig::default(),
         }
     }
 }
@@ -969,6 +1053,8 @@ impl Config {
             mcp: overlay.mcp,
             tool_cache: overlay.tool_cache,
             tools: overlay.tools,
+            agent: overlay.agent,
+            verification: overlay.verification,
         }
     }
 

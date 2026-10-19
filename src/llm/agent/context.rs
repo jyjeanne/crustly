@@ -111,7 +111,11 @@ impl AgentContext {
         self.messages.push(message);
     }
 
-    /// Convert database messages to LLM messages
+    /// Convert database messages to LLM messages.
+    ///
+    /// Only the text of earlier turns is stored, not their tool calls. An
+    /// assistant message that has a tool log gets it as a short note before
+    /// its text, so the model knows what that turn read, changed or ran.
     pub fn from_db_messages(
         session_id: Uuid,
         db_messages: Vec<DbMessage>,
@@ -127,11 +131,18 @@ impl AgentContext {
                 _ => Role::User, // Default fallback
             };
 
+            let text = match (&role, db_msg.tool_log) {
+                (Role::Assistant, Some(log)) if !log.is_empty() => {
+                    format!(
+                        "(Tools used before this answer: {log})\n\n{}",
+                        db_msg.content
+                    )
+                }
+                _ => db_msg.content,
+            };
             let message = Message {
                 role,
-                content: vec![ContentBlock::Text {
-                    text: db_msg.content,
-                }],
+                content: vec![ContentBlock::Text { text }],
             };
 
             context.add_message(message);

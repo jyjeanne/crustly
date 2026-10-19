@@ -243,6 +243,9 @@ pub struct App {
     /// because measuring it tokenizes every tool schema - far too slow for
     /// the header, which redraws on every frame.
     context_usage: Option<crate::llm::agent::ContextUsage>,
+
+    /// Cancels the request in flight; Esc in the chat view triggers it.
+    request_cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
 /// Build the chat input textarea with the widget's default cursor-line
@@ -303,6 +306,7 @@ impl App {
         let context_usage = Some(agent_service.context_usage_preview());
         Self {
             context_usage,
+            request_cancel: None,
             current_session: None,
             messages: Vec::new(),
             sessions: Vec::new(),
@@ -404,6 +408,20 @@ impl App {
     /// How full the context window is (see the `context_usage` field).
     pub fn context_usage(&self) -> Option<crate::llm::agent::ContextUsage> {
         self.context_usage
+    }
+
+    /// Cancel the request in flight, if any. The agent stops at its next
+    /// model call, approval prompt or round boundary and reports
+    /// "Request cancelled". Returns whether there was a request to cancel.
+    fn cancel_request(&mut self) -> bool {
+        match self.request_cancel.take() {
+            Some(cancel) => {
+                tracing::info!("User cancelled the request in flight");
+                cancel.cancel();
+                true
+            }
+            None => false,
+        }
     }
 
     /// Re-measure what an empty conversation costs with the current provider,
@@ -781,6 +799,7 @@ impl App {
             }
             TuiEvent::Error(session_id, error) => {
                 if self.event_belongs_to_current_session(session_id) {
+                    self.request_cancel = None;
                     if self.executing_plan {
                         self.fail_current_plan_task(&error).await?;
                     }
@@ -1226,6 +1245,11 @@ impl App {
         } else if keys::is_newline(&event) {
             self.textarea.insert_newline();
         } else if keys::is_cancel(&event) {
+            // While a reply is being produced, Esc cancels it; otherwise it
+            // clears the input. A local model can take minutes per round.
+            if self.is_processing && self.cancel_request() {
+                return Ok(());
+            }
             self.clear_input();
             self.error_message = None;
         } else if keys::is_page_up(&event) {
@@ -1720,6 +1744,8 @@ impl App {
             let session_id = session.id;
             let event_sender = self.event_sender();
             let read_only_mode = self.mode == AppMode::Plan;
+            let cancel = tokio_util::sync::CancellationToken::new();
+            self.request_cancel = Some(cancel.clone());
 
             let (chunk_tx, mut chunk_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
@@ -1739,6 +1765,7 @@ impl App {
                         None,
                         read_only_mode,
                         chunk_tx,
+                        cancel,
                     )
                     .await;
 
@@ -1822,6 +1849,7 @@ impl App {
         self.is_processing = false;
         self.streaming_response = None;
         self.processing_session = None;
+        self.request_cancel = None;
         if response.context.is_some() {
             self.context_usage = response.context;
         }
@@ -3102,6 +3130,7 @@ mod tests {
             cost: Some(0.001),
             provider_name: None,
             perf_metrics_json: None,
+            tool_log: None,
         };
 
         let display_msg: DisplayMessage = msg.into();

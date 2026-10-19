@@ -7,7 +7,7 @@
 //! implements Phases 1-4 (`complete()`, `stream()`, full sampling/context
 //! reporting, and tool-call recovery via the shared
 //! `tool_call_recovery` module). Grammar-constrained tool calling
-//! (`llguidance`, Phase 4b, behind the `llama-cpp-llguidance` feature) is
+//! (`llguidance`, Phase 4b, part of the `llama-cpp` feature) is
 //! wired into both generation loops as a mid-stream sampler swap - see the
 //! sibling `llama_cpp_grammar` module's doc comment for the full design and
 //! `try_build_constrained_sampler`'s doc comment below for the swap itself.
@@ -324,6 +324,10 @@ fn worker_loop(init: WorkerInit) {
         // model's own trained default). This, not the config value, is
         // what `Provider::context_window()` must report.
         let actual_n_ctx = context.n_ctx();
+        // The tokens the context's KV cache holds for sequence 0, in order. A
+        // new prompt that starts with them reuses them instead of decoding
+        // them again (see `prepare_generation`). Empty for a fresh context.
+        let mut kv_tokens: Vec<LlamaToken> = Vec::new();
 
         // Resolve the chat template once per load: an explicit config
         // override always wins; otherwise use the model's own embedded
@@ -335,7 +339,7 @@ fn worker_loop(init: WorkerInit) {
             .and_then(|t| LlamaChatTemplate::new(t).ok())
             .or_else(|| model.chat_template(None).ok());
 
-        // Built once per load (Phase 4b, `llama-cpp-llguidance` only -
+        // Built once per load (Phase 4b, `llguidance-grammar` only -
         // `None` without that feature or if construction fails) and reused
         // for every request against this loaded model - see
         // `ToolCallGrammarEnv`'s own doc comment for why this can't be a
@@ -368,6 +372,7 @@ fn worker_loop(init: WorkerInit) {
             dispatch_job(
                 &model,
                 &mut context,
+                &mut kv_tokens,
                 &chat_template,
                 &display_name,
                 &grammar_env,
@@ -411,6 +416,7 @@ fn worker_loop(init: WorkerInit) {
             dispatch_job(
                 &model,
                 &mut context,
+                &mut kv_tokens,
                 &chat_template,
                 &display_name,
                 &grammar_env,
@@ -444,6 +450,7 @@ fn worker_loop(init: WorkerInit) {
 fn dispatch_job(
     model: &LlamaModel,
     context: &mut LlamaContext<'_>,
+    kv_tokens: &mut Vec<LlamaToken>,
     chat_template: &Option<LlamaChatTemplate>,
     display_name: &str,
     grammar_env: &Option<ToolCallGrammarEnv>,
@@ -451,7 +458,7 @@ fn dispatch_job(
     seed: Option<u32>,
     job: InferenceJob,
 ) {
-    match job {
+    let panicked = match job {
         InferenceJob::Complete {
             request,
             respond_to,
@@ -460,6 +467,7 @@ fn dispatch_job(
                 run_complete(
                     model,
                     context,
+                    kv_tokens,
                     chat_template,
                     display_name,
                     grammar_env,
@@ -467,15 +475,18 @@ fn dispatch_job(
                     seed,
                     request,
                 )
-            }))
-            .unwrap_or_else(|payload| Err(panic_to_provider_error(&payload)));
+            }));
+            let panicked = result.is_err();
+            let result = result.unwrap_or_else(|payload| Err(panic_to_provider_error(&payload)));
             let _ = respond_to.send(result);
+            panicked
         }
         InferenceJob::Stream { request, events_tx } => {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 run_stream(
                     model,
                     context,
+                    kv_tokens,
                     chat_template,
                     display_name,
                     grammar_env,
@@ -485,14 +496,24 @@ fn dispatch_job(
                     &events_tx,
                 )
             }));
-            if let Err(payload) = result {
-                // A panic anywhere in run_stream means no terminal event
-                // (ContentBlockStop/MessageStop) was sent - tell the
-                // consumer why the stream just stops, rather than leaving
-                // it hanging with no explanation.
-                let _ = events_tx.send(Err(panic_to_provider_error(&payload)));
+            match result {
+                Ok(()) => false,
+                Err(payload) => {
+                    // A panic anywhere in run_stream means no terminal event
+                    // (ContentBlockStop/MessageStop) was sent - tell the
+                    // consumer why the stream just stops, rather than
+                    // leaving it hanging with no explanation.
+                    let _ = events_tx.send(Err(panic_to_provider_error(&payload)));
+                    true
+                }
             }
         }
+    };
+    if panicked {
+        // The cache may hold a half-decoded batch the token list does not
+        // describe: start the next request from an empty cache.
+        context.clear_kv_cache();
+        kv_tokens.clear();
     }
 }
 
@@ -531,6 +552,7 @@ struct PreparedGeneration {
 fn prepare_generation(
     model: &LlamaModel,
     context: &mut LlamaContext<'_>,
+    kv_tokens: &mut Vec<LlamaToken>,
     chat_template: &Option<LlamaChatTemplate>,
     sampling_defaults: &SamplingDefaults,
     default_seed: Option<u32>,
@@ -561,16 +583,13 @@ fn prepare_generation(
         None,
     );
 
-    // Prefill: decode the whole prompt in one batch. `add_sequence` sets
-    // logits=true only on the last token, which is all prefill needs -
-    // generation reads from that position via `sample(ctx, -1)`.
-    let mut batch = LlamaBatch::new(prompt_tokens.len().max(1), 1);
-    batch
-        .add_sequence(&prompt_tokens, 0, false)
-        .map_err(|e| ProviderError::InvalidRequest(format!("failed to build prompt batch: {e}")))?;
-    context
-        .decode(&mut batch)
-        .map_err(|e| ProviderError::Internal(format!("prefill decode failed: {e}")))?;
+    if let Err(e) = prefill(context, kv_tokens, &prompt_tokens) {
+        // A failed decode leaves the cache in a state the token list no
+        // longer describes: start the next request from an empty cache.
+        context.clear_kv_cache();
+        kv_tokens.clear();
+        return Err(e);
+    }
 
     Ok(PreparedGeneration {
         sampler,
@@ -579,11 +598,74 @@ fn prepare_generation(
     })
 }
 
+/// Bring the KV cache from `kv_tokens` to `prompt_tokens`.
+///
+/// The context outlives requests, so its cache still holds the previous
+/// request's prompt and answer. The longest common prefix with the new
+/// prompt is kept (the agent loop resends the same system prompt, tools and
+/// history every round) and only the rest is decoded. Without this, every
+/// request after the first decoded from position 0 on top of a full cache,
+/// which llama.cpp rejects ("inconsistent sequence positions").
+///
+/// The rest is decoded in batches of at most `n_batch` tokens: llama.cpp
+/// aborts the process (`GGML_ASSERT`) when one decode carries more, which
+/// any prompt over the default 2,048-token batch did. Only the last prompt
+/// token needs logits - generation samples from it via `sample(ctx, -1)`.
+fn prefill(
+    context: &mut LlamaContext<'_>,
+    kv_tokens: &mut Vec<LlamaToken>,
+    prompt_tokens: &[LlamaToken],
+) -> Result<()> {
+    use super::prompt_cache::{prefill_batches, reusable_prefix};
+
+    let wanted = reusable_prefix(kv_tokens, prompt_tokens);
+    // Drop everything past the shared prefix. A model whose cache cannot be
+    // cut part-way (recurrent architectures) says so, and starts over.
+    let reused = if wanted > 0
+        && matches!(
+            context.clear_kv_cache_seq(Some(0), Some(wanted as u32), None),
+            Ok(true)
+        ) {
+        kv_tokens.truncate(wanted);
+        wanted
+    } else {
+        context.clear_kv_cache();
+        kv_tokens.clear();
+        0
+    };
+
+    let n_batch = context.n_batch() as usize;
+    let last = prompt_tokens.len().saturating_sub(1);
+    let mut batch = LlamaBatch::new(n_batch.clamp(1, prompt_tokens.len().max(1)), 1);
+    for range in prefill_batches(reused, prompt_tokens.len(), n_batch) {
+        batch.clear();
+        for i in range.clone() {
+            batch
+                .add(prompt_tokens[i], i as i32, &[0], i == last)
+                .map_err(|e| {
+                    ProviderError::InvalidRequest(format!("failed to build prompt batch: {e}"))
+                })?;
+        }
+        context
+            .decode(&mut batch)
+            .map_err(|e| ProviderError::Internal(format!("prefill decode failed: {e}")))?;
+        kv_tokens.extend_from_slice(&prompt_tokens[range]);
+    }
+
+    tracing::debug!(
+        "llama.cpp prefill: reused {} cached tokens, decoded {}",
+        reused,
+        prompt_tokens.len() - reused
+    );
+    Ok(())
+}
+
 /// Decode exactly one new token into `context` at `pos` for sequence 0,
 /// mirroring the single-token extension step both `run_complete` and
-/// `run_stream` need after each sampled token.
+/// `run_stream` need after each sampled token, and record it as cached.
 fn decode_one_more(
     context: &mut LlamaContext<'_>,
+    kv_tokens: &mut Vec<LlamaToken>,
     batch: &mut LlamaBatch<'_>,
     token: LlamaToken,
     pos: i32,
@@ -592,9 +674,17 @@ fn decode_one_more(
     batch
         .add(token, pos, &[0], true)
         .map_err(|e| ProviderError::Internal(format!("failed to extend batch: {e}")))?;
-    context
-        .decode(batch)
-        .map_err(|e| ProviderError::Internal(format!("decode failed: {e}")))
+    match context.decode(batch) {
+        Ok(()) => {
+            kv_tokens.push(token);
+            Ok(())
+        }
+        Err(e) => {
+            context.clear_kv_cache();
+            kv_tokens.clear();
+            Err(ProviderError::Internal(format!("decode failed: {e}")))
+        }
+    }
 }
 
 /// Build the prompt for `request`, tokenize it, run prefill + generation,
@@ -605,6 +695,7 @@ fn decode_one_more(
 fn run_complete(
     model: &LlamaModel,
     context: &mut LlamaContext<'_>,
+    kv_tokens: &mut Vec<LlamaToken>,
     chat_template: &Option<LlamaChatTemplate>,
     display_name: &str,
     grammar_env: &Option<ToolCallGrammarEnv>,
@@ -621,6 +712,7 @@ fn run_complete(
     } = prepare_generation(
         model,
         context,
+        kv_tokens,
         chat_template,
         sampling_defaults,
         default_seed,
@@ -697,7 +789,7 @@ fn run_complete(
             break;
         }
 
-        decode_one_more(context, &mut batch, token, pos)?;
+        decode_one_more(context, kv_tokens, &mut batch, token, pos)?;
     }
 
     let text = String::from_utf8_lossy(&generated_bytes).into_owned();
@@ -757,6 +849,7 @@ fn run_complete(
 fn run_stream(
     model: &LlamaModel,
     context: &mut LlamaContext<'_>,
+    kv_tokens: &mut Vec<LlamaToken>,
     chat_template: &Option<LlamaChatTemplate>,
     display_name: &str,
     grammar_env: &Option<ToolCallGrammarEnv>,
@@ -773,6 +866,7 @@ fn run_stream(
     let prepared = prepare_generation(
         model,
         context,
+        kv_tokens,
         chat_template,
         sampling_defaults,
         default_seed,
@@ -926,7 +1020,7 @@ fn run_stream(
             break;
         }
 
-        if let Err(e) = decode_one_more(context, &mut batch, token, pos) {
+        if let Err(e) = decode_one_more(context, kv_tokens, &mut batch, token, pos) {
             let _ = events_tx.send(Err(e));
             return;
         }
@@ -1047,7 +1141,7 @@ fn token_to_piece_bytes(vocab: &LlamaVocab<'_>, token: LlamaToken) -> Vec<u8> {
 /// front-end convention.
 ///
 /// `grammar`, when present, is prepended as the *first* stage (Phase 4b,
-/// `llama-cpp-llguidance` only - see `try_build_constrained_sampler`): it
+/// `llguidance-grammar` only - see `try_build_constrained_sampler`): it
 /// masks disallowed tokens to `-inf` logit before penalties/top-k/top-p/temp
 /// narrow the remaining candidates further, mirroring llama.cpp's own
 /// `common_sampler`'s "grammar first" ordering (`common/sampling.cpp`) -
@@ -1128,16 +1222,16 @@ fn build_sampler(
 /// created once per model/tokenizer and reused across requests", which is
 /// exactly what this is: built once per model load in `build_grammar_env`
 /// and reused for every request against it, never rebuilt per response. A
-/// plain `()` placeholder without the `llama-cpp-llguidance` feature, so
+/// plain `()` placeholder without the `llguidance-grammar` feature, so
 /// `worker_loop`/`dispatch_job`/`run_complete`/`run_stream` can carry an
 /// `Option<ToolCallGrammarEnv>` unconditionally rather than needing a
 /// second, `#[cfg]`-gated copy of every function in between.
-#[cfg(feature = "llama-cpp-llguidance")]
+#[cfg(feature = "llguidance-grammar")]
 type ToolCallGrammarEnv = llguidance::ParserFactory;
-#[cfg(not(feature = "llama-cpp-llguidance"))]
+#[cfg(not(feature = "llguidance-grammar"))]
 type ToolCallGrammarEnv = ();
 
-#[cfg(feature = "llama-cpp-llguidance")]
+#[cfg(feature = "llguidance-grammar")]
 fn build_grammar_env(model: &LlamaModel) -> Option<ToolCallGrammarEnv> {
     let tok_env = LlamaSampler::llguidance_tok_env(model);
     match super::llama_cpp_grammar::build_parser_factory(&tok_env) {
@@ -1153,7 +1247,7 @@ fn build_grammar_env(model: &LlamaModel) -> Option<ToolCallGrammarEnv> {
     }
 }
 
-#[cfg(not(feature = "llama-cpp-llguidance"))]
+#[cfg(not(feature = "llguidance-grammar"))]
 fn build_grammar_env(_model: &LlamaModel) -> Option<ToolCallGrammarEnv> {
     None
 }
@@ -1188,7 +1282,7 @@ fn build_grammar_env(_model: &LlamaModel) -> Option<ToolCallGrammarEnv> {
 /// `llguidance` 1.7.6's `Matcher::consume_tokens`/`with_inner` and
 /// `llama-cpp-2` 0.1.153's `llguidance_sampler.rs` directly, not assumed.
 #[allow(clippy::too_many_arguments)]
-#[cfg(feature = "llama-cpp-llguidance")]
+#[cfg(feature = "llguidance-grammar")]
 fn try_build_constrained_sampler(
     n_vocab: i32,
     grammar_env: &ToolCallGrammarEnv,
@@ -1228,7 +1322,7 @@ fn try_build_constrained_sampler(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[cfg(not(feature = "llama-cpp-llguidance"))]
+#[cfg(not(feature = "llguidance-grammar"))]
 fn try_build_constrained_sampler(
     _n_vocab: i32,
     _grammar_env: &ToolCallGrammarEnv,
@@ -1686,14 +1780,14 @@ mod tests {
 
     // ── mid-stream grammar swap (Phase 4b) ────────────────────────────────
 
-    #[cfg(feature = "llama-cpp-llguidance")]
+    #[cfg(feature = "llguidance-grammar")]
     fn test_grammar_env() -> ToolCallGrammarEnv {
         let tok_env = toktrie::ApproximateTokEnv::single_byte_env();
         super::super::llama_cpp_grammar::build_parser_factory(&tok_env)
             .expect("factory must build for the stand-in TokEnv")
     }
 
-    #[cfg(feature = "llama-cpp-llguidance")]
+    #[cfg(feature = "llguidance-grammar")]
     #[test]
     fn try_build_constrained_sampler_succeeds_for_a_valid_tool_schema() {
         let grammar_env = test_grammar_env();
@@ -1721,7 +1815,7 @@ mod tests {
     /// replay mismatch degrades the matcher into a silent no-op, not a
     /// panic), without needing a real model/tokenizer to manufacture a
     /// "realistic" token sequence.
-    #[cfg(feature = "llama-cpp-llguidance")]
+    #[cfg(feature = "llguidance-grammar")]
     #[test]
     fn try_build_constrained_sampler_does_not_panic_on_an_arbitrary_token_replay() {
         let grammar_env = test_grammar_env();
@@ -1745,7 +1839,7 @@ mod tests {
         assert!(sampler.is_some());
     }
 
-    #[cfg(not(feature = "llama-cpp-llguidance"))]
+    #[cfg(not(feature = "llguidance-grammar"))]
     #[test]
     fn try_build_constrained_sampler_without_the_feature_is_always_none() {
         let tools = [bash_tool()];

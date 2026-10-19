@@ -8,6 +8,8 @@ pub mod compaction;
 pub mod context;
 pub mod error;
 pub mod memory;
+pub mod middleware;
+pub mod project_memory;
 pub mod service;
 pub mod tool_profile;
 

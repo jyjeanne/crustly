@@ -357,10 +357,8 @@ mod tests {
                     ContentBlock::ToolUse { id, .. } => {
                         seen.insert(id.clone());
                     }
-                    ContentBlock::ToolResult { tool_use_id, .. } => {
-                        if !seen.contains(tool_use_id) {
-                            return false;
-                        }
+                    ContentBlock::ToolResult { tool_use_id, .. } if !seen.contains(tool_use_id) => {
+                        return false;
                     }
                     _ => {}
                 }

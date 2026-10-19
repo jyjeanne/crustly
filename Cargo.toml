@@ -204,7 +204,7 @@ gguf-management = ["dep:sha2", "dep:sysinfo", "dep:windows"]
 # llama-cpp-2-integration-plan.md §3/§3.4/§4.2. Depends on `gguf-management`
 # so `--features llama-cpp` still gets `crustly llama-cpp list/pull/rm`
 # exactly as before this feature was split out.
-llama-cpp = ["dep:llama-cpp-2", "gguf-management"]
+llama-cpp = ["dep:llama-cpp-2", "gguf-management", "llguidance-grammar"]
 # GPU backends (llama-cpp-2-integration-plan.md §4.1/Phase 8), each layered
 # on top of `llama-cpp` and requiring its own SDK/toolkit at build time -
 # see §4.2. Opt-in individually; none are implied by `llama-cpp` alone
@@ -217,9 +217,16 @@ llama-cpp-opencl = ["llama-cpp", "llama-cpp-2/opencl"]
 llama-cpp-mkl = ["llama-cpp", "llama-cpp-2/mkl"]
 # Grammar-constrained tool-call decoding (llama-cpp-2-integration-plan.md
 # Phase 4b) - additive on top of the always-on JSON-recovery heuristic
-# (§4.7), not a replacement for it. Not wired into the default generation
-# path yet - see src/llm/provider/llama_cpp_grammar.rs's module doc.
-llama-cpp-llguidance = ["llama-cpp", "llama-cpp-2/llguidance", "dep:llguidance", "dep:toktrie"]
+# (§4.7), not a replacement for it: once a response commits to a call to an
+# offered tool, the rest is decoded under a grammar of valid calls (see
+# src/llm/provider/llama_cpp_grammar.rs). Part of `llama-cpp` itself since
+# malformed tool-call JSON is a common local-model failure; this internal
+# feature only exists because `llama-cpp-llguidance` (below) cannot be both
+# implied by and depend on `llama-cpp` (Cargo rejects feature cycles).
+llguidance-grammar = ["llama-cpp-2/llguidance", "dep:llguidance", "dep:toktrie"]
+# Kept so existing build commands and CI feature lists still work; grammar
+# decoding is now part of `llama-cpp`.
+llama-cpp-llguidance = ["llama-cpp"]
 all-llm = ["openai", "aws-bedrock", "ollama", "gguf-management"]
 
 [profile.dev]
