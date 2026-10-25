@@ -86,9 +86,10 @@
 | 🔧 **Built-in Tools** | 22 tools: files, shell, web, agents, skills | Direct code manipulation from chat |
 | 🔒 **Interactive Approval** | Permission dialogs for dangerous operations | Full control over what AI can do |
 | 🎨 **Syntax Highlighting** | 100+ languages with line numbers | Beautiful code display in terminal |
-| 🏠 **Local LLM Support** | Run with LM Studio/Ollama | 100% private, $0 cost, offline |
+| 🏠 **Local LLM Support** | Run with LM Studio, Ollama or in-process llama.cpp; fits an 8K context window | 100% private, $0 cost, offline |
 | 💬 **Multi-line Input** | Paste entire functions | Natural code interaction |
-| 🧠 **Session Context** | Persistent conversation memory | Maintains project context |
+| 🧠 **Session Context** | Persistent conversation memory, project notes, compaction | Maintains project context |
+| 🤖 **Sub-Agents** | Explorer, implementer and reviewer profiles that report back | Large tasks without filling the main context |
 | ⌨️ **Terminal Native** | Fast keyboard shortcuts | No context switching |
 | 💰 **Cost Tracking** | Per-message token & cost | Budget control |
 | 🌊 **Streaming** | Real-time token-by-token rendering | See code as it's written |
@@ -134,7 +135,79 @@ Crustly: [creates comprehensive docs]
 
 ## ✨ What's New
 
-### Unreleased — Native `/review` and `/spec` Skills
+### v0.5.3 — In-Process llama.cpp, GGUF Management & a Local-Model Harness
+
+A third local backend that needs no server, tools to find and manage
+`.gguf` files, and an agent loop reworked for small context windows. The
+full list is in [CHANGELOG.md](CHANGELOG.md).
+
+#### A Harness for Local Models
+
+The agent loop was reworked so a long task fits and survives in a local
+model's small context window. Details are in [CHANGELOG.md](CHANGELOG.md),
+and every new setting is in `config.toml.example`.
+
+- **Fits an 8,192-token window.** Below 32,768 tokens, requests carry only
+  the 7 core tools and a shorter system prompt. The fixed cost of a request
+  drops from 7,607 tokens to 2,769, leaving 5,423 for the conversation
+  instead of 585. `[tools] profile` forces `"core"` or `"full"`, and
+  `extra = [...]` adds tools back.
+- **Context use shown.** `🧠 Ctx` in the TUI header, the tool profile and
+  fixed cost in Model Info (`Ctrl+O`), and the same figures in
+  `crustly run`, which warns before sending a prompt that leaves no room.
+- **Compaction that runs.** Old tool output is replaced with a stub first,
+  then older turns are summarized. A round that still overflows is
+  compacted and retried instead of failing.
+- **Limits and cancellation.** `Esc` cancels the request in flight. `[agent]`
+  sets the round limit and optional wall-clock and token limits; at a limit,
+  the agent answers from the work done so far instead of failing.
+- **Verify before answering.** After editing files, the agent must run a
+  check command (`cargo check`, `go build ./...`, `npx tsc --noEmit`, or
+  `[verification] command`) and see it pass.
+- **Memory across requests.** Each answer keeps a one-line summary of its
+  tool calls. Project notes (`AGENTS.md`, `CLAUDE.md`, `CRUSTLY.md`,
+  `.crustly/memory.md`) join the system prompt within a token budget, and
+  longer work is logged to `.crustly/progress.md`.
+- **Tool-call repair.** Arguments that cannot match a tool's schema are
+  refused with the expected arguments listed. Grammar-constrained decoding
+  is now part of `--features llama-cpp`.
+- **llama.cpp prompt reuse.** The in-process provider keeps the matching
+  part of its KV cache and decodes only the new tokens each round, in
+  batches.
+- **Sub-agents that report back.** The `agent` tool returns the sub-agent's
+  answer to the parent, or runs it in the background (`start`, `status`,
+  `result`, `cancel`, `list`). `[subagents] max_concurrent` defaults to 1,
+  since one local GPU runs one model at a time.
+- **Agent profiles.** Built-in `explorer`, `implementer`, `reviewer` and
+  `general` profiles set a sub-agent's tools, model, round limit and role.
+  `[subagents.profiles.<name>]` changes them or adds new ones.
+- **Routing and fallback.** `[router]` picks a fast, balanced or powerful
+  model from the request's wording. `[fallback] provider = "..."` sends the
+  rest of a request to another provider when the main one fails or
+  overflows.
+- **AutoPlan gaps closed.** AutoPlan now prompts for `execute_code`,
+  `powershell`, any tool that declares shell or file-write capabilities,
+  and tool aliases such as `Bash`.
+
+#### A Faster, Friendlier Terminal UI
+
+- **Paste at full speed.** Windows terminals deliver a paste one key at a
+  time, and the input loop paused 50ms after each one; a pasted line break
+  also sent the message half-written. Keys that arrive together are now
+  read as one paste, which lands at once, line breaks included. `Ctrl+Z`
+  undoes an edit to the input.
+- **Copy that sticks.** One clipboard handle stays open, so copied text
+  stays available on X11 and Wayland, and `Ctrl+Y` confirms what it copied.
+- **Smoother long sessions.** Each message is rendered once, not ten times
+  a second, and the end of a reply with long paragraphs no longer hides
+  below the bottom edge.
+- **Ferris.** An animated Ferris greets you in an empty chat and scuttles
+  while the model thinks, next to a timer for the request.
+- **Ctrl+C asks twice.** The first press cancels the request or clears the
+  input; the second quits. The input box grows with long messages, and the
+  help screen scrolls.
+
+#### Native `/review` and `/spec` Skills
 
 Two new slash commands work in any project with zero setup, on top of a
 generic fix to how `/`-commands are handled. See
@@ -174,7 +247,7 @@ writeup, or the skill source directly at
   `spawn_blocking` path, so the filesystem walk never stalls TUI
   rendering.
 
-### Unreleased — In-Process llama.cpp Provider
+#### In-Process llama.cpp Provider
 
 A third local-inference path, alongside the OpenAI-compatible route and
 native Ollama: `providers.llama_cpp` loads a `.gguf` file **directly into
@@ -189,7 +262,7 @@ the full technical design and phase-by-phase implementation record.
   optional GPU backend features (`llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`)
   with a startup warning if `n_gpu_layers` is set without a matching
   feature compiled in.
-- **Grammar-constrained tool calling** (`--features llama-cpp-llguidance`) —
+- **Grammar-constrained tool calling** (now part of `--features llama-cpp`) —
   the moment a response commits to a bare-JSON tool call, decoding swaps
   mid-stream to a sampler that can only produce tokens forming a valid
   call to one of the tools actually offered. Ships with the fixes from two
@@ -205,9 +278,28 @@ the full technical design and phase-by-phase implementation record.
 - **Idle-unload** — `providers.llama_cpp.idle_unload_secs` frees the
   loaded model and its context after a configurable idle period, reloading
   on the next request.
-- **Fixed:** responses echoed the requested model name instead of the
-  model actually loaded, breaking `ModelRouter`'s tier-based auto-routing
-  for this provider.
+
+The provider builds in CI but has not yet been run end-to-end against a
+real model.
+
+#### GGUF Model Management
+
+The `Ctrl+G` dialog and `crustly llama-cpp list|pull|rm` no longer need the
+llama.cpp build: they come with the default `gguf-management` feature. See
+the v0.5.3 entry in [ROADMAP.md](ROADMAP.md) for the full list.
+
+- **Model details from the GGUF header** — architecture, parameter count,
+  quantization, native context length and chat template, with an estimate
+  of the memory the model needs.
+- **More places to find models** — `extra_model_paths` and Ollama's model
+  store (`scan_ollama_models`). Duplicates and split files are merged, and
+  `mmproj` projector files are paired with their base model.
+- **Safer downloads** — a free-space check first, `@revision` pins on the
+  `hf:` shorthand, and resume where a download stopped.
+- **Hardware fit** — GPU and RAM detection labels each model Fits, Tight or
+  Won't fit; `crustly llama-cpp list --best-fit` sorts by it.
+- **For scripts and agents** — `crustly llama-cpp list --json` with
+  documented exit codes, and `crustly llama-cpp doctor` to check the setup.
 
 ### v0.5.2 — Local-Model Reliability & Per-Model Tuning
 
@@ -390,8 +482,8 @@ times in the status bar:
 | Level | Behavior |
 |-------|----------|
 | `⚙ Interactive` (default) | Every dangerous tool call prompts, as above. |
-| `⚡ AutoPlan` | Low-risk tools (reads, searches, etc.) run without prompting. `bash`, `write_file`, `edit_file`, and `code_exec` still prompt. |
-| `⚡⚡ FullAuto` | Nothing prompts, including `bash`/`write_file`/`edit_file`/`code_exec`. Use with care. |
+| `⚡ AutoPlan` | Low-risk tools (reads, searches, etc.) run without prompting. `bash`, `powershell`, `write_file`, `edit_file`, `apply_patch`, `execute_code`, and any tool that declares shell or file-write capabilities still prompt, including when called by an alias such as `Bash`. |
+| `⚡⚡ FullAuto` | Nothing prompts, including `bash`/`write_file`/`edit_file`/`execute_code`. Use with care. |
 
 Two things stay true no matter which level is active:
 - The `[security]` config policy (`deny_tools`, `deny_paths`, `allow_bash`)
@@ -553,8 +645,8 @@ daemon, no LM Studio server, no port to start.
   count, without going through a server's own defaults.
 - Same tool-calling reliability mechanism as native Ollama's fallback path
   (printed-JSON recovery, shared code — `src/llm/provider/tool_call_recovery.rs`),
-  optionally upgraded with a syntax guarantee via `--features llama-cpp-llguidance`
-  (grammar-constrained decoding for bare-JSON tool calls — see the
+  upgraded with a syntax guarantee by grammar-constrained decoding of
+  bare-JSON tool calls, built into `--features llama-cpp` (see the
   [guide](docs/guides/LLAMA_CPP_GUIDE.md#grammar-constrained-tool-calling-optional)).
 - **`Ctrl+G` Local Models dialog** — the TUI equivalent of Ollama's `Ctrl+D`:
   pick an already-downloaded `.gguf` file to switch to (shows a "Loading
@@ -680,7 +772,7 @@ Comparable footprint to other 27B-class dense models already in this README (Gem
 
 ### Prerequisites
 
-- **Rust 1.75+** - [Install Rust](https://rustup.rs/)
+- **Rust 1.95+** - [Install Rust](https://rustup.rs/)
 - **API Key** from your preferred provider (see Supported AI Providers above)
 - **SQLite** (bundled with sqlx)
 - **Git** (optional)
@@ -759,7 +851,8 @@ cargo run
    - Press `Enter` to send (`Shift+Enter`/`Alt+Enter` for a new line,
      `Ctrl+Enter` still works too)
    - Press `Ctrl+H` to see all available commands and help
-   - Press `Ctrl+C` to quit
+   - Press `Ctrl+C` twice to quit (the first press cancels a request or
+     clears the input)
 
 > 💡 **Tip:** Press `Ctrl+H` at any time to display the comprehensive help screen with all keyboard shortcuts and features!
 
@@ -874,6 +967,18 @@ for build requirements, getting a model, GPU acceleration, and
 troubleshooting — and
 **[llama-cpp-2-integration-plan.md](llama-cpp-2-integration-plan.md)** for
 the full technical design.
+
+### Small context windows
+Local providers default to an 8,192-token window. Below 32,768 tokens,
+Crustly sends only the core tools (`read_file`, `edit_file`, `write_file`,
+`bash`, `grep`, `glob`, `ls`), compacts the history before it overflows,
+and shows how full the window is (`🧠 Ctx` in the header, `Ctrl+O` for the
+breakdown). If your GPU memory allows, set `num_ctx` (Ollama) or `n_ctx`
+(llama.cpp) to 32,768 to get the full tool set. The `[tools]`, `[agent]`,
+`[verification]`, `[memory]`, `[subagents]`, `[router]` and `[fallback]`
+sections of `config.toml.example` tune the rest. With one GPU, sub-agents
+help by keeping a search out of the main context, not by running in
+parallel.
 
 ### Configuring `crustly.toml`
 All three routes are configured the same way, through `crustly.toml` or
@@ -1143,7 +1248,7 @@ Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidel
 
 ### Development Setup
 
-1. Install Rust 1.75+
+1. Install Rust 1.95+
 2. Clone the repository
 3. Run `cargo build`
 4. Make changes

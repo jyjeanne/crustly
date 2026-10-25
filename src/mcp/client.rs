@@ -150,9 +150,8 @@ impl MCPClient {
                 })),
             )
             .await
-            .map_err(|e| {
+            .inspect_err(|_| {
                 self.healthy = false;
-                e
             })?;
 
         // Extract text content from the result

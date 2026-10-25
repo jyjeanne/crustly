@@ -37,7 +37,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [stable, beta]
+        rust: [stable]
     steps:
       - uses: actions/checkout@v7
 
@@ -62,11 +62,25 @@ jobs:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
 
+      # `target` holds llama.cpp's CMake build tree (llama-cpp-sys-2's
+      # OUT_DIR), whose CMakeCache.txt pins absolute paths to system packages
+      # found at configure time (e.g. OpenSSL's include dir on macOS), and
+      # llama-cpp-sys-2's build script never re-runs CMake configure once
+      # that cache exists (`always_configure(false)`). A target cache
+      # restored onto a newer runner image therefore builds against paths
+      # that may no longer exist ("'openssl/err.h' file not found" on
+      # macos-latest) even though a fresh build is fine - so key the target
+      # cache on the runner image version too.
+      - name: Get runner image version
+        id: runner-image
+        shell: bash
+        run: echo "version=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+
       - name: Cache target
         uses: actions/cache@v6
         with:
           path: target
-          key: ${{ runner.os }}-target-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.runner-image.outputs.version }}-target-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'

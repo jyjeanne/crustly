@@ -77,15 +77,18 @@ async fn compaction_preserves_last_10_turns() {
 
     let record = compact(&mut ctx, db.pool()).await.expect("compact");
 
-    // Post-compaction: context should have 1 summary message + 10 preserved turns = 11
+    // Post-compaction: the 10 preserved turns. The summary of the dropped
+    // turns rides in the system prompt (`compacted_summary`), not as a
+    // message - a mid-conversation system message is rejected by Anthropic.
     assert_eq!(
         ctx.messages.len(),
-        11,
-        "expected 11 messages after compaction"
+        10,
+        "expected 10 messages after compaction"
     );
+    assert!(ctx.compacted_summary.is_some(), "summary must be kept");
 
     // The last 10 messages must match the original last 10 verbatim
-    let after_last_10: Vec<String> = ctx.messages[1..]
+    let after_last_10: Vec<String> = ctx.messages[..]
         .iter()
         .flat_map(|m| m.content.iter())
         .filter_map(|b| {

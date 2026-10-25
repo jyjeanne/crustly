@@ -121,7 +121,7 @@ Crustly is a high-performance terminal AI assistant built in Rust, featuring:
 
 | Aspect | Description |
 |--------|-------------|
-| **Language** | Rust 2021 Edition (1.75+) |
+| **Language** | Rust 2021 Edition (1.95+) |
 | **Async Runtime** | Tokio (full features) |
 | **TUI Framework** | Ratatui + Crossterm |
 | **Database** | SQLite via SQLx |
@@ -412,7 +412,7 @@ pub struct App {
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+Enter` | Submit message |
-| `Ctrl+C` | Quit |
+| `Ctrl+C` | Cancel the request or clear the input; twice to quit |
 | `Ctrl+N` | New session |
 | `Ctrl+L` | List sessions |
 | `Ctrl+P` | Toggle plan mode |

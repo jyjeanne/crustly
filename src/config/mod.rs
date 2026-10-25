@@ -105,6 +105,14 @@ pub struct MemoryConfig {
     /// Context compaction threshold (0.0–1.0).
     #[serde(default = "default_compaction_threshold")]
     pub compaction_threshold: f64,
+    /// Add the project's notes files (AGENTS.md, CLAUDE.md, CRUSTLY.md,
+    /// `.crustly/memory.md`) to the system prompt, within a token budget.
+    #[serde(default = "default_true")]
+    pub project_notes: bool,
+    /// Log requests that edited files or ran several tool rounds to
+    /// `.crustly/progress.md` in the working directory.
+    #[serde(default = "default_true")]
+    pub progress_file: bool,
 }
 
 impl Default for MemoryConfig {
@@ -113,6 +121,171 @@ impl Default for MemoryConfig {
             episodic_budget_tokens: default_episodic_budget(),
             enable_codebase_index: true,
             compaction_threshold: default_compaction_threshold(),
+            project_notes: true,
+            progress_file: true,
+        }
+    }
+}
+
+/// Agent loop limits (`[agent]` section). When a limit is reached the agent
+/// stops calling tools and answers from the work done so far.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConfig {
+    /// Rounds of tool calls per request.
+    #[serde(default = "default_max_tool_rounds")]
+    pub max_tool_rounds: usize,
+    /// Wall-clock seconds per request; 0 = no limit.
+    #[serde(default)]
+    pub max_wall_time_secs: u64,
+    /// Input + output tokens per request; 0 = no limit.
+    #[serde(default)]
+    pub max_request_tokens: u32,
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            max_tool_rounds: default_max_tool_rounds(),
+            max_wall_time_secs: 0,
+            max_request_tokens: 0,
+        }
+    }
+}
+
+fn default_max_tool_rounds() -> usize {
+    20
+}
+
+impl AgentConfig {
+    /// The wall-clock limit, `None` when unlimited.
+    pub fn max_wall_time(&self) -> Option<std::time::Duration> {
+        (self.max_wall_time_secs > 0)
+            .then(|| std::time::Duration::from_secs(self.max_wall_time_secs))
+    }
+
+    /// The token limit, `None` when unlimited.
+    pub fn max_request_tokens(&self) -> Option<u32> {
+        (self.max_request_tokens > 0).then_some(self.max_request_tokens)
+    }
+}
+
+/// Sub-agents (`[subagents]` section): how many run at once, and the
+/// profiles they can be started with.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubAgentsConfig {
+    /// Sub-agents running at the same time. One local GPU serializes
+    /// inference anyway, so the default is 1: sub-agents isolate context,
+    /// they do not add speed.
+    #[serde(default = "default_max_concurrent_subagents")]
+    pub max_concurrent: usize,
+    /// Profiles by name (`[subagents.profiles.<name>]`). A profile named
+    /// like a built-in one (`explorer`, `implementer`, `reviewer`,
+    /// `general`) overrides only the fields it sets.
+    #[serde(default)]
+    pub profiles: std::collections::HashMap<String, AgentProfileConfig>,
+}
+
+impl Default for SubAgentsConfig {
+    fn default() -> Self {
+        Self {
+            max_concurrent: default_max_concurrent_subagents(),
+            profiles: std::collections::HashMap::new(),
+        }
+    }
+}
+
+fn default_max_concurrent_subagents() -> usize {
+    1
+}
+
+/// One sub-agent profile (`[subagents.profiles.<name>]`). Unset fields keep
+/// the built-in profile's value, or the parent agent's setting.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AgentProfileConfig {
+    /// Model to run the sub-agent on, from the active provider (for
+    /// example a small fast model for exploration).
+    #[serde(default)]
+    pub model: Option<String>,
+    /// The only tools the sub-agent may use.
+    #[serde(default)]
+    pub tools: Option<Vec<String>>,
+    /// Whether the sub-agent is limited to read-only actions.
+    #[serde(default)]
+    pub read_only: Option<bool>,
+    /// Rounds of tool calls before it must answer.
+    #[serde(default)]
+    pub max_rounds: Option<usize>,
+    /// Role instructions added to its system prompt.
+    #[serde(default)]
+    pub instructions: Option<String>,
+}
+
+/// Model routing by request complexity (`[router]` section): each request is
+/// classified fast / balanced / powerful from its wording and sent to that
+/// tier's model on the active provider. Off by default: on a local server,
+/// switching models means loading another one.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RouterConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Model for simple lookups; defaults to the provider's default model.
+    #[serde(default)]
+    pub fast: Option<String>,
+    /// Model for ordinary edits and explanations.
+    #[serde(default)]
+    pub balanced: Option<String>,
+    /// Model for refactors and deep debugging.
+    #[serde(default)]
+    pub powerful: Option<String>,
+}
+
+/// Fallback provider (`[fallback]` section): when the main provider fails or
+/// its context window overflows, the round is sent to this one instead. Off
+/// unless a provider is named, since it sends the conversation elsewhere.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FallbackConfig {
+    /// A configured provider: `anthropic`, `openai`, `gemini`, `azure`,
+    /// `qwen`, `ollama` or `llama_cpp`.
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// Fall back when the main provider is unreachable, rate-limited, times
+    /// out or returns a server error.
+    #[serde(default = "default_true")]
+    pub on_error: bool,
+    /// Fall back when the prompt overflows the main model's context window
+    /// and compaction cannot free enough of it.
+    #[serde(default = "default_true")]
+    pub on_overflow: bool,
+}
+
+impl Default for FallbackConfig {
+    fn default() -> Self {
+        Self {
+            provider: None,
+            on_error: true,
+            on_overflow: true,
+        }
+    }
+}
+
+/// Edit verification (`[verification]` section): after the agent edits
+/// files, it must run a check command and see it pass before answering.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// The check command. When unset it is inferred from the project:
+    /// `cargo check` (Cargo.toml), `go build ./...` (go.mod) or
+    /// `npx tsc --noEmit` (tsconfig.json); with none of those, no check.
+    #[serde(default)]
+    pub command: Option<String>,
+}
+
+impl Default for VerificationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            command: None,
         }
     }
 }
@@ -190,6 +363,36 @@ impl ToolCacheConfig {
     }
 }
 
+/// Which tool schemas are sent to the model (`[tools] profile`).
+///
+/// Every tool schema rides along with every request, so on a small local
+/// context window the full set (about 4,800 tokens for the 23 built-in tools)
+/// leaves little room for the conversation itself.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolProfile {
+    /// `Core` when the model's context window is small, `Full` otherwise
+    /// (see `llm::agent::tool_profile` for the threshold).
+    #[default]
+    Auto,
+    /// Only the core file and shell tools, plus `extra` and MCP tools.
+    Core,
+    /// Every registered tool.
+    Full,
+}
+
+/// Tool exposure configuration (`[tools]` section).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToolsConfig {
+    /// Which tools the model sees. Defaults to `auto`.
+    #[serde(default)]
+    pub profile: ToolProfile,
+    /// Tools exposed on top of the core set, e.g. `["plan", "web_fetch"]`.
+    /// Ignored by the `full` profile, which already exposes everything.
+    #[serde(default)]
+    pub extra: Vec<String>,
+}
+
 /// MCP configuration (`[mcp]` section).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct McpConfig {
@@ -239,6 +442,30 @@ pub struct Config {
     /// Tool result cache settings
     #[serde(default)]
     pub tool_cache: ToolCacheConfig,
+
+    /// Which tools are exposed to the model
+    #[serde(default)]
+    pub tools: ToolsConfig,
+
+    /// Agent loop limits
+    #[serde(default)]
+    pub agent: AgentConfig,
+
+    /// Edit verification
+    #[serde(default)]
+    pub verification: VerificationConfig,
+
+    /// Sub-agents and their profiles
+    #[serde(default)]
+    pub subagents: SubAgentsConfig,
+
+    /// Model routing by request complexity
+    #[serde(default)]
+    pub router: RouterConfig,
+
+    /// Fallback provider
+    #[serde(default)]
+    pub fallback: FallbackConfig,
 }
 
 /// Debug configuration options
@@ -812,6 +1039,12 @@ impl Default for Config {
             memory: MemoryConfig::default(),
             mcp: McpConfig::default(),
             tool_cache: ToolCacheConfig::default(),
+            tools: ToolsConfig::default(),
+            agent: AgentConfig::default(),
+            verification: VerificationConfig::default(),
+            subagents: SubAgentsConfig::default(),
+            router: RouterConfig::default(),
+            fallback: FallbackConfig::default(),
         }
     }
 }
@@ -933,6 +1166,12 @@ impl Config {
             memory: overlay.memory,
             mcp: overlay.mcp,
             tool_cache: overlay.tool_cache,
+            tools: overlay.tools,
+            agent: overlay.agent,
+            verification: overlay.verification,
+            subagents: overlay.subagents,
+            router: overlay.router,
+            fallback: overlay.fallback,
         }
     }
 

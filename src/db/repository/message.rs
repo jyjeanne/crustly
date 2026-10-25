@@ -80,10 +80,11 @@ impl MessageRepository {
         sqlx::query(
             r#"
             INSERT INTO messages (id, session_id, role, content, sequence,
-                                 created_at, token_count, cost, provider_name, perf_metrics_json)
+                                 created_at, token_count, cost, provider_name, perf_metrics_json,
+                                 tool_log)
             VALUES (?, ?, ?, ?,
                     (SELECT COALESCE(MAX(sequence), 0) + 1 FROM messages WHERE session_id = ?),
-                    ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(message.id.to_string())
@@ -96,6 +97,7 @@ impl MessageRepository {
         .bind(message.cost)
         .bind(&message.provider_name)
         .bind(&message.perf_metrics_json)
+        .bind(&message.tool_log)
         .execute(&mut *tx)
         .await
         .context("Failed to create message")?;
@@ -126,7 +128,8 @@ impl MessageRepository {
         sqlx::query(
             r#"
             UPDATE messages
-            SET content = ?, token_count = ?, cost = ?, provider_name = ?, perf_metrics_json = ?
+            SET content = ?, token_count = ?, cost = ?, provider_name = ?, perf_metrics_json = ?,
+                tool_log = ?
             WHERE id = ?
             "#,
         )
@@ -135,6 +138,7 @@ impl MessageRepository {
         .bind(message.cost)
         .bind(&message.provider_name)
         .bind(&message.perf_metrics_json)
+        .bind(&message.tool_log)
         .bind(message.id.to_string())
         .execute(&self.pool)
         .await

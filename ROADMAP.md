@@ -1,6 +1,6 @@
 # Crustly Roadmap
 
-**Current Version:** 0.5.2 — July 2026
+**Current Version:** 0.5.3 — October 2026
 **Author:** Jeremy JEANNE
 
 **Related strategy docs:** [`differentiation-strategy-vs-opencode.md`](./differentiation-strategy-vs-opencode.md) (competitive positioning — depth over breadth), [`docs/guides/SECURITY_MODEL.md`](./docs/guides/SECURITY_MODEL.md) (permission engine, compared to OpenCode's), [`llm-file-gguf-support.md`](./llm-file-gguf-support.md) (direct GGUF loading evaluation, conditional Go/No-Go), [`ccguf-managment-imrpoment-plan.md`](./ccguf-managment-imrpoment-plan.md) (GGUF model-management improvement plan, informed by a `llamastash` feature analysis — full design/rationale for the v0.5.3 milestone below)
@@ -66,7 +66,7 @@ Hardening pass from end-to-end agentic testing against local Ollama models (qwen
 - **`--model` CLI flag** — one-shot default-model override for any command
 - **Fixed:** the "Message not found" crash that broke every `crustly run` (sqlx-sqlite doesn't auto-commit `INSERT ... RETURNING` on a WAL pool — message creation now commits an explicit transaction); the tool-loop detector falsely aborting distinct path-based calls (wrong input key in the signature); `Ctrl+W` rebuilding a bare provider that dropped the entire `[providers.ollama]` config; TUI timestamps rendered in UTC instead of local time; `Ctrl+K` deleting messages out from under an in-flight response; raw-JSON model-not-found errors replaced with actionable guidance; chat input text rendering underlined (textarea cursor-line default style)
 
-### Unreleased — In-Process llama.cpp Provider
+### v0.5.3 — In-Process llama.cpp Provider
 The GGUF-loading backlog item below shipped: `providers.llama_cpp` loads a
 `.gguf` file directly into the Crustly process via `llama-cpp-2`, no Ollama
 daemon or server of any kind. Delivered across 10 phases plus a follow-up
@@ -97,58 +97,11 @@ design/safety reasoning (documented in the plan's §0.0 Phase 4b entry) is
 judged sound enough to ship unverified, but a real run is the next step for
 whoever has a model and terminal to try it against.
 
-### Unreleased — Native `/review` and `/spec` Skills
-Closed a gap where the `skill` tool (Phase 4) could load a `SKILL.md` file
-but nothing actually routed a typed `/<name>` slash command to it — and
-shipped two built-in skills on top of the fix.
-
-- **Generic slash-command → skill routing** — `try_handle_slash_command`
-  now resolves any unmatched `/<name>` through the same lookup order
-  `SkillTool` uses (project `.crustly/skills/`, `.claude/skills/`,
-  user-global, then a built-in fallback tier) before falling through to a
-  plain chat message. Runs off `spawn_blocking` since it does filesystem
-  walks, matching `SkillTool::execute`'s existing pattern — a fix applied
-  after `/code-review` caught the first version blocking the TUI's
-  draw/handle-key loop on every submitted `/word`
-- **Built-in skill fallback tier** — a small set of skills ship compiled
-  into the binary via `include_str!`, so they work in any project with
-  zero setup; always overridable by a project/user file of the same name.
-  `list_skills()` surfaces them the same way it does file-based skills,
-  deduplicating against any shadowing override
-- **`/review`** — multi-pass automated code review of the current diff, a
-  PR, a branch, or a path: independent correctness/guideline-compliance/
-  security passes dispatched in parallel via the `agent` tool, then a
-  second, skeptical pass filters findings by confidence before anything
-  is reported. Optional `--comment` (posts a summary via `gh`) and
-  `--fix` (applies surviving findings via `edit_file`/`apply_patch`)
-- **`/spec`** — native Specification-Driven Development workflow
-  (`specify → plan → tasks → implement → analyze`), writing to
-  `specs/<NNN>-<slug>/`. Studied from the author's own external
-  [rustyspec](https://github.com/jyjeanne/rustyspec) and
-  [solidspec](https://github.com/jyjeanne/solidspec) projects and modeled
-  on solidspec's `spec-driven` schema — documented there as the
-  polyvalent default among its 7 workflow schemas (`minimal`,
-  `spec-driven`, `security-first`, `tdd-driven`, `intent-driven`,
-  `apex-driven`, `intent-apex`). Unlike those tools, which are separate
-  CLIs and must hand off `implement` to an external agent's CLI, Crustly's
-  `implement` phase runs natively in-session via its own
-  `task_manager`/`write_file`/`edit_file`/`bash` tools, checking off
-  `tasks.md` as it builds. Includes a constitution gate (simplicity /
-  anti-abstraction / integration-first) during `plan`
-- Content of both skills is original — written fresh for Crustly's own
-  tool names and architecture, not ported from any external source
-
----
-
-## Upcoming Milestones
-
 ### v0.5.3 — GGUF Model Management
-**Target:** Q3 2026
-
 **Full design/rationale:** [`ccguf-managment-imrpoment-plan.md`](./ccguf-managment-imrpoment-plan.md)
 — informed by a feature analysis of [`llamastash`](https://github.com/llamastash/llamastash),
 scoped to what's portable without adopting its daemon/launcher/proxy architecture (Crustly
-already runs inference in-process, see the "Unreleased" entry above). Follows the same
+already runs inference in-process, see the in-process llama.cpp entry above). Follows the same
 point-release pattern as v0.4.2 (Native Ollama Integration) and v0.5.2 (Local-Model
 Reliability): focused follow-up hardening on a subsystem that just shipped, ahead of v0.6's
 unrelated stability/DX work. Items below are ordered by the plan's own priority (§4 gap
@@ -238,6 +191,99 @@ tasks and acceptance criteria per item.
 `recommend` for models not yet downloaded (needs an external CI-maintained benchmark dataset;
 disproportionate maintenance burden for now — see the plan's §3 item 5 and Phase M10).
 
+### v0.5.3 — Native `/review` and `/spec` Skills
+Closed a gap where the `skill` tool (Phase 4) could load a `SKILL.md` file
+but nothing actually routed a typed `/<name>` slash command to it — and
+shipped two built-in skills on top of the fix.
+
+- **Generic slash-command → skill routing** — `try_handle_slash_command`
+  now resolves any unmatched `/<name>` through the same lookup order
+  `SkillTool` uses (project `.crustly/skills/`, `.claude/skills/`,
+  user-global, then a built-in fallback tier) before falling through to a
+  plain chat message. Runs off `spawn_blocking` since it does filesystem
+  walks, matching `SkillTool::execute`'s existing pattern — a fix applied
+  after `/code-review` caught the first version blocking the TUI's
+  draw/handle-key loop on every submitted `/word`
+- **Built-in skill fallback tier** — a small set of skills ship compiled
+  into the binary via `include_str!`, so they work in any project with
+  zero setup; always overridable by a project/user file of the same name.
+  `list_skills()` surfaces them the same way it does file-based skills,
+  deduplicating against any shadowing override
+- **`/review`** — multi-pass automated code review of the current diff, a
+  PR, a branch, or a path: independent correctness/guideline-compliance/
+  security passes dispatched in parallel via the `agent` tool, then a
+  second, skeptical pass filters findings by confidence before anything
+  is reported. Optional `--comment` (posts a summary via `gh`) and
+  `--fix` (applies surviving findings via `edit_file`/`apply_patch`)
+- **`/spec`** — native Specification-Driven Development workflow
+  (`specify → plan → tasks → implement → analyze`), writing to
+  `specs/<NNN>-<slug>/`. Studied from the author's own external
+  [rustyspec](https://github.com/jyjeanne/rustyspec) and
+  [solidspec](https://github.com/jyjeanne/solidspec) projects and modeled
+  on solidspec's `spec-driven` schema — documented there as the
+  polyvalent default among its 7 workflow schemas (`minimal`,
+  `spec-driven`, `security-first`, `tdd-driven`, `intent-driven`,
+  `apex-driven`, `intent-apex`). Unlike those tools, which are separate
+  CLIs and must hand off `implement` to an external agent's CLI, Crustly's
+  `implement` phase runs natively in-session via its own
+  `task_manager`/`write_file`/`edit_file`/`bash` tools, checking off
+  `tasks.md` as it builds. Includes a constitution gate (simplicity /
+  anti-abstraction / integration-first) during `plan`
+- Content of both skills is original — written fresh for Crustly's own
+  tool names and architecture, not ported from any external source
+
+### v0.5.3 — A Harness for Local Models
+Fourteen changes to make long agent tasks fit, survive and stay correct
+on a local model's small context window, drawn from the
+[agentic harness engineering](https://www.decodingai.com/p/agentic-harness-engineering)
+article and a comparison with Mistral's Vibe. Shipped in three commits, by
+priority:
+
+- **P0 — fit the window** (`bde8509`): context budget shown in the TUI
+  header, Model Info and `crustly run`, corrected from the provider's own
+  token counts; a `[tools]` profile that sends the 7 core tools below
+  32,768 tokens (fixed cost per request from 7,607 to 2,769 tokens on an
+  8,192 window); compaction wired in, eliding old tool output before
+  summarizing, with compact-and-retry on overflow; AutoPlan approval gaps
+  closed (`execute_code`, `powershell`, capability-based checks, aliases
+  resolved before the check, cached reads checked against policy)
+- **P1 — fast and correct** (`ebe2596`): the agent loop split into
+  `AgentRun`, a round executor and middleware; `Esc` cancellation and
+  `[agent]` round/time/token limits that end with a partial answer;
+  verification before the final answer after file edits; tool-call
+  summaries stored with each answer, project notes in the system prompt,
+  `.crustly/progress.md`; schema checks on tool arguments; llama.cpp KV
+  prefix reuse and batched prefill, which also fixed two crashes (every
+  request after the first, and prompts over 2,048 tokens)
+- **P2 — multi-agent** (`9ea38cf`): a sub-agent manager whose sub-agents
+  report back to the parent, run in the background on request, share the
+  main approval prompt, and run one at a time by default; built-in
+  `explorer`, `implementer`, `reviewer` and `general` profiles; `[router]`
+  model tiers switched on; a `[fallback]` provider for the rest of a
+  request when the main one fails or overflows
+
+**Still open:** the llama.cpp changes compile in CI but have not run
+against a real `.gguf` model, and the gains are not measured yet (see the
+local-model benchmark item under v0.7).
+
+### v0.5.3 — A Faster, Friendlier Terminal UI
+- Pasting at full speed on Windows: input read on its own thread with no
+  per-event delay, and keys that arrive together read as one paste, so a
+  pasted line break no longer sends the message half-written
+- One long-lived clipboard handle; copy and paste confirmations in the
+  status bar; `Ctrl+Z`/`Ctrl+Shift+Z` undo and redo in the input (closes
+  Phase 2 of [`ergonomy-improvment.md`](./ergonomy-improvment.md))
+- Rendered messages cached, and scrolling counted in wrapped rows so the
+  end of a long reply stays on screen
+- An animated Ferris on the welcome screen and while the model thinks,
+  with the request's elapsed time
+- `Ctrl+C` cancels or clears first and quits on a second press; the input
+  box grows with its text; the help screen scrolls
+
+---
+
+## Upcoming Milestones
+
 ### v0.6 — Stability & Developer Experience
 **Target:** Q4 2026
 
@@ -268,15 +314,16 @@ are done; the rest are tracked here as they get picked up:
   plainly that Crustly never starts a background server or opens a local port, unlike
   OpenCode's Hono HTTP/SSE server (see `differentiation-strategy-vs-opencode.md` §3.2)
 - [ ] **Integration test suite** — full chat/tool/approval flows with a mock provider (no live API calls required)
-- [x] **CI/CD pipeline** — GitHub Actions (`.github/workflows/ci.yml`): `cargo test` (Linux/Windows/macOS × stable/beta),
+- [x] **CI/CD pipeline** — GitHub Actions (`.github/workflows/ci.yml`): `cargo test` (Linux/Windows/macOS on stable Rust),
   `cargo clippy -D warnings`, `cargo fmt --check`, release `cargo build`, and `cargo tarpaulin` coverage on every PR.
   `cargo audit` is not yet wired in
 - [x] **Fixed the CI feature matrix** — `--all-features` was unconditionally enabling the six GPU backend features
   added for llama.cpp (`llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`), each needing a GPU SDK the
   GitHub-hosted runners don't have (`cmake` failed with "CUDA Toolkit not found"), breaking Clippy/Build/Coverage
   and one Test matrix leg. Replaced with an explicit `CI_FEATURES` list covering only what a plain C/C++ toolchain
-  builds. `.github/workflows/release.yml` has the same `--all-features` issue in its cross-compiled Unix release
-  step (not yet fixed — needs verification of cross-compiled cmake/C++ toolchain behavior for `llama-cpp`)
+  builds. `.github/workflows/release.yml` now uses the same kind of explicit list (`UNIX_FEATURES`), and builds
+  aarch64 Linux natively on `ubuntu-24.04-arm` instead of cross-compiling. The CI target cache is keyed on the
+  runner image, so a stale llama.cpp CMake tree from an older image can no longer break the macOS build
 - [ ] **Interactive settings TUI** — configure provider, API keys (masked), model, tool toggles, approval timeout from inside the TUI
 - [ ] **Session search & export** — fuzzy search sessions by content; export to Markdown or JSON
 - [ ] **Git status bar** — current branch, dirty/clean state, uncommitted changes count shown in footer
@@ -286,6 +333,10 @@ are done; the rest are tracked here as they get picked up:
 **Target:** Q1 2027
 
 - [ ] **Benchmark suite** — `cargo bench` targets for DB operations, syntax highlighting, and TUI rendering
+- [ ] **Local-model harness benchmark** — time prefill with llama.cpp KV prefix reuse, and run the same few
+  tasks on a local model at 8,192 tokens with the old and new harness, to see which of the changes pay off
+- [ ] **Run the llama.cpp provider against a real model** — a multi-round tool-calling task on a `.gguf`
+  model, covering KV prefix reuse, batched prefill and grammar-constrained tool calls
 - [ ] **Message pagination** — virtual list rendering so large sessions (1000+ messages) don't degrade TUI performance
 - [ ] **Lazy syntax highlighting** — cache rendered blocks; skip re-highlighting unchanged content
 - [ ] **Crash recovery** — write a recovery manifest on panic; offer to restore the interrupted session on next launch

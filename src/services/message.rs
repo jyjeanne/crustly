@@ -44,6 +44,7 @@ impl MessageService {
             cost: None,
             provider_name: None,
             perf_metrics_json: None,
+            tool_log: None,
         };
 
         repo.create(&mut message)
@@ -108,6 +109,20 @@ impl MessageService {
             token_count,
             cost
         );
+        Ok(())
+    }
+
+    /// Record the summary of the tool calls that produced this message.
+    pub async fn update_message_tool_log(&self, id: Uuid, tool_log: &str) -> Result<()> {
+        let mut message = self.get_message_required(id).await?;
+        message.tool_log = Some(tool_log.to_string());
+
+        let repo = MessageRepository::new(self.context.pool());
+        repo.update(&message)
+            .await
+            .context("Failed to update message tool log")?;
+
+        tracing::debug!("Updated message tool log: {}", id);
         Ok(())
     }
 

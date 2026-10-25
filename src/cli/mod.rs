@@ -129,6 +129,92 @@ For complex tasks (multi-file analysis, debugging, architecture questions), stru
 
 Apply this pattern silently — do not output the THINK/OBSERVE/UPDATE labels to the user unless they ask to see your reasoning. Emit **ACT:** labels only when you want to explain which tool you are about to call and why."#;
 
+/// System prompt used while only the core tools are exposed (`[tools]
+/// profile`). `SYSTEM_PROMPT` spends most of its ~1,800 tokens on tools the
+/// core set does not send (the plan tool above all), which is wasted space on
+/// a small local context window and invites calls to tools that are not there.
+pub(crate) const CORE_SYSTEM_PROMPT: &str = r#"You are Crustly, a coding assistant that works in the user's project through tools.
+
+Your main tools: read_file, edit_file, write_file, bash, grep, glob, ls. Use only the tools you were given.
+
+RULES
+- When the answer depends on files or commands, use a tool. Never guess file contents or paths.
+- A simple request needs one tool call, then a text answer: "list the files" -> ls, "read main.rs" -> read_file, "find the TODOs" -> grep.
+- Once you have the results you need, answer the user in text. Do not keep calling tools.
+- Read a file before you edit it. Use edit_file to change a file and write_file to create one.
+- Use bash for builds, tests and git (cargo test, git diff). After changing code, run the tests if the project has them.
+- Stay inside the working directory. Never invent paths such as ~/ or /tmp: a path you have not seen in a tool result or in the user's message does not exist.
+- If a tool fails or is denied, say what failed and stop. Do not switch to unrelated work.
+- Keep answers short: the result first, then only the detail the user needs."#;
+
+/// Apply the agent-loop config to an agent service: which tools the model
+/// sees (`[tools]`, with the shorter system prompt for the core set), the
+/// request limits (`[agent]`), edit verification (`[verification]`),
+/// project memory (`[memory]`), sub-agents (`[subagents]`), model routing
+/// (`[router]`) and the fallback provider (`[fallback]`).
+///
+/// `can_approve_shell` says whether a shell command the model runs can be
+/// approved at all; verification is skipped when it cannot, since the model
+/// would be sent back to run a check that is then refused.
+fn configure_agent(
+    service: crate::llm::agent::AgentService,
+    config: &crate::config::Config,
+    can_approve_shell: bool,
+) -> Result<crate::llm::agent::AgentService> {
+    let mut service = configure_agent_loop(service, config, can_approve_shell).with_subagents(
+        config.subagents.max_concurrent,
+        crate::llm::agent::profiles::resolve_profiles(&config.subagents.profiles),
+    );
+
+    if config.router.enabled {
+        let provider = service.provider_name().to_string();
+        let default = service.provider_model().to_string();
+        let model = |tier: &Option<String>| tier.clone().unwrap_or_else(|| default.clone());
+        service = service.with_model_router(crate::llm::provider::router::ModelRouter::new(
+            &provider,
+            &model(&config.router.fast),
+            &provider,
+            &model(&config.router.balanced),
+            &provider,
+            &model(&config.router.powerful),
+        ));
+    }
+
+    if let Some(name) = &config.fallback.provider {
+        println!("☁  Fallback provider (used only when the main one fails):");
+        let provider = crate::llm::provider::create_named_provider(config, name)
+            .with_context(|| format!("[fallback] provider = \"{name}\""))?;
+        service = service.with_fallback(crate::llm::agent::Fallback {
+            provider,
+            on_error: config.fallback.on_error,
+            on_overflow: config.fallback.on_overflow,
+        });
+    }
+
+    Ok(service)
+}
+
+fn configure_agent_loop(
+    service: crate::llm::agent::AgentService,
+    config: &crate::config::Config,
+    can_approve_shell: bool,
+) -> crate::llm::agent::AgentService {
+    service
+        .with_core_system_prompt(CORE_SYSTEM_PROMPT.to_string())
+        .with_tool_profile(config.tools.profile, config.tools.extra.clone())
+        .with_max_tool_iterations(config.agent.max_tool_rounds)
+        .with_request_limits(
+            config.agent.max_wall_time(),
+            config.agent.max_request_tokens(),
+        )
+        .with_verification(
+            config.verification.enabled && can_approve_shell,
+            config.verification.command.clone(),
+        )
+        .with_project_notes(config.memory.project_notes)
+        .with_progress_file(config.memory.progress_file)
+}
+
 /// Crustly - High-Performance Terminal AI Assistant
 #[derive(Parser, Debug)]
 #[command(name = "crustly")]
@@ -983,7 +1069,7 @@ fn build_approval_callback(
             use tokio::sync::mpsc;
 
             let mode = auto_mode.lock().expect("auto_mode mutex poisoned").clone();
-            if auto_mode_bypasses_approval(&mode, &tool_info.tool_name) {
+            if auto_mode_bypasses_approval(&mode, &tool_info.tool_name, &tool_info.capabilities) {
                 tracing::debug!(
                     "Auto Mode ({:?}) approved tool '{}' without prompting",
                     mode,
@@ -1060,12 +1146,13 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     let working_directory = std::env::current_dir().unwrap_or_default();
 
     // Create agent service with system prompt and working directory
-    let agent_service = Arc::new(
+    let agent_service = Arc::new(configure_agent_loop(
         AgentService::new(provider.clone(), service_context.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
-            .with_max_tool_iterations(20)
             .with_working_directory(working_directory.clone()),
-    );
+        config,
+        true,
+    ));
 
     // Create TUI app first (so we can get the event sender)
     tracing::debug!("Creating TUI app");
@@ -1112,14 +1199,15 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
 
     // Create agent service with approval callback
     tracing::debug!("Creating agent service with approval callback");
-    let agent_service = Arc::new(
+    let agent_service = Arc::new(configure_agent(
         AgentService::new(provider.clone(), service_context.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_tool_registry(Arc::new(tool_registry))
             .with_approval_callback(Some(approval_callback))
-            .with_max_tool_iterations(20)
             .with_working_directory(working_directory),
-    );
+        config,
+        true,
+    )?);
 
     // Update app with the configured agent service (preserve event channels!)
     app.set_agent_service(agent_service);
@@ -1140,25 +1228,59 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
 /// channel/TUI plumbing.
 ///
 /// - `Interactive`: never bypasses - always prompts.
-/// - `AutoPlan`: bypasses everything except high-risk tools
-///   (`PlanModeState::is_high_risk_tool`: `bash`, `write_file`,
-///   `edit_file`, `code_exec`), which still prompt.
+/// - `AutoPlan`: bypasses everything except high-risk tools, which still
+///   prompt. A tool is high-risk when `PlanModeState::is_high_risk_tool`
+///   lists it, or when its declared capabilities (the `{:?}` strings in
+///   `ToolApprovalInfo::capabilities`) include shell execution, file writes
+///   or system modification. The capability check keeps a renamed or newly
+///   added tool from slipping through a stale name list.
 /// - `FullAuto`: bypasses everything, including high-risk tools.
+///
+/// `tool_name` must be the canonical registered name; the agent loop
+/// resolves aliases before it asks for approval.
 ///
 /// Callers must not treat this as the only safety layer: the
 /// `SecurityConfig` policy chain (`deny_tools`/`deny_paths`/`allow_bash`)
 /// is installed via `ToolRegistry::set_policy` and evaluated independently in
 /// `ToolRegistry::execute()`, so it stays enforced regardless of this
 /// function's result. A `Deny` there overrides any bypass decided here.
-fn auto_mode_bypasses_approval(mode: &crate::config::PlanExecMode, tool_name: &str) -> bool {
+fn auto_mode_bypasses_approval(
+    mode: &crate::config::PlanExecMode,
+    tool_name: &str,
+    capabilities: &[String],
+) -> bool {
     use crate::config::PlanExecMode;
     use crate::plan::PlanModeState;
 
     match mode {
         PlanExecMode::Interactive => false,
-        PlanExecMode::AutoPlan => !PlanModeState::is_high_risk_tool(tool_name),
+        PlanExecMode::AutoPlan => {
+            let risky_capability = capabilities.iter().any(|c| {
+                matches!(
+                    c.as_str(),
+                    "ExecuteShell" | "WriteFiles" | "SystemModification"
+                )
+            });
+            !(PlanModeState::is_high_risk_tool(tool_name) || risky_capability)
+        }
         PlanExecMode::FullAuto => true,
     }
+}
+
+/// One-line summary of a request's context usage for `crustly run` output.
+fn describe_context_usage(usage: &crate::llm::agent::ContextUsage) -> String {
+    format!(
+        "{} of {} tokens used ({} fixed by the system prompt and {} tools, {} profile)",
+        usage.used,
+        usage.window,
+        usage.fixed_overhead,
+        usage.tool_count,
+        if usage.core_tools_only {
+            "core"
+        } else {
+            "full"
+        }
+    )
 }
 
 /// Run a single command non-interactively
@@ -1215,11 +1337,25 @@ async fn cmd_run(
 
     // Create service context and agent service
     let service_context = ServiceContext::new(db.pool().clone());
-    let agent_service = AgentService::new(provider.clone(), service_context.clone())
-        .with_tool_registry(Arc::new(tool_registry))
-        .with_system_prompt(SYSTEM_PROMPT.to_string())
-        .with_max_tool_iterations(20)
-        .with_auto_approve_tools(auto_approve);
+    let agent_service = configure_agent(
+        AgentService::new(provider.clone(), service_context.clone())
+            .with_tool_registry(Arc::new(tool_registry))
+            .with_system_prompt(SYSTEM_PROMPT.to_string())
+            .with_auto_approve_tools(auto_approve),
+        config,
+        auto_approve,
+    )?;
+
+    // Warn up front when the system prompt and tool schemas leave a local
+    // model almost no room: the answer would otherwise just come back cut off.
+    let preview = agent_service.context_usage_preview();
+    if preview.overhead_is_tight() {
+        eprintln!(
+            "⚠️  The system prompt and {} tool schemas take {} of the model's {} context tokens.\n   \
+             Raise the context window (num_ctx / n_ctx) or set [tools] profile = \"core\".\n",
+            preview.tool_count, preview.fixed_overhead, preview.window
+        );
+    }
 
     // Create or get session
     let session_service = SessionService::new(service_context);
@@ -1247,6 +1383,9 @@ async fn cmd_run(
                 response.usage.input_tokens + response.usage.output_tokens
             );
             println!("💰 Cost: ${:.6}", response.cost);
+            if let Some(usage) = &response.context {
+                println!("🧠 Context: {}", describe_context_usage(usage));
+            }
         }
         OutputFormat::Json => {
             let output = serde_json::json!({
@@ -1257,6 +1396,14 @@ async fn cmd_run(
                 },
                 "cost": response.cost,
                 "model": response.model,
+                "context": response.context.map(|c| serde_json::json!({
+                    "window": c.window,
+                    "used": c.used,
+                    "fixed_overhead": c.fixed_overhead,
+                    "available": c.available,
+                    "tool_count": c.tool_count,
+                    "tool_profile": if c.core_tools_only { "core" } else { "full" },
+                })),
             });
             println!("{}", serde_json::to_string_pretty(&output)?);
         }
@@ -1269,6 +1416,9 @@ async fn cmd_run(
                 response.usage.input_tokens + response.usage.output_tokens
             );
             println!("**Cost:** ${:.6}", response.cost);
+            if let Some(usage) = &response.context {
+                println!("**Context:** {}", describe_context_usage(usage));
+            }
         }
     }
 
@@ -2232,10 +2382,10 @@ mod tests {
             "bash",
             "write_file",
             "edit_file",
-            "code_exec",
+            "execute_code",
         ] {
             assert!(
-                !auto_mode_bypasses_approval(&PlanExecMode::Interactive, tool),
+                !auto_mode_bypasses_approval(&PlanExecMode::Interactive, tool, &[]),
                 "Interactive must always prompt, including for {tool}"
             );
         }
@@ -2252,41 +2402,114 @@ mod tests {
             "glob",
             "ls",
             "web_search",
-            "todo_write",
+            "http_request",
         ] {
             assert!(
-                auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool),
+                auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool, &[]),
                 "AutoPlan should bypass the low-risk tool {tool}"
             );
         }
 
         // High-risk tools: this is the load-bearing safety property of
         // AutoPlan - these must still prompt.
-        for tool in ["bash", "write_file", "edit_file", "code_exec"] {
+        for tool in [
+            "bash",
+            "powershell",
+            "write_file",
+            "edit_file",
+            "apply_patch",
+            "execute_code",
+        ] {
             assert!(
-                !auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool),
+                !auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool, &[]),
                 "AutoPlan must still prompt for the high-risk tool {tool}"
             );
         }
     }
 
+    /// Regression: the high-risk list named `code_exec`, but the tool is
+    /// registered as `execute_code`, and PowerShell was missing entirely - so
+    /// AutoPlan ran arbitrary code and commands on Windows without asking.
     #[test]
-    fn known_gap_powershell_is_not_classified_as_high_risk() {
+    fn autoplan_prompts_for_the_registered_code_and_shell_tool_names() {
         use crate::config::PlanExecMode;
 
-        // Documents a pre-existing gap (flagged as an open decision in
-        // ergonomy-improvment.md, not something introduced or silently
-        // fixed here): PlanModeState::is_high_risk_tool() only lists
-        // bash/write_file/edit_file/code_exec, so PowerShell - an
-        // equally-capable arbitrary command execution tool on Windows -
-        // is bypassed by AutoPlan the same as a read-only tool. Whether to
-        // add it (and http/notebook) to the high-risk list is left as an
-        // explicit follow-up decision rather than expanded here, since
-        // that shared classification is also used by pre-existing plan
-        // auto-run code this phase didn't otherwise touch.
+        let registry = build_tool_registry();
+        for tool in ["execute_code", "powershell"] {
+            assert!(
+                registry.has_tool(tool),
+                "{tool} must be a registered tool name"
+            );
+            assert!(
+                !auto_mode_bypasses_approval(&PlanExecMode::AutoPlan, tool, &[]),
+                "AutoPlan must prompt for {tool}"
+            );
+        }
+    }
+
+    /// The core profile exists to fit small local windows: its system prompt
+    /// and tool schemas must stay a small part of an 8,192-token window, and
+    /// well under what the full set costs.
+    #[test]
+    fn core_profile_fixed_overhead_fits_a_small_window() {
+        use crate::config::ToolProfile;
+        use crate::llm::agent::budget::ContextBudget;
+        use crate::llm::agent::tool_profile::{ToolSelection, CORE_TOOLS};
+
+        let all_tools = build_tool_registry().get_tool_definitions();
+        let selection = ToolSelection::resolve(ToolProfile::Core, &[], 8192);
+        let core_tools: Vec<_> = all_tools
+            .iter()
+            .filter(|t| selection.exposes(&t.name))
+            .cloned()
+            .collect();
+        assert_eq!(
+            core_tools.len(),
+            CORE_TOOLS.len(),
+            "every core tool is registered"
+        );
+
+        let core = ContextBudget::measure(8192, Some(CORE_SYSTEM_PROMPT), &core_tools, 0, 1.0);
+        let full = ContextBudget::measure(8192, Some(SYSTEM_PROMPT), &all_tools, 0, 1.0);
+        println!(
+            "fixed overhead: core {} (prompt {} + tools {}), full {} (prompt {} + tools {})",
+            core.fixed_overhead(),
+            core.system_prompt_tokens,
+            core.tool_schema_tokens,
+            full.fixed_overhead(),
+            full.system_prompt_tokens,
+            full.tool_schema_tokens
+        );
+
+        assert!(
+            core.fixed_overhead() < 8192 / 2,
+            "core overhead {} must leave at least half of an 8K window",
+            core.fixed_overhead()
+        );
+        assert!(core.fixed_overhead() < full.fixed_overhead() / 2);
+        assert!(!core.is_tight());
+    }
+
+    /// A tool missing from the name list still prompts in AutoPlan when its
+    /// declared capabilities say it writes files or runs a shell.
+    #[test]
+    fn autoplan_prompts_for_unlisted_tools_with_risky_capabilities() {
+        use crate::config::PlanExecMode;
+
+        for capability in ["ExecuteShell", "WriteFiles", "SystemModification"] {
+            assert!(
+                !auto_mode_bypasses_approval(
+                    &PlanExecMode::AutoPlan,
+                    "notebook_edit",
+                    &[capability.to_string()]
+                ),
+                "AutoPlan must prompt for a tool with {capability}"
+            );
+        }
         assert!(auto_mode_bypasses_approval(
             &PlanExecMode::AutoPlan,
-            "powershell"
+            "http_request",
+            &["Network".to_string()]
         ));
     }
 
@@ -2300,11 +2523,15 @@ mod tests {
             "bash",
             "write_file",
             "edit_file",
-            "code_exec",
+            "execute_code",
             "powershell",
         ] {
             assert!(
-                auto_mode_bypasses_approval(&PlanExecMode::FullAuto, tool),
+                auto_mode_bypasses_approval(
+                    &PlanExecMode::FullAuto,
+                    tool,
+                    &["ExecuteShell".to_string()]
+                ),
                 "FullAuto should bypass every tool, including {tool}"
             );
         }

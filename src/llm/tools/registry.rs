@@ -73,6 +73,31 @@ impl ToolRegistry {
         )
     }
 
+    /// Whether the policy denies this exact call. Resolves `name` through the
+    /// alias table first, same as [`Self::is_trusted`] and `execute()`.
+    ///
+    /// Lets callers that can answer a call without running the tool - the
+    /// agent's read-result cache - still honour a `deny_tools`/`deny_paths`
+    /// rule instead of serving a result the policy would have refused.
+    pub fn is_denied(&self, name: &str, input: &serde_json::Value) -> bool {
+        use crate::llm::tools::sandbox::PolicyDecision;
+        let canonical = self.canonical_name(name);
+        matches!(
+            self.policy.as_ref().map(|p| p.evaluate(canonical, input)),
+            Some(PolicyDecision::Deny(_))
+        )
+    }
+
+    /// The registered name `name` resolves to (see [`Self::canonical_name`]),
+    /// as an owned string. Unknown names come back unchanged.
+    ///
+    /// The agent loop canonicalizes every tool call with this before it
+    /// classifies the call, so a model that writes `Bash` or `shell` gets the
+    /// same approval gate, plan checks and cache key as one that writes `bash`.
+    pub fn resolve_name(&self, name: &str) -> String {
+        self.canonical_name(name).to_string()
+    }
+
     /// Register a tool
     pub fn register(&mut self, tool: Arc<dyn Tool>) {
         let name = tool.name().to_string();
@@ -526,6 +551,47 @@ mod tests {
         // If alias resolution had won, this would be Crustly's real
         // `read_file` tool instead of the mock registered above.
         assert_eq!(tool.name(), "cat");
+    }
+
+    #[test]
+    fn resolve_name_maps_aliases_and_keeps_unknown_names() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MockTool {
+            name: "bash".to_string(),
+            requires_approval: false,
+        }));
+
+        assert_eq!(registry.resolve_name("Bash"), "bash");
+        assert_eq!(registry.resolve_name("shell"), "bash");
+        assert_eq!(registry.resolve_name("bash"), "bash");
+        assert_eq!(registry.resolve_name("no_such_tool"), "no_such_tool");
+    }
+
+    #[test]
+    fn is_denied_follows_the_policy_through_aliases() {
+        use crate::llm::tools::sandbox::DenyToolRule;
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MockTool {
+            name: "bash".to_string(),
+            requires_approval: false,
+        }));
+        registry.register(Arc::new(MockTool {
+            name: "read_file".to_string(),
+            requires_approval: false,
+        }));
+        registry.set_policy(Arc::new(DenyToolRule::new("bash")));
+
+        let input = serde_json::json!({ "message": "test" });
+        assert!(registry.is_denied("bash", &input));
+        assert!(registry.is_denied("shell", &input));
+        assert!(!registry.is_denied("read_file", &input));
+    }
+
+    #[test]
+    fn is_denied_is_false_without_a_policy() {
+        let registry = ToolRegistry::new();
+        assert!(!registry.is_denied("bash", &serde_json::json!({})));
     }
 
     #[tokio::test]

@@ -248,45 +248,179 @@ impl EventHandler {
         self.rx.recv().await
     }
 
-    /// Start listening for terminal events
+    /// Start listening for terminal events, on a thread of its own.
+    ///
+    /// Reading the terminal blocks, so it runs on a dedicated OS thread rather
+    /// than a Tokio task, where each `poll` held a runtime worker. Events are
+    /// forwarded as soon as they are read; the old loop slept 50ms after every
+    /// one, so a paste that arrives one key per character (every Windows
+    /// console) crawled at 20 characters a second. `Tick` keeps its own fixed
+    /// cadence however busy the input is.
     pub fn start_terminal_listener(tx: mpsc::UnboundedSender<TuiEvent>) {
-        tokio::spawn(async move {
-            loop {
-                // Poll for crossterm events with timeout
-                if crossterm::event::poll(Duration::from_millis(100)).unwrap_or(false) {
-                    if let Ok(event) = crossterm::event::read() {
-                        match event {
-                            crossterm::event::Event::Key(key)
-                                if key.kind == crossterm::event::KeyEventKind::Press
-                                    && tx.send(TuiEvent::Key(key)).is_err() =>
-                            {
-                                break;
+        let spawned = std::thread::Builder::new()
+            .name("crustly-input".to_string())
+            .spawn(move || read_terminal_events(&tx));
+        if let Err(e) = spawned {
+            tracing::error!("Failed to start the terminal input thread: {e}");
+        }
+    }
+}
+
+/// How often `Tick` is sent, for animations and timeouts.
+const TICK_INTERVAL: Duration = Duration::from_millis(100);
+
+/// Once a batch of input looks like a paste, how long to wait for more of it.
+/// Terminals deliver a large paste in several writes; without the wait, a
+/// paste split between two writes could end on a lone Enter, which submits.
+const PASTE_GRACE: Duration = Duration::from_millis(15);
+
+/// The listener thread's loop: read each event together with everything
+/// already waiting behind it, pass the batch through [`coalesce_input`], and
+/// send `Tick` on time. Returns once the app stops receiving.
+fn read_terminal_events(tx: &mpsc::UnboundedSender<TuiEvent>) {
+    use crossterm::event::{poll, read};
+    use std::time::Instant;
+
+    let mut next_tick = Instant::now() + TICK_INTERVAL;
+    loop {
+        match poll(next_tick.saturating_duration_since(Instant::now())) {
+            Ok(true) => {
+                let mut batch = Vec::new();
+                let mut text_keys = 0usize;
+                let mut wait = Duration::ZERO;
+                loop {
+                    match read() {
+                        Ok(event) => {
+                            if is_text_press(&event) {
+                                text_keys += 1;
                             }
-                            crossterm::event::Event::Resize(w, h)
-                                if tx.send(TuiEvent::Resize(w, h)).is_err() =>
-                            {
-                                break;
-                            }
-                            #[allow(clippy::collapsible_match)]
-                            crossterm::event::Event::Paste(text) => {
-                                if tx.send(TuiEvent::Paste(text)).is_err() {
-                                    break;
-                                }
-                            }
-                            _ => {}
+                            batch.push(event);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to read terminal input: {e}");
+                            break;
                         }
                     }
+                    if text_keys >= 2 {
+                        wait = PASTE_GRACE;
+                    }
+                    if !poll(wait).unwrap_or(false) {
+                        break;
+                    }
                 }
-
-                // Send tick event for animations
-                if tx.send(TuiEvent::Tick).is_err() {
-                    break;
+                for event in coalesce_input(batch) {
+                    if tx.send(event).is_err() {
+                        return;
+                    }
                 }
-
-                // Small delay to prevent CPU spinning
-                tokio::time::sleep(Duration::from_millis(50)).await;
             }
-        });
+            Ok(false) => {}
+            Err(e) => {
+                tracing::warn!("Failed to poll terminal input: {e}");
+                std::thread::sleep(TICK_INTERVAL);
+            }
+        }
+
+        if Instant::now() >= next_tick {
+            if tx.send(TuiEvent::Tick).is_err() {
+                return;
+            }
+            next_tick = Instant::now() + TICK_INTERVAL;
+        }
+    }
+}
+
+/// Turn terminal events read together into TUI events.
+///
+/// Without bracketed paste - and crossterm never reports a paste on Windows -
+/// pasted text arrives as one key press per character. Handled as keys, it
+/// misfired: a line break pressed Enter and sent the message half-pasted, an
+/// `@` opened the file picker, a leading `t` toggled the thinking block. A
+/// person types one key at a time, so two or more text keys read together are
+/// a paste, and become one `Paste`. Everything else passes through unchanged.
+///
+/// Only key presses reach the app, which ignores the rest, so releases and
+/// repeats are dropped here, where they would otherwise split a paste.
+pub(crate) fn coalesce_input(batch: Vec<crossterm::event::Event>) -> Vec<TuiEvent> {
+    use crossterm::event::{Event, KeyEventKind};
+
+    let mut events = Vec::new();
+    let mut run: Vec<KeyEvent> = Vec::new();
+    for event in batch {
+        match event {
+            Event::Key(key) if key.kind != KeyEventKind::Press => {}
+            Event::Key(key) if typed_char(&key).is_some() => run.push(key),
+            Event::Key(key) => {
+                flush_run(&mut run, &mut events);
+                events.push(TuiEvent::Key(key));
+            }
+            Event::Paste(text) => {
+                flush_run(&mut run, &mut events);
+                events.push(TuiEvent::Paste(text));
+            }
+            Event::Resize(w, h) => {
+                flush_run(&mut run, &mut events);
+                events.push(TuiEvent::Resize(w, h));
+            }
+            _ => {}
+        }
+    }
+    flush_run(&mut run, &mut events);
+    events
+}
+
+/// Emit a run of text keys: one key as itself, more as a paste.
+fn flush_run(run: &mut Vec<KeyEvent>, events: &mut Vec<TuiEvent>) {
+    match run.as_slice() {
+        [] => {}
+        [key] => events.push(TuiEvent::Key(*key)),
+        keys => events.push(TuiEvent::Paste(pasted_text(keys))),
+    }
+    run.clear();
+}
+
+/// The text a run of pasted keys types. A CR followed by an LF is one line
+/// break, as in a Windows clipboard.
+fn pasted_text(keys: &[KeyEvent]) -> String {
+    let mut text = String::with_capacity(keys.len());
+    let mut after_cr = false;
+    for key in keys {
+        let Some(c) = typed_char(key) else {
+            continue;
+        };
+        let is_lf = key.code == KeyCode::Char('\n');
+        if is_lf && after_cr {
+            after_cr = false;
+            continue;
+        }
+        after_cr = matches!(key.code, KeyCode::Enter | KeyCode::Char('\r'));
+        text.push(c);
+    }
+    text
+}
+
+/// Whether `event` is a key press that types text (see [`typed_char`]).
+fn is_text_press(event: &crossterm::event::Event) -> bool {
+    matches!(
+        event,
+        crossterm::event::Event::Key(key)
+            if key.kind == crossterm::event::KeyEventKind::Press && typed_char(key).is_some()
+    )
+}
+
+/// The character a key press types, if it is text entry: a character on its
+/// own, with Shift, or with AltGr (which Windows reports as Ctrl+Alt), and
+/// Enter or Tab. Ctrl or Alt with a character is a shortcut and types nothing.
+fn typed_char(key: &KeyEvent) -> Option<char> {
+    let mods = key.modifiers;
+    let plain = mods.difference(KeyModifiers::SHIFT).is_empty();
+    let altgr = mods.contains(KeyModifiers::CONTROL | KeyModifiers::ALT);
+    match key.code {
+        KeyCode::Char('\r' | '\n') => Some('\n'),
+        KeyCode::Char(c) if plain || altgr => Some(c),
+        KeyCode::Enter if plain => Some('\n'),
+        KeyCode::Tab if mods.is_empty() => Some('\t'),
+        _ => None,
     }
 }
 
@@ -594,5 +728,115 @@ mod tests {
 
         let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::ALT);
         assert!(!keys::is_newline(&event));
+    }
+
+    use crossterm::event::{Event, KeyEventKind};
+
+    fn press(code: KeyCode) -> Event {
+        Event::Key(KeyEvent::new(code, KeyModifiers::empty()))
+    }
+
+    fn typed(text: &str) -> Vec<Event> {
+        text.chars()
+            .map(|c| match c {
+                '\n' => press(KeyCode::Enter),
+                c => press(KeyCode::Char(c)),
+            })
+            .collect()
+    }
+
+    fn pasted(events: &[TuiEvent]) -> Vec<&str> {
+        events
+            .iter()
+            .filter_map(|e| match e {
+                TuiEvent::Paste(text) => Some(text.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn keys_read_together_become_one_paste() {
+        let events = coalesce_input(typed("fn main() {\n    @todo\n}"));
+        assert_eq!(events.len(), 1);
+        assert_eq!(pasted(&events), ["fn main() {\n    @todo\n}"]);
+    }
+
+    #[test]
+    fn a_single_key_stays_a_key() {
+        let events = coalesce_input(vec![press(KeyCode::Enter)]);
+        assert!(matches!(&events[..], [TuiEvent::Key(k)] if k.code == KeyCode::Enter));
+
+        let events = coalesce_input(vec![press(KeyCode::Char('@'))]);
+        assert!(matches!(&events[..], [TuiEvent::Key(k)] if k.code == KeyCode::Char('@')));
+    }
+
+    #[test]
+    fn shortcuts_and_navigation_split_a_paste_and_pass_through() {
+        let mut batch = typed("ab");
+        batch.push(Event::Key(KeyEvent::new(
+            KeyCode::Char('y'),
+            KeyModifiers::CONTROL,
+        )));
+        batch.push(press(KeyCode::Left));
+        batch.extend(typed("cd"));
+        let events = coalesce_input(batch);
+
+        assert_eq!(events.len(), 4);
+        assert!(matches!(&events[0], TuiEvent::Paste(t) if t == "ab"));
+        assert!(matches!(&events[1], TuiEvent::Key(k) if k.code == KeyCode::Char('y')));
+        assert!(matches!(&events[2], TuiEvent::Key(k) if k.code == KeyCode::Left));
+        assert!(matches!(&events[3], TuiEvent::Paste(t) if t == "cd"));
+    }
+
+    #[test]
+    fn releases_are_dropped_without_splitting_a_paste() {
+        let mut batch = Vec::new();
+        for c in "hi".chars() {
+            batch.push(press(KeyCode::Char(c)));
+            batch.push(Event::Key(KeyEvent::new_with_kind(
+                KeyCode::Char(c),
+                KeyModifiers::empty(),
+                KeyEventKind::Release,
+            )));
+        }
+        assert_eq!(pasted(&coalesce_input(batch)), ["hi"]);
+    }
+
+    #[test]
+    fn shifted_and_altgr_characters_are_text() {
+        let batch = vec![
+            Event::Key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT)),
+            press(KeyCode::Char(':')),
+            Event::Key(KeyEvent::new(
+                KeyCode::Char('\\'),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            )),
+        ];
+        assert_eq!(pasted(&coalesce_input(batch)), [r"D:\"]);
+    }
+
+    #[test]
+    fn a_crlf_pair_is_one_line_break() {
+        let batch = vec![
+            press(KeyCode::Char('a')),
+            press(KeyCode::Enter),
+            press(KeyCode::Char('\n')),
+            press(KeyCode::Char('b')),
+        ];
+        assert_eq!(pasted(&coalesce_input(batch)), ["a\nb"]);
+    }
+
+    #[test]
+    fn bracketed_pastes_and_resizes_keep_their_order() {
+        let batch = vec![
+            press(KeyCode::Char('x')),
+            Event::Paste("block".to_string()),
+            Event::Resize(80, 24),
+        ];
+        let events = coalesce_input(batch);
+        assert!(matches!(&events[0], TuiEvent::Key(k) if k.code == KeyCode::Char('x')));
+        assert!(matches!(&events[1], TuiEvent::Paste(t) if t == "block"));
+        assert!(matches!(&events[2], TuiEvent::Resize(80, 24)));
     }
 }

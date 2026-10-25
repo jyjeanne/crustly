@@ -3,24 +3,40 @@
 //! Core service for managing AI agent conversations, coordinating between
 //! LLM providers, context management, and data persistence.
 
+use super::budget::{
+    calibration_from, tool_schema_tokens, ContextBudget, ContextUsage, DEFAULT_CONTEXT_WINDOW,
+};
+use super::compaction;
 use super::context::{token_count, AgentContext};
 use super::error::{AgentError, Result};
+#[cfg(test)]
+use super::middleware::tool_call_signature;
+use super::middleware::{
+    has_mutating_capability, Limits, LoopGuard, Pipeline, ToolCallRecord, Verification,
+};
+use super::tool_profile::ToolSelection;
+use crate::config::ToolProfile;
 use crate::llm::provider::router::ModelRouter;
 use crate::llm::provider::{
     ContentBlock, ContentDelta, LLMRequest, LLMResponse, Message, PerfMetrics, Provider,
     ProviderStream, StopReason, StreamEvent, TokenUsage, Tool,
 };
-use crate::llm::tools::cache::{CacheKey, ToolResultCache, ToolTtlConfig};
-use crate::llm::tools::{FileReadCache, ToolCapability, ToolExecutionContext, ToolRegistry};
+use crate::llm::tools::cache::{ToolResultCache, ToolTtlConfig};
+use crate::llm::tools::{FileReadCache, ToolExecutionContext, ToolRegistry};
 use crate::services::{MessageService, ServiceContext, SessionService};
-use futures::future::join_all;
 use futures::StreamExt as _;
 use serde_json::Value;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+
+mod run;
+mod subagents;
+mod tool_round;
 
 /// Prefixed to the answer when a response carried no visible text and its
 /// reasoning was surfaced as a fallback (see `final_text_and_thinking`). Makes
@@ -43,133 +59,21 @@ struct FinalText {
     thinking: Option<String>,
 }
 
-/// True when the capabilities can change files or system state, meaning
-/// cached read results may be stale after a tool with them runs.
-fn has_mutating_capability(caps: &[ToolCapability]) -> bool {
-    caps.iter().any(|c| {
-        matches!(
-            c,
-            ToolCapability::WriteFiles
-                | ToolCapability::ExecuteShell
-                | ToolCapability::SystemModification
-        )
-    })
+/// How many times one round is retried after the provider reports that the
+/// prompt overflowed its context window, each time after freeing more context.
+const MAX_OVERFLOW_RETRIES: usize = 2;
+
+/// The tool schemas of one request, counted once: they do not change while
+/// the request runs.
+struct RequestTools {
+    defs: Vec<Tool>,
+    tokens: u32,
 }
 
-/// Choose a completion budget that fits alongside the prompt and tool schema.
-///
-/// Providers reject requests when `prompt_tokens + max_tokens` exceeds their
-/// context window. The context tracker already estimates conversation tokens,
-/// but the system prompt and serialized tool definitions are added separately
-/// by providers (Qwen's Hermes adapter embeds the schemas in its system text),
-/// so include both here with a conservative framing margin.
-fn completion_token_budget(
-    context_window: u32,
-    context: &AgentContext,
-    system_prompt: Option<&str>,
-    tools: Option<&[Tool]>,
-) -> u32 {
-    const DEFAULT_MAX_COMPLETION: usize = 4096;
-    // Provider adapters may expand tool schemas (Qwen/Hermes does this in
-    // the system prompt), so the serialized-schema estimate needs a generous
-    // allowance for chat-template and framing tokens.
-    const PROMPT_FRAMING_MARGIN: usize = 1024;
-
-    let system_tokens = system_prompt.map(token_count).unwrap_or(0) as usize;
-    let tool_tokens = tools
-        .and_then(|defs| serde_json::to_string(defs).ok())
-        .map(|serialized| token_count(&serialized) as usize)
-        .unwrap_or(0);
-    let prompt_tokens = context
-        .token_count
-        .saturating_add(system_tokens)
-        .saturating_add(tool_tokens)
-        .saturating_add(PROMPT_FRAMING_MARGIN);
-    let available = (context_window as usize).saturating_sub(prompt_tokens);
-
-    available.min(DEFAULT_MAX_COMPLETION).max(1) as u32
-}
-
-/// Build a loop-detection signature for one tool call: `<name>:<distinguishing
-/// args>`. Two calls with the same signature seen back-to-back are treated as a
-/// stuck loop. The signature MUST include whatever argument distinguishes one
-/// legitimate call from another (path, command, pattern...), or genuinely
-/// different calls collide and the loop detector aborts the second before it
-/// runs.
-///
-/// For path-based tools the canonical input key is `path`, with `file_path` as
-/// an alias (see the read/edit/write tool schemas). Reading only `file_path`
-/// here yielded a bare `read_file:`/`edit_file:`/`write_file:` for every normal
-/// call, so two operations on *different* paths shared a signature and the
-/// second was falsely aborted as a loop.
-fn tool_call_signature(name: &str, input: &Value) -> String {
-    // First string-valued input under any of `keys`, path-normalized.
-    let first_str = |keys: &[&str]| -> Option<String> {
-        keys.iter()
-            .find_map(|k| input.get(*k).and_then(|v| v.as_str()))
-            .map(|s| s.replace('\\', "/"))
-    };
-
-    match name {
-        "plan" => {
-            if let Some(operation) = input.get("operation").and_then(|v| v.as_str()) {
-                if operation == "add_task" {
-                    if let Some(title) = input.get("title").and_then(|v| v.as_str()) {
-                        format!("{name}:{operation}:{title}")
-                    } else {
-                        format!("{name}:{operation}")
-                    }
-                } else {
-                    format!("{name}:{operation}")
-                }
-            } else {
-                name.to_string()
-            }
-        }
-
-        // File system exploration tools - include path to distinguish calls.
-        "ls" => format!("ls:{}", first_str(&["path"]).unwrap_or_default()),
-        "glob" => format!(
-            "glob:{}",
-            input
-                .get("pattern")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-        ),
-        "grep" => {
-            let pattern = input.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
-            let path = input.get("path").and_then(|v| v.as_str()).unwrap_or("");
-            format!("grep:{pattern}:{path}")
-        }
-
-        // Path-based tools: canonical key `path`, alias `file_path`.
-        "read_file" => format!(
-            "read_file:{}",
-            first_str(&["path", "file_path"]).unwrap_or_default()
-        ),
-        "write_file" | "edit_file" => {
-            format!(
-                "{name}:{}",
-                first_str(&["path", "file_path"]).unwrap_or_default()
-            )
-        }
-
-        // Command execution - include (truncated) command.
-        "bash" => {
-            let cmd = first_str(&["command"]).unwrap_or_default();
-            let cmd_short: String = cmd.chars().take(100).collect();
-            format!("bash:{cmd_short}")
-        }
-
-        // Other tools: name plus an input hash, so different calls to the same
-        // tool never share a signature.
-        _ => {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            let mut h = DefaultHasher::new();
-            input.to_string().hash(&mut h);
-            format!("{name}:{:016x}", h.finish())
-        }
+impl RequestTools {
+    fn new(defs: Vec<Tool>) -> Self {
+        let tokens = tool_schema_tokens(&defs);
+        Self { defs, tokens }
     }
 }
 
@@ -332,13 +236,75 @@ pub struct AgentService {
     /// across every `send_message*` call on this instance.
     file_read_cache: Arc<FileReadCache>,
 
-    /// SQLite pool for compaction writes (T032)
+    /// SQLite pool for compaction records (T032). Defaults to the session
+    /// database in `context`; set only to write them elsewhere.
     pool: Option<Arc<sqlx::SqlitePool>>,
 
     /// Whether this service may wire a SubAgentLauncher into tool contexts.
     /// Always false for services created by AgentServiceLauncher to prevent
     /// recursive sub-agent spawning.
     allow_sub_agents: bool,
+
+    /// Which tool schemas requests carry (see `tool_profile`).
+    tool_profile: ToolProfile,
+
+    /// Tools exposed on top of the core set when the core profile applies.
+    extra_tools: Vec<String>,
+
+    /// Shorter system prompt used while only the core tools are exposed, so
+    /// the prompt does not describe tools the model cannot call.
+    core_system_prompt: Option<String>,
+
+    /// Provider prompt tokens per estimated token, learned from responses
+    /// (see `budget::calibration_from`). Reset when the provider changes.
+    token_calibration: std::sync::Mutex<f64>,
+
+    /// Wall-clock cap for one request (`[agent] max_wall_time_secs`).
+    max_wall_time: Option<Duration>,
+
+    /// Input + output token cap for one request (`[agent] max_request_tokens`).
+    max_request_tokens: Option<u32>,
+
+    /// Whether the model must check its file edits before answering
+    /// (`middleware::Verification`).
+    verification: bool,
+
+    /// The check command; inferred from the project's build files when unset.
+    verification_command: Option<String>,
+
+    /// Whether project notes (AGENTS.md, CLAUDE.md, `.crustly/memory.md`...)
+    /// are added to the system prompt (see `project_memory`).
+    project_notes: bool,
+
+    /// Whether requests that edited files or ran several tool rounds are
+    /// logged to `.crustly/progress.md` (see `project_memory`).
+    progress_file: bool,
+
+    /// When set, the only tools the model may use (a sub-agent profile),
+    /// overriding `tool_profile`.
+    tool_allowlist: Option<Vec<String>>,
+
+    /// Provider a round falls back to when the main one fails or overflows.
+    fallback: Option<Fallback>,
+
+    /// The sub-agents started through the `agent` tool, and how many may
+    /// run at once.
+    subagents: Arc<subagents::SubAgentManager>,
+
+    /// Sub-agent profiles by name (see `profiles`).
+    profiles: Arc<std::collections::BTreeMap<String, super::profiles::AgentProfile>>,
+}
+
+/// A provider to fall back to (`[fallback]` config).
+#[derive(Clone)]
+pub struct Fallback {
+    pub provider: Arc<dyn Provider>,
+    /// Fall back when the main provider is unreachable, rate-limited, times
+    /// out or returns a server error.
+    pub on_error: bool,
+    /// Fall back when the prompt overflows the main model's window and
+    /// compaction cannot free enough of it.
+    pub on_overflow: bool,
 }
 
 /// Route a streaming `TextDelta` through `<think>` tag detection.
@@ -582,7 +548,91 @@ impl AgentService {
             file_read_cache: Arc::new(FileReadCache::new()),
             pool: None,
             allow_sub_agents: true,
+            tool_profile: ToolProfile::Full,
+            extra_tools: Vec::new(),
+            core_system_prompt: None,
+            token_calibration: std::sync::Mutex::new(1.0),
+            max_wall_time: None,
+            max_request_tokens: None,
+            verification: false,
+            verification_command: None,
+            project_notes: false,
+            progress_file: false,
+            tool_allowlist: None,
+            fallback: None,
+            subagents: Arc::new(subagents::SubAgentManager::new(1)),
+            profiles: Arc::new(super::profiles::builtin_profiles()),
         }
+    }
+
+    /// Limit the model to exactly these tools (a sub-agent profile).
+    pub fn with_tool_allowlist(mut self, tools: Vec<String>) -> Self {
+        self.tool_allowlist = Some(tools);
+        self
+    }
+
+    /// Fall back to another provider when the main one fails or overflows.
+    pub fn with_fallback(mut self, fallback: Fallback) -> Self {
+        self.fallback = Some(fallback);
+        self
+    }
+
+    /// Run at most `max_concurrent` sub-agents at a time, with `profiles`.
+    pub fn with_subagents(
+        mut self,
+        max_concurrent: usize,
+        profiles: std::collections::BTreeMap<String, super::profiles::AgentProfile>,
+    ) -> Self {
+        self.subagents = Arc::new(subagents::SubAgentManager::new(max_concurrent));
+        self.profiles = Arc::new(profiles);
+        self
+    }
+
+    /// Cap one request's wall-clock time and tokens. When a cap is reached
+    /// the model is asked to answer from the work done so far.
+    pub fn with_request_limits(
+        mut self,
+        max_wall_time: Option<Duration>,
+        max_tokens: Option<u32>,
+    ) -> Self {
+        self.max_wall_time = max_wall_time;
+        self.max_request_tokens = max_tokens;
+        self
+    }
+
+    /// Require the model to check file edits before it answers, with
+    /// `command` or one inferred from the project's build files.
+    pub fn with_verification(mut self, enabled: bool, command: Option<String>) -> Self {
+        self.verification = enabled;
+        self.verification_command = command;
+        self
+    }
+
+    /// Add the project's notes files to the system prompt.
+    pub fn with_project_notes(mut self, enabled: bool) -> Self {
+        self.project_notes = enabled;
+        self
+    }
+
+    /// Log finished tool work to `.crustly/progress.md`.
+    pub fn with_progress_file(mut self, enabled: bool) -> Self {
+        self.progress_file = enabled;
+        self
+    }
+
+    /// Choose which tool schemas requests carry (the `[tools]` config).
+    /// Defaults to every registered tool.
+    pub fn with_tool_profile(mut self, profile: ToolProfile, extra: Vec<String>) -> Self {
+        self.tool_profile = profile;
+        self.extra_tools = extra;
+        self
+    }
+
+    /// Set the system prompt used while only the core tools are exposed.
+    /// Without one, the default system prompt is used for every profile.
+    pub fn with_core_system_prompt(mut self, prompt: String) -> Self {
+        self.core_system_prompt = Some(prompt);
+        self
     }
 
     /// Enable tier-based model routing (T046)
@@ -591,7 +641,7 @@ impl AgentService {
         self
     }
 
-    /// Enable compaction with a DB pool (T032)
+    /// Write compaction records to `pool` instead of the session database (T032)
     pub fn with_pool(mut self, pool: Arc<sqlx::SqlitePool>) -> Self {
         self.pool = Some(pool);
         self
@@ -646,7 +696,34 @@ impl AgentService {
     /// because the directory is only known at runtime, and a sub-agent may be
     /// running in a different one.
     fn system_prompt_with_env(&self) -> Option<String> {
-        let base = self.default_system_prompt.as_ref()?;
+        self.with_env(self.default_system_prompt.as_deref())
+    }
+
+    /// The system prompt for `selection` on a model with `window` tokens: the
+    /// core prompt while only the core tools are exposed (when one is set),
+    /// the default prompt otherwise, with the environment and - when enabled -
+    /// the project notes appended.
+    fn system_prompt_for(&self, selection: &ToolSelection, window: u32) -> Option<String> {
+        let base = match &self.core_system_prompt {
+            Some(core) if selection.is_core_only() => Some(core.as_str()),
+            _ => self.default_system_prompt.as_deref(),
+        };
+        let prompt = self.with_env(base)?;
+        if !self.project_notes {
+            return Some(prompt);
+        }
+        let notes = super::project_memory::load_project_notes(
+            &self.working_directory,
+            super::project_memory::notes_budget(window),
+        );
+        Some(match notes {
+            Some(notes) => format!("{prompt}\n\n{notes}"),
+            None => prompt,
+        })
+    }
+
+    fn with_env(&self, base: Option<&str>) -> Option<String> {
+        let base = base?;
         Some(format!(
             "{base}\n\n## Environment\n\nCurrent working directory: {}\n\n\
              This is what \"the current directory/folder\" refers to. Paths you pass to \
@@ -670,6 +747,11 @@ impl AgentService {
     /// way constructing a fresh `AgentService` from scratch would.
     pub fn set_provider(&mut self, provider: Arc<dyn Provider>) {
         self.provider = provider;
+        // A different model has a different tokenizer: start over.
+        *self
+            .token_calibration
+            .get_mut()
+            .unwrap_or_else(|e| e.into_inner()) = 1.0;
     }
 
     /// Get the provider name
@@ -688,6 +770,241 @@ impl AgentService {
         self.provider.context_window(self.provider.default_model())
     }
 
+    /// Resolve the tool profile for a model with `context_window` tokens.
+    fn tool_selection(&self, context_window: u32) -> ToolSelection {
+        match &self.tool_allowlist {
+            Some(tools) => ToolSelection::only(tools),
+            None => ToolSelection::resolve(self.tool_profile, &self.extra_tools, context_window),
+        }
+    }
+
+    /// Definitions of the registered tools that `selection` exposes.
+    fn exposed_tool_definitions(&self, selection: &ToolSelection) -> Vec<Tool> {
+        self.tool_registry
+            .get_tool_definitions()
+            .into_iter()
+            .filter(|t| selection.exposes(&t.name))
+            .collect()
+    }
+
+    fn default_context_window(&self) -> u32 {
+        self.provider_context_window()
+            .unwrap_or(DEFAULT_CONTEXT_WINDOW)
+    }
+
+    /// Names of the tools the model currently sees, sorted. The TUI uses this
+    /// to avoid hinting at tools the core profile does not send.
+    pub fn exposed_tool_names(&self) -> Vec<String> {
+        let selection = self.tool_selection(self.default_context_window());
+        let mut names: Vec<String> = self
+            .exposed_tool_definitions(&selection)
+            .into_iter()
+            .map(|t| t.name)
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Context usage of an empty conversation with the current provider,
+    /// model and tool profile: what every request costs before the user says
+    /// anything.
+    pub fn context_usage_preview(&self) -> ContextUsage {
+        let window = self.default_context_window();
+        let selection = self.tool_selection(window);
+        let tools = self.exposed_tool_definitions(&selection);
+        let system = self.system_prompt_for(&selection, window);
+        ContextBudget::measure(window, system.as_deref(), &tools, 0, self.calibration())
+            .usage(selection.is_core_only())
+    }
+
+    fn calibration(&self) -> f64 {
+        *self
+            .token_calibration
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Learn from the provider's own prompt token count for `budget`'s
+    /// request. Skipped when the provider served part of the prompt from its
+    /// cache: its input count then leaves the cached tokens out.
+    fn record_calibration(&self, response: &LLMResponse, budget: &ContextBudget) {
+        if response.cache_metrics.is_some() {
+            return;
+        }
+        if let Some(factor) =
+            calibration_from(response.usage.input_tokens, budget.raw_prompt_tokens())
+        {
+            *self
+                .token_calibration
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = factor;
+        }
+    }
+
+    /// Budget of the request `context` would produce with `tools`.
+    fn measure_budget(&self, context: &AgentContext, tools: &RequestTools) -> ContextBudget {
+        let system_tokens = context
+            .effective_system_prompt()
+            .as_deref()
+            .map(token_count)
+            .unwrap_or(0);
+        ContextBudget::from_counts(
+            context.max_tokens as u32,
+            system_tokens,
+            tools.tokens,
+            tools.defs.len() as u32,
+            context.token_count,
+            self.calibration(),
+        )
+    }
+
+    /// Free context until the answer has room, cheapest step first, and
+    /// return whether anything was freed.
+    ///
+    /// `level` 0 is the check before every round: it acts only when the
+    /// budget is tight. Levels 1 and 2 follow a provider overflow error, when
+    /// the estimate has already proved too low, and cut deeper each time.
+    async fn make_room(
+        &self,
+        context: &mut AgentContext,
+        tools: &RequestTools,
+        level: usize,
+    ) -> bool {
+        if level == 0 && !self.measure_budget(context, tools).is_tight() {
+            return false;
+        }
+
+        // Step 1: drop the output of older tool calls.
+        let keep_results = 2usize.saturating_sub(level);
+        let freed = compaction::elide_tool_results(context, keep_results);
+        let mut freed_any = freed > 0;
+        if freed_any {
+            tracing::info!(
+                "Elided old tool output, freeing ~{} tokens of context",
+                freed
+            );
+            if level == 0 && !self.measure_budget(context, tools).is_tight() {
+                return true;
+            }
+        }
+
+        // Step 2: summarize and drop older messages. The compaction record
+        // goes to the session database, which every service already holds;
+        // `with_pool` only overrides it.
+        let pool: &sqlx::SqlitePool = self.pool.as_deref().unwrap_or(&self.context.pool);
+        let keeps: &[usize] = match level {
+            0 => &[compaction::DEFAULT_KEEP_MESSAGES, 4],
+            1 => &[4],
+            _ => &[2],
+        };
+        for &keep in keeps {
+            match compaction::compact_keeping(context, pool, keep).await {
+                Ok(record) => {
+                    tracing::info!(
+                        "Compacted context: {} -> {} tokens (kept ~{} messages)",
+                        record.tokens_before,
+                        record.tokens_after,
+                        keep
+                    );
+                    freed_any = true;
+                    if !self.measure_budget(context, tools).is_tight() {
+                        break;
+                    }
+                }
+                Err(e) => tracing::debug!("Compaction skipped: {}", e),
+            }
+        }
+
+        let budget = self.measure_budget(context, tools);
+        if budget.is_tight() {
+            tracing::warn!(
+                "Only {} of {} context tokens are left for the answer; the system prompt \
+                 and {} tool schemas take {}. Raise the model's context window or set \
+                 [tools] profile = \"core\".",
+                budget.available(),
+                budget.window,
+                budget.tool_count,
+                budget.fixed_overhead()
+            );
+        }
+        freed_any
+    }
+
+    /// The middleware for one request (see `middleware`): limits, loop
+    /// guards, and - when enabled, the shell tool is offered and the request
+    /// may change files - verification of edits.
+    fn round_pipeline(&self, selection: &ToolSelection, read_only: bool) -> Pipeline {
+        let mut pipeline = Pipeline::new()
+            .with(Limits {
+                max_rounds: self.max_tool_iterations,
+                max_wall_time: self.max_wall_time,
+                max_tokens: self.max_request_tokens,
+            })
+            .with(LoopGuard::new());
+        if self.verification
+            && !read_only
+            && selection.exposes("bash")
+            && self.tool_registry.has_tool("bash")
+        {
+            if let Some(command) = Verification::detect_command(
+                &self.working_directory,
+                self.verification_command.as_deref(),
+            ) {
+                pipeline = pipeline.with(Verification::new(command));
+            }
+        }
+        pipeline
+    }
+
+    /// Log a request that edited files or ran several tool rounds to
+    /// `.crustly/progress.md`. Failures are logged, not returned: the answer
+    /// matters more than the log.
+    fn log_progress(
+        &self,
+        request: &str,
+        tools: Option<&str>,
+        answer: &str,
+        outcome: &run::RunOutcome,
+        read_only: bool,
+    ) {
+        let Some(tools) = tools else {
+            return;
+        };
+        let edited = outcome
+            .tool_log
+            .iter()
+            .any(|r: &ToolCallRecord| r.success && super::middleware::is_file_edit(&r.name));
+        if !self.progress_file || read_only || !(edited || outcome.tool_rounds >= 3) {
+            return;
+        }
+        let entry = super::project_memory::ProgressEntry {
+            request,
+            tools,
+            result: answer,
+        };
+        if let Err(e) = super::project_memory::append_progress(&self.working_directory, &entry) {
+            tracing::warn!("Could not update the progress log: {}", e);
+        }
+    }
+
+    /// Build the provider request for the current context.
+    fn build_request(
+        model_name: &str,
+        context: &AgentContext,
+        tools: &RequestTools,
+        max_tokens: u32,
+    ) -> LLMRequest {
+        let mut request = LLMRequest::new(model_name.to_string(), context.messages.clone())
+            .with_max_tokens(max_tokens);
+        if let Some(system) = context.effective_system_prompt() {
+            request = request.with_system(system);
+        }
+        if !tools.defs.is_empty() {
+            request = request.with_tools(tools.defs.clone());
+        }
+        request
+    }
+
     /// Send a message and get a response
     ///
     /// This will:
@@ -703,7 +1020,7 @@ impl AgentService {
         model: Option<String>,
     ) -> Result<AgentResponse> {
         // Prepare message context (common setup logic)
-        let (_model_name, request, message_service, session_service) = self
+        let (_model_name, request, message_service, session_service, budget) = self
             .prepare_message_context(session_id, user_message, model)
             .await?;
 
@@ -713,6 +1030,7 @@ impl AgentService {
             .complete(request)
             .await
             .map_err(AgentError::Provider)?;
+        self.record_calibration(&response, &budget);
 
         // Resolve text: `stored` is persisted/replayed to the model, `display`
         // is shown to the user (they differ only for the reasoning-only notice).
@@ -766,6 +1084,8 @@ impl AgentService {
             model: response.model,
             provider_name: self.provider.name().to_string(),
             perf_metrics: response.perf_metrics,
+            context: Some(budget.usage(false)),
+            tool_summary: None,
         })
     }
 
@@ -779,7 +1099,7 @@ impl AgentService {
         model: Option<String>,
     ) -> Result<AgentStreamResponse> {
         // Prepare message context (common setup logic)
-        let (model_name, request, _message_service, _session_service) = self
+        let (model_name, request, _message_service, _session_service, _budget) = self
             .prepare_message_context(session_id, user_message, model)
             .await?;
 
@@ -826,12 +1146,63 @@ impl AgentService {
         model: Option<String>,
         read_only_mode: bool,
     ) -> Result<AgentResponse> {
-        self.send_message_with_tools_inner(session_id, user_message, model, read_only_mode, None)
-            .await
+        self.send_message_with_tools_inner(
+            session_id,
+            user_message,
+            model,
+            read_only_mode,
+            None,
+            CancellationToken::new(),
+        )
+        .await
+    }
+
+    /// Non-streaming variant that stops with [`AgentError::Cancelled`] when
+    /// `cancel` is cancelled (sub-agents).
+    pub(crate) async fn send_message_with_tools_cancellable(
+        &self,
+        session_id: Uuid,
+        user_message: String,
+        model: Option<String>,
+        read_only_mode: bool,
+        cancel: CancellationToken,
+    ) -> Result<AgentResponse> {
+        self.send_message_with_tools_inner(
+            session_id,
+            user_message,
+            model,
+            read_only_mode,
+            None,
+            cancel,
+        )
+        .await
+    }
+
+    /// What a sub-agent of this service inherits from it.
+    fn child_template(&self) -> subagents::ChildTemplate {
+        subagents::ChildTemplate {
+            provider: self.provider.clone(),
+            fallback: self.fallback.clone(),
+            context: self.context.clone(),
+            tool_registry: self.tool_registry.clone(),
+            working_directory: self.working_directory.clone(),
+            system_prompt: self.default_system_prompt.clone(),
+            core_system_prompt: self.core_system_prompt.clone(),
+            tool_profile: self.tool_profile,
+            extra_tools: self.extra_tools.clone(),
+            approval_callback: self.approval_callback.clone(),
+            auto_approve_tools: self.auto_approve_tools,
+            verification: self.verification,
+            verification_command: self.verification_command.clone(),
+            project_notes: self.project_notes,
+            profiles: self.profiles.clone(),
+        }
     }
 
     /// Streaming variant — identical to [`send_message_with_tools_and_mode`] but forwards
     /// each LLM text delta to `chunk_tx` so the TUI can render incremental output.
+    /// Cancelling `cancel` ends the request with [`AgentError::Cancelled`] at
+    /// the next model call, approval prompt or round boundary.
     pub async fn send_message_with_tools_and_mode_streaming(
         &self,
         session_id: Uuid,
@@ -839,6 +1210,7 @@ impl AgentService {
         model: Option<String>,
         read_only_mode: bool,
         chunk_tx: mpsc::UnboundedSender<String>,
+        cancel: CancellationToken,
     ) -> Result<AgentResponse> {
         self.send_message_with_tools_inner(
             session_id,
@@ -846,6 +1218,7 @@ impl AgentService {
             model,
             read_only_mode,
             Some(chunk_tx),
+            cancel,
         )
         .await
     }
@@ -858,6 +1231,7 @@ impl AgentService {
         model: Option<String>,
         read_only_mode: bool,
         chunk_tx: Option<mpsc::UnboundedSender<String>>,
+        cancel: CancellationToken,
     ) -> Result<AgentResponse> {
         // Get or create session
         let session_service = SessionService::new(self.context.clone());
@@ -874,17 +1248,50 @@ impl AgentService {
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
-        let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
+        // Resolve the model first, so the context window and tool profile
+        // below are those of the model that will answer. An explicit model
+        // (a sub-agent profile) wins; otherwise the router, when enabled,
+        // picks the tier's model from the request's wording (T046).
+        let model_name = match (model, &self.model_router) {
+            (Some(model), _) => model,
+            (None, Some(router)) => {
+                let tier =
+                    crate::tui::prompt_analyzer::PromptAnalyzer::new().classify_tier(&user_message);
+                let (_, model_id) = router.resolve(tier);
+                tracing::info!("Model router: {:?} request -> {}", tier, model_id);
+                model_id.to_string()
+            }
+            (None, None) => self.provider.default_model().to_string(),
+        };
+        let context_window = self
+            .provider
+            .context_window(&model_name)
+            .unwrap_or(DEFAULT_CONTEXT_WINDOW);
 
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
 
+        // Which tools the model sees on this window, counted once: the
+        // schemas ride along with every round of the loop.
+        let selection = self.tool_selection(context_window);
+        let tools = RequestTools::new(self.exposed_tool_definitions(&selection));
+        if tools.defs.is_empty() {
+            tracing::warn!("No tools registered in tool registry!");
+        }
+
         // Add system prompt if available, with the working directory appended so
         // the model knows where "the current directory" actually is.
-        if let Some(system_prompt) = self.system_prompt_with_env() {
+        if let Some(system_prompt) = self.system_prompt_for(&selection, context_window) {
             context.system_prompt = Some(system_prompt);
         }
+
+        // What the user asked, for the progress log.
+        let request_line = user_message
+            .trim()
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .to_string();
 
         // Auto-inject PDF content when the user message references a .pdf file
         let user_message = crate::llm::pdf_context::augment_message_with_pdf(
@@ -903,685 +1310,85 @@ impl AgentService {
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
-        // Resolve model: router picks tier-appropriate model when available (T046)
-        let model_name = if let Some(ref router) = self.model_router {
-            let last_text = context
-                .messages
-                .last()
-                .map(|m| {
-                    m.content
-                        .iter()
-                        .filter_map(|b| {
-                            if let ContentBlock::Text { text } = b {
-                                Some(text.as_str())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                })
-                .unwrap_or_default();
-            let tier = crate::tui::prompt_analyzer::PromptAnalyzer::new().classify_tier(&last_text);
-            let (_, model_id) = router.resolve(tier);
-            model_id.to_string()
-        } else {
-            model_name
-        };
-
         // Create tool execution context.
-        // Only wire a SubAgentLauncher for top-level services; sub-agents started by
-        // AgentServiceLauncher have allow_sub_agents=false to prevent recursive spawning.
+        // Only wire a SubAgentLauncher for top-level services; sub-agents are
+        // built with allow_sub_agents=false to prevent recursive spawning.
         let mut tool_context = ToolExecutionContext::new(session_id)
             .with_auto_approve(self.auto_approve_tools)
             .with_working_directory(self.working_directory.clone())
             .with_read_only_mode(read_only_mode)
-            .with_file_read_cache(self.file_read_cache.clone());
+            .with_file_read_cache(self.file_read_cache.clone())
+            .with_cancel(cancel.clone());
         if self.allow_sub_agents {
-            let launcher = Arc::new(AgentServiceLauncher::new(
-                self.provider.clone(),
-                self.context.clone(),
-                self.tool_registry.clone(),
-                self.working_directory.clone(),
-                self.default_system_prompt.clone(),
+            let launcher = Arc::new(subagents::AgentServiceLauncher::new(
+                self.subagents.clone(),
+                self.child_template(),
             ));
             tool_context = tool_context.with_sub_agent_launcher(launcher);
         }
 
-        // Tool execution loop
-        let mut iteration = 0;
-        let mut total_input_tokens = 0u32;
-        let mut total_output_tokens = 0u32;
-        let mut final_response: Option<LLMResponse> = None;
-        let mut recent_tool_calls: Vec<String> = Vec::new(); // Track tool calls to detect loops
-                                                             // Consecutive tool-calling turns in which the model said nothing to the
-                                                             // user. Reset by any turn that produces text. See MAX_SILENT_TOOL_CALLS.
-        let mut silent_tool_calls: usize = 0;
-        // Successful mutating tool calls since the previous plan task
-        // completion. Backs `plan_completion_rejection`: marking a plan task
-        // success=true requires evidence of work; each accepted completion
-        // resets the counter so the NEXT task needs fresh evidence.
-        let mut mutating_evidence: usize = 0;
-
-        while iteration < self.max_tool_iterations {
-            iteration += 1;
-
-            // Build LLM request with tools if available. The final completion
-            // budget is calculated after tool definitions are attached so
-            // smaller local context windows (for example vLLM at 8K) do not
-            // receive an over-budget request.
-            let mut request = LLMRequest::new(model_name.clone(), context.messages.clone());
-
-            if let Some(system) = &context.system_prompt {
-                request = request.with_system(system.clone());
-            }
-
-            // Add tools if registry has any
-            let tool_count = self.tool_registry.count();
-            tracing::debug!("Tool registry contains {} tools", tool_count);
-            if tool_count > 0 {
-                let tool_defs = self.tool_registry.get_tool_definitions();
-                tracing::debug!("Adding {} tool definitions to request", tool_defs.len());
-                let max_tokens = completion_token_budget(
-                    context_window,
-                    &context,
-                    context.system_prompt.as_deref(),
-                    Some(&tool_defs),
-                );
-                request = request.with_tools(tool_defs).with_max_tokens(max_tokens);
-            } else {
-                tracing::warn!("No tools registered in tool registry!");
-                let max_tokens = completion_token_budget(
-                    context_window,
-                    &context,
-                    context.system_prompt.as_deref(),
-                    None,
-                );
-                request = request.with_max_tokens(max_tokens);
-            }
-
-            // Send to provider — stream when chunk_tx is available, otherwise block.
-            let response = Self::call_provider_streaming(
-                &self.provider,
-                request,
-                chunk_tx.as_ref(),
-                &model_name,
-            )
-            .await
-            .map_err(AgentError::Provider)?;
-
-            // Track token usage
-            total_input_tokens += response.usage.input_tokens;
-            total_output_tokens += response.usage.output_tokens;
-
-            // Accumulate prompt-cache metrics (T065)
-            if let Some(ref cm) = response.cache_metrics {
-                context.accumulated_cache_metrics.read_tokens += cm.read_tokens;
-                context.accumulated_cache_metrics.creation_tokens += cm.creation_tokens;
-            }
-
-            // Check if response contains tool use
-            tracing::debug!("Response has {} content blocks", response.content.len());
-            for (i, block) in response.content.iter().enumerate() {
-                match block {
-                    ContentBlock::Text { text } => {
-                        tracing::debug!(
-                            "Block {}: Text ({}...)",
-                            i,
-                            &text.chars().take(50).collect::<String>()
-                        );
-                    }
-                    ContentBlock::ToolUse { id, name, input: _ } => {
-                        tracing::debug!("Block {}: ToolUse {{ name: {}, id: {} }}", i, name, id);
-                    }
-                    _ => {
-                        tracing::debug!("Block {}: Other content block", i);
-                    }
-                }
-            }
-
-            let tool_uses: Vec<_> = response
-                .content
-                .iter()
-                .filter_map(|block| {
-                    if let ContentBlock::ToolUse { id, name, input } = block {
-                        Some((id.clone(), name.clone(), input.clone()))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            tracing::debug!("Found {} tool uses to execute", tool_uses.len());
-
-            if tool_uses.is_empty() {
-                // No tool use - we're done
-                tracing::debug!("No tool uses found, completing with final response");
-                final_response = Some(response);
-                break;
-            }
-
-            // Detect tool loops: Track the current batch of tool calls
-            // Include arguments in signature to distinguish different calls
-            // For example: ls(./src) vs ls(./src/cli) should be different
-            let current_call_signature = tool_uses
-                .iter()
-                .map(|(_, name, input)| tool_call_signature(name, input))
-                .collect::<Vec<_>>()
-                .join(",");
-
-            recent_tool_calls.push(current_call_signature.clone());
-
-            // Keep only last 15 iterations for loop detection (increased for deep exploration)
-            if recent_tool_calls.len() > 15 {
-                recent_tool_calls.remove(0);
-            }
-
-            // Drift guard. The identical-call check below only fires when the
-            // model repeats the *same* call, so a model that keeps picking
-            // *different* tools sails past it and burns all 20 iterations. That
-            // is the common failure: the very first `bash` returns the answer,
-            // the model ignores it and wanders off through ls, glob, write_file,
-            // task_manager..., ending in "Maximum tool iterations exceeded".
-            //
-            // Any turn where the model emits text is making progress, so the
-            // counter resets. Only an unbroken run of tool calls with nothing
-            // said to the user counts as drift.
-            const MAX_SILENT_TOOL_CALLS: usize = 6;
-            let produced_text = response
-                .content
-                .iter()
-                .any(|b| matches!(b, ContentBlock::Text { text } if !text.trim().is_empty()));
-            // Building a plan is an intentionally silent chain: create +
-            // one add_task per step + finalize is 7+ consecutive tool calls
-            // with nothing to say in between - the drift guard used to fire
-            // mid-plan and force a text response, cutting the plan off after
-            // its first tasks. Plan-tool turns are therefore neutral: they
-            // neither count toward drift nor reset it. A model genuinely
-            // stuck repeating one plan call is still caught by the
-            // identical-call loop breaker below.
-            let all_plan_calls =
-                !tool_uses.is_empty() && tool_uses.iter().all(|(_, name, _)| name == "plan");
-            if produced_text {
-                silent_tool_calls = 0;
-            } else if !all_plan_calls {
-                silent_tool_calls += 1;
-            }
-            let drifting = silent_tool_calls >= MAX_SILENT_TOOL_CALLS;
-            if drifting {
-                tracing::warn!(
-                    "⚠️ {} consecutive tool calls with no answer to the user \
-                     (last: '{}'). Forcing a text response.",
-                    silent_tool_calls,
-                    current_call_signature
-                );
-            }
-
-            // Check for repeated patterns with tool-specific thresholds
-            // This will only trigger for truly identical calls (same tool + same arguments)
-
-            // Determine loop threshold from the first tool's declared
-            // capabilities, so the classification cannot drift from the
-            // registry's actual tool names the way hardcoded strings did.
-            let first_tool_caps = tool_uses
-                .first()
-                .and_then(|(_, name, _)| self.tool_registry.get(name))
-                .map(|t| t.capabilities())
-                .unwrap_or_default();
-            let is_modification_tool = has_mutating_capability(&first_tool_caps);
-            let is_exploration_tool = !is_modification_tool
-                && first_tool_caps
-                    .iter()
-                    .any(|c| matches!(c, ToolCapability::ReadFiles | ToolCapability::Network));
-
-            // Higher threshold for exploration tools (allow deep directory traversal)
-            // Lower threshold for modification tools (dangerous if looping)
-            let loop_threshold = if is_exploration_tool {
-                10 // Allow up to 10 identical calls for exploration
-            } else if is_modification_tool {
-                2 // Only 2 identical calls for modification tools
-            } else {
-                3 // Default: 3 identical calls
-            };
-
-            // The model is repeating one identical call.
-            let repeating = recent_tool_calls.len() >= loop_threshold
-                && recent_tool_calls[recent_tool_calls.len() - loop_threshold..]
-                    .iter()
-                    .all(|call| call == &current_call_signature);
-
-            // Either failure mode lands in the same recovery: re-ask with no
-            // tools, forcing the model to answer from what it already has.
-            if repeating || drifting {
-                {
-                    tracing::warn!(
-                        "⚠️ Detected tool loop: '{}' called {} times in a row. Breaking loop.",
-                        current_call_signature,
-                        loop_threshold
-                    );
-
-                    if is_exploration_tool {
-                        tracing::info!(
-                            "💡 Hint: The model is stuck trying to access the same path {} times. \
-                             This often means the path doesn't exist or the model is confused about the directory structure.",
-                            loop_threshold
-                        );
-                    } else if is_modification_tool {
-                        tracing::warn!(
-                            "⚠️ Modification tool loop detected! This could be dangerous. \
-                             The model tried to modify the same file/run the same command {} times.",
-                            loop_threshold
-                        );
-                    }
-
-                    // T052: Instead of silently breaking, inject a recovery hint and let the
-                    // LLM self-correct via a follow-up turn (no tools = forced text response).
-                    tracing::warn!(
-                        "⚠️ Detected tool loop: '{}' called {} times in a row. Injecting recovery hint.",
-                        current_call_signature,
-                        loop_threshold
-                    );
-
-                    let hint = if repeating {
-                        format!(
-                            "⚠️ Loop detected: you called '{}' {} times in a row without making progress. \
-                             Please reassess your approach. Summarise what you have found so far and \
-                             explain what the next step should be without repeating the same tool call.",
-                            current_call_signature, loop_threshold
-                        )
-                    } else {
-                        format!(
-                            "⚠️ You have made {} tool calls without answering the user. The results you \
-                             already have are enough. Do NOT call any more tools. Answer the user's \
-                             original question now, using only what those tools returned.",
-                            silent_tool_calls
-                        )
-                    };
-
-                    // Add the assistant's last response and a user recovery message to context.
-                    let assistant_msg = Message {
-                        role: crate::llm::provider::Role::Assistant,
-                        content: response.content.clone(),
-                    };
-                    context.add_message(assistant_msg);
-                    context.add_message(Message::user(hint));
-
-                    // Ask LLM to recover without tools so it is forced to produce a text answer.
-                    let recovery_request =
-                        LLMRequest::new(model_name.clone(), context.messages.clone())
-                            .with_max_tokens(2048);
-                    let recovery_request = if let Some(system) = &context.system_prompt {
-                        recovery_request.with_system(system.clone())
-                    } else {
-                        recovery_request
-                    };
-
-                    match self.provider.complete(recovery_request).await {
-                        Ok(recovery_response) => {
-                            final_response = Some(recovery_response);
-                        }
-                        Err(_) => {
-                            final_response = Some(response);
-                        }
-                    }
-                    break;
-                }
-            }
-
-            // Execute tools and build response message.
-            // Parallelizable tools (read-only, idempotent) run concurrently; others sequentially.
-            // Tool results are cached per-session to avoid redundant calls (T037 / T049).
-            let mut tool_results: Vec<ContentBlock> = Vec::new();
-
-            // Partition tool uses
-            let (parallel_uses, sequential_uses): (Vec<_>, Vec<_>) = tool_uses
-                .into_iter()
-                .partition(|(_, name, _)| is_parallelizable(name));
-
-            // --- Parallel execution ---
-            let parallel_futures: Vec<_> = parallel_uses
-                .into_iter()
-                .map(|(tool_id, tool_name, tool_input)| {
-                    let registry = Arc::clone(&self.tool_registry);
-                    let cache = Arc::clone(&self.tool_cache);
-                    let ctx = tool_context.clone();
-                    async move {
-                        let cache_key = CacheKey::from_tool(&tool_name, &tool_input);
-                        if let Some(cached) = cache.get(&cache_key) {
-                            tracing::debug!("Cache hit for tool '{}'", tool_name);
-                            return ContentBlock::ToolResult {
-                                tool_use_id: tool_id,
-                                content: cached,
-                                is_error: Some(false),
-                            };
-                        }
-                        match registry.execute(&tool_name, tool_input, &ctx).await {
-                            Ok(result) => {
-                                let content = if result.success {
-                                    result.output
-                                } else {
-                                    result
-                                        .error
-                                        .unwrap_or_else(|| "Tool execution failed".to_string())
-                                };
-                                if result.success {
-                                    cache.insert_for_tool(cache_key, content.clone());
-                                }
-                                ContentBlock::ToolResult {
-                                    tool_use_id: tool_id,
-                                    content,
-                                    is_error: Some(!result.success),
-                                }
-                            }
-                            Err(e) => ContentBlock::ToolResult {
-                                tool_use_id: tool_id,
-                                content: format!("Tool execution error: {}", e),
-                                is_error: Some(true),
-                            },
-                        }
-                    }
-                })
-                .collect();
-
-            let parallel_results = join_all(parallel_futures).await;
-            tool_results.extend(parallel_results);
-
-            // --- Sequential execution (tools requiring approval or non-idempotent) ---
-            // Set when a tool with a mutating capability actually executes
-            // (approved or auto), so read caches can be invalidated below.
-            let mut mutating_tool_ran = false;
-            for (tool_id, tool_name, tool_input) in sequential_uses {
-                tracing::info!(
-                    "Executing tool '{}' (iteration {}/{})",
-                    tool_name,
-                    iteration,
-                    self.max_tool_iterations
-                );
-
-                // A plan task may only be marked success=true with evidence
-                // that its work happened (see plan_completion_rejection).
-                if tool_name == "plan" {
-                    if let Some(reason) = plan_completion_rejection(
-                        &tool_input,
-                        mutating_evidence,
-                        &tool_context.working_directory,
-                        tool_context.session_id,
-                    ) {
-                        tracing::warn!(
-                            "⚠️ Blocked a plan complete_task without evidence of work \
-                             (mutating calls since last completion: {})",
-                            mutating_evidence
-                        );
-                        tool_results.push(ContentBlock::ToolResult {
-                            tool_use_id: tool_id,
-                            content: reason,
-                            is_error: Some(true),
-                        });
-                        continue;
-                    }
-                }
-
-                // Check if approval is needed. `requires_approval` is a static
-                // property of the tool (bash always returns true), so it alone
-                // would re-prompt for every `ls`. Defer to the permission policy
-                // too: if it explicitly vouches for this exact command - the
-                // program is on `security.allow_bash` and there is no active
-                // shell operator to smuggle another one in - that stands in for
-                // the user's approval. Anything not allowlisted still prompts.
-                let needs_approval = if let Some(tool) = self.tool_registry.get(&tool_name) {
-                    tool.requires_approval()
-                        && !self.auto_approve_tools
-                        && !tool_context.auto_approve
-                        && !self.tool_registry.is_trusted(&tool_name, &tool_input)
-                } else {
-                    false
-                };
-
-                // Request approval if needed
-                if needs_approval {
-                    if let Some(ref approval_callback) = self.approval_callback {
-                        // Get tool details for approval request
-                        let tool_info = if let Some(tool) = self.tool_registry.get(&tool_name) {
-                            ToolApprovalInfo {
-                                tool_name: tool_name.clone(),
-                                tool_description: tool.description().to_string(),
-                                tool_input: tool_input.clone(),
-                                capabilities: tool
-                                    .capabilities()
-                                    .iter()
-                                    .map(|c| format!("{:?}", c))
-                                    .collect(),
-                            }
-                        } else {
-                            // Tool not found, skip approval
-                            tool_results.push(ContentBlock::ToolResult {
-                                tool_use_id: tool_id,
-                                content: format!("Tool not found: {}", tool_name),
-                                is_error: Some(true),
-                            });
-                            continue;
-                        };
-
-                        // Call approval callback. Log the inputs: for `bash` the
-                        // command decides whether the allowlist trusts it, and
-                        // without it a prompt here is impossible to explain.
-                        tracing::info!(
-                            "Requesting user approval for tool '{}' with input {}",
-                            tool_name,
-                            tool_input
-                        );
-                        match approval_callback(tool_info).await {
-                            Ok(approved) => {
-                                if !approved {
-                                    tracing::warn!("User denied approval for tool '{}'", tool_name);
-                                    tool_results.push(ContentBlock::ToolResult {
-                                        tool_use_id: tool_id,
-                                        content: "User denied permission to execute this tool"
-                                            .to_string(),
-                                        is_error: Some(true),
-                                    });
-                                    continue;
-                                }
-                                tracing::info!("User approved tool '{}'", tool_name);
-                                // Create approved context for this tool execution
-                                let approved_tool_context = ToolExecutionContext {
-                                    session_id: tool_context.session_id,
-                                    working_directory: tool_context.working_directory.clone(),
-                                    env_vars: tool_context.env_vars.clone(),
-                                    auto_approve: true, // User approved this execution
-                                    timeout_secs: tool_context.timeout_secs,
-                                    read_only_mode: tool_context.read_only_mode,
-                                    sub_agent_launcher: tool_context.sub_agent_launcher.clone(),
-                                    file_read_cache: tool_context.file_read_cache.clone(),
-                                };
-
-                                // Execute the tool with approved context
-                                let is_mutating = self
-                                    .tool_registry
-                                    .get(&tool_name)
-                                    .is_some_and(|t| has_mutating_capability(&t.capabilities()));
-                                mutating_tool_ran |= is_mutating;
-                                match self
-                                    .tool_registry
-                                    .execute(&tool_name, tool_input, &approved_tool_context)
-                                    .await
-                                {
-                                    Ok(result) => {
-                                        if result.success && is_mutating {
-                                            mutating_evidence += 1;
-                                        }
-                                        tool_results.push(ContentBlock::ToolResult {
-                                            tool_use_id: tool_id,
-                                            content: if result.success {
-                                                result.output
-                                            } else {
-                                                result.error.unwrap_or_else(|| {
-                                                    "Tool execution failed".to_string()
-                                                })
-                                            },
-                                            is_error: Some(!result.success),
-                                        });
-                                    }
-                                    Err(e) => {
-                                        tool_results.push(ContentBlock::ToolResult {
-                                            tool_use_id: tool_id,
-                                            content: format!("Tool execution error: {}", e),
-                                            is_error: Some(true),
-                                        });
-                                    }
-                                }
-                                continue; // Skip the normal execution path below
-                            }
-                            Err(e) => {
-                                tracing::error!("Approval callback error: {}", e);
-                                tool_results.push(ContentBlock::ToolResult {
-                                    tool_use_id: tool_id,
-                                    content: format!("Approval request failed: {}", e),
-                                    is_error: Some(true),
-                                });
-                                continue;
-                            }
-                        }
-                    } else {
-                        // No approval callback configured, deny execution
-                        tracing::warn!(
-                            "Tool '{}' requires approval but no approval callback configured",
-                            tool_name
-                        );
-                        tool_results.push(ContentBlock::ToolResult {
-                            tool_use_id: tool_id,
-                            content: "Tool requires approval but no approval mechanism configured"
-                                .to_string(),
-                            is_error: Some(true),
-                        });
-                        continue;
-                    }
-                }
-
-                // Execute the tool
-                let is_mutating = self
-                    .tool_registry
-                    .get(&tool_name)
-                    .is_some_and(|t| has_mutating_capability(&t.capabilities()));
-                mutating_tool_ran |= is_mutating;
-                let completes_plan_task = tool_name == "plan"
-                    && tool_input.get("operation").and_then(|v| v.as_str())
-                        == Some("complete_task");
-                match self
-                    .tool_registry
-                    .execute(&tool_name, tool_input, &tool_context)
-                    .await
-                {
-                    Ok(result) => {
-                        if result.success {
-                            if is_mutating {
-                                mutating_evidence += 1;
-                            }
-                            // Checkpoint: an accepted completion consumes the
-                            // evidence, so the NEXT task needs its own.
-                            if completes_plan_task {
-                                mutating_evidence = 0;
-                            }
-                        }
-                        tool_results.push(ContentBlock::ToolResult {
-                            tool_use_id: tool_id,
-                            content: if result.success {
-                                result.output
-                            } else {
-                                result
-                                    .error
-                                    .unwrap_or_else(|| "Tool execution failed".to_string())
-                            },
-                            is_error: Some(!result.success),
-                        });
-                    }
-                    Err(e) => {
-                        tool_results.push(ContentBlock::ToolResult {
-                            tool_use_id: tool_id,
-                            content: format!("Tool execution error: {}", e),
-                            is_error: Some(true),
-                        });
-                    }
-                }
-            }
-
-            // A mutating tool (write_file, edit_file, bash, …) may have
-            // changed the filesystem — drop cached results of every tool
-            // that reads it, so the next read sees the current state
-            // instead of a stale entry within its TTL. Which tools count
-            // as reads comes from their declared capabilities, not a
-            // hardcoded name list; unknown tools are invalidated too.
-            if mutating_tool_ran {
-                self.tool_cache.invalidate_matching(|tool_name| {
-                    self.tool_registry.get(tool_name).map_or(true, |t| {
-                        t.capabilities().contains(&ToolCapability::ReadFiles)
-                    })
-                });
-            }
-
-            // Add assistant message with tool use to context
-            let assistant_msg = Message {
-                role: crate::llm::provider::Role::Assistant,
-                content: response.content.clone(),
-            };
-            context.add_message(assistant_msg);
-
-            // Add user message with tool results to context
-            let tool_result_msg = Message {
-                role: crate::llm::provider::Role::User,
-                content: tool_results,
-            };
-            context.add_message(tool_result_msg);
-
-            // Trigger compaction if token budget is >80% full (T032)
-            if context.should_compact() {
-                if let Some(ref pool) = self.pool {
-                    tracing::info!("Context at >80% token budget — triggering compaction");
-                    match crate::llm::agent::compaction::compact(&mut context, pool).await {
-                        Ok(record) => {
-                            tracing::info!(
-                                "Compaction complete: {} → {} tokens",
-                                record.tokens_before,
-                                record.tokens_after
-                            );
-                        }
-                        Err(e) => {
-                            tracing::warn!("Compaction failed (context unchanged): {}", e);
-                        }
-                    }
-                } else {
-                    tracing::warn!(
-                        "Context at >80% token budget but no DB pool — compaction skipped"
-                    );
-                }
-            }
-
-            // Check if we've hit max iterations
-            if iteration >= self.max_tool_iterations {
-                return Err(AgentError::MaxIterationsExceeded(self.max_tool_iterations));
-            }
+        // Run rounds of model and tool calls until the model answers (see
+        // `run`); the middleware decides when to stop early.
+        let pipeline = self.round_pipeline(&selection, read_only_mode);
+        let outcome = run::AgentRun {
+            service: self,
+            provider: self.provider.clone(),
+            model_name,
+            context,
+            selection: &selection,
+            tools: &tools,
+            tool_context,
+            chunk_tx: chunk_tx.as_ref(),
+            cancel: &cancel,
+            pipeline,
         }
-
-        let response = final_response.ok_or_else(|| {
-            AgentError::Internal("Tool loop completed without final response".to_string())
-        })?;
+        .run()
+        .await?;
+        let response = &outcome.response;
 
         // Resolve text: `stored` is persisted/replayed to the model, `display`
-        // is shown to the user (they differ only for the reasoning-only notice).
-        let final_text = Self::final_text_and_thinking(&response);
+        // is shown to the user (they differ only by UI notices).
+        let final_text = Self::final_text_and_thinking(response);
         let thinking_text = final_text.thinking;
+        let display = match &outcome.notice {
+            Some(notice) => format!("{}\n\n{}", final_text.display, notice),
+            None => final_text.display,
+        };
 
         // Save final assistant response to database (raw text, no UI notice).
         let assistant_db_msg = message_service
-            .create_message(session_id, "assistant".to_string(), final_text.stored)
+            .create_message(
+                session_id,
+                "assistant".to_string(),
+                final_text.stored.clone(),
+            )
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
-        // Calculate total cost
+        // Tool calls and their results are not stored, so record which tools
+        // produced this answer: a later request then knows what this one
+        // read, changed or ran (see `AgentContext::from_db_messages`).
+        let tool_summary = super::project_memory::summarize_tool_calls(&outcome.tool_log);
+        if let Some(summary) = &tool_summary {
+            message_service
+                .update_message_tool_log(assistant_db_msg.id, summary)
+                .await
+                .map_err(|e| AgentError::Database(e.to_string()))?;
+        }
+        self.log_progress(
+            &request_line,
+            tool_summary.as_deref(),
+            &final_text.stored,
+            &outcome,
+            read_only_mode,
+        );
+
+        // Each model call was priced by the provider that made it (the run
+        // may have fallen back part-way).
+        let total_input_tokens = outcome.input_tokens;
+        let total_output_tokens = outcome.output_tokens;
         let total_tokens = total_input_tokens + total_output_tokens;
-        let cost =
-            self.provider
-                .calculate_cost(&response.model, total_input_tokens, total_output_tokens);
+        let cost = outcome.cost;
 
         // Update message with usage info
         message_service
@@ -1593,7 +1400,7 @@ impl AgentService {
         message_service
             .update_message_metrics(
                 assistant_db_msg.id,
-                self.provider.name(),
+                &outcome.provider_name,
                 response.perf_metrics.as_ref(),
             )
             .await
@@ -1607,17 +1414,21 @@ impl AgentService {
 
         Ok(AgentResponse {
             message_id: assistant_db_msg.id,
-            content: final_text.display,
+            content: display,
             thinking_text,
-            stop_reason: response.stop_reason,
+            stop_reason: response.stop_reason.clone(),
             usage: crate::llm::provider::TokenUsage {
                 input_tokens: total_input_tokens,
                 output_tokens: total_output_tokens,
             },
             cost,
-            model: response.model,
-            provider_name: self.provider.name().to_string(),
-            perf_metrics: response.perf_metrics,
+            model: response.model.clone(),
+            provider_name: outcome.provider_name.clone(),
+            perf_metrics: response.perf_metrics.clone(),
+            context: outcome
+                .last_budget
+                .map(|b| b.usage(selection.is_core_only())),
+            tool_summary,
         })
     }
 
@@ -1648,7 +1459,13 @@ impl AgentService {
         session_id: Uuid,
         user_message: String,
         model: Option<String>,
-    ) -> Result<(String, LLMRequest, MessageService, SessionService)> {
+    ) -> Result<(
+        String,
+        LLMRequest,
+        MessageService,
+        SessionService,
+        ContextBudget,
+    )> {
         // Get or create session
         let session_service = SessionService::new(self.context.clone());
         let _session = session_service
@@ -1665,7 +1482,10 @@ impl AgentService {
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
         let model_name = model.unwrap_or_else(|| self.provider.default_model().to_string());
-        let context_window = self.provider.context_window(&model_name).unwrap_or(4096);
+        let context_window = self
+            .provider
+            .context_window(&model_name)
+            .unwrap_or(DEFAULT_CONTEXT_WINDOW);
 
         let mut context =
             AgentContext::from_db_messages(session_id, db_messages, context_window as usize);
@@ -1695,22 +1515,18 @@ impl AgentService {
 
         // Build base LLM request with a budget that fits the configured
         // provider context window after accounting for the system prompt.
-        let max_tokens = completion_token_budget(
-            context_window,
-            &context,
-            context.system_prompt.as_deref(),
-            None,
-        );
-        let request = LLMRequest::new(model_name.clone(), context.messages.clone())
-            .with_max_tokens(max_tokens);
+        let no_tools = RequestTools::new(Vec::new());
+        let budget = self.measure_budget(&context, &no_tools);
+        let request =
+            Self::build_request(&model_name, &context, &no_tools, budget.completion_budget());
 
-        let request = if let Some(system) = context.system_prompt {
-            request.with_system(system)
-        } else {
-            request
-        };
-
-        Ok((model_name, request, message_service, session_service))
+        Ok((
+            model_name,
+            request,
+            message_service,
+            session_service,
+            budget,
+        ))
     }
 
     /// Extract text content from an LLM response.
@@ -1822,6 +1638,12 @@ pub struct AgentResponse {
     /// Runtime performance metrics, if the provider exposes them
     /// (currently only the native Ollama provider).
     pub perf_metrics: Option<crate::llm::provider::PerfMetrics>,
+
+    /// How full the context window was for the last request of this turn.
+    pub context: Option<ContextUsage>,
+
+    /// One-line summary of the tool calls behind this answer, if any.
+    pub tool_summary: Option<String>,
 }
 
 /// Streaming response from the agent
@@ -1839,103 +1661,12 @@ pub struct AgentStreamResponse {
     pub model: String,
 }
 
-/// Implements [`SubAgentLauncher`] by creating a fresh [`AgentService`] and
-/// running the sub-agent prompt in a detached Tokio task.
-///
-/// Wired into [`ToolExecutionContext`] so the `AgentTool` can fire sub-agents
-/// without depending directly on `AgentService` internals.
-pub struct AgentServiceLauncher {
-    provider: Arc<dyn Provider>,
-    context: ServiceContext,
-    tool_registry: Arc<ToolRegistry>,
-    working_directory: std::path::PathBuf,
-    system_prompt: Option<String>,
-}
-
-impl std::fmt::Debug for AgentServiceLauncher {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AgentServiceLauncher")
-            .field("working_directory", &self.working_directory)
-            .finish_non_exhaustive()
-    }
-}
-
-impl AgentServiceLauncher {
-    pub fn new(
-        provider: Arc<dyn Provider>,
-        context: ServiceContext,
-        tool_registry: Arc<ToolRegistry>,
-        working_directory: std::path::PathBuf,
-        system_prompt: Option<String>,
-    ) -> Self {
-        Self {
-            provider,
-            context,
-            tool_registry,
-            working_directory,
-            system_prompt,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl crate::llm::tools::SubAgentLauncher for AgentServiceLauncher {
-    async fn launch(
-        &self,
-        _agent_id: uuid::Uuid,
-        description: &str,
-        prompt: &str,
-    ) -> std::result::Result<(), String> {
-        // Sub-agents run detached in a background task with no UI to prompt,
-        // so there's no `approval_callback` to wire up here - but that must
-        // NOT mean auto-approving every tool call. With the default
-        // `AllowAll` sandbox policy (no `security.allow_bash`/`deny_tools`
-        // configured), that would let a sub-agent run any bash command or
-        // write any file with zero human-in-the-loop check, regardless of
-        // the parent session's approval mode. Leaving `auto_approve_tools`
-        // at its default `false` (and no callback) means tools that don't
-        // require approval (read, glob, grep, etc.) still run freely, while
-        // approval-requiring tools (bash, write, edit) are denied with a
-        // clear error instead of silently executing.
-        let mut svc = AgentService::new(self.provider.clone(), self.context.clone())
-            .with_tool_registry(self.tool_registry.clone())
-            .with_max_tool_iterations(20)
-            .with_working_directory(self.working_directory.clone())
-            .with_allow_sub_agents(false);
-
-        if let Some(sp) = &self.system_prompt {
-            svc = svc.with_system_prompt(sp.clone());
-        }
-
-        let prompt = prompt.to_string();
-        let description = description.to_string();
-        let context = self.context.clone();
-        tokio::spawn(async move {
-            let session_svc = crate::services::SessionService::new(context);
-            let session = match session_svc
-                .create_session(Some(format!("sub-agent: {description}")))
-                .await
-            {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::warn!(%description, error = %e, "Sub-agent failed to create session");
-                    return;
-                }
-            };
-            if let Err(e) = svc.send_message_with_tools(session.id, prompt, None).await {
-                tracing::warn!(%description, error = %e, "Sub-agent failed");
-            }
-        });
-
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::Database;
     use crate::llm::provider::{LLMRequest, LLMResponse, TokenUsage};
+    use crate::llm::tools::ToolCapability;
     use async_trait::async_trait;
 
     /// Mock provider for testing
@@ -2293,31 +2024,8 @@ mod tests {
         assert!(agent_service.system_prompt_with_env().is_none());
     }
 
-    /// Regression: `AgentServiceLauncher::launch` used to build the
-    /// sub-agent's `AgentService` with `.with_auto_approve_tools(true)`,
-    /// which skipped the human-approval gate entirely for every tool call a
-    /// sub-agent made. It must build with approval left at its safe default
-    /// (`false`, no callback) instead, so approval-requiring tools are
-    /// denied rather than silently auto-approved.
-    #[tokio::test]
-    async fn sub_agent_launcher_does_not_auto_approve_tools() {
-        use crate::llm::tools::SubAgentLauncher;
-
-        let db = Database::connect_in_memory().await.unwrap();
-        db.run_migrations().await.unwrap();
-        let pool = db.pool().clone();
-        let context = ServiceContext::new(pool);
-        let provider = Arc::new(MockProvider);
-        let registry = Arc::new(crate::llm::tools::ToolRegistry::new());
-
-        let launcher =
-            AgentServiceLauncher::new(provider, context, registry, std::env::temp_dir(), None);
-
-        let result = launcher
-            .launch(Uuid::new_v4(), "test sub-agent", "do something")
-            .await;
-        assert!(result.is_ok());
-    }
+    // Sub-agent approval: see `sub_agents_without_an_approval_prompt_cannot_run_gated_tools`
+    // and `sub_agent_tool_calls_are_approved_through_the_parent_s_prompt`.
 
     /// Mock provider that simulates tool use
     struct MockProviderWithTools {
@@ -2676,6 +2384,1458 @@ mod tests {
             tool.1,
             serde_json::json!({"file_path": "src/main.rs"}),
             "input_json_delta fragments must be assembled into the tool input"
+        );
+    }
+
+    // ── Context budget, tool profile and overflow recovery ──────────────────
+
+    /// Provider that answers from a script, one entry per call, and records
+    /// every request it receives.
+    struct ScriptedProvider {
+        name: &'static str,
+        model: &'static str,
+        window: u32,
+        script:
+            std::sync::Mutex<std::collections::VecDeque<crate::llm::provider::Result<LLMResponse>>>,
+        requests: std::sync::Mutex<Vec<LLMRequest>>,
+    }
+
+    impl ScriptedProvider {
+        fn new(window: u32, script: Vec<crate::llm::provider::Result<LLMResponse>>) -> Self {
+            Self {
+                name: "scripted",
+                model: "scripted-model",
+                window,
+                script: std::sync::Mutex::new(script.into()),
+                requests: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        fn named(mut self, name: &'static str, model: &'static str) -> Self {
+            self.name = name;
+            self.model = model;
+            self
+        }
+
+        fn requests(&self) -> Vec<LLMRequest> {
+            self.requests.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl Provider for ScriptedProvider {
+        async fn complete(&self, request: LLMRequest) -> crate::llm::provider::Result<LLMResponse> {
+            self.requests.lock().unwrap().push(request);
+            self.script
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or_else(|| Ok(text_reply("done")))
+        }
+
+        async fn stream(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<ProviderStream> {
+            unimplemented!("tests use the non-streaming path")
+        }
+
+        fn name(&self) -> &str {
+            self.name
+        }
+
+        fn default_model(&self) -> &str {
+            self.model
+        }
+
+        fn supported_models(&self) -> Vec<String> {
+            vec![self.model.to_string()]
+        }
+
+        fn context_window(&self, model: &str) -> Option<u32> {
+            match model {
+                "small-model" => Some(8192),
+                "mid-model" => Some(32_768),
+                "big-model" => Some(128_000),
+                _ => Some(self.window),
+            }
+        }
+
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    fn text_reply(text: &str) -> LLMResponse {
+        LLMResponse {
+            id: "r".to_string(),
+            model: "scripted-model".to_string(),
+            content: vec![ContentBlock::Text {
+                text: text.to_string(),
+            }],
+            stop_reason: Some(StopReason::EndTurn),
+            usage: TokenUsage {
+                input_tokens: 0,
+                output_tokens: 1,
+            },
+            cache_metrics: None,
+            perf_metrics: None,
+        }
+    }
+
+    fn tool_call(name: &str, input: serde_json::Value) -> LLMResponse {
+        LLMResponse {
+            id: "r".to_string(),
+            model: "scripted-model".to_string(),
+            content: vec![ContentBlock::ToolUse {
+                id: "call-1".to_string(),
+                name: name.to_string(),
+                input,
+            }],
+            stop_reason: Some(StopReason::ToolUse),
+            usage: TokenUsage {
+                input_tokens: 0,
+                output_tokens: 1,
+            },
+            cache_metrics: None,
+            perf_metrics: None,
+        }
+    }
+
+    /// Tool with a configurable name and approval requirement.
+    struct NamedTool {
+        name: &'static str,
+        requires_approval: bool,
+    }
+
+    #[async_trait]
+    impl crate::llm::tools::Tool for NamedTool {
+        fn name(&self) -> &str {
+            self.name
+        }
+
+        fn description(&self) -> &str {
+            "A named test tool"
+        }
+
+        fn input_schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object", "properties": {}})
+        }
+
+        fn capabilities(&self) -> Vec<ToolCapability> {
+            vec![]
+        }
+
+        fn requires_approval(&self) -> bool {
+            self.requires_approval
+        }
+
+        async fn execute(
+            &self,
+            _input: serde_json::Value,
+            _context: &ToolExecutionContext,
+        ) -> crate::llm::tools::Result<crate::llm::tools::ToolResult> {
+            Ok(crate::llm::tools::ToolResult::success(format!(
+                "{} ran",
+                self.name
+            )))
+        }
+    }
+
+    fn registry_of(tools: &[(&'static str, bool)]) -> Arc<ToolRegistry> {
+        let mut registry = ToolRegistry::new();
+        for &(name, requires_approval) in tools {
+            registry.register(Arc::new(NamedTool {
+                name,
+                requires_approval,
+            }));
+        }
+        Arc::new(registry)
+    }
+
+    async fn session_for(context: &ServiceContext) -> Uuid {
+        SessionService::new(context.clone())
+            .create_session(Some("Test".to_string()))
+            .await
+            .unwrap()
+            .id
+    }
+
+    async fn test_context() -> ServiceContext {
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        ServiceContext::new(db.pool().clone())
+    }
+
+    fn tool_names(request: &LLMRequest) -> Vec<String> {
+        let mut names: Vec<String> = request
+            .tools
+            .iter()
+            .flatten()
+            .map(|t| t.name.clone())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// With the auto profile on a small window, requests carry only the core
+    /// tools, and a call to a tool outside them gets an error result instead
+    /// of running.
+    #[tokio::test]
+    async fn auto_profile_sends_core_tools_on_a_small_window() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![
+                Ok(tool_call("web_fetch", serde_json::json!({}))),
+                Ok(text_reply("answer")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[
+                ("read_file", false),
+                ("grep", false),
+                ("web_fetch", false),
+            ]))
+            .with_tool_profile(ToolProfile::Auto, Vec::new())
+            .with_system_prompt("full prompt".to_string())
+            .with_core_system_prompt("core prompt".to_string());
+
+        let response = service
+            .send_message_with_tools(session, "fetch it".to_string(), None)
+            .await
+            .unwrap();
+
+        let requests = provider.requests();
+        assert_eq!(tool_names(&requests[0]), vec!["grep", "read_file"]);
+        assert!(requests[0]
+            .system
+            .as_deref()
+            .unwrap()
+            .starts_with("core prompt"));
+
+        // The hidden tool did not run: its result is an error naming the
+        // tools that are available.
+        let result = requests[1]
+            .messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .find_map(|b| match b {
+                ContentBlock::ToolResult {
+                    content, is_error, ..
+                } => Some((content, *is_error)),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(result.1, Some(true));
+        assert!(result.0.contains("not available"), "got: {}", result.0);
+        assert!(!result.0.contains("web_fetch ran"));
+
+        let usage = response.context.expect("context usage is reported");
+        assert!(usage.core_tools_only);
+        assert_eq!(usage.tool_count, 2);
+        assert_eq!(usage.window, 8192);
+    }
+
+    #[tokio::test]
+    async fn auto_profile_sends_every_tool_on_a_large_window() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(128_000, vec![Ok(text_reply("hi"))]));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[("read_file", false), ("web_fetch", false)]))
+            .with_tool_profile(ToolProfile::Auto, Vec::new());
+
+        service
+            .send_message_with_tools(session, "hi".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            tool_names(&provider.requests()[0]),
+            vec!["read_file", "web_fetch"]
+        );
+        assert_eq!(service.exposed_tool_names(), vec!["read_file", "web_fetch"]);
+    }
+
+    /// A model that calls a tool by an alias (`Bash`) must reach the approval
+    /// gate under the registered name: AutoPlan's high-risk check matches
+    /// registered names only, so the alias used to skip it.
+    #[tokio::test]
+    async fn approval_callback_sees_the_canonical_tool_name() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call("Bash", serde_json::json!({}))),
+                Ok(text_reply("done")),
+            ],
+        ));
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen_in_callback = seen.clone();
+        let callback: ApprovalCallback = Arc::new(move |info: ToolApprovalInfo| {
+            seen_in_callback.lock().unwrap().push(info.tool_name);
+            Box::pin(async { Ok(true) })
+        });
+        let service = AgentService::new(provider, context)
+            .with_tool_registry(registry_of(&[("bash", true)]))
+            .with_approval_callback(Some(callback));
+
+        service
+            .send_message_with_tools(session, "run it".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(*seen.lock().unwrap(), vec!["bash".to_string()]);
+    }
+
+    /// When the provider says the prompt overflowed its window, the loop
+    /// compacts the history and retries the same round instead of failing.
+    #[tokio::test]
+    async fn context_overflow_compacts_and_retries_the_round() {
+        use crate::llm::provider::ProviderError;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let messages = MessageService::new(context.clone());
+        for i in 0..6 {
+            messages
+                .create_message(session, "user".to_string(), format!("question {i}"))
+                .await
+                .unwrap();
+            messages
+                .create_message(session, "assistant".to_string(), format!("answer {i}"))
+                .await
+                .unwrap();
+        }
+
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Err(ProviderError::ContextLengthExceeded(200_000)),
+                Ok(text_reply("fits now")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context.clone());
+
+        let response = service
+            .send_message_with_tools(session, "next question".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "fits now");
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 2, "one failed attempt, one retry");
+        assert!(
+            requests[1].messages.len() < requests[0].messages.len(),
+            "the retry must carry less history"
+        );
+        // The retried request opens with a user message and carries the
+        // summary of what was dropped in its system prompt.
+        assert!(matches!(
+            requests[1].messages[0].role,
+            crate::llm::provider::Role::User
+        ));
+        assert!(requests[1]
+            .system
+            .as_deref()
+            .unwrap()
+            .contains("Earlier in this conversation (compacted)"));
+
+        let records: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM compaction_records")
+            .fetch_one(&*context.pool)
+            .await
+            .unwrap();
+        assert_eq!(records, 1);
+    }
+
+    /// An overflow that compaction cannot fix (nothing left to drop) is
+    /// reported, not retried forever.
+    #[tokio::test]
+    async fn context_overflow_with_nothing_to_free_is_an_error() {
+        use crate::llm::provider::ProviderError;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![
+                Err(ProviderError::ContextLengthExceeded(9000)),
+                Ok(text_reply("unreachable")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context);
+
+        let result = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await;
+
+        assert!(matches!(result, Err(AgentError::Provider(_))));
+        assert_eq!(provider.requests().len(), 1);
+    }
+
+    /// If the local estimate already fills the window after compaction, fail
+    /// before dispatch instead of sending the one-token minimum request.
+    #[tokio::test]
+    async fn estimated_context_overflow_is_rejected_before_dispatch() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128,
+            vec![Ok(text_reply("unreachable"))],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_system_prompt("large system prompt ".repeat(256));
+
+        let result = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await;
+
+        assert!(matches!(result, Err(AgentError::ContextTooLarge { .. })));
+        assert!(
+            provider.requests().is_empty(),
+            "oversized request was dispatched"
+        );
+    }
+
+    /// Before each round, a tight budget elides old tool output first.
+    #[tokio::test]
+    async fn make_room_elides_old_tool_output_when_the_budget_is_tight() {
+        let context = test_context().await;
+        let service = AgentService::new(Arc::new(MockProvider), context);
+        let mut agent_context = AgentContext::new(Uuid::new_v4(), 8192);
+        agent_context.add_message(Message::user("read everything"));
+        let big = "fn f() {}\n".repeat(300);
+        for i in 0..6 {
+            agent_context.add_message(Message {
+                role: crate::llm::provider::Role::Assistant,
+                content: vec![ContentBlock::ToolUse {
+                    id: format!("c{i}"),
+                    name: "read_file".to_string(),
+                    input: serde_json::json!({}),
+                }],
+            });
+            agent_context.add_message(Message {
+                role: crate::llm::provider::Role::User,
+                content: vec![ContentBlock::ToolResult {
+                    tool_use_id: format!("c{i}"),
+                    content: big.clone(),
+                    is_error: None,
+                }],
+            });
+        }
+        let tools = RequestTools::new(Vec::new());
+        assert!(service.measure_budget(&agent_context, &tools).is_tight());
+        let before = agent_context.token_count;
+
+        assert!(service.make_room(&mut agent_context, &tools, 0).await);
+
+        assert!(agent_context.token_count < before);
+        assert!(!service.measure_budget(&agent_context, &tools).is_tight());
+    }
+
+    /// The provider's own prompt count corrects later estimates upward, and a
+    /// provider switch starts over.
+    #[tokio::test]
+    async fn calibration_learns_from_the_provider_and_resets_on_switch() {
+        let context = test_context().await;
+        let mut service = AgentService::new(Arc::new(MockProvider), context);
+        let budget = ContextBudget::from_counts(4096, 500, 500, 2, 0, 1.0);
+        let mut response = text_reply("x");
+        response.usage.input_tokens = 1500;
+
+        service.record_calibration(&response, &budget);
+        assert!((service.calibration() - 1.5).abs() < 1e-9);
+
+        // A response served partly from the provider's prompt cache says
+        // nothing reliable about the prompt size.
+        response.usage.input_tokens = 1900;
+        response.cache_metrics = Some(crate::llm::provider::types::CacheMetrics {
+            read_tokens: 1000,
+            creation_tokens: 0,
+        });
+        service.record_calibration(&response, &budget);
+        assert!((service.calibration() - 1.5).abs() < 1e-9);
+
+        service.set_provider(Arc::new(MockProvider));
+        assert_eq!(service.calibration(), 1.0);
+    }
+
+    // ── Middleware, cancellation, tool log, project memory (P1) ──────────────
+
+    fn last_user_text(request: &LLMRequest) -> String {
+        request
+            .messages
+            .iter()
+            .rev()
+            .find(|m| matches!(m.role, crate::llm::provider::Role::User))
+            .and_then(|m| {
+                m.content.iter().find_map(|b| match b {
+                    ContentBlock::Text { text } => Some(text.clone()),
+                    _ => None,
+                })
+            })
+            .unwrap_or_default()
+    }
+
+    /// At the round limit the loop no longer fails with
+    /// `MaxIterationsExceeded`: the pending tool calls get "not run" results
+    /// and the model answers, without tools, from the work done so far.
+    #[tokio::test]
+    async fn round_limit_ends_with_an_answer_instead_of_an_error() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call("read_file", serde_json::json!({"path": "a.rs"}))),
+                Ok(text_reply("Here is what I found so far.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[("read_file", false)]))
+            .with_max_tool_iterations(1);
+
+        let response = service
+            .send_message_with_tools(session, "read the files".to_string(), None)
+            .await
+            .unwrap();
+
+        assert!(response.content.starts_with("Here is what I found so far."));
+        assert!(
+            response
+                .content
+                .contains("Stopped at the limit of 1 tool rounds"),
+            "the user is told why: {}",
+            response.content
+        );
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 2, "one tool round, then the final answer");
+        assert!(
+            requests[1].tools.is_none(),
+            "the final call offers no tools"
+        );
+        assert!(last_user_text(&requests[1]).contains("reached the limit"));
+    }
+
+    /// When the loop guard stops a stuck model, every pending tool use still
+    /// gets a result, so the final request is valid for strict providers.
+    #[tokio::test]
+    async fn stopping_mid_round_answers_every_pending_tool_call() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let call = || Ok(tool_call("write_file", serde_json::json!({"path": "a.rs"})));
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![call(), call(), Ok(text_reply("Stopping."))],
+        ));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(WritingTool));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(Arc::new(registry))
+            .with_auto_approve_tools(true);
+
+        let response = service
+            .send_message_with_tools(session, "write it".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "Stopping.");
+        let final_request = provider.requests().pop().unwrap();
+        let uses: Vec<&String> = final_request
+            .messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .filter_map(|b| match b {
+                ContentBlock::ToolUse { id, .. } => Some(id),
+                _ => None,
+            })
+            .collect();
+        let results: Vec<&String> = final_request
+            .messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .filter_map(|b| match b {
+                ContentBlock::ToolResult { tool_use_id, .. } => Some(tool_use_id),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(uses.len(), results.len(), "every tool use has its result");
+        assert!(last_user_text(&final_request).contains("Loop detected"));
+    }
+
+    /// Tool that writes files (for the loop guard's modification threshold).
+    struct WritingTool;
+
+    #[async_trait]
+    impl crate::llm::tools::Tool for WritingTool {
+        fn name(&self) -> &str {
+            "write_file"
+        }
+        fn description(&self) -> &str {
+            "Writes a file"
+        }
+        fn input_schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object", "properties": {"path": {"type": "string"}}})
+        }
+        fn capabilities(&self) -> Vec<ToolCapability> {
+            vec![ToolCapability::WriteFiles]
+        }
+        fn requires_approval(&self) -> bool {
+            false
+        }
+        async fn execute(
+            &self,
+            _input: serde_json::Value,
+            _context: &ToolExecutionContext,
+        ) -> crate::llm::tools::Result<crate::llm::tools::ToolResult> {
+            Ok(crate::llm::tools::ToolResult::success(
+                "written".to_string(),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_request_stops_with_cancelled() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(128_000, vec![Ok(text_reply("hi"))]));
+        let service = AgentService::new(provider.clone(), context);
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        let result = service
+            .send_message_with_tools_and_mode_streaming(
+                session,
+                "hello".to_string(),
+                None,
+                false,
+                tx,
+                cancel,
+            )
+            .await;
+
+        assert!(matches!(result, Err(AgentError::Cancelled)));
+        assert!(provider.requests().is_empty(), "nothing was sent");
+    }
+
+    /// Cancelling while an approval prompt is open ends the request; it does
+    /// not wait for an answer that will never come.
+    #[tokio::test]
+    async fn cancelling_during_an_approval_prompt_ends_the_request() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![Ok(tool_call("bash", serde_json::json!({"command": "ls"})))],
+        ));
+        // The user cancels while the prompt is open, and never answers it.
+        // Cancelling from inside the callback, rather than on a timer, makes
+        // sure the request really reached the prompt: on a timer it could
+        // be cancelled before the first model call and pass without testing
+        // anything.
+        let cancel = CancellationToken::new();
+        let canceller = cancel.clone();
+        let callback: ApprovalCallback = Arc::new(move |_info: ToolApprovalInfo| {
+            canceller.cancel();
+            Box::pin(std::future::pending())
+        });
+        let service = AgentService::new(provider.clone(), context.clone())
+            .with_tool_registry(registry_of(&[("bash", true)]))
+            .with_approval_callback(Some(callback));
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            service.send_message_with_tools_cancellable(
+                session,
+                "list".to_string(),
+                None,
+                false,
+                cancel,
+            ),
+        )
+        .await
+        .expect("cancellation must not hang");
+
+        assert!(matches!(result, Err(AgentError::Cancelled)));
+        assert_eq!(provider.requests.lock().unwrap().len(), 1);
+    }
+
+    /// With verification on, a reply after a file edit is held back until a
+    /// check command has passed.
+    #[tokio::test]
+    async fn verification_sends_the_model_back_to_check_its_edit() {
+        let workdir = tempfile::tempdir().unwrap();
+        std::fs::write(workdir.path().join("Cargo.toml"), "[package]").unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "edit_file",
+                    serde_json::json!({"path": "src/lib.rs"}),
+                )),
+                Ok(text_reply("Done, I fixed it.")),
+                Ok(tool_call(
+                    "bash",
+                    serde_json::json!({"command": "cargo check"}),
+                )),
+                Ok(text_reply("Fixed, and cargo check passes.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[("edit_file", false), ("bash", false)]))
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_verification(true, None);
+
+        let response = service
+            .send_message_with_tools(session, "fix the bug".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "Fixed, and cargo check passes.");
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 4);
+        let nudge = last_user_text(&requests[2]);
+        assert!(nudge.contains("cargo check"), "{nudge}");
+        assert!(nudge.contains("src/lib.rs"), "{nudge}");
+    }
+
+    /// Without verification, the first reply after an edit is the answer.
+    #[tokio::test]
+    async fn verification_is_off_unless_enabled() {
+        let workdir = tempfile::tempdir().unwrap();
+        std::fs::write(workdir.path().join("Cargo.toml"), "[package]").unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call("edit_file", serde_json::json!({"path": "a.rs"}))),
+                Ok(text_reply("Done.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(registry_of(&[("edit_file", false), ("bash", false)]))
+            .with_working_directory(workdir.path().to_path_buf());
+
+        let response = service
+            .send_message_with_tools(session, "fix".to_string(), None)
+            .await
+            .unwrap();
+        assert_eq!(response.content, "Done.");
+        assert_eq!(provider.requests().len(), 2);
+    }
+
+    /// The tool calls behind an answer are stored with it and shown to the
+    /// model on the next request; requests that edit files are logged to the
+    /// progress file.
+    #[tokio::test]
+    async fn tool_work_is_remembered_across_requests() {
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "edit_file",
+                    serde_json::json!({"path": "src/main.rs"}),
+                )),
+                Ok(text_reply("Renamed the function.")),
+                Ok(text_reply("It was in src/main.rs.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context.clone())
+            .with_tool_registry(registry_of(&[("edit_file", false)]))
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_progress_file(true);
+
+        service
+            .send_message_with_tools(session, "rename main_loop".to_string(), None)
+            .await
+            .unwrap();
+        service
+            .send_message_with_tools(session, "where was it?".to_string(), None)
+            .await
+            .unwrap();
+
+        let stored = MessageService::new(context)
+            .list_messages_for_session(session)
+            .await
+            .unwrap();
+        let answer = stored.iter().find(|m| m.role == "assistant").unwrap();
+        assert_eq!(answer.tool_log.as_deref(), Some("edit_file src/main.rs"));
+
+        let second = provider.requests().pop().unwrap();
+        let replayed = second
+            .messages
+            .iter()
+            .filter_map(|m| match &m.content[0] {
+                ContentBlock::Text { text }
+                    if matches!(m.role, crate::llm::provider::Role::Assistant) =>
+                {
+                    Some(text.clone())
+                }
+                _ => None,
+            })
+            .next()
+            .unwrap();
+        assert!(
+            replayed.starts_with("(Tools used before this answer: edit_file src/main.rs)"),
+            "{replayed}"
+        );
+
+        let log = std::fs::read_to_string(
+            workdir
+                .path()
+                .join(super::super::project_memory::PROGRESS_FILE),
+        )
+        .unwrap();
+        assert!(log.contains("rename main_loop"));
+        assert!(log.contains("- Tools: edit_file src/main.rs"));
+        assert!(log.contains("- Result: Renamed the function."));
+    }
+
+    #[tokio::test]
+    async fn project_notes_are_added_to_the_system_prompt_when_enabled() {
+        let workdir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            workdir.path().join("AGENTS.md"),
+            "Run cargo fmt before committing.",
+        )
+        .unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![Ok(text_reply("ok")), Ok(text_reply("ok"))],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_system_prompt("base prompt".to_string())
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_project_notes(true);
+
+        service
+            .send_message_with_tools(session, "hi".to_string(), None)
+            .await
+            .unwrap();
+        let system = provider.requests()[0].system.clone().unwrap();
+        assert!(system.contains("## Project notes"), "{system}");
+        assert!(system.contains("Run cargo fmt before committing."));
+
+        let service = service.with_project_notes(false);
+        service
+            .send_message_with_tools(session, "hi".to_string(), None)
+            .await
+            .unwrap();
+        let system = provider.requests()[1].system.clone().unwrap();
+        assert!(!system.contains("## Project notes"));
+    }
+
+    /// Tool with a typed schema that rejects input missing its `path`.
+    struct StrictTool;
+
+    #[async_trait]
+    impl crate::llm::tools::Tool for StrictTool {
+        fn name(&self) -> &str {
+            "read_file"
+        }
+        fn description(&self) -> &str {
+            "Reads a file"
+        }
+        fn input_schema(&self) -> serde_json::Value {
+            serde_json::json!({
+                "type": "object",
+                "properties": {"path": {"type": "string"}, "limit": {"type": "integer"}},
+                "required": ["path"]
+            })
+        }
+        fn capabilities(&self) -> Vec<ToolCapability> {
+            vec![ToolCapability::ReadFiles]
+        }
+        fn requires_approval(&self) -> bool {
+            false
+        }
+        async fn execute(
+            &self,
+            input: serde_json::Value,
+            _context: &ToolExecutionContext,
+        ) -> crate::llm::tools::Result<crate::llm::tools::ToolResult> {
+            match input.get("path").and_then(|p| p.as_str()) {
+                Some(path) => Ok(crate::llm::tools::ToolResult::success(format!(
+                    "read {path}"
+                ))),
+                None => Err(crate::llm::tools::ToolError::InvalidInput(
+                    "missing field `path`".to_string(),
+                )),
+            }
+        }
+    }
+
+    fn tool_results(request: &LLMRequest) -> Vec<String> {
+        request
+            .messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .filter_map(|b| match b {
+                ContentBlock::ToolResult { content, .. } => Some(content.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Malformed arguments get an error that lists the expected arguments,
+    /// whether the check catches them first or the tool rejects them.
+    #[tokio::test]
+    async fn bad_tool_arguments_get_the_expected_arguments_back() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "read_file",
+                    serde_json::json!({"path": ["a.rs"]}),
+                )),
+                Ok(tool_call("read_file", serde_json::json!({"limit": 5}))),
+                Ok(text_reply("done")),
+            ],
+        ));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(StrictTool));
+        let service =
+            AgentService::new(provider.clone(), context).with_tool_registry(Arc::new(registry));
+
+        service
+            .send_message_with_tools(session, "read".to_string(), None)
+            .await
+            .unwrap();
+
+        let results = tool_results(&provider.requests()[2]);
+        assert_eq!(results.len(), 2);
+        assert!(
+            results[0].contains("field 'path' must be string, got a list"),
+            "{}",
+            results[0]
+        );
+        assert!(results[0].contains("path (string, required)"));
+        assert!(
+            results[1].contains("missing field `path`"),
+            "{}",
+            results[1]
+        );
+        assert!(results[1].contains("Expected arguments for read_file: path (string, required)"));
+    }
+
+    // ── Sub-agents, profiles, router, fallback (P2) ──────────────────────────
+
+    /// A registry with the `agent` tool plus named test tools.
+    fn agent_registry(tools: &[(&'static str, bool)]) -> Arc<ToolRegistry> {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(crate::llm::tools::agent::AgentTool));
+        for &(name, requires_approval) in tools {
+            registry.register(Arc::new(NamedTool {
+                name,
+                requires_approval,
+            }));
+        }
+        Arc::new(registry)
+    }
+
+    /// The sub-agent's answer comes back to the parent as the tool result;
+    /// the explorer profile only sees its read-only tools; the task and the
+    /// answer are kept under .crustly/agents.
+    #[tokio::test]
+    async fn a_sub_agent_s_answer_comes_back_to_the_parent() {
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "agent",
+                    serde_json::json!({
+                        "description": "find usages",
+                        "prompt": "Where is parse_config used?",
+                        "profile": "explorer"
+                    }),
+                )),
+                Ok(text_reply("parse_config is called in src/main.rs:12")),
+                Ok(text_reply("It is called from src/main.rs.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(agent_registry(&[
+                ("read_file", false),
+                ("grep", false),
+                ("edit_file", false),
+            ]))
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_system_prompt("parent prompt".to_string());
+
+        let response = service
+            .send_message_with_tools(session, "where is parse_config used?".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "It is called from src/main.rs.");
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 3, "parent, sub-agent, parent");
+        assert_eq!(tool_names(&requests[1]), vec!["grep", "read_file"]);
+        let child_system = requests[1].system.clone().unwrap();
+        assert!(child_system.contains("## Your role"), "{child_system}");
+        assert!(child_system.contains("explorer sub-agent"));
+        let results = tool_results(&requests[2]);
+        assert!(
+            results[0].contains("parse_config is called in src/main.rs:12"),
+            "{}",
+            results[0]
+        );
+
+        let dir = workdir.path().join(".crustly/agents");
+        let files: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(files.len(), 2, "{files:?}");
+        let md = files.iter().find(|f| f.ends_with(".md")).unwrap();
+        let task = std::fs::read_to_string(dir.join(md)).unwrap();
+        assert!(task.contains("Where is parse_config used?"));
+        assert!(task.contains("## Answer\n\nparse_config is called in src/main.rs:12"));
+    }
+
+    /// Without an approval prompt (crustly run without --auto-approve), a
+    /// sub-agent's approval-requiring tools are refused, never run.
+    #[tokio::test]
+    async fn sub_agents_without_an_approval_prompt_cannot_run_gated_tools() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "agent",
+                    serde_json::json!({
+                        "description": "run tests",
+                        "prompt": "Run the tests",
+                        "profile": "implementer"
+                    }),
+                )),
+                Ok(tool_call(
+                    "bash",
+                    serde_json::json!({"command": "cargo test"}),
+                )),
+                Ok(text_reply("I could not run the tests.")),
+                Ok(text_reply("The sub-agent could not run them.")),
+            ],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(agent_registry(&[("bash", true)]));
+
+        service
+            .send_message_with_tools(session, "test it".to_string(), None)
+            .await
+            .unwrap();
+
+        let child_results = tool_results(&provider.requests()[2]);
+        assert!(
+            child_results[0].contains("requires approval"),
+            "{}",
+            child_results[0]
+        );
+    }
+
+    /// With an approval prompt, a sub-agent's gated tool calls go through it,
+    /// labelled with the sub-agent's task.
+    #[tokio::test]
+    async fn sub_agent_tool_calls_are_approved_through_the_parent_s_prompt() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "agent",
+                    serde_json::json!({
+                        "description": "run tests",
+                        "prompt": "Run the tests",
+                        "profile": "implementer"
+                    }),
+                )),
+                Ok(tool_call(
+                    "bash",
+                    serde_json::json!({"command": "cargo test"}),
+                )),
+                Ok(text_reply("All tests pass.")),
+                Ok(text_reply("Tests pass.")),
+            ],
+        ));
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen_in_callback = seen.clone();
+        let callback: ApprovalCallback = Arc::new(move |info: ToolApprovalInfo| {
+            seen_in_callback
+                .lock()
+                .unwrap()
+                .push(info.tool_description.clone());
+            Box::pin(async { Ok(true) })
+        });
+        let service = AgentService::new(provider.clone(), context)
+            .with_tool_registry(agent_registry(&[("bash", true)]))
+            .with_approval_callback(Some(callback));
+
+        service
+            .send_message_with_tools(session, "test it".to_string(), None)
+            .await
+            .unwrap();
+
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert!(seen[0].starts_with("[sub-agent: run tests]"), "{}", seen[0]);
+        assert!(tool_results(&provider.requests()[2])[0].contains("bash ran"));
+    }
+
+    fn task(description: &str, profile: Option<&str>) -> crate::llm::tools::SubAgentTask {
+        crate::llm::tools::SubAgentTask {
+            id: Uuid::new_v4(),
+            description: description.to_string(),
+            prompt: format!("Please {description}"),
+            profile: profile.map(str::to_string),
+            read_only: false,
+        }
+    }
+
+    fn launcher_for(service: &AgentService) -> subagents::AgentServiceLauncher {
+        subagents::AgentServiceLauncher::new(service.subagents.clone(), service.child_template())
+    }
+
+    #[tokio::test]
+    async fn a_background_sub_agent_is_collected_with_its_report() {
+        use crate::llm::tools::{SubAgentLauncher, SubAgentStatus};
+
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![Ok(text_reply("Done in the background."))],
+        ));
+        let service = AgentService::new(provider, context)
+            .with_working_directory(workdir.path().to_path_buf());
+        let launcher = launcher_for(&service);
+        let task = task("summarize the readme", None);
+        let id = task.id;
+
+        launcher
+            .start(task, CancellationToken::new())
+            .await
+            .unwrap();
+        let report = launcher.report(id, true).await.unwrap();
+
+        assert_eq!(report.status, SubAgentStatus::Completed);
+        assert_eq!(report.answer.as_deref(), Some("Done in the background."));
+        assert_eq!(report.profile, "general");
+        assert_eq!(launcher.list().len(), 1);
+        assert!(!launcher.cancel(id), "a finished sub-agent is not running");
+    }
+
+    #[tokio::test]
+    async fn an_unknown_profile_fails_with_the_available_ones() {
+        use crate::llm::tools::{SubAgentLauncher, SubAgentStatus};
+
+        let context = test_context().await;
+        let provider = Arc::new(ScriptedProvider::new(128_000, vec![]));
+        let service = AgentService::new(provider.clone(), context)
+            .with_working_directory(tempfile::tempdir().unwrap().path().to_path_buf());
+
+        let report = launcher_for(&service)
+            .run(task("x", Some("wizard")), CancellationToken::new())
+            .await;
+
+        assert_eq!(report.status, SubAgentStatus::Failed);
+        let error = report.error.unwrap();
+        assert!(error.contains("unknown profile 'wizard'"), "{error}");
+        assert!(error.contains("explorer"));
+        assert!(provider.requests().is_empty());
+    }
+
+    /// Provider whose calls wait until the test lets them through.
+    struct GatedProvider {
+        gate: Arc<tokio::sync::Semaphore>,
+    }
+
+    #[async_trait]
+    impl Provider for GatedProvider {
+        async fn complete(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<LLMResponse> {
+            self.gate.acquire().await.unwrap().forget();
+            Ok(text_reply("released"))
+        }
+        async fn stream(
+            &self,
+            _request: LLMRequest,
+        ) -> crate::llm::provider::Result<ProviderStream> {
+            unimplemented!()
+        }
+        fn name(&self) -> &str {
+            "gated"
+        }
+        fn default_model(&self) -> &str {
+            "gated-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["gated-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(128_000)
+        }
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    async fn wait_for_status(
+        launcher: &subagents::AgentServiceLauncher,
+        id: Uuid,
+        status: crate::llm::tools::SubAgentStatus,
+    ) {
+        use crate::llm::tools::SubAgentLauncher;
+        for _ in 0..200 {
+            if launcher.report(id, false).await.map(|r| r.status) == Some(status) {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        panic!("sub-agent {id} never reached {status:?}");
+    }
+
+    /// With one slot (the default), a second sub-agent waits until the
+    /// first is done: one local GPU serializes inference anyway.
+    #[tokio::test]
+    async fn sub_agents_run_one_at_a_time_by_default() {
+        use crate::llm::tools::{SubAgentLauncher, SubAgentStatus};
+
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let gate = Arc::new(tokio::sync::Semaphore::new(0));
+        let service = AgentService::new(Arc::new(GatedProvider { gate: gate.clone() }), context)
+            .with_working_directory(workdir.path().to_path_buf());
+        let launcher = launcher_for(&service);
+        let first = task("first", None);
+        let second = task("second", None);
+        let (first_id, second_id) = (first.id, second.id);
+
+        launcher
+            .start(first, CancellationToken::new())
+            .await
+            .unwrap();
+        wait_for_status(&launcher, first_id, SubAgentStatus::Running).await;
+        launcher
+            .start(second, CancellationToken::new())
+            .await
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert_eq!(
+            launcher.report(second_id, false).await.unwrap().status,
+            SubAgentStatus::Queued
+        );
+
+        gate.add_permits(2);
+        assert_eq!(
+            launcher.report(first_id, true).await.unwrap().status,
+            SubAgentStatus::Completed
+        );
+        assert_eq!(
+            launcher.report(second_id, true).await.unwrap().status,
+            SubAgentStatus::Completed
+        );
+    }
+
+    #[tokio::test]
+    async fn a_running_sub_agent_can_be_cancelled() {
+        use crate::llm::tools::{SubAgentLauncher, SubAgentStatus};
+
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let gate = Arc::new(tokio::sync::Semaphore::new(0));
+        let service = AgentService::new(Arc::new(GatedProvider { gate }), context)
+            .with_working_directory(workdir.path().to_path_buf());
+        let launcher = launcher_for(&service);
+        let task = task("never finishes", None);
+        let id = task.id;
+
+        launcher
+            .start(task, CancellationToken::new())
+            .await
+            .unwrap();
+        wait_for_status(&launcher, id, SubAgentStatus::Running).await;
+        assert!(launcher.cancel(id));
+
+        let report =
+            tokio::time::timeout(std::time::Duration::from_secs(5), launcher.report(id, true))
+                .await
+                .expect("cancellation must not hang")
+                .unwrap();
+        assert_eq!(report.status, SubAgentStatus::Cancelled);
+    }
+
+    fn fallback_to(provider: Arc<ScriptedProvider>, on_overflow: bool) -> Fallback {
+        Fallback {
+            provider,
+            on_error: true,
+            on_overflow,
+        }
+    }
+
+    /// When the main provider is unreachable or failing, the round goes to
+    /// the fallback, with the fallback's own model, and the user is told.
+    #[tokio::test]
+    async fn a_failing_provider_falls_back_and_says_so() {
+        use crate::llm::provider::ProviderError;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let local = Arc::new(
+            ScriptedProvider::new(8192, vec![Err(ProviderError::Timeout(120))])
+                .named("ollama", "qwen2.5-coder:7b"),
+        );
+        let cloud = Arc::new(
+            ScriptedProvider::new(200_000, vec![Ok(text_reply("Answer from the cloud."))])
+                .named("anthropic", "claude-sonnet"),
+        );
+        let service = AgentService::new(local.clone(), context)
+            .with_fallback(fallback_to(cloud.clone(), true));
+
+        let response = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await
+            .unwrap();
+
+        assert!(response.content.starts_with("Answer from the cloud."));
+        assert!(
+            response
+                .content
+                .contains("Answered by the fallback provider anthropic"),
+            "{}",
+            response.content
+        );
+        assert_eq!(response.provider_name, "anthropic");
+        let sent = cloud.requests();
+        assert_eq!(
+            sent[0].model, "claude-sonnet",
+            "never the local model's name"
+        );
+    }
+
+    /// An overflow is first handled locally by compaction; only when
+    /// nothing can be freed does the round go to the fallback, and only if
+    /// `on_overflow` allows it.
+    #[tokio::test]
+    async fn an_overflow_falls_back_only_when_allowed() {
+        use crate::llm::provider::ProviderError;
+
+        for on_overflow in [true, false] {
+            let context = test_context().await;
+            let session = session_for(&context).await;
+            let local = Arc::new(ScriptedProvider::new(
+                8192,
+                vec![Err(ProviderError::ContextLengthExceeded(9000))],
+            ));
+            let cloud = Arc::new(
+                ScriptedProvider::new(200_000, vec![Ok(text_reply("Fits in the cloud."))])
+                    .named("anthropic", "claude-sonnet"),
+            );
+            let service = AgentService::new(local, context)
+                .with_fallback(fallback_to(cloud.clone(), on_overflow));
+
+            let result = service
+                .send_message_with_tools(session, "hello".to_string(), None)
+                .await;
+
+            if on_overflow {
+                assert!(result.unwrap().content.starts_with("Fits in the cloud."));
+            } else {
+                assert!(matches!(result, Err(AgentError::Provider(_))));
+                assert!(cloud.requests().is_empty());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn errors_that_a_retry_cannot_fix_do_not_fall_back() {
+        use crate::llm::provider::ProviderError;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let local = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![Err(ProviderError::InvalidApiKey)],
+        ));
+        let cloud = Arc::new(ScriptedProvider::new(200_000, vec![]));
+        let service =
+            AgentService::new(local, context).with_fallback(fallback_to(cloud.clone(), true));
+
+        let result = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await;
+
+        assert!(matches!(result, Err(AgentError::Provider(_))));
+        assert!(cloud.requests().is_empty());
+    }
+
+    /// With the router on, the request's wording picks the tier's model; an
+    /// explicit model (a sub-agent profile) wins.
+    #[tokio::test]
+    async fn the_router_picks_the_model_for_the_request() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(128_000, vec![]));
+        let service = AgentService::new(provider.clone(), context)
+            .with_system_prompt("system ".repeat(3500))
+            .with_tool_profile(crate::config::ToolProfile::Core, Vec::new())
+            .with_model_router(ModelRouter::new(
+                "p",
+                "small-model",
+                "p",
+                "mid-model",
+                "p",
+                "big-model",
+            ));
+
+        for prompt in [
+            "what is a trait?",
+            "refactor the parser module",
+            "explain this",
+        ] {
+            service
+                .send_message_with_tools(session, prompt.to_string(), None)
+                .await
+                .unwrap();
+        }
+        service
+            .send_message_with_tools(
+                session,
+                "what is x?".to_string(),
+                Some("pinned".to_string()),
+            )
+            .await
+            .unwrap();
+
+        let requests = provider.requests();
+        let models: Vec<String> = requests.iter().map(|r| r.model.clone()).collect();
+        assert_eq!(
+            models,
+            vec!["small-model", "big-model", "mid-model", "pinned"]
+        );
+        assert!(
+            requests[0].max_tokens < requests[1].max_tokens,
+            "the small routed model must use its smaller context-window budget"
         );
     }
 }

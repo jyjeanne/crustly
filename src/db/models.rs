@@ -39,6 +39,9 @@ pub struct Message {
     /// Runtime performance metrics (`PerfMetrics`), JSON-serialized. `None`
     /// for providers that don't expose this level of detail.
     pub perf_metrics_json: Option<String>,
+    /// Summary of the tool calls that produced this (assistant) message;
+    /// see `llm::agent::project_memory::summarize_tool_calls`.
+    pub tool_log: Option<String>,
 }
 
 /// File model
@@ -252,6 +255,7 @@ impl Message {
             cost: None,
             provider_name: None,
             perf_metrics_json: None,
+            tool_log: None,
         }
     }
 }
@@ -313,6 +317,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for Message {
             cost: row.try_get("cost")?,
             provider_name: row.try_get("provider_name")?,
             perf_metrics_json: row.try_get("perf_metrics_json")?,
+            tool_log: row.try_get("tool_log")?,
         })
     }
 }

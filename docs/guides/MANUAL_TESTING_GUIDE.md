@@ -142,7 +142,7 @@ What programming languages do you support?
    - Previous messages remain visible
    - Can scroll with Page Up/Down
 
-9. Press `Ctrl+C` to quit
+9. Press `Ctrl+C` twice to quit
 
 **Success Criteria:**
 - ✅ TUI launches without errors
@@ -228,7 +228,7 @@ cargo run
 # Type: "This is my first conversation"
 # Ctrl+Enter to send
 # Wait for response
-# Ctrl+C to quit
+# Ctrl+C twice to quit
 ```
 
 2. Create second session:
@@ -434,7 +434,7 @@ If I mix my favorite color with yellow, what do I get?
 
 | Shortcut | Action | Test Method |
 |----------|--------|-------------|
-| `Ctrl+C` | Quit | Press and verify clean exit |
+| `Ctrl+C` | Quit | Press once: "Press Ctrl+C again to quit"; press again within 2s: clean exit |
 | `Ctrl+N` | New session | Creates new empty session |
 | `Ctrl+L` | List sessions | Shows session list overlay |
 | `Ctrl+H` | Help | Shows help screen |

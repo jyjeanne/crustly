@@ -7,6 +7,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Same feature list as ci.yml's CI_FEATURES, for the same reason:
+  # `--all-features` also enables llama-cpp-cuda/-metal/-vulkan/-rocm/
+  # -opencl/-mkl, each needing a GPU SDK/toolkit that GitHub-hosted runners
+  # don't have, so it can't build on any of them.
+  UNIX_FEATURES: openai,aws-bedrock,ollama,llama-cpp,llama-cpp-llguidance,profiling
 
 jobs:
   create-release:
@@ -42,7 +47,11 @@ jobs:
             artifact_name: crustly
             asset_name: crustly-linux-amd64
 
-          - os: ubuntu-latest
+          # Native arm64 runner (free for public repos) rather than cross-
+          # compiling from ubuntu-latest: besides a cross linker, the build
+          # needs arm64 OpenSSL (openssl-sys via native-tls) and an arm64
+          # C/C++ toolchain for llama.cpp - all available natively here.
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             artifact_name: crustly
             asset_name: crustly-linux-arm64
@@ -74,19 +83,13 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install cmake -y
 
-      - name: Install cross-compilation tools (Linux ARM64)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
       - name: Build (Windows)
         if: matrix.os == 'windows-latest'
         run: cargo build --release --target ${{ matrix.target }} --features openai,aws-bedrock
 
       - name: Build (Unix)
         if: matrix.os != 'windows-latest'
-        run: cargo build --release --target ${{ matrix.target }} --all-features
+        run: cargo build --release --target ${{ matrix.target }} --features ${{ env.UNIX_FEATURES }}
 
       - name: Strip binary (Unix)
         if: matrix.os != 'windows-latest'

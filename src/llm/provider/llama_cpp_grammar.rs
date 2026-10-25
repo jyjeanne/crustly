@@ -1,6 +1,6 @@
 //! Grammar-constrained tool-call decoding for `LlamaCppProvider`
-//! (`llama-cpp-2-integration-plan.md` Phase 4b, optional, behind the
-//! `llama-cpp-llguidance` Cargo feature).
+//! (`llama-cpp-2-integration-plan.md` Phase 4b, behind the
+//! `llguidance-grammar` Cargo feature, part of `llama-cpp`).
 //!
 //! This module builds the two pieces Phase 4b needs: a JSON Schema that
 //! describes "a valid call to one of the offered tools"

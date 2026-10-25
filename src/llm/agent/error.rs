@@ -23,7 +23,7 @@ pub enum AgentError {
     InvalidRequest(String),
 
     /// Context too large
-    #[error("Context too large: {current} tokens exceeds limit of {limit}")]
+    #[error("Context too large: estimated {current} tokens for a limit of {limit}")]
     ContextTooLarge { current: usize, limit: usize },
 
     /// Tool execution error
@@ -37,6 +37,10 @@ pub enum AgentError {
     /// Maximum tool iterations exceeded
     #[error("Maximum tool iterations exceeded: {0}")]
     MaxIterationsExceeded(usize),
+
+    /// The user cancelled the request
+    #[error("Request cancelled")]
+    Cancelled,
 
     /// Internal error
     #[error("Internal error: {0}")]

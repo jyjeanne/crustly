@@ -8,7 +8,7 @@
 
 ### Prerequisites
 
-- **Rust 1.75+** (already required for Crustly)
+- **Rust 1.95+** (already required for Crustly)
 - **16 GB RAM** recommended (8 GB minimum for small models)
 - **NVIDIA/AMD GPU** optional but strongly recommended for speed
 - **Internet connection** for the initial model download only

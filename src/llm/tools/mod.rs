@@ -9,6 +9,7 @@ pub mod error;
 pub mod file_read_cache;
 pub mod registry;
 pub mod sandbox;
+pub mod schema_check;
 pub mod ssrf_guard;
 mod r#trait;
 
@@ -46,5 +47,8 @@ pub mod web_fetch;
 // Re-exports
 pub use error::{Result, ToolError};
 pub use file_read_cache::{FileFingerprint, FileReadCache, ReadGate};
-pub use r#trait::{SubAgentLauncher, Tool, ToolCapability, ToolExecutionContext, ToolResult};
+pub use r#trait::{
+    SubAgentLauncher, SubAgentReport, SubAgentStatus, SubAgentTask, Tool, ToolCapability,
+    ToolExecutionContext, ToolResult,
+};
 pub use registry::ToolRegistry;
