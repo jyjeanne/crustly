@@ -152,7 +152,7 @@ zip = "9.0"
 quick-xml = "0.42"
 
 [dev-dependencies]
-rstest = "0.27"
+rstest = "0.28"
 proptest = "1.4"
 mockall = "0.15"
 criterion = { version = "0.8", features = ["html_reports"] }
