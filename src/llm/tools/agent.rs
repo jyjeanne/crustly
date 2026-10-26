@@ -279,7 +279,7 @@ fn report_result(report: &SubAgentReport) -> ToolResult {
 }
 
 fn is_blank(value: &Option<String>) -> bool {
-    value.as_deref().map_or(true, |s| s.trim().is_empty())
+    value.as_deref().is_none_or(|s| s.trim().is_empty())
 }
 
 #[cfg(test)]

@@ -2452,8 +2452,13 @@ mod tests {
             vec![self.model.to_string()]
         }
 
-        fn context_window(&self, _model: &str) -> Option<u32> {
-            Some(self.window)
+        fn context_window(&self, model: &str) -> Option<u32> {
+            match model {
+                "small-model" => Some(8192),
+                "mid-model" => Some(32_768),
+                "big-model" => Some(128_000),
+                _ => Some(self.window),
+            }
         }
 
         fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
@@ -2769,6 +2774,30 @@ mod tests {
 
         assert!(matches!(result, Err(AgentError::Provider(_))));
         assert_eq!(provider.requests().len(), 1);
+    }
+
+    /// If the local estimate already fills the window after compaction, fail
+    /// before dispatch instead of sending the one-token minimum request.
+    #[tokio::test]
+    async fn estimated_context_overflow_is_rejected_before_dispatch() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128,
+            vec![Ok(text_reply("unreachable"))],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_system_prompt("large system prompt ".repeat(256));
+
+        let result = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await;
+
+        assert!(matches!(result, Err(AgentError::ContextTooLarge { .. })));
+        assert!(
+            provider.requests().is_empty(),
+            "oversized request was dispatched"
+        );
     }
 
     /// Before each round, a tight budget elides old tool output first.
@@ -3767,9 +3796,17 @@ mod tests {
         let context = test_context().await;
         let session = session_for(&context).await;
         let provider = Arc::new(ScriptedProvider::new(128_000, vec![]));
-        let service = AgentService::new(provider.clone(), context).with_model_router(
-            ModelRouter::new("p", "small-model", "p", "mid-model", "p", "big-model"),
-        );
+        let service = AgentService::new(provider.clone(), context)
+            .with_system_prompt("system ".repeat(3500))
+            .with_tool_profile(crate::config::ToolProfile::Core, Vec::new())
+            .with_model_router(ModelRouter::new(
+                "p",
+                "small-model",
+                "p",
+                "mid-model",
+                "p",
+                "big-model",
+            ));
 
         for prompt in [
             "what is a trait?",
@@ -3790,10 +3827,15 @@ mod tests {
             .await
             .unwrap();
 
-        let models: Vec<String> = provider.requests().into_iter().map(|r| r.model).collect();
+        let requests = provider.requests();
+        let models: Vec<String> = requests.iter().map(|r| r.model.clone()).collect();
         assert_eq!(
             models,
             vec!["small-model", "big-model", "mid-model", "pinned"]
+        );
+        assert!(
+            requests[0].max_tokens < requests[1].max_tokens,
+            "the small routed model must use its smaller context-window budget"
         );
     }
 }

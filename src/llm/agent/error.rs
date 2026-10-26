@@ -23,7 +23,7 @@ pub enum AgentError {
     InvalidRequest(String),
 
     /// Context too large
-    #[error("Context too large: {current} tokens exceeds limit of {limit}")]
+    #[error("Context too large: estimated {current} tokens for a limit of {limit}")]
     ContextTooLarge { current: usize, limit: usize },
 
     /// Tool execution error

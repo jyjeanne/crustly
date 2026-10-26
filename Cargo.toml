@@ -2,7 +2,7 @@
 name = "crustly"
 version = "0.5.3"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.95"
 authors = ["Crustly Team"]
 license = "FSL-1.1-MIT"
 description = "High-performance terminal AI assistant for software development"

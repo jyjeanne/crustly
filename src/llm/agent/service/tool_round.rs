@@ -373,9 +373,9 @@ impl AgentService {
         // invalidated too.
         if mutating_tool_ran {
             self.tool_cache.invalidate_matching(|tool_name| {
-                self.tool_registry.get(tool_name).map_or(true, |t| {
-                    t.capabilities().contains(&ToolCapability::ReadFiles)
-                })
+                self.tool_registry
+                    .get(tool_name)
+                    .is_none_or(|t| t.capabilities().contains(&ToolCapability::ReadFiles))
             });
         }
 

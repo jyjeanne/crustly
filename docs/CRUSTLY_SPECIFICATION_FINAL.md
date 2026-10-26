@@ -5,7 +5,7 @@
 **Crate:** `crustly`
 **License:** FSL-1.1-MIT
 **Target Rust Edition:** 2021
-**MSRV:** 1.75.0
+**MSRV:** 1.95.0
 **Feature Parity:** 95%+ with Crush (Go)
 
 ---
@@ -86,7 +86,7 @@ To deliver a blazingly fast, memory-efficient terminal AI assistant that:
 name = "crustly"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.95"
 authors = ["Crustly Team"]
 license = "FSL-1.1-MIT"
 description = "High-performance terminal AI assistant"
