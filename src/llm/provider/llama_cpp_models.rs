@@ -938,9 +938,8 @@ pub(crate) fn available_space_at(path: &Path) -> Option<u64> {
     }
     let canonical = std::fs::canonicalize(&probe).ok()?;
 
-    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let disks = sysinfo::Disks::new_with_refreshed_list().ok()?;
     disks
-        .list()
         .iter()
         // The disk whose mount point is the *longest* matching prefix
         // wins - handles nested mount points correctly (e.g. a separate

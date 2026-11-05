@@ -472,7 +472,7 @@ fn parse_vulkaninfo_summary(stdout: &str) -> Option<GpuInfo> {
 /// `None` only if the underlying platform call itself reports zero, which
 /// `sysinfo` treats as "couldn't determine" on every supported target.
 fn system_ram_total_bytes() -> Option<u64> {
-    let sys = sysinfo::System::new_all();
+    let sys = sysinfo::System::new_all().ok()?;
     let total = sys.total_memory();
     (total > 0).then_some(total)
 }
