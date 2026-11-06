@@ -4101,8 +4101,18 @@ mod tests {
         );
     }
 
+    /// The Windows clipboard is one global object that only one thread may
+    /// hold at a time (see arboard's docs), and `App` keeps its clipboard
+    /// handle open for its whole life. Two tests using it on parallel test
+    /// threads corrupted the heap and crashed the test binary
+    /// (STATUS_HEAP_CORRUPTION, most runs of these two tests together).
+    /// Every test that touches the clipboard holds this lock before creating
+    /// its `App`, so the lock is released only after the app is dropped.
+    static CLIPBOARD_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     #[tokio::test]
     async fn ctrl_y_copies_last_code_block_when_present() {
+        let _clipboard = CLIPBOARD_TESTS.lock().await;
         let mut app = test_app().await;
         app.mode = AppMode::Chat;
         app.messages.push(DisplayMessage {
@@ -4291,6 +4301,7 @@ mod tests {
 
     #[tokio::test]
     async fn ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking() {
+        let _clipboard = CLIPBOARD_TESTS.lock().await;
         let mut app = test_app().await;
         app.mode = AppMode::Chat;
 
