@@ -285,22 +285,27 @@ impl AgentRun<'_> {
         let mut overflow_retries = 0;
         loop {
             let budget = self.service.measure_budget(&self.context, self.tools);
-            if budget.is_full() {
-                // `completion_budget()` must never be zero because providers
-                // reject it, but sending one token when the prompt already
-                // fills the window guarantees an oversized request. `run`
-                // only made the routine room before each round; cut deeper,
-                // as an overflow error would, then use a larger fallback or
-                // fail locally.
+            // `run` only made the routine room before this round. When that
+            // left too little for a useful answer and the conversation is the
+            // cause, cut deeper, as an overflow error would: sending a few
+            // hundred tokens to answer in gets a truncated answer.
+            if budget.is_full() || budget.history_crowds_answer() {
                 tracing::warn!(
-                    "Estimated prompt ({} tokens) fills the {}-token context window; \
-                     freeing context before sending",
+                    "Estimated prompt ({} tokens) leaves {} of the {}-token context window \
+                     for the answer; freeing context before sending",
                     budget.estimated_prompt_tokens(),
+                    budget.available(),
                     budget.window
                 );
                 if self.compact_deeper(&mut overflow_retries).await {
                     continue;
                 }
+            }
+            if budget.is_full() {
+                // `completion_budget()` must never be zero because providers
+                // reject it, but sending one token when the prompt already
+                // fills the window guarantees an oversized request: use a
+                // larger fallback or fail locally.
                 let overflow =
                     ProviderError::ContextLengthExceeded(budget.estimated_prompt_tokens());
                 if self.fall_back(true, &overflow, totals) {

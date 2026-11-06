@@ -2832,7 +2832,7 @@ mod tests {
     }
 
     /// Tool whose result is large, to fill a small window in a few rounds.
-    struct BigOutputTool;
+    struct BigOutputTool(usize);
 
     #[async_trait]
     impl crate::llm::tools::Tool for BigOutputTool {
@@ -2861,7 +2861,9 @@ mod tests {
             _input: serde_json::Value,
             _context: &ToolExecutionContext,
         ) -> crate::llm::tools::Result<crate::llm::tools::ToolResult> {
-            Ok(crate::llm::tools::ToolResult::success("word ".repeat(3700)))
+            Ok(crate::llm::tools::ToolResult::success(
+                "word ".repeat(self.0),
+            ))
         }
     }
 
@@ -2873,7 +2875,7 @@ mod tests {
         let context = test_context().await;
         let session = session_for(&context).await;
         let mut registry = ToolRegistry::new();
-        registry.register(Arc::new(BigOutputTool));
+        registry.register(Arc::new(BigOutputTool(3700)));
         // Two big results overfill an 8,192 window. The routine pass keeps
         // the two most recent tool results; a deeper one elides the older.
         let provider = Arc::new(ScriptedProvider::new(
@@ -2898,6 +2900,43 @@ mod tests {
         assert!(
             requests[2].max_tokens.unwrap_or(0) > 1000,
             "the final request must leave room for an answer: {:?}",
+            requests[2].max_tokens
+        );
+    }
+
+    /// A window the routine pass leaves short of a useful answer, but not
+    /// full, is also cut deeper when the conversation is what crowds the
+    /// answer out, rather than sent with a few hundred tokens to answer in.
+    #[tokio::test]
+    async fn a_nearly_full_window_is_cut_deeper_before_sending() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(BigOutputTool(3300)));
+        // Two results leave about 500 of 8,192 tokens: under the 1,024 a
+        // useful answer needs, yet not full.
+        let provider = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![
+                Ok(tool_call("dump", serde_json::json!({}))),
+                Ok(tool_call("dump", serde_json::json!({}))),
+                Ok(text_reply("room to answer")),
+            ],
+        ));
+        let service =
+            AgentService::new(provider.clone(), context).with_tool_registry(Arc::new(registry));
+
+        let response = service
+            .send_message_with_tools(session, "dump twice".to_string(), None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "room to answer");
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 3);
+        assert!(
+            requests[2].max_tokens.unwrap_or(0) >= 1024,
+            "the final request must leave a useful answer budget: {:?}",
             requests[2].max_tokens
         );
     }
