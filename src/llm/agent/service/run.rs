@@ -274,14 +274,25 @@ impl AgentRun<'_> {
     /// back to the configured fallback provider for the rest of the request.
     async fn call_model(&mut self, totals: &mut Totals) -> Result<(LLMResponse, ContextBudget)> {
         let mut overflow_retries = 0;
-        loop {
+        'round: loop {
             let budget = self.service.measure_budget(&self.context, self.tools);
             if budget.available() == 0 {
                 // `completion_budget()` must never be zero because providers
                 // reject it, but sending one token when the prompt already
                 // fills the window guarantees an oversized request. `run`
-                // has already tried to make room before entering this method;
-                // at this point either use a larger fallback or fail locally.
+                // only made the routine room before each round; cut deeper,
+                // as an overflow error would, then use a larger fallback or
+                // fail locally.
+                while overflow_retries < MAX_OVERFLOW_RETRIES {
+                    overflow_retries += 1;
+                    if self
+                        .service
+                        .make_room(&mut self.context, self.tools, overflow_retries)
+                        .await
+                    {
+                        continue 'round;
+                    }
+                }
                 let overflow =
                     ProviderError::ContextLengthExceeded(budget.estimated_prompt_tokens());
                 if self.fall_back(true, &overflow, totals) {
