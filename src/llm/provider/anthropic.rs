@@ -321,6 +321,11 @@ impl Provider for AnthropicProvider {
             "claude-3-sonnet-20240229" => Some(200_000),
             "claude-3-5-sonnet-20240620" => Some(200_000),
             "claude-3-haiku-20240307" => Some(200_000),
+            // Every current Claude model has at least a 200k window. Without
+            // this, a model missing from the list above was budgeted as 4,096
+            // tokens: core tools only, constant compaction, and prompts
+            // refused as too large for a window 50 times bigger.
+            m if m.starts_with("claude-") => Some(200_000),
             _ => None,
         }
     }
@@ -507,6 +512,8 @@ mod tests {
             provider.context_window("claude-3-opus-20240229"),
             Some(200_000)
         );
+        // Claude models not listed by name still get their real window.
+        assert_eq!(provider.context_window("claude-sonnet-4-5"), Some(200_000));
         assert_eq!(provider.context_window("unknown-model"), None);
     }
 

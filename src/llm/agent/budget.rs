@@ -11,6 +11,7 @@
 //! prompt token count into a correction factor for later estimates.
 
 use super::context::token_count;
+use super::error::AgentError;
 use crate::llm::provider::Tool;
 
 /// Most tokens a single answer may use.
@@ -121,6 +122,22 @@ impl ContextBudget {
     /// Tokens left in the window for the answer.
     pub fn available(&self) -> u32 {
         self.window.saturating_sub(self.used())
+    }
+
+    /// True when the estimated prompt leaves nothing for the answer. Such a
+    /// request would go out with the one-token minimum of
+    /// [`Self::completion_budget`] and can only overflow or come back
+    /// truncated, so callers refuse it before dispatch.
+    pub fn is_full(&self) -> bool {
+        self.available() == 0
+    }
+
+    /// The error for a prompt refused because it [`Self::is_full`].
+    pub fn overflow_error(&self) -> AgentError {
+        AgentError::ContextTooLarge {
+            current: self.estimated_prompt_tokens() as usize,
+            limit: self.window as usize,
+        }
     }
 
     /// The `max_tokens` to send: what is left, capped at
@@ -238,6 +255,7 @@ mod tests {
     fn distinguishes_prompt_overflow_from_a_clamped_full_window() {
         let b = budget(8192, 6000, 1000, 1500);
         assert_eq!(b.available(), 0);
+        assert!(b.is_full());
         assert!(b.estimated_prompt_tokens() > b.window);
     }
 

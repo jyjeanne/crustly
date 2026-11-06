@@ -862,8 +862,9 @@ impl AgentService {
     /// return whether anything was freed.
     ///
     /// `level` 0 is the check before every round: it acts only when the
-    /// budget is tight. Levels 1 and 2 follow a provider overflow error, when
-    /// the estimate has already proved too low, and cut deeper each time.
+    /// budget is tight. Levels 1 and 2 follow an overflow - a provider error,
+    /// or an estimate that already fills the window - and cut deeper each
+    /// time.
     async fn make_room(
         &self,
         context: &mut AgentContext,
@@ -1507,16 +1508,22 @@ impl AgentService {
         let user_msg = Message::user(user_message.clone());
         context.add_message(user_msg);
 
+        // Size the answer from what the configured provider context window
+        // leaves after the system prompt. A prompt that already fills it
+        // would go out with a one-token answer budget: refuse it before
+        // saving the message, as the tool loop does before dispatch.
+        let no_tools = RequestTools::new(Vec::new());
+        let budget = self.measure_budget(&context, &no_tools);
+        if budget.is_full() {
+            return Err(budget.overflow_error());
+        }
+
         // Save user message to database
         message_service
             .create_message(session_id, "user".to_string(), user_message)
             .await
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
-        // Build base LLM request with a budget that fits the configured
-        // provider context window after accounting for the system prompt.
-        let no_tools = RequestTools::new(Vec::new());
-        let budget = self.measure_budget(&context, &no_tools);
         let request =
             Self::build_request(&model_name, &context, &no_tools, budget.completion_budget());
 
@@ -2457,6 +2464,7 @@ mod tests {
                 "small-model" => Some(8192),
                 "mid-model" => Some(32_768),
                 "big-model" => Some(128_000),
+                "unknown-window-model" => None,
                 _ => Some(self.window),
             }
         }
@@ -2791,6 +2799,29 @@ mod tests {
 
         let result = service
             .send_message_with_tools(session, "hello".to_string(), None)
+            .await;
+
+        assert!(matches!(result, Err(AgentError::ContextTooLarge { .. })));
+        assert!(
+            provider.requests().is_empty(),
+            "oversized request was dispatched"
+        );
+    }
+
+    /// The tool-less path refuses a prompt that fills the window too.
+    #[tokio::test]
+    async fn estimated_context_overflow_is_rejected_without_tools() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(
+            128,
+            vec![Ok(text_reply("unreachable"))],
+        ));
+        let service = AgentService::new(provider.clone(), context)
+            .with_system_prompt("large system prompt ".repeat(256));
+
+        let result = service
+            .send_message(session, "hello".to_string(), None)
             .await;
 
         assert!(matches!(result, Err(AgentError::ContextTooLarge { .. })));
@@ -3836,6 +3867,35 @@ mod tests {
                 assert!(cloud.requests().is_empty());
             }
         }
+    }
+
+    /// An estimated overflow hands the request to the fallback even when the
+    /// fallback reports no window for its model: it is not budgeted against
+    /// the local window it was called in to replace.
+    #[tokio::test]
+    async fn an_estimated_overflow_reaches_a_fallback_with_an_unknown_window() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let local = Arc::new(ScriptedProvider::new(128, vec![]));
+        let cloud = Arc::new(
+            ScriptedProvider::new(0, vec![Ok(text_reply("Fits in the cloud."))])
+                .named("cloud", "unknown-window-model"),
+        );
+        let service = AgentService::new(local.clone(), context)
+            .with_system_prompt("large system prompt ".repeat(256))
+            .with_fallback(fallback_to(cloud.clone(), true));
+
+        let response = service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await
+            .expect("the fallback takes the request");
+
+        assert!(response.content.starts_with("Fits in the cloud."));
+        assert!(
+            local.requests().is_empty(),
+            "nothing goes to the full window"
+        );
+        assert_eq!(cloud.requests().len(), 1);
     }
 
     #[tokio::test]
