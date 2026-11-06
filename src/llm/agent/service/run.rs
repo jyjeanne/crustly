@@ -21,6 +21,13 @@ use std::time::Instant;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+/// Window assumed for a fallback provider that reports none for its model.
+/// The fallback is called in when the local window is too small; budgeting
+/// it against that same window refused, before sending, the very request it
+/// was called in for. A real overflow still comes back as the provider's
+/// own error and is handled as one.
+const UNKNOWN_FALLBACK_WINDOW: u32 = 128_000;
+
 /// Everything one request needs to run its loop.
 pub(super) struct AgentRun<'a> {
     pub service: &'a AgentService,
@@ -268,40 +275,38 @@ impl AgentRun<'_> {
 
     /// Call the model for one round. Streams when `chunk_tx` is set.
     ///
-    /// When the provider reports that the prompt overflowed its window, free
-    /// more context and retry the same round instead of failing. When that
-    /// cannot free enough, or the provider is unreachable or failing, fall
-    /// back to the configured fallback provider for the rest of the request.
+    /// When the prompt overflows the window - estimated before sending, or
+    /// reported by the provider - free more context and retry the same round
+    /// instead of failing. When that cannot free enough, or the provider is
+    /// unreachable or failing, fall back to the configured fallback provider
+    /// for the rest of the request. An estimated overflow that neither can
+    /// fix fails locally with `ContextTooLarge`, before anything is sent.
     async fn call_model(&mut self, totals: &mut Totals) -> Result<(LLMResponse, ContextBudget)> {
         let mut overflow_retries = 0;
-        'round: loop {
+        loop {
             let budget = self.service.measure_budget(&self.context, self.tools);
-            if budget.available() == 0 {
+            if budget.is_full() {
                 // `completion_budget()` must never be zero because providers
                 // reject it, but sending one token when the prompt already
                 // fills the window guarantees an oversized request. `run`
                 // only made the routine room before each round; cut deeper,
                 // as an overflow error would, then use a larger fallback or
                 // fail locally.
-                while overflow_retries < MAX_OVERFLOW_RETRIES {
-                    overflow_retries += 1;
-                    if self
-                        .service
-                        .make_room(&mut self.context, self.tools, overflow_retries)
-                        .await
-                    {
-                        continue 'round;
-                    }
+                tracing::warn!(
+                    "Estimated prompt ({} tokens) fills the {}-token context window; \
+                     freeing context before sending",
+                    budget.estimated_prompt_tokens(),
+                    budget.window
+                );
+                if self.compact_deeper(&mut overflow_retries).await {
+                    continue;
                 }
                 let overflow =
                     ProviderError::ContextLengthExceeded(budget.estimated_prompt_tokens());
                 if self.fall_back(true, &overflow, totals) {
                     continue;
                 }
-                return Err(AgentError::ContextTooLarge {
-                    current: budget.estimated_prompt_tokens() as usize,
-                    limit: budget.window as usize,
-                });
+                return Err(budget.overflow_error());
             }
             tracing::debug!(
                 "Sending {} tool definitions; {} of {} context tokens left for the answer",
@@ -331,22 +336,12 @@ impl AgentRun<'_> {
             };
 
             if error.is_context_overflow() {
-                if overflow_retries < MAX_OVERFLOW_RETRIES {
-                    overflow_retries += 1;
-                    tracing::warn!(
-                        "Prompt overflowed the context window ({}); freeing context and \
-                         retrying ({}/{})",
-                        error,
-                        overflow_retries,
-                        MAX_OVERFLOW_RETRIES
-                    );
-                    if self
-                        .service
-                        .make_room(&mut self.context, self.tools, overflow_retries)
-                        .await
-                    {
-                        continue;
-                    }
+                tracing::warn!(
+                    "Prompt overflowed the context window ({}); freeing context and retrying",
+                    error
+                );
+                if self.compact_deeper(&mut overflow_retries).await {
+                    continue;
                 }
                 if self.fall_back(true, &error, totals) {
                     continue;
@@ -356,6 +351,28 @@ impl AgentRun<'_> {
             }
             return Err(AgentError::Provider(error));
         }
+    }
+
+    /// Free context at the next deeper `make_room` level after an overflow,
+    /// real or estimated, moving on to deeper levels while one frees nothing.
+    /// Returns whether anything was freed; false once every level is used.
+    async fn compact_deeper(&mut self, overflow_retries: &mut usize) -> bool {
+        while *overflow_retries < MAX_OVERFLOW_RETRIES {
+            *overflow_retries += 1;
+            tracing::debug!(
+                "Freeing context at level {}/{}",
+                overflow_retries,
+                MAX_OVERFLOW_RETRIES
+            );
+            if self
+                .service
+                .make_room(&mut self.context, self.tools, *overflow_retries)
+                .await
+            {
+                return true;
+            }
+        }
+        false
     }
 
     /// Switch the rest of the request to the fallback provider, when one is
@@ -391,9 +408,11 @@ impl AgentRun<'_> {
             fallback.provider.name(),
             model
         );
-        if let Some(window) = fallback.provider.context_window(&model) {
-            self.context.max_tokens = self.context.max_tokens.max(window as usize);
-        }
+        let window = fallback
+            .provider
+            .context_window(&model)
+            .unwrap_or(UNKNOWN_FALLBACK_WINDOW);
+        self.context.max_tokens = self.context.max_tokens.max(window as usize);
         self.provider = fallback.provider.clone();
         self.model_name = model;
         totals.fallback_reason = Some(reason);
@@ -443,11 +462,26 @@ impl AgentRun<'_> {
 
         // Ask without tools so the model is forced to produce a text answer.
         let no_tools = RequestTools::new(Vec::new());
-        let max_tokens = self
-            .service
-            .measure_budget(&self.context, &no_tools)
-            .completion_budget()
-            .min(2048);
+        // The reply, its "not run" results and the instruction were just
+        // added: make the routine room, and never send a prompt that already
+        // fills the window with the one-token minimum answer budget.
+        self.service
+            .make_room(&mut self.context, &no_tools, 0)
+            .await;
+        let budget = self.service.measure_budget(&self.context, &no_tools);
+        if budget.is_full() {
+            tracing::warn!(
+                "Final answer request skipped: the estimated prompt ({} tokens) fills the \
+                 {}-token context window",
+                budget.estimated_prompt_tokens(),
+                budget.window
+            );
+            return match pending {
+                Some(pending) => Ok(pending),
+                None => Err(budget.overflow_error()),
+            };
+        }
+        let max_tokens = budget.completion_budget().min(2048);
         let request =
             AgentService::build_request(&self.model_name, &self.context, &no_tools, max_tokens);
         let outcome = tokio::select! {
