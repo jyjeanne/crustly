@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Crustly is a high-performance terminal AI assistant for software development written in Rust. It's a Rust reimplementation of Crush with focus on performance, memory efficiency, and reduced resource consumption.
 
 **Key Technologies:**
-- **Language:** Rust 1.75+
+- **Language:** Rust 1.95+
 - **Async Runtime:** Tokio
 - **TUI Framework:** Ratatui with Crossterm
 - **Database:** SQLite with sqlx (WAL mode for concurrent reads)

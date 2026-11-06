@@ -95,6 +95,14 @@ impl ContextBudget {
         (tokens as f64 * self.calibration).ceil() as u32
     }
 
+    /// Estimated prompt size including provider framing, before clamping it to
+    /// the context window. Callers use this to distinguish a full window from
+    /// an estimate that already exceeds it.
+    pub fn estimated_prompt_tokens(&self) -> u32 {
+        self.calibrated(self.raw_prompt_tokens())
+            .saturating_add(PROMPT_FRAMING_MARGIN)
+    }
+
     /// What every request costs before any conversation: system prompt, tool
     /// schemas and the framing margin.
     pub fn fixed_overhead(&self) -> u32 {
@@ -107,9 +115,7 @@ impl ContextBudget {
 
     /// Tokens the prompt is expected to take, framing margin included.
     pub fn used(&self) -> u32 {
-        self.calibrated(self.raw_prompt_tokens())
-            .saturating_add(PROMPT_FRAMING_MARGIN)
-            .min(self.window)
+        self.estimated_prompt_tokens().min(self.window)
     }
 
     /// Tokens left in the window for the answer.
@@ -226,6 +232,13 @@ mod tests {
             budget(200_000, 1000, 1000, 0).completion_budget(),
             MAX_COMPLETION_TOKENS
         );
+    }
+
+    #[test]
+    fn distinguishes_prompt_overflow_from_a_clamped_full_window() {
+        let b = budget(8192, 6000, 1000, 1500);
+        assert_eq!(b.available(), 0);
+        assert!(b.estimated_prompt_tokens() > b.window);
     }
 
     #[test]

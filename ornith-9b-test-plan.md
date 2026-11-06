@@ -79,7 +79,7 @@ ollama serve   # if not already running as a service
 #    (DEFAULT_OLLAMA_HOST in src/llm/provider/ollama.rs).
 curl -s http://127.0.0.1:11434/api/version
 
-# 3. Rust toolchain per Cargo.toml (rust-version = "1.75")
+# 3. Rust toolchain per Cargo.toml (rust-version = "1.95")
 rustc --version
 ```
 
