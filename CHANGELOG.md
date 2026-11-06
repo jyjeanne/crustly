@@ -5,6 +5,21 @@ For the forward-looking plan, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
+### Unreleased — Context Budgets That Hold
+
+#### Rust 1.95 Required
+Building Crustly now needs Rust 1.95 or newer (`rust-version = "1.95"`). The declared minimum was 1.75, but the dependencies already required more: `sysinfo` 0.40 needs 1.95 and the AWS SDK crates 1.94.1, so 1.95 is the real floor, now stated.
+
+#### No More One-Token Answers
+A request whose prompt already fills the context window used to go out with a one-token answer budget, and came back cut off or rejected. Crustly now frees context first (dropping old tool output, then older turns), hands the request to the configured `[fallback]` provider, or stops with a "Context too large" error before sending anything. The final answer at a round or time limit does the same, keeping the last reply when there is no room to ask for a new one. A window left with only a few hundred tokens for the answer is also cut deeper when the conversation, not the system prompt and tools, is what fills it.
+
+#### Fixes
+- Claude models other than the four Claude 3 ids were budgeted as a 4,096-token window instead of 200k: only the core tools, constant compaction, and prompts refused as too large.
+- A fallback provider that reports no context window for its model was measured against the local window it replaces, so an overflow never reached it.
+- With the model router on, the answer budget now always comes from the routed model's window.
+
+---
+
 ### v0.5.3 — In-Process llama.cpp, GGUF Management & a Local-Model Harness
 
 This release is about running Crustly on a model on your own machine: a third local backend that needs no server, tools to find and manage `.gguf` files, and an agent loop reworked for small context windows. The terminal UI also got faster: pasting no longer crawls on Windows. On the 8,192-token default window of the local providers, the system prompt and the 23 tool schemas used to take 7,607 tokens of every request (counting the framing margin), leaving 585 for the conversation and the answer. They now take 2,769, leaving 5,423.

@@ -157,6 +157,16 @@ impl ContextBudget {
         self.available() < self.min_answer_tokens()
     }
 
+    /// True when the budget [`Self::is_tight`] although the fixed overhead
+    /// alone would leave a useful answer: the conversation is what crowds the
+    /// answer out, so dropping more of it helps. When the overhead itself is
+    /// too big, compacting cannot help, and cutting deeper every round would
+    /// only throw the history away.
+    pub fn history_crowds_answer(&self) -> bool {
+        self.is_tight()
+            && self.window.saturating_sub(self.fixed_overhead()) >= self.min_answer_tokens()
+    }
+
     /// The numbers shown to the user.
     pub fn usage(&self, core_tools_only: bool) -> ContextUsage {
         ContextUsage {
@@ -280,6 +290,24 @@ mod tests {
         assert_eq!(calibration_from(0, 1000), None);
         assert_eq!(calibration_from(1000, 0), None);
         assert_eq!(calibration_from(5000, 1000), Some(MAX_CALIBRATION));
+    }
+
+    #[test]
+    fn history_crowds_the_answer_only_when_dropping_it_would_help() {
+        // 8,192 window, min answer 1,024. Small overhead, big history: tight,
+        // and dropping history frees room.
+        let crowded = budget(8192, 500, 500, 5800);
+        assert!(crowded.is_tight() && !crowded.is_full());
+        assert!(crowded.history_crowds_answer());
+
+        // The system prompt and tools alone leave under 1,024: tight however
+        // much history is dropped.
+        let overhead_bound = budget(8192, 4000, 2500, 100);
+        assert!(overhead_bound.is_tight());
+        assert!(!overhead_bound.history_crowds_answer());
+
+        // Plenty of room: nothing to do.
+        assert!(!budget(8192, 500, 500, 500).history_crowds_answer());
     }
 
     #[test]
