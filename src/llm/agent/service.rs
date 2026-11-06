@@ -2800,6 +2800,77 @@ mod tests {
         );
     }
 
+    /// Tool whose result is large, to fill a small window in a few rounds.
+    struct BigOutputTool;
+
+    #[async_trait]
+    impl crate::llm::tools::Tool for BigOutputTool {
+        fn name(&self) -> &str {
+            "dump"
+        }
+
+        fn description(&self) -> &str {
+            "Returns a large result"
+        }
+
+        fn input_schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object", "properties": {}})
+        }
+
+        fn capabilities(&self) -> Vec<ToolCapability> {
+            vec![]
+        }
+
+        fn requires_approval(&self) -> bool {
+            false
+        }
+
+        async fn execute(
+            &self,
+            _input: serde_json::Value,
+            _context: &ToolExecutionContext,
+        ) -> crate::llm::tools::Result<crate::llm::tools::ToolResult> {
+            Ok(crate::llm::tools::ToolResult::success("word ".repeat(3700)))
+        }
+    }
+
+    /// A prompt the routine room-making before a round leaves too big gets
+    /// the deeper compaction an overflow error would get, instead of an
+    /// immediate `ContextTooLarge` (or an early switch to the fallback).
+    #[tokio::test]
+    async fn estimated_overflow_tries_deeper_compaction_first() {
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(BigOutputTool));
+        // Two big results overfill an 8,192 window. The routine pass keeps
+        // the two most recent tool results; a deeper one elides the older.
+        let provider = Arc::new(ScriptedProvider::new(
+            8192,
+            vec![
+                Ok(tool_call("dump", serde_json::json!({}))),
+                Ok(tool_call("dump", serde_json::json!({}))),
+                Ok(text_reply("fits after compaction")),
+            ],
+        ));
+        let service =
+            AgentService::new(provider.clone(), context).with_tool_registry(Arc::new(registry));
+
+        let response = service
+            .send_message_with_tools(session, "dump twice".to_string(), None)
+            .await
+            .expect("deeper compaction makes the request fit");
+
+        assert_eq!(response.content, "fits after compaction");
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 3);
+        assert!(
+            requests[2].max_tokens.unwrap_or(0) > 1000,
+            "the final request must leave room for an answer: {:?}",
+            requests[2].max_tokens
+        );
+    }
+
     /// Before each round, a tight budget elides old tool output first.
     #[tokio::test]
     async fn make_room_elides_old_tool_output_when_the_budget_is_tight() {
