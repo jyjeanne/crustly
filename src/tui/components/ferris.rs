@@ -31,18 +31,22 @@ pub enum Mood {
 /// [`WIDTH`] columns. The claws wave, the legs step, and Ferris blinks every
 /// three seconds.
 pub fn frame(tick: usize, mood: Mood) -> [String; HEIGHT] {
-    let (left_claw, right_claw) = if (tick / 3) % 2 == 0 {
+    let (left_claw, right_claw) = if (tick / 3).is_multiple_of(2) {
         ("\\)", "(/")
     } else {
         ("/)", "(\\")
     };
-    let eyes = if tick % 30 == 0 { "- -" } else { "o o" };
+    let eyes = if tick.is_multiple_of(30) {
+        "- -"
+    } else {
+        "o o"
+    };
     let mouth = match mood {
         Mood::Idle => '-',
-        Mood::Thinking if (tick / 4) % 2 == 0 => 'o',
+        Mood::Thinking if (tick / 4).is_multiple_of(2) => 'o',
         Mood::Thinking => '-',
     };
-    let legs = if (tick / 2) % 2 == 0 {
+    let legs = if (tick / 2).is_multiple_of(2) {
         "/ '-----' \\"
     } else {
         "| '-----' |"

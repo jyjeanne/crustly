@@ -276,6 +276,22 @@ impl AgentRun<'_> {
         let mut overflow_retries = 0;
         loop {
             let budget = self.service.measure_budget(&self.context, self.tools);
+            if budget.available() == 0 {
+                // `completion_budget()` must never be zero because providers
+                // reject it, but sending one token when the prompt already
+                // fills the window guarantees an oversized request. `run`
+                // has already tried to make room before entering this method;
+                // at this point either use a larger fallback or fail locally.
+                let overflow =
+                    ProviderError::ContextLengthExceeded(budget.estimated_prompt_tokens());
+                if self.fall_back(true, &overflow, totals) {
+                    continue;
+                }
+                return Err(AgentError::ContextTooLarge {
+                    current: budget.estimated_prompt_tokens() as usize,
+                    limit: budget.window as usize,
+                });
+            }
             tracing::debug!(
                 "Sending {} tool definitions; {} of {} context tokens left for the answer",
                 self.tools.defs.len(),
