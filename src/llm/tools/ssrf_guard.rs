@@ -47,10 +47,7 @@ fn is_blocked_ipv4(ip: &Ipv4Addr) -> bool {
     // 100.64.0.0/10: carrier-grade NAT / shared address space, also used for
     // some cloud-internal networking - not covered by any `is_*` helper.
     let o = ip.octets();
-    if o[0] == 100 && (64..=127).contains(&o[1]) {
-        return true;
-    }
-    false
+    o[0] == 100 && (64..=127).contains(&o[1])
 }
 
 fn is_blocked_ipv6(ip: &Ipv6Addr) -> bool {
