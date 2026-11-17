@@ -637,249 +637,35 @@ impl Provider for OpenAIProvider {
         )
         .await?;
 
-        // Parse Server-Sent Events stream.
-        //
-        // Tool calls arrive as *fragmented* deltas across many chunks:
-        //   chunk 1: { tool_calls: [{ index:0, id:"call_abc", type:"function", function:{name:"read_file"} }] }
-        //   chunk 2: { tool_calls: [{ index:0, function:{arguments:"{\"path\":"} }] }
-        //   chunk 3: { tool_calls: [{ index:0, function:{arguments:"\"src/main.rs\"}"} }] }
-        //   chunk N: { finish_reason: "tool_calls" }
-        //
-        // We accumulate fragments in `tool_call_builders` (indexed by tool call
-        // position) and emit all ToolUse events just before the MessageStop.
-        let byte_stream = response.bytes_stream();
-
-        // Intermediate accumulator for a single tool call's fragments.
-        #[derive(Default)]
-        struct ToolCallBuilder {
-            id: String,
-            name: String,
-            arguments: String,
-        }
-
-        // Collect the full byte stream first so we can hold mutable state while
-        // processing.  Tool call JSON is fragmented across many SSE chunks and must
-        // be fully assembled before it can be parsed.
-        let mut tool_call_builders: Vec<ToolCallBuilder> = Vec::new();
-        let mut events: Vec<StreamEvent> = Vec::new();
-        let mut raw_bytes = Vec::<u8>::new();
-
-        {
-            use futures::StreamExt as _;
-            let mut bs = byte_stream;
-            while let Some(chunk_result) = bs.next().await {
-                match chunk_result {
-                    Ok(chunk) => raw_bytes.extend_from_slice(&chunk),
-                    Err(e) => {
-                        return Err(ProviderError::StreamError(e.to_string()));
-                    }
-                }
-            }
-        }
-
-        let text = String::from_utf8_lossy(&raw_bytes);
-        let mut finish_reason: Option<String> = None;
-        // Captured from the first SSE chunk for MessageStart.
-        let mut message_id: Option<String> = None;
-        let mut stream_model: Option<String> = None;
-        // Captured from the final SSE chunk when stream_options.include_usage is true.
-        let mut stream_usage: Option<OpenAIUsage> = None;
-        // Whether a text ContentBlock (index 0) has been opened via ContentBlockStart.
-        let mut text_block_started = false;
-
-        for line in text.lines() {
-            let Some(json_str) = line.strip_prefix("data: ") else {
-                if !line.trim().is_empty()
-                    && !line.starts_with("event:")
-                    && !line.starts_with("id:")
-                    && !line.starts_with("retry:")
-                {
-                    tracing::debug!("OpenAI: Unexpected SSE line format: {}", line);
-                }
-                continue;
-            };
-
-            if json_str == "[DONE]" {
-                tracing::trace!("OpenAI stream completed with [DONE] marker");
-                break;
-            }
-
-            match serde_json::from_str::<OpenAIStreamChunk>(json_str) {
-                Ok(chunk) => {
-                    // Capture id and model from the first chunk for MessageStart.
-                    if message_id.is_none() {
-                        message_id = Some(chunk.id.clone());
-                        stream_model = chunk.model.clone();
-                    }
-                    // Capture usage from the final chunk (stream_options.include_usage).
-                    if chunk.usage.is_some() {
-                        stream_usage = chunk.usage;
-                    }
-
-                    if let Some(choice) = chunk.choices.first() {
-                        // Capture finish_reason for the final flush decision.
-                        if let Some(ref reason) = choice.finish_reason {
-                            if !reason.is_empty() {
-                                finish_reason = Some(reason.clone());
-                            }
+        // Parse the Server-Sent Events as the bytes arrive, so text reaches the
+        // caller token by token. Dropping the returned stream drops the HTTP
+        // response with it.
+        use futures::StreamExt as _;
+        let bytes = Box::pin(response.bytes_stream());
+        let events = futures::stream::unfold(
+            (bytes, Some(OpenAIStreamState::new(model))),
+            |(mut bytes, state)| async move {
+                let mut state = state?;
+                let events = match bytes.next().await {
+                    Some(Ok(chunk)) => {
+                        let mut events = state.on_bytes(&chunk);
+                        if !state.done {
+                            return Some((ok_events(events), (bytes, Some(state))));
                         }
-
-                        if let Some(ref delta) = choice.delta {
-                            // --- text content ---
-                            if let Some(ref content) = delta.content {
-                                if !content.is_empty() {
-                                    // Open the text block on the first non-empty delta.
-                                    if !text_block_started {
-                                        text_block_started = true;
-                                        events.push(StreamEvent::ContentBlockStart {
-                                            index: 0,
-                                            content_block: ContentBlock::Text {
-                                                text: String::new(),
-                                            },
-                                        });
-                                    }
-                                    events.push(StreamEvent::ContentBlockDelta {
-                                        index: 0,
-                                        delta: ContentDelta::TextDelta {
-                                            text: content.clone(),
-                                        },
-                                    });
-                                }
-                            }
-
-                            // --- tool call fragments ---
-                            for tc_delta in &delta.tool_calls {
-                                let idx = tc_delta.index;
-
-                                if !tool_call_index_in_bounds(idx) {
-                                    tracing::warn!(
-                                        "Ignoring tool call delta with out-of-range index {}",
-                                        idx
-                                    );
-                                    continue;
-                                }
-
-                                // Grow the builder vec as needed.
-                                if idx >= tool_call_builders.len() {
-                                    tool_call_builders.resize_with(idx + 1, Default::default);
-                                }
-                                let builder = &mut tool_call_builders[idx];
-
-                                if let Some(ref id) = tc_delta.id {
-                                    builder.id.clone_from(id);
-                                }
-                                if let Some(ref func) = tc_delta.function {
-                                    if let Some(ref name) = func.name {
-                                        builder.name.clone_from(name);
-                                    }
-                                    if let Some(ref args) = func.arguments {
-                                        builder.arguments.push_str(args);
-                                    }
-                                }
-                            }
-                        }
+                        // `[DONE]` arrived: finish without waiting for the
+                        // server to close the connection.
+                        events.extend(state.finish());
+                        ok_events(events)
                     }
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to parse OpenAI stream chunk: {}. Data: {}",
-                        e,
-                        json_str.chars().take(200).collect::<String>()
-                    );
-                }
-            }
-        }
-
-        // Prepend MessageStart as the required first event in the stream.
-        // Use id/model captured from the first SSE chunk; fall back to request values.
-        events.insert(
-            0,
-            StreamEvent::MessageStart {
-                message: StreamMessage {
-                    id: message_id.unwrap_or_else(|| "unknown".to_string()),
-                    model: stream_model.unwrap_or_else(|| model.clone()),
-                    role: Role::Assistant,
-                    usage: TokenUsage {
-                        input_tokens: 0,
-                        output_tokens: 0,
-                    },
-                },
+                    Some(Err(e)) => vec![Err(ProviderError::StreamError(e.to_string()))],
+                    None => ok_events(state.finish()),
+                };
+                Some((events, (bytes, None)))
             },
-        );
+        )
+        .flat_map(futures::stream::iter);
 
-        // Close the text block before emitting any tool call blocks.
-        if text_block_started {
-            events.push(StreamEvent::ContentBlockStop { index: 0 });
-        }
-
-        // Flush accumulated tool calls as ToolUse events before MessageStop.
-        if !tool_call_builders.is_empty() {
-            tracing::debug!(
-                "OpenAI stream: flushing {} tool call(s) accumulated from deltas",
-                tool_call_builders.len()
-            );
-            // Block indices start at 1 when a text block was opened at index 0,
-            // or at 0 when the response contains only tool calls.
-            let base_index: usize = if text_block_started { 1 } else { 0 };
-            for (i, builder) in tool_call_builders.into_iter().enumerate() {
-                // Skip incomplete tool calls produced by truncated/malformed responses.
-                if builder.id.is_empty() || builder.name.is_empty() {
-                    tracing::warn!(
-                        "Skipping incomplete streamed tool call at index {}: id='{}', name='{}'",
-                        i,
-                        builder.id,
-                        builder.name
-                    );
-                    continue;
-                }
-                let input = serde_json::from_str(&builder.arguments).unwrap_or_else(|e| {
-                    tracing::warn!(
-                        "Failed to parse streamed tool arguments for '{}': {}",
-                        builder.name,
-                        e
-                    );
-                    serde_json::json!({})
-                });
-                let block_index = base_index + i;
-                events.push(StreamEvent::ContentBlockStart {
-                    index: block_index,
-                    content_block: ContentBlock::ToolUse {
-                        id: builder.id,
-                        name: builder.name,
-                        input,
-                    },
-                });
-                events.push(StreamEvent::ContentBlockStop { index: block_index });
-            }
-        }
-
-        // Emit stop reason via MessageDelta then the terminal MessageStop.
-        let stop_reason = finish_reason.as_deref().and_then(|r| match r {
-            "tool_calls" | "function_call" => Some(StopReason::ToolUse),
-            "length" => Some(StopReason::MaxTokens),
-            "stop" => Some(StopReason::EndTurn),
-            _ => None,
-        });
-        if stop_reason.is_some() {
-            events.push(StreamEvent::MessageDelta {
-                delta: MessageDelta {
-                    stop_reason,
-                    stop_sequence: None,
-                },
-                usage: TokenUsage {
-                    input_tokens: stream_usage.as_ref().map(|u| u.prompt_tokens).unwrap_or(0),
-                    output_tokens: stream_usage
-                        .as_ref()
-                        .map(|u| u.completion_tokens)
-                        .unwrap_or(0),
-                },
-                perf_metrics: None,
-            });
-        }
-        events.push(StreamEvent::MessageStop);
-
-        let event_stream = futures::stream::iter(events.into_iter().map(Ok::<_, ProviderError>));
-        Ok(Box::pin(event_stream))
+        Ok(Box::pin(events))
     }
 
     fn supports_streaming(&self) -> bool {
@@ -1131,6 +917,284 @@ struct OpenAIFunctionDelta {
     arguments: Option<String>,
 }
 
+fn ok_events(events: Vec<StreamEvent>) -> Vec<Result<StreamEvent>> {
+    events.into_iter().map(Ok).collect()
+}
+
+/// A tool call assembled from its streamed fragments.
+#[derive(Default)]
+struct StreamedToolCall {
+    id: String,
+    name: String,
+    arguments: String,
+}
+
+/// Parses an OpenAI-compatible Server-Sent Events body into [`StreamEvent`]s
+/// as the bytes arrive.
+///
+/// Text deltas are forwarded as soon as their line is complete. Tool calls
+/// arrive as fragments spread over many chunks:
+///
+/// ```text
+/// chunk 1: { tool_calls: [{ index:0, id:"call_abc", type:"function", function:{name:"read_file"} }] }
+/// chunk 2: { tool_calls: [{ index:0, function:{arguments:"{\"path\":"} }] }
+/// chunk 3: { tool_calls: [{ index:0, function:{arguments:"\"src/main.rs\"}"} }] }
+/// chunk N: { finish_reason: "tool_calls" }
+/// ```
+///
+/// so they are assembled here and emitted as `ToolUse` blocks when the stream ends.
+struct OpenAIStreamState {
+    /// Model name from the request, used when the chunks don't carry one.
+    request_model: String,
+    /// Bytes of an SSE line not yet terminated by `\n`.
+    pending_line: Vec<u8>,
+    message_started: bool,
+    text_block_started: bool,
+    tool_calls: Vec<StreamedToolCall>,
+    finish_reason: Option<String>,
+    /// From the final chunk when `stream_options.include_usage` is set.
+    usage: Option<OpenAIUsage>,
+    /// Set once the `[DONE]` marker has been read.
+    done: bool,
+}
+
+impl OpenAIStreamState {
+    fn new(request_model: String) -> Self {
+        Self {
+            request_model,
+            pending_line: Vec::new(),
+            message_started: false,
+            text_block_started: false,
+            tool_calls: Vec::new(),
+            finish_reason: None,
+            usage: None,
+            done: false,
+        }
+    }
+
+    /// Events for the complete SSE lines in `bytes`, available immediately.
+    fn on_bytes(&mut self, bytes: &[u8]) -> Vec<StreamEvent> {
+        let mut events = Vec::new();
+        if self.done {
+            return events;
+        }
+        self.pending_line.extend_from_slice(bytes);
+        while let Some(end) = self.pending_line.iter().position(|&b| b == b'\n') {
+            let line: Vec<u8> = self.pending_line.drain(..=end).collect();
+            // A complete line never ends inside a multi-byte UTF-8 character,
+            // so decoding line by line is safe even when a network chunk
+            // splits one.
+            let line = String::from_utf8_lossy(&line);
+            self.on_line(line.trim_end_matches(['\n', '\r']), &mut events);
+            if self.done {
+                self.pending_line.clear();
+                break;
+            }
+        }
+        events
+    }
+
+    fn on_line(&mut self, line: &str, events: &mut Vec<StreamEvent>) {
+        let Some(json_str) = line.strip_prefix("data: ") else {
+            if !line.trim().is_empty()
+                && !line.starts_with("event:")
+                && !line.starts_with("id:")
+                && !line.starts_with("retry:")
+            {
+                tracing::debug!("OpenAI: Unexpected SSE line format: {}", line);
+            }
+            return;
+        };
+
+        if json_str == "[DONE]" {
+            tracing::trace!("OpenAI stream completed with [DONE] marker");
+            self.done = true;
+            return;
+        }
+
+        let chunk = match serde_json::from_str::<OpenAIStreamChunk>(json_str) {
+            Ok(chunk) => chunk,
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse OpenAI stream chunk: {}. Data: {}",
+                    e,
+                    json_str.chars().take(200).collect::<String>()
+                );
+                return;
+            }
+        };
+
+        // The first chunk carries the id and model for MessageStart.
+        if !self.message_started {
+            self.message_started = true;
+            events.push(StreamEvent::MessageStart {
+                message: StreamMessage {
+                    id: chunk.id.clone(),
+                    model: chunk
+                        .model
+                        .clone()
+                        .unwrap_or_else(|| self.request_model.clone()),
+                    role: Role::Assistant,
+                    usage: TokenUsage {
+                        input_tokens: 0,
+                        output_tokens: 0,
+                    },
+                },
+            });
+        }
+        if chunk.usage.is_some() {
+            self.usage = chunk.usage;
+        }
+
+        let Some(choice) = chunk.choices.first() else {
+            return;
+        };
+        if let Some(reason) = choice.finish_reason.as_ref().filter(|r| !r.is_empty()) {
+            self.finish_reason = Some(reason.clone());
+        }
+        let Some(delta) = &choice.delta else {
+            return;
+        };
+
+        if let Some(content) = delta.content.as_ref().filter(|c| !c.is_empty()) {
+            if !self.text_block_started {
+                self.text_block_started = true;
+                events.push(StreamEvent::ContentBlockStart {
+                    index: 0,
+                    content_block: ContentBlock::Text {
+                        text: String::new(),
+                    },
+                });
+            }
+            events.push(StreamEvent::ContentBlockDelta {
+                index: 0,
+                delta: ContentDelta::TextDelta {
+                    text: content.clone(),
+                },
+            });
+        }
+
+        for fragment in &delta.tool_calls {
+            let idx = fragment.index;
+            if !tool_call_index_in_bounds(idx) {
+                tracing::warn!("Ignoring tool call delta with out-of-range index {}", idx);
+                continue;
+            }
+            if idx >= self.tool_calls.len() {
+                self.tool_calls.resize_with(idx + 1, Default::default);
+            }
+            let call = &mut self.tool_calls[idx];
+            if let Some(id) = &fragment.id {
+                call.id.clone_from(id);
+            }
+            if let Some(function) = &fragment.function {
+                if let Some(name) = &function.name {
+                    call.name.clone_from(name);
+                }
+                if let Some(arguments) = &function.arguments {
+                    call.arguments.push_str(arguments);
+                }
+            }
+        }
+    }
+
+    /// Closing events once the byte stream has ended or `[DONE]` was read.
+    fn finish(mut self) -> Vec<StreamEvent> {
+        let mut events = Vec::new();
+
+        // A last line the server did not terminate with a newline.
+        if !self.done && !self.pending_line.is_empty() {
+            let line =
+                String::from_utf8_lossy(&std::mem::take(&mut self.pending_line)).into_owned();
+            self.on_line(line.trim_end_matches('\r'), &mut events);
+        }
+
+        // MessageStart must be the first event even if no chunk parsed.
+        if !self.message_started {
+            events.insert(
+                0,
+                StreamEvent::MessageStart {
+                    message: StreamMessage {
+                        id: "unknown".to_string(),
+                        model: self.request_model.clone(),
+                        role: Role::Assistant,
+                        usage: TokenUsage {
+                            input_tokens: 0,
+                            output_tokens: 0,
+                        },
+                    },
+                },
+            );
+        }
+
+        // Close the text block before emitting any tool call blocks.
+        if self.text_block_started {
+            events.push(StreamEvent::ContentBlockStop { index: 0 });
+        }
+
+        if !self.tool_calls.is_empty() {
+            tracing::debug!(
+                "OpenAI stream: flushing {} tool call(s) accumulated from deltas",
+                self.tool_calls.len()
+            );
+            // Block indices start at 1 when a text block was opened at index 0.
+            let base_index = usize::from(self.text_block_started);
+            for (i, call) in std::mem::take(&mut self.tool_calls).into_iter().enumerate() {
+                // Skip incomplete tool calls from truncated or malformed responses.
+                if call.id.is_empty() || call.name.is_empty() {
+                    tracing::warn!(
+                        "Skipping incomplete streamed tool call at index {}: id='{}', name='{}'",
+                        i,
+                        call.id,
+                        call.name
+                    );
+                    continue;
+                }
+                let input = serde_json::from_str(&call.arguments).unwrap_or_else(|e| {
+                    tracing::warn!(
+                        "Failed to parse streamed tool arguments for '{}': {}",
+                        call.name,
+                        e
+                    );
+                    serde_json::json!({})
+                });
+                let block_index = base_index + i;
+                events.push(StreamEvent::ContentBlockStart {
+                    index: block_index,
+                    content_block: ContentBlock::ToolUse {
+                        id: call.id,
+                        name: call.name,
+                        input,
+                    },
+                });
+                events.push(StreamEvent::ContentBlockStop { index: block_index });
+            }
+        }
+
+        let stop_reason = self.finish_reason.as_deref().and_then(|r| match r {
+            "tool_calls" | "function_call" => Some(StopReason::ToolUse),
+            "length" => Some(StopReason::MaxTokens),
+            "stop" => Some(StopReason::EndTurn),
+            _ => None,
+        });
+        if stop_reason.is_some() {
+            events.push(StreamEvent::MessageDelta {
+                delta: MessageDelta {
+                    stop_reason,
+                    stop_sequence: None,
+                },
+                usage: TokenUsage {
+                    input_tokens: self.usage.as_ref().map_or(0, |u| u.prompt_tokens),
+                    output_tokens: self.usage.as_ref().map_or(0, |u| u.completion_tokens),
+                },
+                perf_metrics: None,
+            });
+        }
+        events.push(StreamEvent::MessageStop);
+        events
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct OpenAIErrorResponse {
     error: OpenAIError,
@@ -1308,5 +1372,180 @@ mod tests {
         assert!(tool_call_index_in_bounds(MAX_TOOL_CALL_INDEX));
         assert!(!tool_call_index_in_bounds(MAX_TOOL_CALL_INDEX + 1));
         assert!(!tool_call_index_in_bounds(500_000_000));
+    }
+}
+
+#[cfg(test)]
+mod streaming_tests {
+    use super::*;
+    use crate::llm::provider::test_support::held_response_server;
+    use futures::StreamExt as _;
+    use serde_json::json;
+    use std::time::Duration;
+
+    fn sse(value: serde_json::Value) -> String {
+        format!("data: {value}\n\n")
+    }
+
+    fn text_chunk(text: &str, finish_reason: Option<&str>) -> serde_json::Value {
+        json!({
+            "id": "c1",
+            "model": "m",
+            "choices": [{ "index": 0, "delta": { "content": text }, "finish_reason": finish_reason }]
+        })
+    }
+
+    fn texts(events: &[StreamEvent]) -> Vec<String> {
+        events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::ContentBlockDelta {
+                    delta: ContentDelta::TextDelta { text },
+                    ..
+                } => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn text_is_forwarded_once_its_line_is_complete() {
+        let mut state = OpenAIStreamState::new("m".to_string());
+        let line = sse(text_chunk("Café", None));
+        // Split the bytes inside the two-byte "é".
+        let split = line.find('é').expect("accent present") + 1;
+
+        assert!(state.on_bytes(&line.as_bytes()[..split]).is_empty());
+        let events = state.on_bytes(&line.as_bytes()[split..]);
+        assert!(matches!(events[0], StreamEvent::MessageStart { .. }));
+        assert_eq!(texts(&events), ["Café"]);
+
+        let next = state.on_bytes(sse(text_chunk(" au lait", None)).as_bytes());
+        assert!(
+            !next
+                .iter()
+                .any(|e| matches!(e, StreamEvent::MessageStart { .. })),
+            "MessageStart is sent once"
+        );
+        assert_eq!(texts(&next), [" au lait"]);
+    }
+
+    #[test]
+    fn fragmented_tool_call_is_assembled_when_done() {
+        let mut state = OpenAIStreamState::new("m".to_string());
+        let body = [
+            sse(json!({"id": "c1", "choices": [{"index": 0, "delta": {"tool_calls": [
+                {"index": 0, "id": "call_1", "type": "function", "function": {"name": "read_file"}}
+            ]}, "finish_reason": null}]})),
+            sse(json!({"id": "c1", "choices": [{"index": 0, "delta": {"tool_calls": [
+                {"index": 0, "function": {"arguments": "{\"path\":"}}
+            ]}, "finish_reason": null}]})),
+            sse(json!({"id": "c1", "choices": [{"index": 0, "delta": {"tool_calls": [
+                {"index": 0, "function": {"arguments": "\"a.rs\"}"}}
+            ]}, "finish_reason": null}]})),
+            sse(json!({"id": "c1", "choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}],
+                       "usage": {"prompt_tokens": 7, "completion_tokens": 5}})),
+            "data: [DONE]\n\n".to_string(),
+        ]
+        .concat();
+
+        let mut events = state.on_bytes(body.as_bytes());
+        assert!(state.done, "[DONE] read");
+        assert!(
+            state.on_bytes(b"data: ignored\n\n").is_empty(),
+            "nothing after [DONE]"
+        );
+        events.extend(state.finish());
+
+        let (name, input) = events
+            .iter()
+            .find_map(|e| match e {
+                StreamEvent::ContentBlockStart {
+                    content_block: ContentBlock::ToolUse { name, input, .. },
+                    ..
+                } => Some((name.clone(), input.clone())),
+                _ => None,
+            })
+            .expect("tool call assembled");
+        assert_eq!(name, "read_file");
+        assert_eq!(input["path"], "a.rs");
+        let (stop, usage) = events
+            .iter()
+            .find_map(|e| match e {
+                StreamEvent::MessageDelta { delta, usage, .. } => {
+                    Some((delta.stop_reason.clone(), *usage))
+                }
+                _ => None,
+            })
+            .expect("stop reason sent");
+        assert_eq!(stop, Some(StopReason::ToolUse));
+        assert_eq!((usage.input_tokens, usage.output_tokens), (7, 5));
+        assert!(matches!(events.last(), Some(StreamEvent::MessageStop)));
+    }
+
+    #[test]
+    fn last_line_without_newline_is_parsed_at_the_end() {
+        let mut state = OpenAIStreamState::new("m".to_string());
+        let line = format!("data: {}", text_chunk("Bye", Some("stop")));
+
+        assert!(state.on_bytes(line.as_bytes()).is_empty());
+        let events = state.finish();
+        assert!(matches!(events[0], StreamEvent::MessageStart { .. }));
+        assert_eq!(texts(&events), ["Bye"]);
+        assert!(matches!(events.last(), Some(StreamEvent::MessageStop)));
+    }
+
+    #[test]
+    fn empty_stream_still_starts_and_stops_the_message() {
+        let events = OpenAIStreamState::new("m".to_string()).finish();
+        assert!(
+            matches!(&events[0], StreamEvent::MessageStart { message } if message.model == "m")
+        );
+        assert!(matches!(events.last(), Some(StreamEvent::MessageStop)));
+    }
+
+    /// Regression: `stream()` used to read the whole response body before
+    /// yielding any event, so callers saw nothing until the model had finished.
+    #[tokio::test]
+    async fn text_arrives_before_the_response_is_complete() {
+        let (release, held) = tokio::sync::oneshot::channel();
+        let url = held_response_server(
+            "text/event-stream",
+            sse(text_chunk("Hello", None)),
+            sse(text_chunk(" there.", Some("stop"))) + "data: [DONE]\n\n",
+            held,
+        )
+        .await;
+        let provider = OpenAIProvider::local(format!("{url}/v1/chat/completions"));
+        let request = LLMRequest::new("m", vec![Message::user("hi")]);
+
+        // The server holds back the rest of the response: the first text must
+        // already be here. A provider that buffers the body hangs instead.
+        let mut stream = tokio::time::timeout(Duration::from_secs(10), async {
+            let mut stream = provider.stream(request).await.expect("stream starts");
+            loop {
+                match stream.next().await {
+                    Some(Ok(StreamEvent::ContentBlockDelta {
+                        delta: ContentDelta::TextDelta { text },
+                        ..
+                    })) => {
+                        assert_eq!(text, "Hello");
+                        break stream;
+                    }
+                    Some(Ok(_)) => {}
+                    other => panic!("stream ended before any text: {other:?}"),
+                }
+            }
+        })
+        .await
+        .expect("first text arrives while the server is still holding the response");
+
+        release.send(()).expect("server is waiting");
+        let mut rest = Vec::new();
+        while let Some(event) = stream.next().await {
+            rest.push(event.expect("no stream error"));
+        }
+        assert_eq!(texts(&rest), [" there."]);
+        assert!(matches!(rest.last(), Some(StreamEvent::MessageStop)));
     }
 }

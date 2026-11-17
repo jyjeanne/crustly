@@ -38,6 +38,8 @@ pub mod ollama_models;
 pub mod openai;
 pub mod prompt_cache;
 pub mod qwen;
+#[cfg(test)]
+mod test_support;
 
 pub use anthropic::AnthropicProvider;
 pub use azure::AzureOpenAIProvider;
