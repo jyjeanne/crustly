@@ -13,10 +13,15 @@ Building Crustly now needs Rust 1.95 or newer (`rust-version = "1.95"`). The dec
 #### No More One-Token Answers
 A request whose prompt already fills the context window used to go out with a one-token answer budget, and came back cut off or rejected. Crustly now frees context first (dropping old tool output, then older turns), hands the request to the configured `[fallback]` provider, or stops with a "Context too large" error before sending anything. The final answer at a round or time limit does the same, keeping the last reply when there is no room to ask for a new one. A window left with only a few hundred tokens for the answer is also cut deeper when the conversation, not the system prompt and tools, is what fills it.
 
+#### Local Models Stream as They Write
+With native Ollama and OpenAI-compatible servers (LM Studio, Ollama's `/v1` endpoint, LocalAI), the answer now appears as the model writes it. Crustly used to read the whole response before showing any of it, so a long answer arrived all at once at the end. Output that may be a tool call printed as JSON is still held back until it is clear whether it is a call or text.
+
 #### Fixes
 - Claude models other than the four Claude 3 ids were budgeted as a 4,096-token window instead of 200k: only the core tools, constant compaction, and prompts refused as too large.
 - A fallback provider that reports no context window for its model was measured against the local window it replaces, so an overflow never reached it.
 - With the model router on, the answer budget now always comes from the routed model's window.
+- Settings from several config files are now combined key by key. A project `.crustly/config.toml` used to replace the user config as a whole, so a project file that only set `[agent]` dropped the providers configured for the user.
+- `crustly run --format json` printed lines such as "Using native Ollama at: ..." before the JSON, which broke tools reading the output.
 
 ---
 

@@ -552,165 +552,52 @@ impl Provider for OllamaProvider {
             ollama_request.tools.len()
         );
 
-        let mut chunk_stream = self
+        use futures::StreamExt as _;
+
+        let chunk_stream = self
             .client
             .send_chat_messages_stream(ollama_request)
             .await
             .map_err(map_ollama_error)?;
 
-        let message_id = format!("ollama-{}", uuid::Uuid::new_v4());
-        let mut events: Vec<StreamEvent> = vec![StreamEvent::MessageStart {
+        let message_start = StreamEvent::MessageStart {
             message: StreamMessage {
-                id: message_id,
-                model: model.clone(),
+                id: format!("ollama-{}", uuid::Uuid::new_v4()),
+                model,
                 role: Role::Assistant,
                 usage: TokenUsage {
                     input_tokens: 0,
                     output_tokens: 0,
                 },
             },
-        }];
-
-        let mut text_block_started = false;
-        let mut streamed_text = String::new();
-        let mut final_tool_calls: Vec<(String, serde_json::Value)> = Vec::new();
-        let mut final_usage = TokenUsage {
-            input_tokens: 0,
-            output_tokens: 0,
         };
-        let mut final_perf: Option<PerfMetrics> = None;
-        let mut stop_reason: Option<StopReason> = None;
 
-        {
-            use futures::StreamExt as _;
-            while let Some(item) = chunk_stream.next().await {
-                let chunk = match item {
-                    Ok(c) => c,
-                    Err(()) => {
-                        return Err(ProviderError::StreamError(
-                            "Ollama stream terminated with an error".to_string(),
-                        ));
+        // Emit events as each chunk arrives, so the caller can show the first
+        // words while the model is still generating. Dropping the returned
+        // stream drops the HTTP response with it.
+        let events = futures::stream::unfold(
+            (chunk_stream, Some(OllamaStreamState::new(offered_tools))),
+            |(mut chunks, state)| async move {
+                let mut state = state?;
+                let events = match chunks.next().await {
+                    Some(Ok(chunk)) => {
+                        let events = state.on_chunk(chunk);
+                        return Some((ok_events(events), (chunks, Some(state))));
                     }
+                    Some(Err(())) => vec![Err(ProviderError::StreamError(
+                        "Ollama stream terminated with an error".to_string(),
+                    ))],
+                    None => ok_events(state.finish()),
                 };
+                Some((events, (chunks, None)))
+            },
+        )
+        .flat_map(futures::stream::iter);
 
-                if let Some(thinking) = chunk.message.thinking.as_ref().filter(|t| !t.is_empty()) {
-                    events.push(StreamEvent::ContentBlockDelta {
-                        index: 0,
-                        delta: ContentDelta::ThinkingDelta {
-                            thinking: thinking.clone(),
-                        },
-                    });
-                }
-
-                if !chunk.message.content.is_empty() {
-                    streamed_text.push_str(&chunk.message.content);
-
-                    // Stream deltas out as they arrive, as usual - but not while
-                    // the content still looks like it might be a tool call the
-                    // model is printing as text (qwen2.5-coder does this). Those
-                    // are withheld so raw JSON never reaches the chat; if the
-                    // content turns out to be prose after all, the buffered text
-                    // is flushed below and nothing is lost but a little latency.
-                    if !maybe_tool_call_json(&streamed_text) {
-                        if !text_block_started {
-                            text_block_started = true;
-                            events.push(StreamEvent::ContentBlockStart {
-                                index: 0,
-                                content_block: ContentBlock::Text {
-                                    text: String::new(),
-                                },
-                            });
-                        }
-                        events.push(StreamEvent::ContentBlockDelta {
-                            index: 0,
-                            delta: ContentDelta::TextDelta {
-                                text: std::mem::take(&mut streamed_text),
-                            },
-                        });
-                    }
-                }
-
-                final_tool_calls.extend(collect_tool_calls(&chunk.message.tool_calls));
-
-                if chunk.done {
-                    if let Some(final_data) = &chunk.final_data {
-                        final_usage = TokenUsage {
-                            input_tokens: final_data.prompt_eval_count as u32,
-                            output_tokens: final_data.eval_count as u32,
-                        };
-                        final_perf = Some(perf_metrics_from_final_data(final_data));
-                    }
-                    stop_reason = Some(StopReason::EndTurn); // refined below
-                }
-            }
-        }
-
-        // Templates that never populate `tool_calls` print the call as content.
-        // Recover it from the buffered text; on success the text is the call, so
-        // it is not also streamed to the user as a message.
-        if final_tool_calls.is_empty() {
-            if let Some(call) = tool_call_from_content(&streamed_text, &offered_tools) {
-                final_tool_calls.push(call);
-                streamed_text.clear();
-            }
-        }
-
-        // Whatever was withheld but turned out not to be a tool call.
-        if !streamed_text.is_empty() {
-            if !text_block_started {
-                text_block_started = true;
-                events.push(StreamEvent::ContentBlockStart {
-                    index: 0,
-                    content_block: ContentBlock::Text {
-                        text: String::new(),
-                    },
-                });
-            }
-            events.push(StreamEvent::ContentBlockDelta {
-                index: 0,
-                delta: ContentDelta::TextDelta {
-                    text: std::mem::take(&mut streamed_text),
-                },
-            });
-        }
-
-        tracing::debug!("Ollama stream done: tool_calls={}", final_tool_calls.len());
-
-        if text_block_started {
-            events.push(StreamEvent::ContentBlockStop { index: 0 });
-        }
-
-        if stop_reason.is_some() {
-            stop_reason = Some(stop_reason_for(&final_tool_calls));
-        }
-
-        for (i, (name, input)) in final_tool_calls.into_iter().enumerate() {
-            let index = if text_block_started { i + 1 } else { i };
-            events.push(StreamEvent::ContentBlockStart {
-                index,
-                content_block: ContentBlock::ToolUse {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    name,
-                    input,
-                },
-            });
-            events.push(StreamEvent::ContentBlockStop { index });
-        }
-
-        if stop_reason.is_some() {
-            events.push(StreamEvent::MessageDelta {
-                delta: MessageDelta {
-                    stop_reason,
-                    stop_sequence: None,
-                },
-                usage: final_usage,
-                perf_metrics: final_perf,
-            });
-        }
-        events.push(StreamEvent::MessageStop);
-
-        let event_stream = futures::stream::iter(events.into_iter().map(Ok::<_, ProviderError>));
-        Ok(Box::pin(event_stream))
+        Ok(Box::pin(
+            futures::stream::once(async move { Ok::<_, ProviderError>(message_start) })
+                .chain(events),
+        ))
     }
 
     fn supports_streaming(&self) -> bool {
@@ -796,6 +683,162 @@ fn stop_reason_for(tool_calls: &[(String, serde_json::Value)]) -> StopReason {
         StopReason::EndTurn
     } else {
         StopReason::ToolUse
+    }
+}
+
+fn ok_events(events: Vec<StreamEvent>) -> Vec<Result<StreamEvent>> {
+    events.into_iter().map(Ok).collect()
+}
+
+/// Turns Ollama chat chunks into [`StreamEvent`]s, one chunk at a time.
+///
+/// Text is forwarded as soon as it arrives, except while it still looks like a
+/// tool call the model is printing as text (templates that never fill
+/// `tool_calls`, e.g. qwen2.5-coder): that text is withheld so raw JSON never
+/// reaches the caller. When the stream ends it is either recovered as a tool
+/// call or flushed as ordinary text, so nothing is lost but a little latency.
+struct OllamaStreamState {
+    offered_tools: Vec<Tool>,
+    text_block_started: bool,
+    /// Text withheld because it may be a printed tool call.
+    withheld_text: String,
+    tool_calls: Vec<(String, serde_json::Value)>,
+    usage: TokenUsage,
+    perf_metrics: Option<PerfMetrics>,
+    /// Set once the terminal `done` chunk has arrived.
+    done: bool,
+}
+
+impl OllamaStreamState {
+    fn new(offered_tools: Vec<Tool>) -> Self {
+        Self {
+            offered_tools,
+            text_block_started: false,
+            withheld_text: String::new(),
+            tool_calls: Vec::new(),
+            usage: TokenUsage {
+                input_tokens: 0,
+                output_tokens: 0,
+            },
+            perf_metrics: None,
+            done: false,
+        }
+    }
+
+    fn open_text_block(&mut self, events: &mut Vec<StreamEvent>) {
+        if !self.text_block_started {
+            self.text_block_started = true;
+            events.push(StreamEvent::ContentBlockStart {
+                index: 0,
+                content_block: ContentBlock::Text {
+                    text: String::new(),
+                },
+            });
+        }
+    }
+
+    /// Events for one chunk, available immediately.
+    fn on_chunk(&mut self, chunk: ChatMessageResponse) -> Vec<StreamEvent> {
+        let mut events = Vec::new();
+
+        if let Some(thinking) = chunk.message.thinking.as_ref().filter(|t| !t.is_empty()) {
+            events.push(StreamEvent::ContentBlockDelta {
+                index: 0,
+                delta: ContentDelta::ThinkingDelta {
+                    thinking: thinking.clone(),
+                },
+            });
+        }
+
+        if !chunk.message.content.is_empty() {
+            self.withheld_text.push_str(&chunk.message.content);
+            if !maybe_tool_call_json(&self.withheld_text) {
+                self.open_text_block(&mut events);
+                events.push(StreamEvent::ContentBlockDelta {
+                    index: 0,
+                    delta: ContentDelta::TextDelta {
+                        text: std::mem::take(&mut self.withheld_text),
+                    },
+                });
+            }
+        }
+
+        // Tool calls arrive on a mid-stream chunk, not on the `done` one.
+        self.tool_calls
+            .extend(collect_tool_calls(&chunk.message.tool_calls));
+
+        if chunk.done {
+            if let Some(final_data) = &chunk.final_data {
+                self.usage = TokenUsage {
+                    input_tokens: final_data.prompt_eval_count as u32,
+                    output_tokens: final_data.eval_count as u32,
+                };
+                self.perf_metrics = Some(perf_metrics_from_final_data(final_data));
+            }
+            self.done = true;
+        }
+
+        events
+    }
+
+    /// Closing events once the chunk stream has ended.
+    fn finish(mut self) -> Vec<StreamEvent> {
+        let mut events = Vec::new();
+
+        // Templates that never populate `tool_calls` print the call as content.
+        // Recover it from the withheld text; on success the text is the call,
+        // so it is not also sent as a message.
+        if self.tool_calls.is_empty() {
+            if let Some(call) = tool_call_from_content(&self.withheld_text, &self.offered_tools) {
+                self.tool_calls.push(call);
+                self.withheld_text.clear();
+            }
+        }
+
+        // Whatever was withheld but turned out not to be a tool call.
+        if !self.withheld_text.is_empty() {
+            self.open_text_block(&mut events);
+            events.push(StreamEvent::ContentBlockDelta {
+                index: 0,
+                delta: ContentDelta::TextDelta {
+                    text: std::mem::take(&mut self.withheld_text),
+                },
+            });
+        }
+
+        tracing::debug!("Ollama stream done: tool_calls={}", self.tool_calls.len());
+
+        if self.text_block_started {
+            events.push(StreamEvent::ContentBlockStop { index: 0 });
+        }
+
+        let stop_reason = self.done.then(|| stop_reason_for(&self.tool_calls));
+        let first_tool_index = usize::from(self.text_block_started);
+        for (i, (name, input)) in self.tool_calls.into_iter().enumerate() {
+            let index = first_tool_index + i;
+            events.push(StreamEvent::ContentBlockStart {
+                index,
+                content_block: ContentBlock::ToolUse {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    name,
+                    input,
+                },
+            });
+            events.push(StreamEvent::ContentBlockStop { index });
+        }
+
+        if stop_reason.is_some() {
+            events.push(StreamEvent::MessageDelta {
+                delta: MessageDelta {
+                    stop_reason,
+                    stop_sequence: None,
+                },
+                usage: self.usage,
+                perf_metrics: self.perf_metrics,
+            });
+        }
+        events.push(StreamEvent::MessageStop);
+        events
     }
 }
 
@@ -1588,5 +1631,209 @@ mod tests {
             .expect("image should be attached");
         assert_eq!(images.len(), 1);
         assert_eq!(images[0].to_base64(), "aGVsbG8=");
+    }
+}
+
+#[cfg(test)]
+mod streaming_tests {
+    use super::*;
+    use crate::llm::provider::test_support::held_response_server;
+    use futures::StreamExt as _;
+    use std::time::Duration;
+
+    fn chunk(content: &str, done: bool) -> ChatMessageResponse {
+        ChatMessageResponse {
+            model: "m".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            message: ChatMessage::assistant(content.to_string()),
+            logprobs: None,
+            done,
+            final_data: None,
+        }
+    }
+
+    fn texts(events: &[StreamEvent]) -> Vec<String> {
+        events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::ContentBlockDelta {
+                    delta: ContentDelta::TextDelta { text },
+                    ..
+                } => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn stop_reason(events: &[StreamEvent]) -> Option<StopReason> {
+        events.iter().find_map(|e| match e {
+            StreamEvent::MessageDelta { delta, .. } => delta.stop_reason.clone(),
+            _ => None,
+        })
+    }
+
+    fn read_file_tool() -> Tool {
+        Tool {
+            name: "read_file".to_string(),
+            description: "Reads a file".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": { "path": { "type": "string" } }
+            }),
+        }
+    }
+
+    #[test]
+    fn text_is_forwarded_as_each_chunk_arrives() {
+        let mut state = OllamaStreamState::new(vec![]);
+
+        let first = state.on_chunk(chunk("Hello", false));
+        assert!(matches!(
+            first[0],
+            StreamEvent::ContentBlockStart { index: 0, .. }
+        ));
+        assert_eq!(texts(&first), ["Hello"]);
+
+        let second = state.on_chunk(chunk(" world.", false));
+        assert_eq!(second.len(), 1, "the text block is opened only once");
+        assert_eq!(texts(&second), [" world."]);
+    }
+
+    #[test]
+    fn printed_tool_call_is_withheld_then_recovered() {
+        let mut state = OllamaStreamState::new(vec![read_file_tool()]);
+
+        assert!(state
+            .on_chunk(chunk("{\"name\": \"read_file\", ", false))
+            .is_empty());
+        assert!(state
+            .on_chunk(chunk("\"arguments\": {\"path\": \"a.rs\"}}", false))
+            .is_empty());
+        assert!(state.on_chunk(chunk("", true)).is_empty());
+
+        let events = state.finish();
+        assert!(
+            texts(&events).is_empty(),
+            "the JSON is a call, not text to show"
+        );
+        let (name, input, index) = events
+            .iter()
+            .find_map(|e| match e {
+                StreamEvent::ContentBlockStart {
+                    index,
+                    content_block: ContentBlock::ToolUse { name, input, .. },
+                } => Some((name.clone(), input.clone(), *index)),
+                _ => None,
+            })
+            .expect("tool call recovered");
+        assert_eq!(name, "read_file");
+        assert_eq!(input["path"], "a.rs");
+        assert_eq!(index, 0, "no text block was opened");
+        assert_eq!(stop_reason(&events), Some(StopReason::ToolUse));
+        assert!(matches!(events.last(), Some(StreamEvent::MessageStop)));
+    }
+
+    #[test]
+    fn withheld_text_that_is_not_a_tool_call_is_flushed() {
+        let mut state = OllamaStreamState::new(vec![read_file_tool()]);
+
+        assert!(state.on_chunk(chunk("{ just braces }", true)).is_empty());
+
+        let events = state.finish();
+        assert_eq!(texts(&events), ["{ just braces }"]);
+        assert_eq!(stop_reason(&events), Some(StopReason::EndTurn));
+    }
+
+    #[test]
+    fn usage_comes_from_the_done_chunk() {
+        let mut state = OllamaStreamState::new(vec![]);
+        state.on_chunk(chunk("Hi.", false));
+        let mut last = chunk("", true);
+        last.final_data = Some(ChatMessageFinalResponseData {
+            total_duration: 3_000_000,
+            load_duration: 1_000_000,
+            prompt_eval_count: 12,
+            prompt_eval_duration: 1_000_000,
+            eval_count: 3,
+            eval_duration: 1_000_000,
+        });
+        state.on_chunk(last);
+
+        let usage = state
+            .finish()
+            .iter()
+            .find_map(|e| match e {
+                StreamEvent::MessageDelta { usage, .. } => Some(*usage),
+                _ => None,
+            })
+            .expect("usage reported");
+        assert_eq!((usage.input_tokens, usage.output_tokens), (12, 3));
+    }
+
+    /// Regression: `stream()` used to read the whole response before yielding
+    /// any event, so callers saw nothing until the model had finished.
+    #[tokio::test]
+    async fn text_arrives_before_the_response_is_complete() {
+        let line = |content: &str, done: bool| {
+            let mut value = serde_json::json!({
+                "model": "m",
+                "created_at": "2026-01-01T00:00:00Z",
+                "message": { "role": "assistant", "content": content },
+                "done": done,
+            });
+            if done {
+                for key in [
+                    "total_duration",
+                    "load_duration",
+                    "prompt_eval_count",
+                    "prompt_eval_duration",
+                    "eval_count",
+                    "eval_duration",
+                ] {
+                    value[key] = serde_json::json!(1);
+                }
+            }
+            format!("{value}\n")
+        };
+        let (release, held) = tokio::sync::oneshot::channel();
+        let url = held_response_server(
+            "application/x-ndjson",
+            line("Hello", false),
+            line(" there.", true),
+            held,
+        )
+        .await;
+        let provider = OllamaProvider::new(url);
+        let request = LLMRequest::new("m", vec![Message::user("hi")]);
+
+        // The server holds back the rest of the response: the first text must
+        // already be here. A provider that buffers the body hangs instead.
+        let mut stream = tokio::time::timeout(Duration::from_secs(10), async {
+            let mut stream = provider.stream(request).await.expect("stream starts");
+            loop {
+                match stream.next().await {
+                    Some(Ok(StreamEvent::ContentBlockDelta {
+                        delta: ContentDelta::TextDelta { text },
+                        ..
+                    })) => {
+                        assert_eq!(text, "Hello");
+                        break stream;
+                    }
+                    Some(Ok(_)) => {}
+                    other => panic!("stream ended before any text: {other:?}"),
+                }
+            }
+        })
+        .await
+        .expect("first text arrives while the server is still holding the response");
+
+        release.send(()).expect("server is waiting");
+        let mut rest = Vec::new();
+        while let Some(event) = stream.next().await {
+            rest.push(event.expect("no stream error"));
+        }
+        assert_eq!(texts(&rest), [" there."]);
+        assert_eq!(stop_reason(&rest), Some(StopReason::EndTurn));
+        assert!(matches!(rest.last(), Some(StreamEvent::MessageStop)));
     }
 }
