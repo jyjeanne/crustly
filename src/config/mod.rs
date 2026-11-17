@@ -1049,43 +1049,68 @@ impl Default for Config {
     }
 }
 
+/// Merge `overlay` into `base` key by key. Nested tables merge recursively;
+/// any other overlay value (a scalar or an array) replaces the base value.
+fn merge_toml_tables(base: &mut toml::Table, overlay: toml::Table) {
+    for (key, value) in overlay {
+        match value {
+            toml::Value::Table(overlay_table) => match base.get_mut(&key) {
+                Some(toml::Value::Table(base_table)) => {
+                    merge_toml_tables(base_table, overlay_table)
+                }
+                _ => {
+                    base.insert(key, toml::Value::Table(overlay_table));
+                }
+            },
+            value => {
+                base.insert(key, value);
+            }
+        }
+    }
+}
+
 impl Config {
     /// Load configuration from default locations
     ///
     /// Priority (lowest to highest):
     /// 1. Default values
     /// 2. System config: ~/.config/crustly/config.toml
-    /// 3. Local config: ./crustly.toml
-    /// 4. Environment variables
+    /// 3. Project config: .crustly/config.toml in the current directory or an ancestor
+    /// 4. Local config: ./crustly.toml
+    /// 5. Environment variables
+    ///
+    /// Config files are layered key by key (see [`Config::from_layers`]): a
+    /// higher-priority file only overrides the keys it actually sets.
     pub fn load() -> Result<Self> {
         tracing::debug!("Loading configuration...");
 
-        // Start with defaults
-        let mut config = Self::default();
+        let mut layers = Vec::new();
 
-        // 1. Try to load system config
+        // 1. System config
         if let Some(system_config_path) = Self::system_config_path() {
             if system_config_path.exists() {
                 tracing::debug!("Loading system config from: {:?}", system_config_path);
-                config = Self::merge_from_file(config, &system_config_path)?;
+                layers.push(system_config_path);
             }
         }
 
-        // 2. Try to load project-level config (.crustly/config.toml in cwd or ancestors)
+        // 2. Project-level config (.crustly/config.toml in cwd or ancestors)
         if let Some(project_config) = Self::project_config_path() {
             tracing::debug!("Loading project config from: {:?}", project_config);
-            config = Self::merge_from_file(config, &project_config)?;
+            layers.push(project_config);
         }
 
-        // 3. Try to load local config
+        // 3. Local config
         let local_config_path = Self::local_config_path();
         if local_config_path.exists() {
             tracing::debug!("Loading local config from: {:?}", local_config_path);
-            config = Self::merge_from_file(config, &local_config_path)?;
+            layers.push(local_config_path);
         }
 
+        let config = Self::from_layers(&layers)?;
+
         // 4. Apply environment variable overrides
-        config = Self::apply_env_overrides(config)?;
+        let config = Self::apply_env_overrides(config)?;
 
         tracing::debug!("Configuration loaded successfully");
         Ok(config)
@@ -1101,18 +1126,13 @@ impl Config {
         let path = path.as_ref();
         tracing::debug!("Loading configuration from custom path: {:?}", path);
 
-        // Start with defaults
-        let mut config = Self::default();
-
-        // Load from custom path
-        if path.exists() {
-            config = Self::merge_from_file(config, path)?;
-        } else {
+        if !path.exists() {
             anyhow::bail!("Config file not found: {:?}", path);
         }
+        let config = Self::from_layers(&[path.to_path_buf()])?;
 
         // Apply environment variable overrides
-        config = Self::apply_env_overrides(config)?;
+        let config = Self::apply_env_overrides(config)?;
 
         tracing::debug!("Configuration loaded successfully from custom path");
         Ok(config)
@@ -1142,37 +1162,33 @@ impl Config {
         PathBuf::from("./crustly.toml")
     }
 
-    /// Load and merge configuration from a TOML file
-    fn merge_from_file(base: Self, path: &Path) -> Result<Self> {
-        let contents = fs::read_to_string(path)
-            .with_context(|| format!("Failed to read config file: {:?}", path))?;
-
-        let file_config: Self = toml::from_str(&contents)
-            .with_context(|| format!("Failed to parse config file: {:?}", path))?;
-
-        Ok(Self::merge(base, file_config))
-    }
-
-    /// Merge two configs (file_config overwrites base where specified)
-    fn merge(_base: Self, overlay: Self) -> Self {
-        Self {
-            crabrace: overlay.crabrace,
-            database: overlay.database,
-            logging: overlay.logging,
-            debug: overlay.debug,
-            providers: overlay.providers,
-            plan_mode: overlay.plan_mode,
-            security: overlay.security,
-            memory: overlay.memory,
-            mcp: overlay.mcp,
-            tool_cache: overlay.tool_cache,
-            tools: overlay.tools,
-            agent: overlay.agent,
-            verification: overlay.verification,
-            subagents: overlay.subagents,
-            router: overlay.router,
-            fallback: overlay.fallback,
+    /// Build a config from TOML files layered in order, lowest priority first.
+    ///
+    /// The files are merged as TOML tables before deserializing, so a later
+    /// file overrides only the keys it sets: tables merge recursively, and any
+    /// other value (a scalar or an array) replaces the earlier one. Keys that
+    /// no file sets keep their default values.
+    ///
+    /// Deserializing each file into a full `Config` and keeping the last one
+    /// would reset every key the last file leaves out to its default, losing
+    /// values set by lower-priority files.
+    fn from_layers(paths: &[PathBuf]) -> Result<Self> {
+        if paths.is_empty() {
+            return Ok(Self::default());
         }
+
+        let mut merged = toml::Table::new();
+        for path in paths {
+            let contents = fs::read_to_string(path)
+                .with_context(|| format!("Failed to read config file: {:?}", path))?;
+            let layer: toml::Table = toml::from_str(&contents)
+                .with_context(|| format!("Failed to parse config file: {:?}", path))?;
+            merge_toml_tables(&mut merged, layer);
+        }
+
+        merged
+            .try_into::<Self>()
+            .with_context(|| format!("Invalid configuration in config files: {:?}", paths))
     }
 
     /// Apply environment variable overrides
@@ -1732,6 +1748,110 @@ enabled = false
 
         assert_eq!(loaded_config.logging.level, config.logging.level);
         assert_eq!(loaded_config.crabrace.enabled, config.crabrace.enabled);
+    }
+
+    /// Write `contents` to a temp file. The caller keeps the handle alive.
+    fn config_file(contents: &str) -> NamedTempFile {
+        let file = NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), contents).unwrap();
+        file
+    }
+
+    fn layers(files: &[&NamedTempFile]) -> Vec<PathBuf> {
+        files.iter().map(|f| f.path().to_path_buf()).collect()
+    }
+
+    #[test]
+    fn test_from_layers_keeps_keys_the_later_file_does_not_set() {
+        let system =
+            config_file("[logging]\nlevel = \"debug\"\n\n[database]\npath = \"system.db\"\n");
+        let project = config_file("[logging]\nfile = \"project.log\"\n");
+
+        let config = Config::from_layers(&layers(&[&system, &project])).unwrap();
+
+        // Set only by the system file.
+        assert_eq!(config.logging.level, "debug");
+        assert_eq!(config.database.path, PathBuf::from("system.db"));
+        // Set by the project file.
+        assert_eq!(config.logging.file, Some(PathBuf::from("project.log")));
+    }
+
+    #[test]
+    fn test_from_layers_later_file_wins_on_the_same_key() {
+        let system = config_file("[logging]\nlevel = \"debug\"\n");
+        let local = config_file("[logging]\nlevel = \"warn\"\n");
+
+        let config = Config::from_layers(&layers(&[&system, &local])).unwrap();
+
+        assert_eq!(config.logging.level, "warn");
+    }
+
+    #[test]
+    fn test_from_layers_merges_nested_tables() {
+        let system = config_file(
+            "[providers.openai]\nenabled = true\nbase_url = \"http://localhost:1234/v1\"\n",
+        );
+        let project = config_file("[providers.openai]\ndefault_model = \"qwen3.5:9b\"\n");
+
+        let config = Config::from_layers(&layers(&[&system, &project])).unwrap();
+
+        let openai = config.providers.openai.expect("openai provider configured");
+        assert!(openai.enabled);
+        assert_eq!(openai.base_url.as_deref(), Some("http://localhost:1234/v1"));
+        assert_eq!(openai.default_model.as_deref(), Some("qwen3.5:9b"));
+    }
+
+    #[test]
+    fn test_from_layers_replaces_arrays_instead_of_concatenating() {
+        let system = config_file(
+            "[security]\ndeny_tools = [\"bash\", \"powershell\"]\ndeny_paths = [\"/etc\"]\n",
+        );
+        let project = config_file("[security]\ndeny_tools = [\"execute_code\"]\n");
+
+        let config = Config::from_layers(&layers(&[&system, &project])).unwrap();
+
+        assert_eq!(config.security.deny_tools, vec!["execute_code".to_string()]);
+        // Not set by the project file, so kept from the system file.
+        assert_eq!(config.security.deny_paths, vec!["/etc".to_string()]);
+    }
+
+    #[test]
+    fn test_from_layers_without_files_is_default() {
+        let config = Config::from_layers(&[]).unwrap();
+        let default = Config::default();
+
+        assert_eq!(config.logging.level, default.logging.level);
+        assert_eq!(config.database.path, default.database.path);
+        assert_eq!(config.crabrace.enabled, default.crabrace.enabled);
+    }
+
+    #[test]
+    fn test_from_layers_reports_the_files_on_an_invalid_value() {
+        let system = config_file("[logging]\nlevel = \"debug\"\n");
+        let local = config_file("[logging]\nlevel = 5\n");
+
+        let err = Config::from_layers(&layers(&[&system, &local])).unwrap_err();
+
+        let message = format!("{:#}", err);
+        assert!(
+            message.contains(&format!("{:?}", local.path())),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn test_from_layers_reports_the_file_with_a_syntax_error() {
+        let system = config_file("[logging]\nlevel = \"debug\"\n");
+        let broken = config_file("[logging\nlevel = \"warn\"\n");
+
+        let err = Config::from_layers(&layers(&[&system, &broken])).unwrap_err();
+
+        let message = format!("{:#}", err);
+        assert!(message.contains("Failed to parse config file"), "{message}");
+        assert!(
+            message.contains(&format!("{:?}", broken.path())),
+            "{message}"
+        );
     }
 
     #[test]
