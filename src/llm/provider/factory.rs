@@ -242,12 +242,10 @@ fn try_create_azure(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     };
 
     tracing::info!("Using Azure OpenAI provider");
-    println!("🔷 Using Azure OpenAI\n");
 
     let mut provider = AzureOpenAIProvider::with_endpoint(api_key, base_url);
     if let Some(model) = &azure_config.default_model {
         tracing::info!("Using custom default model: {}", model);
-        println!("📦 Model: {}\n", model);
         provider = provider.with_default_model(model.clone());
     }
 
@@ -271,7 +269,6 @@ fn try_create_gemini(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     };
 
     tracing::info!("Using Gemini provider");
-    println!("✨ Using Google Gemini\n");
 
     let mut provider = match &gemini_config.base_url {
         Some(base_url) => GeminiProvider::with_base_url(api_key, base_url.clone()),
@@ -280,7 +277,6 @@ fn try_create_gemini(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
 
     if let Some(model) = &gemini_config.default_model {
         tracing::info!("Using custom default model: {}", model);
-        println!("📦 Model: {}\n", model);
         provider = provider.with_default_model(model.clone());
     }
 
@@ -296,10 +292,8 @@ fn try_create_ollama(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     };
 
     tracing::info!("Using native Ollama at: {}", ollama_config.host);
-    println!("🦙 Using native Ollama at: {}\n", ollama_config.host);
     if let Some(model) = &ollama_config.default_model {
         tracing::info!("Using custom default model: {}", model);
-        println!("📦 Model: {}\n", model);
     }
 
     Ok(Some(Arc::new(ollama_provider_from_config(
@@ -403,10 +397,6 @@ fn try_create_llama_cpp(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
         "Loading llama.cpp model: {}",
         llama_cpp_config.model_path.display()
     );
-    println!(
-        "🦙 Loading llama.cpp model: {}\n",
-        llama_cpp_config.model_path.display()
-    );
 
     let provider = super::llama_cpp::LlamaCppProvider::new(llama_cpp_config)
         .context("Failed to create llama.cpp provider")?;
@@ -438,7 +428,6 @@ fn try_create_qwen(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     // Local Qwen (vLLM, LM Studio, etc.)
     if let Some(base_url) = &qwen_config.base_url {
         tracing::info!("Using local Qwen at: {}", base_url);
-        println!("🏠 Using local Qwen at: {}\n", base_url);
 
         let provider = configure_qwen(QwenProvider::local(base_url.clone()), qwen_config);
         return Ok(Some(Arc::new(provider)));
@@ -451,12 +440,10 @@ fn try_create_qwen(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
         let provider_base = match region {
             "cn" => {
                 tracing::info!("Using DashScope China (Beijing)");
-                println!("☁️  Using DashScope China (Beijing)\n");
                 QwenProvider::dashscope_cn(api_key.clone())
             }
             _ => {
                 tracing::info!("Using DashScope International (Singapore)");
-                println!("☁️  Using DashScope International (Singapore)\n");
                 QwenProvider::dashscope_intl(api_key.clone())
             }
         };
@@ -479,10 +466,6 @@ fn configure_qwen(mut provider: QwenProvider, config: &QwenProviderConfig) -> Qw
         };
         provider = provider.with_tool_parser(tool_parser);
         tracing::info!("Using tool parser: {:?}", tool_parser);
-
-        if tool_parser == ToolCallParser::NativeQwen {
-            println!("🔧 Using native Qwen function calling (✿FUNCTION✿ markers)\n");
-        }
     } else if config
         .default_model
         .as_deref()
@@ -502,7 +485,6 @@ fn configure_qwen(mut provider: QwenProvider, config: &QwenProviderConfig) -> Qw
     if config.enable_thinking {
         provider = provider.with_thinking(true);
         tracing::info!("🧠 Qwen3 thinking mode enabled");
-        println!("🧠 Thinking mode: enabled\n");
 
         if let Some(budget) = config.thinking_budget {
             provider = provider.with_thinking_budget(budget);
@@ -513,7 +495,6 @@ fn configure_qwen(mut provider: QwenProvider, config: &QwenProviderConfig) -> Qw
     // Set custom model
     if let Some(model) = &config.default_model {
         tracing::info!("Using custom default model: {}", model);
-        println!("📦 Model: {}\n", model);
         provider = provider.with_default_model(model.clone());
     }
 
@@ -536,7 +517,6 @@ fn try_create_openai(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     // Local LLM (LM Studio, Ollama, etc.)
     if let Some(base_url) = &openai_config.base_url {
         tracing::info!("Using local LLM at: {}", base_url);
-        println!("🏠 Using local LLM at: {}\n", base_url);
 
         let provider = configure_openai(OpenAIProvider::local(base_url.clone()), openai_config);
         return Ok(Some(Arc::new(provider)));
@@ -545,7 +525,6 @@ fn try_create_openai(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
     // Official OpenAI API
     if let Some(api_key) = &openai_config.api_key {
         tracing::info!("Using OpenAI provider");
-        println!("🤖 Using OpenAI provider\n");
 
         let provider = configure_openai(OpenAIProvider::new(api_key.clone()), openai_config);
         return Ok(Some(Arc::new(provider)));
@@ -558,7 +537,6 @@ fn try_create_openai(config: &Config) -> Result<Option<Arc<dyn Provider>>> {
 fn configure_openai(mut provider: OpenAIProvider, config: &ProviderConfig) -> OpenAIProvider {
     if let Some(model) = &config.default_model {
         tracing::info!("Using custom default model: {}", model);
-        println!("📦 Model: {}\n", model);
         provider = provider.with_default_model(model.clone());
     }
     provider
@@ -588,7 +566,6 @@ fn create_anthropic(config: &Config) -> Result<Arc<dyn Provider>> {
         .clone();
 
     tracing::info!("Using Anthropic provider");
-    println!("🤖 Using Anthropic Claude\n");
 
     Ok(Arc::new(AnthropicProvider::new(api_key)))
 }
