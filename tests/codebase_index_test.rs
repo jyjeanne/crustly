@@ -31,7 +31,7 @@ async fn index_and_query_provider_trait() {
     let pool = create_pool_with_schema().await;
     let index = CodebaseIndex::new(pool);
 
-    let trait_rs = Path::new("src/llm/provider/trait.rs");
+    let trait_rs = Path::new("crates/crustly-llm/src/trait.rs");
     index
         .index_file(trait_rs)
         .await
@@ -61,7 +61,7 @@ async fn index_file_twice_no_duplicate() {
     let pool = create_pool_with_schema().await;
     let index = CodebaseIndex::new(pool.clone());
 
-    let trait_rs = Path::new("src/llm/provider/trait.rs");
+    let trait_rs = Path::new("crates/crustly-llm/src/trait.rs");
     index.index_file(trait_rs).await.expect("first index");
     index.index_file(trait_rs).await.expect("second index");
 
@@ -82,7 +82,7 @@ async fn fts_search_finds_symbol_by_partial_name() {
     let pool = create_pool_with_schema().await;
     let index = CodebaseIndex::new(pool);
 
-    let trait_rs = Path::new("src/llm/provider/trait.rs");
+    let trait_rs = Path::new("crates/crustly-llm/src/trait.rs");
     index.index_file(trait_rs).await.expect("index");
 
     // "Provider" is the trait name in trait.rs; fts_search matches on symbol_name LIKE '%Provider%'

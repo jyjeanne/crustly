@@ -1637,7 +1637,7 @@ mod tests {
 #[cfg(test)]
 mod streaming_tests {
     use super::*;
-    use crate::llm::provider::test_support::held_response_server;
+    use crate::test_support::held_response_server;
     use futures::StreamExt as _;
     use std::time::Duration;
 

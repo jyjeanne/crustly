@@ -171,10 +171,9 @@ impl QwenProvider {
         self
     }
 
-    /// Current tool-call parsing mode, for tests in other modules (e.g.
-    /// `factory::configure_qwen`'s auto-selection logic).
-    #[cfg(test)]
-    pub(crate) fn tool_parser(&self) -> ToolCallParser {
+    /// Current tool-call parsing mode. Crustly's factory tests use it to check
+    /// `configure_qwen`'s auto-selection logic.
+    pub fn tool_parser(&self) -> ToolCallParser {
         self.tool_parser
     }
 

@@ -644,7 +644,7 @@ daemon, no LM Studio server, no port to start.
   `llama-cpp-cuda`/`-metal`/`-vulkan`/`-rocm`/`-opencl`/`-mkl`) and thread
   count, without going through a server's own defaults.
 - Same tool-calling reliability mechanism as native Ollama's fallback path
-  (printed-JSON recovery, shared code — `src/llm/provider/tool_call_recovery.rs`),
+  (printed-JSON recovery, shared code — `crates/crustly-llm/src/tool_call_recovery.rs`),
   upgraded with a syntax guarantee by grammar-constrained decoding of
   bare-JSON tool calls, built into `--features llama-cpp` (see the
   [guide](docs/guides/LLAMA_CPP_GUIDE.md#grammar-constrained-tool-calling-optional)).
@@ -1147,6 +1147,8 @@ Integration Layer (LLM, LSP, MCP)
 
 ```
 crustly/
+├── crates/
+│   └── crustly-llm/   # LLM providers, shared with other projects
 ├── src/
 │   ├── cli/           # Command-line interface
 │   ├── app/           # Application lifecycle
@@ -1156,7 +1158,7 @@ crustly/
 │   ├── services/      # Business logic
 │   ├── llm/           # LLM integration
 │   │   ├── agent/     # Agent service
-│   │   ├── provider/  # LLM providers
+│   │   ├── provider/  # Re-exports crustly-llm, plus the provider factory
 │   │   ├── tools/     # Tool system
 │   │   └── prompt/    # Prompt engineering
 │   ├── tui/           # Terminal UI

@@ -382,8 +382,7 @@ impl OpenAIProvider {
                         (r, text.to_string())
                     } else {
                         // No separate reasoning field — extract from <think> tags if present.
-                        let (tag_thinking, cleaned) =
-                            crate::llm::provider::extract_think_tags(text);
+                        let (tag_thinking, cleaned) = crate::extract_think_tags(text);
                         (tag_thinking, cleaned)
                     }
                 }
@@ -1310,7 +1309,7 @@ mod tests {
 
     #[test]
     fn test_llm_request_new_fields() {
-        use crate::llm::provider::types::{LLMRequest, Message};
+        use crate::types::{LLMRequest, Message};
         let req = LLMRequest::new("llama3.2", vec![Message::user("hi")])
             .with_top_p(0.9)
             .with_seed(42)
@@ -1329,7 +1328,7 @@ mod tests {
 
     #[test]
     fn test_new_fields_forwarded_to_openai_request() {
-        use crate::llm::provider::types::{LLMRequest, Message};
+        use crate::types::{LLMRequest, Message};
         let provider = OpenAIProvider::new("test-key".to_string());
         let req = LLMRequest::new("gpt-4", vec![Message::user("hi")])
             .with_top_p(0.8)
@@ -1378,7 +1377,7 @@ mod tests {
 #[cfg(test)]
 mod streaming_tests {
     use super::*;
-    use crate::llm::provider::test_support::held_response_server;
+    use crate::test_support::held_response_server;
     use futures::StreamExt as _;
     use serde_json::json;
     use std::time::Duration;

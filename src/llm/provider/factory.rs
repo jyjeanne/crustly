@@ -91,7 +91,7 @@ impl Provider for FailoverProvider {
     async fn stream(
         &self,
         request: super::types::LLMRequest,
-    ) -> super::error::Result<super::r#trait::ProviderStream> {
+    ) -> super::error::Result<super::ProviderStream> {
         let mut last_err = ProviderError::InvalidRequest("empty failover chain".to_string());
         for (i, provider) in self.chain.iter().enumerate() {
             match provider.stream(self.request_for(i, &request)).await {
@@ -574,8 +574,8 @@ fn create_anthropic(config: &Config) -> Result<Arc<dyn Provider>> {
 mod tests {
     use super::super::{
         error::{ProviderError, Result as ProviderResult},
-        r#trait::ProviderStream,
         types::{ContentBlock, LLMRequest, LLMResponse, StopReason, TokenUsage},
+        ProviderStream,
     };
     use super::*;
     use crate::config::{Config, ProviderConfig, ProviderConfigs, QwenProviderConfig};

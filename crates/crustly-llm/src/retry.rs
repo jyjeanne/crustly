@@ -96,8 +96,8 @@ impl RetryConfig {
 ///
 /// # Example
 /// ```no_run
-/// use crustly::llm::provider::retry::{retry_with_backoff, RetryConfig};
-/// use crustly::llm::ProviderError;
+/// use crustly_llm::retry::{retry_with_backoff, RetryConfig};
+/// use crustly_llm::ProviderError;
 ///
 /// async fn example() {
 ///     async fn make_api_call() -> Result<String, ProviderError> {

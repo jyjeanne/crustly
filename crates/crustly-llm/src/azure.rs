@@ -28,7 +28,7 @@ impl AzureOpenAIProvider {
     ///
     /// # Example
     /// ```
-    /// use crustly::llm::provider::azure::AzureOpenAIProvider;
+    /// use crustly_llm::azure::AzureOpenAIProvider;
     ///
     /// let provider = AzureOpenAIProvider::new(
     ///     "your-api-key".to_string(),

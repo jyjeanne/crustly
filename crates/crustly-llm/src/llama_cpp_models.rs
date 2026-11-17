@@ -30,10 +30,10 @@ const ESTIMATE_DEFAULT_CONTEXT_LENGTH: u64 = 8_192;
 /// cannot silently drift apart - a wording change here changes what
 /// `bail!` prints AND what the exit-code matcher looks for, in one edit,
 /// since there is exactly one place the text is written down.
-pub(crate) const DISK_SPACE_ERROR_PREFIX: &str = "Not enough disk space";
-pub(crate) const CHECKSUM_MISMATCH_ERROR_PREFIX: &str = "Checksum mismatch for";
-pub(crate) const DOWNLOAD_START_ERROR_PREFIX: &str = "Failed to start download from";
-pub(crate) const DOWNLOAD_FAILED_ERROR_PREFIX: &str = "Download failed for";
+pub const DISK_SPACE_ERROR_PREFIX: &str = "Not enough disk space";
+pub const CHECKSUM_MISMATCH_ERROR_PREFIX: &str = "Checksum mismatch for";
+pub const DOWNLOAD_START_ERROR_PREFIX: &str = "Failed to start download from";
+pub const DOWNLOAD_FAILED_ERROR_PREFIX: &str = "Download failed for";
 
 /// The context length used for a memory estimate: `native` capped at
 /// [`ESTIMATE_DEFAULT_CONTEXT_LENGTH`], or that default when `native` is
@@ -63,7 +63,7 @@ pub struct LocalGgufModel {
     /// the filename) when the header itself can't be read at all. `None`
     /// only if none of those three sources produced anything - displayed as
     /// "unknown" by callers rather than guessed further. See
-    /// `crate::llm::provider::gguf_metadata` for the header parser.
+    /// `crate::gguf_metadata` for the header parser.
     pub quantization_hint: Option<String>,
     /// GGUF `general.architecture` (e.g. "llama", "qwen2"). `None` if the
     /// header couldn't be read or didn't set it.
@@ -928,10 +928,10 @@ async fn fetch_hf_lfs_sha256(
 /// filesystem of its nearest existing ancestor (the download target
 /// itself doesn't exist yet, so `path` alone can't be queried directly).
 /// `None` when no matching disk is found - advisory only, callers must
-/// never block a download on an unknown. `pub(crate)` (not just used by
+/// never block a download on an unknown. Public (not just used by
 /// `download_model` below) since `crustly llama-cpp doctor`
 /// (`src/cli/mod.rs`, Phase M9) reports the same figure as a diagnostic.
-pub(crate) fn available_space_at(path: &Path) -> Option<u64> {
+pub fn available_space_at(path: &Path) -> Option<u64> {
     let mut probe = path.to_path_buf();
     while !probe.exists() {
         probe = probe.parent()?.to_path_buf();

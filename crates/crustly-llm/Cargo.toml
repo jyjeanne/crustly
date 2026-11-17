@@ -1,0 +1,79 @@
+[package]
+name = "crustly-llm"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+authors = ["Crustly Team"]
+license = "FSL-1.1-MIT"
+description = "LLM provider layer of Crustly: Anthropic, OpenAI-compatible servers, Ollama, Gemini, Azure OpenAI, Qwen and in-process llama.cpp, with streaming and tool calls"
+repository = "https://github.com/jyjeanne/crustly"
+keywords = ["llm", "ollama", "openai", "anthropic", "llama-cpp"]
+categories = ["api-bindings"]
+readme = "README.md"
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+tokio-stream = "0.1"
+futures = "0.3"
+async-trait = "0.1"
+reqwest = { version = "0.13", features = ["json", "native-tls", "stream", "query"], default-features = false }
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+rand = "0.9"
+bytes = "1.5"
+
+# Native Ollama provider (feature `ollama`). ollama-rs brings its own reqwest
+# 0.12 client, so its errors are mapped by hand (see `ollama.rs`). schemars must
+# track ollama-rs's own schemars version (1.2.x) to build its tool schemas.
+ollama-rs = { version = "0.3", optional = true, features = ["stream"] }
+schemars = { version = "1.2", optional = true, features = ["preserve_order"] }
+
+# In-process llama.cpp (feature `llama-cpp`). Builds the vendored llama.cpp
+# C++ sources with CMake, so it needs a C/C++ toolchain. llguidance and
+# toktrie build the grammar for tool-call decoding and must match the version
+# llama-cpp-2 pins.
+llama-cpp-2 = { version = "0.1.153", optional = true, default-features = false }
+llguidance = { version = "1.7", optional = true }
+toktrie = { version = "1.7", optional = true }
+
+# Local `.gguf` management and hardware detection (feature `gguf-management`):
+# checksums, free disk space and RAM. Pure Rust, no C toolchain needed.
+sha2 = { version = "0.11", optional = true }
+sysinfo = { version = "0.40", optional = true, default-features = false, features = [
+    "disk",
+    "system",
+] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# DXGI adapter enumeration for AMD/Intel GPU detection on Windows
+# (`hardware_detect.rs`), enabled by `gguf-management`.
+windows = { version = "0.62", optional = true, features = [
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Foundation",
+] }
+
+[dev-dependencies]
+tempfile = "3.9"
+
+[features]
+default = []
+ollama = ["dep:ollama-rs", "dep:schemars"]
+gguf-management = ["dep:sha2", "dep:sysinfo", "dep:windows"]
+llama-cpp = ["dep:llama-cpp-2", "gguf-management", "llguidance-grammar"]
+# GPU backends for llama.cpp, each needing its own SDK at build time.
+llama-cpp-cuda = ["llama-cpp", "llama-cpp-2/cuda"]
+llama-cpp-metal = ["llama-cpp", "llama-cpp-2/metal"]
+llama-cpp-vulkan = ["llama-cpp", "llama-cpp-2/vulkan"]
+llama-cpp-rocm = ["llama-cpp", "llama-cpp-2/rocm"]
+llama-cpp-opencl = ["llama-cpp", "llama-cpp-2/opencl"]
+llama-cpp-mkl = ["llama-cpp", "llama-cpp-2/mkl"]
+# Grammar-constrained tool-call decoding; part of `llama-cpp`. Separate only
+# because a feature cannot both imply and depend on `llama-cpp`.
+llguidance-grammar = ["llama-cpp-2/llguidance", "dep:llguidance", "dep:toktrie"]

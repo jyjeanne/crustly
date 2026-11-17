@@ -1,55 +1,14 @@
 //! LLM Provider Abstraction Layer
 //!
-//! Provides a unified interface for interacting with different LLM providers.
+//! The providers live in the `crustly-llm` crate (`crates/crustly-llm`), which
+//! other projects use as well. This module re-exports it, so every
+//! `crate::llm::provider::...` path keeps working, and adds the factory that
+//! builds a provider from Crustly's [`Config`](crate::config::Config).
 
-pub mod error;
-pub mod model_hints;
-pub mod retry;
-pub mod router;
-pub mod tool_call_recovery;
-#[allow(clippy::module_inception)]
-mod r#trait;
-pub mod types;
+pub use crustly_llm::*;
 
-// Re-exports
-pub use error::{ProviderError, Result};
-pub use r#trait::{Provider, ProviderCapabilities, ProviderStream};
-pub use types::*;
-
-// Provider implementations
-pub mod anthropic;
-pub mod azure;
 pub mod factory;
-pub mod gemini;
-#[cfg(feature = "gguf-management")]
-pub mod gguf_metadata;
-#[cfg(feature = "gguf-management")]
-pub mod hardware_detect;
-#[cfg(feature = "llama-cpp")]
-pub mod llama_cpp;
-#[cfg(all(feature = "llama-cpp", feature = "llguidance-grammar"))]
-pub mod llama_cpp_grammar;
-#[cfg(feature = "gguf-management")]
-pub mod llama_cpp_models;
-#[cfg(feature = "ollama")]
-pub mod ollama;
-#[cfg(feature = "ollama")]
-pub mod ollama_models;
-pub mod openai;
-pub mod prompt_cache;
-pub mod qwen;
-#[cfg(test)]
-mod test_support;
 
-pub use anthropic::AnthropicProvider;
-pub use azure::AzureOpenAIProvider;
 #[cfg(feature = "ollama")]
 pub use factory::ollama_provider_from_config;
 pub use factory::{create_named_provider, create_provider};
-pub use gemini::GeminiProvider;
-#[cfg(feature = "llama-cpp")]
-pub use llama_cpp::LlamaCppProvider;
-#[cfg(feature = "ollama")]
-pub use ollama::OllamaProvider;
-pub use openai::OpenAIProvider;
-pub use qwen::{QwenProvider, ThinkingConfig, ToolCallParser};

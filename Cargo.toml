@@ -11,6 +11,11 @@ keywords = ["ai", "terminal", "assistant", "llm", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 
+[workspace]
+members = ["crates/crustly-llm"]
+# Plain `cargo test` / `cargo clippy` at the root also cover the provider crate.
+default-members = [".", "crates/crustly-llm"]
+
 [dependencies]
 # Async Runtime
 tokio = { version = "1.35", features = ["full"] }
@@ -53,45 +58,11 @@ shellexpand = "3.1"
 reqwest = { version = "0.13", features = ["json", "native-tls", "stream", "query"], default-features = false }
 async-openai = { version = "0.43", optional = true }
 aws-sdk-bedrockruntime = { version = "1.15", optional = true }
-# Native Ollama provider. Pulls its own reqwest 0.12 client internally (ollama-rs
-# is built against reqwest 0.12, incompatible with the reqwest 0.11 client used
-# by the rest of this crate) - the two major versions coexist in the dependency
-# tree, they are not shared/reused across providers.
-ollama-rs = { version = "0.3", optional = true, features = ["stream"] }
-# Needed to build ollama-rs's `ToolInfo`/`FormatType` schemas from our generic
-# serde_json::Value tool definitions. Version must track ollama-rs's own
-# schemars dependency (currently 1.2.x).
-schemars = { version = "1.2", optional = true, features = ["preserve_order"] }
-# In-process llama.cpp inference (loads a local .gguf file directly, no
-# external server). Builds the vendored llama.cpp C++ sources via `cmake` at
-# `cargo build` time - requires a C/C++ toolchain, only when this feature is
-# enabled. See llama-cpp-2-integration-plan.md.
-llama-cpp-2 = { version = "0.1.153", optional = true, default-features = false }
-# Checksum verification for downloaded .gguf files (llama_cpp_models.rs) -
-# see llama-cpp-2-integration-plan.md §4.11/§8 and, for why this is gated on
-# `gguf-management` rather than `llama-cpp`, ccguf-managment-imrpoment-plan.md
-# Phase M0.
-sha2 = { version = "0.11", optional = true }
-# Cross-platform free-disk-space query for the download precheck
-# (llama_cpp_models.rs, Phase M6) - no stable stdlib API exists for this.
-# Only the `Disks`/`Disk` API is used (`Disks::new_with_refreshed_list()`,
-# `.mount_point()`, `.available_space()`), so default features are dropped
-# to skip process/network/component enumeration this crate doesn't need.
-# "system" added for Phase M11 (hardware_detect.rs) - `System::total_memory()`
-# for the CPU-only/Apple-unified-memory RAM reading is gated behind it (confirmed
-# by reading the vendored crate's Cargo.toml, not assumed).
-sysinfo = { version = "0.40", optional = true, default-features = false, features = [
-    "disk",
-    "system",
-] }
-# Grammar-constrained decoding for tool calls (Phase 4b, `llama-cpp-llguidance`
-# feature only) - builds the JSON-Schema-union grammar and the constrained
-# sampler in src/llm/provider/llama_cpp_grammar.rs. Neither is re-exported
-# by `llama-cpp-2` (its `LlamaSampler::llguidance_tok_env` merely returns a
-# `toktrie::TokEnv` by name), so both must be declared directly here (same
-# version constraint `llama-cpp-2` 0.1.153 itself pins, "1.7").
-llguidance = { version = "1.7", optional = true }
-toktrie = { version = "1.7", optional = true }
+# The LLM providers (Anthropic, OpenAI-compatible, Ollama, Gemini, Azure, Qwen,
+# in-process llama.cpp), shared with other projects. Its optional dependencies
+# (ollama-rs, llama-cpp-2, sha2, sysinfo, ...) are enabled through the
+# features below, which forward to the crate's features of the same name.
+crustly-llm = { path = "crates/crustly-llm", version = "0.1.0" }
 
 # Provider Registry (Crabrace - replaces Catwalk)
 crabrace = "0.1.0"
@@ -165,65 +136,48 @@ tokio-test = "0.4"
 # Profiling (Unix-only - not supported on Windows)
 pprof = { version = "0.15", features = ["flamegraph", "frame-pointer"], optional = true }
 
-[target.'cfg(target_os = "windows")'.dependencies]
-# Win32 DXGI adapter enumeration for AMD/Intel GPU detection on Windows
-# (src/llm/provider/hardware_detect.rs, Phase M11) - a native API call, not
-# a subprocess, since no vendor CLI tool is a reliable cross-vendor default
-# on Windows the way nvidia-smi/rocm-smi/system_profiler are on their
-# platforms. `optional = true` + gated via `gguf-management`'s `dep:windows`
-# below (same wiring as `sha2`/`sysinfo`) so a Windows build with zero
-# Cargo features doesn't pay this compile cost either - target-specific
-# dependency tables and Cargo features compose independently, so this has
-# no effect at all on non-Windows targets regardless of which features are
-# enabled.
-windows = { version = "0.62", optional = true, features = [
-    "Win32_Graphics_Dxgi",
-    "Win32_Graphics_Dxgi_Common",
-    "Win32_Foundation",
-] }
-
 [features]
 default = ["gguf-management"]
 # Profiling feature enables pprof on Unix only (no-op on Windows)
 profiling = []
 openai = ["async-openai"]
 aws-bedrock = ["aws-sdk-bedrockruntime"]
-ollama = ["dep:ollama-rs", "dep:schemars"]
+ollama = ["crustly-llm/ollama"]
 # Local `.gguf` file management (list/pull/rm - directory scan + plain HTTP)
 # plus hardware detection - see ccguf-managment-imrpoment-plan.md Phases M0
 # and M11. Unlike `llama-cpp` below, this carries no C/C++ toolchain cost on
 # any platform (`sha2`/`sysinfo` are small pure-Rust deps; `windows` is
-# Microsoft's own metadata-only FFI bindings crate, Windows-only per the
-# target table above, no C compiler needed to build it), so it's part of
-# `default` and `all-llm`: managing `.gguf` files shouldn't require building
-# the in-process inference engine just to list what's on disk.
-gguf-management = ["dep:sha2", "dep:sysinfo", "dep:windows"]
+# Microsoft's own metadata-only FFI bindings crate, Windows-only, no C
+# compiler needed to build it), so it's part of `default` and `all-llm`:
+# managing `.gguf` files shouldn't require building the in-process inference
+# engine just to list what's on disk.
+gguf-management = ["crustly-llm/gguf-management"]
 # Deliberately NOT part of `all-llm`/`default`: unlike every other provider
 # feature (and unlike `gguf-management` above), this one compiles native
 # C++ (cmake + a C/C++ toolchain required) - see
 # llama-cpp-2-integration-plan.md §3/§3.4/§4.2. Depends on `gguf-management`
 # so `--features llama-cpp` still gets `crustly llama-cpp list/pull/rm`
 # exactly as before this feature was split out.
-llama-cpp = ["dep:llama-cpp-2", "gguf-management", "llguidance-grammar"]
+llama-cpp = ["crustly-llm/llama-cpp", "gguf-management", "llguidance-grammar"]
 # GPU backends (llama-cpp-2-integration-plan.md §4.1/Phase 8), each layered
 # on top of `llama-cpp` and requiring its own SDK/toolkit at build time -
 # see §4.2. Opt-in individually; none are implied by `llama-cpp` alone
 # (CPU-only) or by `all-llm` (§3.4).
-llama-cpp-cuda = ["llama-cpp", "llama-cpp-2/cuda"]
-llama-cpp-metal = ["llama-cpp", "llama-cpp-2/metal"]
-llama-cpp-vulkan = ["llama-cpp", "llama-cpp-2/vulkan"]
-llama-cpp-rocm = ["llama-cpp", "llama-cpp-2/rocm"]
-llama-cpp-opencl = ["llama-cpp", "llama-cpp-2/opencl"]
-llama-cpp-mkl = ["llama-cpp", "llama-cpp-2/mkl"]
+llama-cpp-cuda = ["llama-cpp", "crustly-llm/llama-cpp-cuda"]
+llama-cpp-metal = ["llama-cpp", "crustly-llm/llama-cpp-metal"]
+llama-cpp-vulkan = ["llama-cpp", "crustly-llm/llama-cpp-vulkan"]
+llama-cpp-rocm = ["llama-cpp", "crustly-llm/llama-cpp-rocm"]
+llama-cpp-opencl = ["llama-cpp", "crustly-llm/llama-cpp-opencl"]
+llama-cpp-mkl = ["llama-cpp", "crustly-llm/llama-cpp-mkl"]
 # Grammar-constrained tool-call decoding (llama-cpp-2-integration-plan.md
 # Phase 4b) - additive on top of the always-on JSON-recovery heuristic
 # (§4.7), not a replacement for it: once a response commits to a call to an
 # offered tool, the rest is decoded under a grammar of valid calls (see
-# src/llm/provider/llama_cpp_grammar.rs). Part of `llama-cpp` itself since
+# crates/crustly-llm/src/llama_cpp_grammar.rs). Part of `llama-cpp` itself since
 # malformed tool-call JSON is a common local-model failure; this internal
 # feature only exists because `llama-cpp-llguidance` (below) cannot be both
 # implied by and depend on `llama-cpp` (Cargo rejects feature cycles).
-llguidance-grammar = ["llama-cpp-2/llguidance", "dep:llguidance", "dep:toktrie"]
+llguidance-grammar = ["crustly-llm/llguidance-grammar"]
 # Kept so existing build commands and CI feature lists still work; grammar
 # decoding is now part of `llama-cpp`.
 llama-cpp-llguidance = ["llama-cpp"]
