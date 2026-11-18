@@ -22,6 +22,9 @@ With native Ollama and OpenAI-compatible servers (LM Studio, Ollama's `/v1` endp
 - With the model router on, the answer budget now always comes from the routed model's window.
 - Settings from several config files are now combined key by key. A project `.crustly/config.toml` used to replace the user config as a whole, so a project file that only set `[agent]` dropped the providers configured for the user.
 - `crustly run --format json` printed lines such as "Using native Ollama at: ..." before the JSON, which broke tools reading the output.
+- Native Ollama, streaming: JSON that a reply printed after some text (an example, or the user's requested output) could be run as a tool call. Only a reply that is nothing but the call is now recovered as one, as without streaming.
+- Native Ollama, streaming: a code block or `{` after some text held back the rest of the answer until the model finished. It now streams as it arrives.
+- Native Ollama, streaming: a reply cut off when the model failed (no final chunk from Ollama) ended like a normal answer. It now ends with an error.
 
 ---
 

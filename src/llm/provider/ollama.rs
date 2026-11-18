@@ -587,7 +587,14 @@ impl Provider for OllamaProvider {
                     Some(Err(())) => vec![Err(ProviderError::StreamError(
                         "Ollama stream terminated with an error".to_string(),
                     ))],
-                    None => ok_events(state.finish()),
+                    None if state.done => ok_events(state.finish()),
+                    // The reply ended without Ollama's final chunk: the model
+                    // failed mid-reply (ollama-rs drops Ollama's error line).
+                    None => vec![Err(ProviderError::StreamError(
+                        "Ollama stopped before finishing the reply (the model may have \
+                         failed or run out of memory)"
+                            .to_string(),
+                    ))],
                 };
                 Some((events, (chunks, None)))
             },
@@ -692,10 +699,12 @@ fn ok_events(events: Vec<StreamEvent>) -> Vec<Result<StreamEvent>> {
 
 /// Turns Ollama chat chunks into [`StreamEvent`]s, one chunk at a time.
 ///
-/// Text is forwarded as soon as it arrives, except while it still looks like a
-/// tool call the model is printing as text (templates that never fill
-/// `tool_calls`, e.g. qwen2.5-coder): that text is withheld so raw JSON never
-/// reaches the caller. When the stream ends it is either recovered as a tool
+/// Text is forwarded as soon as it arrives, except at the start of a reply that
+/// still looks like a tool call the model is printing as text (templates that
+/// never fill `tool_calls`, e.g. qwen2.5-coder): that text is withheld so raw
+/// JSON never reaches the caller. Once any text has been sent, the reply is
+/// prose: later JSON or code is streamed as text and never run as a call, as in
+/// `complete`. When the stream ends, withheld text is either recovered as a tool
 /// call or flushed as ordinary text, so nothing is lost but a little latency.
 struct OllamaStreamState {
     offered_tools: Vec<Tool>,
@@ -752,7 +761,8 @@ impl OllamaStreamState {
 
         if !chunk.message.content.is_empty() {
             self.withheld_text.push_str(&chunk.message.content);
-            if !maybe_tool_call_json(&self.withheld_text) {
+            // Only the start of a reply can be a printed tool call.
+            if self.text_block_started || !maybe_tool_call_json(&self.withheld_text) {
                 self.open_text_block(&mut events);
                 events.push(StreamEvent::ContentBlockDelta {
                     index: 0,
@@ -786,9 +796,9 @@ impl OllamaStreamState {
         let mut events = Vec::new();
 
         // Templates that never populate `tool_calls` print the call as content.
-        // Recover it from the withheld text; on success the text is the call,
-        // so it is not also sent as a message.
-        if self.tool_calls.is_empty() {
+        // Recover it when the whole reply was withheld; on success the text is
+        // the call, so it is not also sent as a message.
+        if self.tool_calls.is_empty() && !self.text_block_started {
             if let Some(call) = tool_call_from_content(&self.withheld_text, &self.offered_tools) {
                 self.tool_calls.push(call);
                 self.withheld_text.clear();
@@ -1835,5 +1845,89 @@ mod streaming_tests {
         assert_eq!(texts(&rest), [" there."]);
         assert_eq!(stop_reason(&rest), Some(StopReason::EndTurn));
         assert!(matches!(rest.last(), Some(StreamEvent::MessageStop)));
+    }
+
+    /// Regression: once text had been sent, a later `{...}` chunk was withheld
+    /// and then run as a tool call, which `complete` treats as plain text.
+    #[test]
+    fn json_after_text_is_streamed_as_text_and_never_run() {
+        let mut state = OllamaStreamState::new(vec![read_file_tool()]);
+        let intro = "Here is the JSON you asked for:\n";
+        assert_eq!(texts(&state.on_chunk(chunk(intro, false))), [intro]);
+
+        let call = r#"{"name": "read_file", "arguments": {"path": "a.rs"}}"#;
+        assert_eq!(
+            texts(&state.on_chunk(chunk(call, false))),
+            [call],
+            "sent at once, not withheld"
+        );
+        state.on_chunk(chunk("", true));
+
+        let events = state.finish();
+        assert!(
+            !events.iter().any(|e| matches!(
+                e,
+                StreamEvent::ContentBlockStart {
+                    content_block: ContentBlock::ToolUse { .. },
+                    ..
+                }
+            )),
+            "prose followed by JSON is not a tool call"
+        );
+        assert_eq!(stop_reason(&events), Some(StopReason::EndTurn));
+    }
+
+    /// Regression: a code fence after some text held back the rest of the
+    /// reply until the model finished.
+    #[test]
+    fn a_code_block_after_text_streams_immediately() {
+        let mut state = OllamaStreamState::new(vec![]);
+        state.on_chunk(chunk("Sure, here's the code:\n", false));
+        assert_eq!(texts(&state.on_chunk(chunk("```", false))), ["```"]);
+        assert_eq!(
+            texts(&state.on_chunk(chunk("rust\nfn main() {}\n```", false))),
+            ["rust\nfn main() {}\n```"]
+        );
+    }
+
+    /// Regression: a reply that ended without Ollama's final `done` chunk
+    /// (the model failed mid-reply) looked like a normal, complete reply.
+    #[tokio::test]
+    async fn a_reply_cut_off_before_the_done_chunk_is_an_error() {
+        let line = serde_json::json!({
+            "model": "m",
+            "created_at": "2026-01-01T00:00:00Z",
+            "message": { "role": "assistant", "content": "Half an ans" },
+            "done": false,
+        });
+        let (release, held) = tokio::sync::oneshot::channel();
+        let url = held_response_server(
+            "application/x-ndjson",
+            format!("{line}\n"),
+            String::new(),
+            held,
+        )
+        .await;
+        let provider = OllamaProvider::new(url);
+        let request = LLMRequest::new("m", vec![Message::user("hi")]);
+
+        let last = tokio::time::timeout(Duration::from_secs(10), async {
+            let mut stream = provider.stream(request).await.expect("stream starts");
+            release.send(()).expect("server is waiting");
+            let mut last = None;
+            while let Some(event) = stream.next().await {
+                last = Some(event);
+            }
+            last
+        })
+        .await
+        .expect("the stream ends");
+
+        match last {
+            Some(Err(ProviderError::StreamError(message))) => {
+                assert!(message.contains("before finishing"), "{message}")
+            }
+            other => panic!("expected a stream error at the end, got {other:?}"),
+        }
     }
 }
