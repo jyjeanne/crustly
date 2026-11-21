@@ -295,6 +295,35 @@ mod tests {
         );
     }
 
+    /// The long-term memory schema (docs/improve-memory.md §6.2) needs FTS5
+    /// with the `secure-delete` option, which SQLite added in 3.44. This
+    /// checks the bundled SQLite provides both, so a dependency change
+    /// cannot silently break the memory migration.
+    #[tokio::test]
+    async fn bundled_sqlite_supports_fts5_secure_delete() {
+        let db = Database::connect_in_memory().await.unwrap();
+
+        let version: String = sqlx::query_scalar("SELECT sqlite_version()")
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+        let mut parts = version.split('.').map(|p| p.parse::<u32>().unwrap_or(0));
+        let (major, minor) = (parts.next().unwrap_or(0), parts.next().unwrap_or(0));
+        assert!(
+            (major, minor) >= (3, 44),
+            "SQLite {version} is older than 3.44, which secure-delete needs"
+        );
+
+        sqlx::query("CREATE VIRTUAL TABLE probe_fts USING fts5(content)")
+            .execute(db.pool())
+            .await
+            .expect("FTS5 must be compiled in");
+        sqlx::query("INSERT INTO probe_fts(probe_fts, rank) VALUES ('secure-delete', 1)")
+            .execute(db.pool())
+            .await
+            .expect("FTS5 secure-delete option must be supported");
+    }
+
     /// Regression companion: with the constraint live, deleting a session
     /// must actually cascade-delete its messages (the behavior every
     /// migration's `ON DELETE CASCADE` already declared but which never
