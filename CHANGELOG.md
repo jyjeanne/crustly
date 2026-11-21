@@ -26,6 +26,9 @@ With native Ollama and OpenAI-compatible servers (LM Studio, Ollama's `/v1` endp
 - Native Ollama, streaming: a code block or `{` after some text held back the rest of the answer until the model finished. It now streams as it arrives.
 - Native Ollama, streaming: a reply cut off when the model failed (no final chunk from Ollama) ended like a normal answer. It now ends with an error.
 
+#### Removed
+- The codebase symbol index and its file watcher. The watcher was never started and nothing read the index, so it had no effect. The `notify` dependency goes with it. Existing databases keep their (empty) `codebase_index` table, and `enable_codebase_index` in `[memory]` is still accepted but does nothing. Code structure for the memory work planned in `docs/improve-memory.md` is to come from an [okf-rs](https://github.com/jyjeanne/okf-rs) bundle instead.
+
 ---
 
 ### v0.5.3 — In-Process llama.cpp, GGUF Management & a Local-Model Harness

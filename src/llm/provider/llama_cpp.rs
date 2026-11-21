@@ -19,12 +19,10 @@
 //! safe to move across threads or share concurrently (confirmed by reading
 //! `llama-cpp-2` 0.1.153's source - neither type has an `unsafe impl
 //! Send`/`Sync`). All three are therefore created and used exclusively on a
-//! single dedicated OS thread ("the worker"), following the same
-//! sync-thread-bridged-to-tokio pattern already used by
-//! `crate::app::start_file_watcher` (`src/app/mod.rs`) for another
-//! non-async library (`notify::Watcher`): a `tokio::sync::mpsc` channel
-//! carries requests in, the worker thread drains it with `blocking_recv()`,
-//! and responses go back out through a `oneshot` channel per request.
+//! single dedicated OS thread ("the worker"), bridged to tokio: a
+//! `tokio::sync::mpsc` channel carries requests in, the worker thread
+//! drains it with `blocking_recv()`, and responses go back out through a
+//! `oneshot` channel per request.
 //!
 //! Model loading itself also happens on the worker thread (not the caller's
 //! thread), for the same reason - `LlamaCppProvider::new()` blocks
