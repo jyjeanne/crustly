@@ -719,6 +719,12 @@ impl Provider for OpenAIProvider {
     }
 
     fn calculate_cost(&self, model: &str, input_tokens: u32, output_tokens: u32) -> f64 {
+        if let Some(cost) = llm_prices::Provider::OpenAi
+            .lookup(model)
+            .and_then(|p| p.cost(input_tokens as u64, output_tokens as u64))
+        {
+            return cost;
+        }
         // Costs per million tokens (as of 2024)
         let (input_cost, output_cost) = match model {
             "gpt-4-turbo-preview" => (10.0, 30.0),
@@ -1355,6 +1361,17 @@ mod tests {
         // Cost: (1000/1M * 0.5) + (1000/1M * 1.5) = 0.0005 + 0.0015 = 0.002
         let cost = provider.calculate_cost("gpt-3.5-turbo", 1000, 1000);
         assert!((cost - 0.002).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_calculate_cost_current_models_are_not_free() {
+        let provider = OpenAIProvider::new("test-key".to_string());
+        // gpt-4o: $2.50 input + $10.00 output per 1M tokens
+        let cost = provider.calculate_cost("gpt-4o", 1_000_000, 1_000_000);
+        assert!((cost - 12.5).abs() < 1e-9);
+        for model in ["gpt-4o-mini", "gpt-4.1", "gpt-5", "o3"] {
+            assert!(provider.calculate_cost(model, 1000, 1000) > 0.0, "{model}");
+        }
     }
 
     #[test]
