@@ -96,14 +96,15 @@ impl SecurityConfig {
 /// Memory / context configuration (`[memory]` section).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryConfig {
-    /// Maximum token budget for injected episodic memories.
+    /// No effect. Episodic memory injection was removed; the key is still
+    /// accepted so existing config files keep loading.
     #[serde(default = "default_episodic_budget")]
     pub episodic_budget_tokens: i32,
     /// No effect. The codebase symbol index it switched was removed; the
     /// key is still accepted so existing config files keep loading.
     #[serde(default = "default_true")]
     pub enable_codebase_index: bool,
-    /// Context compaction threshold (0.0–1.0).
+    /// No effect. Accepted so existing config files keep loading.
     #[serde(default = "default_compaction_threshold")]
     pub compaction_threshold: f64,
     /// Add the project's notes files (AGENTS.md, CLAUDE.md, CRUSTLY.md,
