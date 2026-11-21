@@ -7,7 +7,6 @@ pub mod budget;
 pub mod compaction;
 pub mod context;
 pub mod error;
-pub mod memory;
 pub mod middleware;
 pub mod profiles;
 pub mod project_memory;
