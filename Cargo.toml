@@ -71,7 +71,7 @@ llama-cpp-2 = { version = "0.1.153", optional = true, default-features = false }
 # see llama-cpp-2-integration-plan.md §4.11/§8 and, for why this is gated on
 # `gguf-management` rather than `llama-cpp`, ccguf-managment-imrpoment-plan.md
 # Phase M0.
-sha2 = { version = "0.11", optional = true }
+sha2 = "0.11"
 # Cross-platform free-disk-space query for the download precheck
 # (llama_cpp_models.rs, Phase M6) - no stable stdlib API exists for this.
 # Only the `Disks`/`Disk` API is used (`Disks::new_with_refreshed_list()`,
@@ -196,7 +196,7 @@ ollama = ["dep:ollama-rs", "dep:schemars"]
 # target table above, no C compiler needed to build it), so it's part of
 # `default` and `all-llm`: managing `.gguf` files shouldn't require building
 # the in-process inference engine just to list what's on disk.
-gguf-management = ["dep:sha2", "dep:sysinfo", "dep:windows"]
+gguf-management = ["dep:sysinfo", "dep:windows"]
 # Deliberately NOT part of `all-llm`/`default`: unlike every other provider
 # feature (and unlike `gguf-management` above), this one compiles native
 # C++ (cmake + a C/C++ toolchain required) - see
