@@ -331,6 +331,12 @@ impl Provider for AnthropicProvider {
     }
 
     fn calculate_cost(&self, model: &str, input_tokens: u32, output_tokens: u32) -> f64 {
+        if let Some(cost) = llm_prices::Provider::Anthropic
+            .lookup(model)
+            .and_then(|p| p.cost(input_tokens as u64, output_tokens as u64))
+        {
+            return cost;
+        }
         // Costs per million tokens (as of 2024)
         let (input_cost, output_cost) = match model {
             "claude-3-opus-20240229" => (15.0, 75.0),
@@ -540,7 +546,7 @@ mod tests {
         // silently returning $0.00.
         assert_eq!(
             provider.calculate_cost("claude-opus-4-7", 1_000_000, 1_000_000),
-            90.0
+            30.0
         );
         assert_eq!(
             provider.calculate_cost("claude-sonnet-4-6", 1_000_000, 1_000_000),
@@ -548,7 +554,7 @@ mod tests {
         );
         assert_eq!(
             provider.calculate_cost("claude-haiku-4-5-20251001", 1_000_000, 1_000_000),
-            1.5
+            6.0
         );
     }
 
