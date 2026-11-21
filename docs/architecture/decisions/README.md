@@ -38,3 +38,4 @@ with Y because of a version conflict" does.
 | [0003](0003-crabrace-provider-registry.md) | Crabrace for provider discovery (replaces Catwalk) | Accepted |
 | [0004](0004-plan-mode-read-only-with-approval-gating.md) | Plan Mode: read-only planning with explicit approval gating | Accepted |
 | [0005](0005-llama-cpp-in-process-worker-thread.md) | In-process llama.cpp provider: one dedicated OS worker thread per model | Accepted |
+| [0006](0006-long-term-memory.md) | Long-term memory: two scopes in SQLite, recall before each request | Accepted |
