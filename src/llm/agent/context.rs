@@ -223,20 +223,6 @@ impl AgentContext {
             }
         }
     }
-
-    /// Prepend recent episodic memories (from prior sessions) as a system message.
-    ///
-    /// Loads memories within `max_tokens` budget from the DB and inserts them at
-    /// position 0. Call this after `new()` before the first user turn.
-    pub async fn inject_episodic_memories(
-        &mut self,
-        pool: &sqlx::SqlitePool,
-        max_tokens: i32,
-    ) -> anyhow::Result<()> {
-        use crate::db::repository::EpisodicMemoryRepository;
-        let repo = EpisodicMemoryRepository::new(pool.clone());
-        repo.inject_into_context(self, max_tokens).await
-    }
 }
 
 /// BPE-accurate token count using cl100k_base (OpenAI/Claude-compatible).
