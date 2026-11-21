@@ -34,7 +34,7 @@
 
 ### v0.4 — Claw Code Parity & Reasoning
 - Reasoning / thinking display (Anthropic extended thinking, DeepSeek-R1, QwQ-32B via `<think>` tags)
-- Codebase index with file watcher (`notify` crate, symbol index, FTS search)
+- Codebase index with file watcher (`notify` crate, symbol index, FTS search). Never wired up; removed after v0.5.3
 - MCP tool server integration (`[[mcp.servers]]` config, auto-registered at startup)
 - Phase 4 tools: `web_fetch`, `todo_write`, `ask_user`, `skill`, `agent`, `powershell`
 - `SubAgentLauncher` trait — decoupled sub-agent spawning with recursion guard
@@ -377,7 +377,7 @@ are done; the rest are tracked here as they get picked up:
 
 | Item | Notes |
 |------|-------|
-| RAG / vector store | Semantic search over the codebase; integrate with the existing codebase index. Raw embedding generation is already available via the native Ollama provider (`crustly ollama embed`) — no retrieval layer wired up yet |
+| RAG / vector store | Semantic search over the codebase. The old codebase index was removed (it was never wired up); code structure is planned to come from an okf-rs bundle (`docs/improve-memory.md` §23). Raw embedding generation is already available via the native Ollama provider (`crustly ollama embed`) — no retrieval layer wired up yet |
 | Multi-pane TUI | Chat + file preview split; tabs for multiple conversations |
 | Web interface | Optional `crustly serve` command exposing a browser UI |
 | Multi-user / team | Shared sessions, role-based approval, audit log export |

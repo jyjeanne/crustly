@@ -99,7 +99,8 @@ pub struct MemoryConfig {
     /// Maximum token budget for injected episodic memories.
     #[serde(default = "default_episodic_budget")]
     pub episodic_budget_tokens: i32,
-    /// Whether to build and maintain the codebase symbol index.
+    /// No effect. The codebase symbol index it switched was removed; the
+    /// key is still accepted so existing config files keep loading.
     #[serde(default = "default_true")]
     pub enable_codebase_index: bool,
     /// Context compaction threshold (0.0–1.0).
