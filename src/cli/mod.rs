@@ -1003,6 +1003,11 @@ fn build_tool_registry(
     // Phase 3: Workflow & integration
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));
+    if let Some(store) = memory.clone() {
+        tool_registry.register(Arc::new(
+            crate::llm::tools::search_memory::SearchMemoryTool::new(store),
+        ));
+    }
     tool_registry.register(Arc::new(SaveMemoryTool::new(memory)));
     tool_registry.register(Arc::new(HttpClientTool));
     tool_registry.register(Arc::new(PlanTool));

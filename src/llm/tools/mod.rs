@@ -34,6 +34,7 @@ pub mod context;
 pub mod http;
 pub mod plan_tool;
 pub mod save_memory;
+pub mod search_memory;
 pub mod task;
 
 // Tool implementations - Phase 4: Claw Code parity
