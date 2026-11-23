@@ -133,6 +133,9 @@ pub struct MemoryConfig {
     /// Semantic recall (`[memory.embeddings]`, docs/improve-memory.md §16).
     #[serde(default)]
     pub embeddings: MemoryEmbeddingsConfig,
+    /// Automatic extraction of memories from conversations (`[memory.extraction]`).
+    #[serde(default)]
+    pub extraction: MemoryExtractionConfig,
 }
 
 /// `[memory.embeddings]`: where vectors come from, and how they are used.
@@ -202,6 +205,60 @@ fn default_embed_min_similarity() -> f32 {
     0.35
 }
 
+/// `[memory.extraction]`: learning memories from conversations
+/// (docs/improve-memory.md §12, §16). Off unless `enabled` is set.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryExtractionConfig {
+    /// Extract memories after conversations. Off by default.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Only "inherit" (the active provider) is supported for now.
+    #[serde(default = "default_extraction_provider")]
+    pub provider: String,
+    /// Model for extraction; empty uses the provider's current model.
+    #[serde(default)]
+    pub model: String,
+    /// Extract after this many new user messages.
+    #[serde(default = "default_extraction_every")]
+    pub every_n_user_messages: usize,
+    /// Most memories kept from one run (an episode is extra).
+    #[serde(default = "default_extraction_max")]
+    pub max_per_run: usize,
+    /// Least importance (1-5) a candidate needs to be kept.
+    #[serde(default = "default_extraction_min_importance")]
+    pub min_importance: u8,
+    /// Extracted memories wait as pending until approved.
+    #[serde(default)]
+    pub review: bool,
+}
+
+impl Default for MemoryExtractionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_extraction_provider(),
+            model: String::new(),
+            every_n_user_messages: default_extraction_every(),
+            max_per_run: default_extraction_max(),
+            min_importance: default_extraction_min_importance(),
+            review: false,
+        }
+    }
+}
+
+fn default_extraction_provider() -> String {
+    "inherit".to_string()
+}
+fn default_extraction_every() -> usize {
+    6
+}
+fn default_extraction_max() -> usize {
+    5
+}
+fn default_extraction_min_importance() -> u8 {
+    3
+}
+
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
@@ -215,6 +272,7 @@ impl Default for MemoryConfig {
             pinned_min_importance: default_pinned_min_importance(),
             recent_work: true,
             embeddings: MemoryEmbeddingsConfig::default(),
+            extraction: MemoryExtractionConfig::default(),
         }
     }
 }
@@ -238,6 +296,35 @@ impl MemoryConfig {
                 default_recall_max_tokens()
             );
             self.recall_max_tokens = default_recall_max_tokens();
+        }
+        let x = &mut self.extraction;
+        if !(1..=100).contains(&x.every_n_user_messages) {
+            tracing::warn!(
+                "memory.extraction.every_n_user_messages {} is outside 1-100; using 6",
+                x.every_n_user_messages
+            );
+            x.every_n_user_messages = default_extraction_every();
+        }
+        if !(1..=5).contains(&x.max_per_run) {
+            tracing::warn!(
+                "memory.extraction.max_per_run {} is outside 1-5; using 5",
+                x.max_per_run
+            );
+            x.max_per_run = default_extraction_max();
+        }
+        if !(1..=5).contains(&x.min_importance) {
+            tracing::warn!(
+                "memory.extraction.min_importance {} is outside 1-5; using 3",
+                x.min_importance
+            );
+            x.min_importance = default_extraction_min_importance();
+        }
+        if x.provider != "inherit" {
+            tracing::warn!(
+                "memory.extraction.provider {:?} is not supported yet; using inherit",
+                x.provider
+            );
+            x.provider = "inherit".to_string();
         }
         let e = &mut self.embeddings;
         if !matches!(e.provider.as_str(), "none" | "ollama" | "openai-compatible") {
