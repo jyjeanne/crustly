@@ -1084,6 +1084,12 @@ All decided on 2026-11-21:
 5. **The unused `[memory]` keys are documented as unused.** `episodic_budget_tokens`, `enable_codebase_index` and `compaction_threshold` are still accepted, so old config files keep loading, but their doc comments and the configuration reference say they have no effect (§16).
 6. **Two clones of the same remote are separate projects.** The project id comes from the canonical root path only; the remote URL is for display (§7).
 
+Decided on 2026-11-23:
+
+7. **Extraction is configured as `[memory.extraction] enabled = false`**, with the table's other keys beside it. This replaces the `extraction = "off" | "auto"` key in §16, which cannot coexist with that table in TOML. D6 and §16 are read with this name.
+8. **Phase 6 (okf-rs integration) is deferred.** It needs changes in the okf-rs repository first (§23.5).
+9. **Verification is with fake models.** Real-model runs (the Ollama benchmark, and an extraction run with a small local model) are listed as pending, not claimed as done.
+
 ## 22. Rules for the implementing agent
 
 1. Work phase by phase: one PR per phase, one commit per task of §24, using the prompt and checks in §24.1.
