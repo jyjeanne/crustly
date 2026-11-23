@@ -211,6 +211,8 @@ pub enum RejectReason {
         rule: &'static str,
     },
     ScopeMismatch,
+    /// The memory was saved by the user; only the user may change it.
+    SavedByUser,
     NotFound,
     ReadOnly,
 }
@@ -230,6 +232,10 @@ impl fmt::Display for RejectReason {
                 "not saved: the text looks like a secret ({rule}). Never store credentials"
             ),
             Self::ScopeMismatch => write!(f, "the replaced memory is in a different scope"),
+            Self::SavedByUser => write!(
+                f,
+                "that memory was saved by the user; only the user can change it"
+            ),
             Self::NotFound => write!(f, "no memory with that id"),
             Self::ReadOnly => write!(f, "memory cannot change in read-only (plan) mode"),
         }
