@@ -199,11 +199,12 @@ fn configure_agent(
 fn memory_store(
     pool: &sqlx::SqlitePool,
     config: &crate::config::Config,
+    provider: &Arc<dyn crate::llm::provider::Provider>,
 ) -> Option<Arc<crate::memory::MemoryStore>> {
     config
         .memory
         .long_term
-        .then(|| Arc::new(build_memory_store(pool, config, true)))
+        .then(|| Arc::new(build_memory_store(pool, config, true, Some(provider))))
 }
 
 /// A memory store on `pool`, with semantic recall when `[memory.embeddings]`
@@ -214,8 +215,13 @@ fn build_memory_store(
     pool: &sqlx::SqlitePool,
     config: &crate::config::Config,
     background: bool,
+    provider: Option<&Arc<dyn crate::llm::provider::Provider>>,
 ) -> crate::memory::MemoryStore {
-    let store = crate::memory::MemoryStore::new(pool.clone(), config.memory.clone());
+    let mut store = crate::memory::MemoryStore::new(pool.clone(), config.memory.clone());
+    if let Some(provider) = provider {
+        let model = provider.default_model().to_string();
+        store = store.with_extraction(provider.clone(), model);
+    }
     match crate::memory::embedder_from_config(&config.memory.embeddings) {
         Ok(Some((embedder, runtime))) => store.attach_embedder(embedder, runtime, background),
         Ok(None) => store,
@@ -740,6 +746,18 @@ pub enum MemoryCommands {
         #[arg(long)]
         from_notes: bool,
     },
+    /// Memories extracted from conversations, waiting for approval
+    Review,
+    /// Approve a pending memory, so it is recalled from now on
+    Approve {
+        /// Id, or a unique prefix of it
+        id: String,
+    },
+    /// Reject a pending memory, which deletes it
+    Reject {
+        /// Id, or a unique prefix of it
+        id: String,
+    },
     /// Embed memories that lack a vector (needs [memory.embeddings])
     Reindex {
         /// Also delete vectors made by other embedding models
@@ -1066,7 +1084,7 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
         .await
         .context("Failed to connect to database")?;
     db.run_migrations().await?;
-    let store = build_memory_store(db.pool(), config, false);
+    let store = build_memory_store(db.pool(), config, false, None);
     let cwd = std::env::current_dir()?;
     let project = identify(&cwd);
     store.register_project(&project).await?;
@@ -1387,6 +1405,30 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                     display_path(std::path::Path::new(&root))
                 );
             }
+        }
+        MemoryCommands::Review => {
+            let pending = store.pending(&project).await?;
+            if pending.is_empty() {
+                println!("Nothing waiting for review.");
+            }
+            for memory in &pending {
+                println!("{}", memory_line(memory));
+            }
+            if !pending.is_empty() {
+                println!("\nApprove with `crustly memory approve <id>`, reject with `crustly memory reject <id>`.");
+            }
+        }
+        MemoryCommands::Approve { id } => {
+            let memory = resolve_memory(&store, &id).await?;
+            match store.approve(memory.id).await? {
+                Ok(()) => println!("Approved [m:{}]", &memory.id.simple().to_string()[..8]),
+                Err(reason) => anyhow::bail!("not approved: {reason}"),
+            }
+        }
+        MemoryCommands::Reject { id } => {
+            let memory = resolve_memory(&store, &id).await?;
+            store.forget(memory.id, "user").await?;
+            println!("Rejected [m:{}]", &memory.id.simple().to_string()[..8]);
         }
         MemoryCommands::Reindex { prune } => {
             let (embedded, pruned) = store.reindex(prune).await?;
@@ -1709,7 +1751,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
 
     // Create tool registry
     tracing::debug!("Setting up tool registry");
-    let memory = memory_store(db.pool(), config);
+    let memory = memory_store(db.pool(), config, &provider);
     let mut tool_registry = build_tool_registry(memory.clone());
     let mcp_status = connect_configured_mcp_servers(&mut tool_registry, config).await;
 
@@ -1884,7 +1926,7 @@ async fn cmd_run(
 
     // Create tool registry (same built-in set as the interactive chat agent
     // - see build_tool_registry's doc comment).
-    let memory = memory_store(db.pool(), config);
+    let memory = memory_store(db.pool(), config, &provider);
     let mut tool_registry = build_tool_registry(memory.clone());
 
     // Connect to configured MCP servers, same as cmd_chat - see its
@@ -1951,6 +1993,16 @@ async fn cmd_run(
     let response = agent_service
         .send_message_with_tools(session.id, prompt, None)
         .await?;
+
+    // A one-shot run is a whole session: extract at its end, in the foreground,
+    // so the saves are made before the process exits (§12.1, session end).
+    if let Some(store) = &memory {
+        let project =
+            crate::memory::project::identify(&std::env::current_dir().unwrap_or_default());
+        if let Err(err) = store.extract(session.id, &project, true, false).await {
+            tracing::warn!("memory extraction skipped: {err:#}");
+        }
+    }
 
     // Every save is announced (docs/improve-memory.md section 8, step 6).
     // On stderr, so --format json output stays clean.
