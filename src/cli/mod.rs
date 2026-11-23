@@ -1181,6 +1181,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tracing::debug!("Creating TUI app");
     let mut app = tui::App::new(agent_service, service_context.clone());
     app.set_ollama_host(ollama_host(config));
+    app.set_memory(memory.clone());
     // Hand the [providers.ollama] section to the TUI so the Ctrl+W model
     // switch rebuilds providers with the SAME settings as startup (per-model
     // num_ctx/sampling, keep_alive) instead of a bare unconfigured provider.
@@ -1398,6 +1399,14 @@ async fn cmd_run(
     let response = agent_service
         .send_message_with_tools(session.id, prompt, None)
         .await?;
+
+    // Every save is announced (docs/improve-memory.md section 8, step 6).
+    // On stderr, so --format json output stays clean.
+    if let Some(store) = &memory {
+        for notice in store.take_notices() {
+            eprintln!("💾 {notice}");
+        }
+    }
 
     // Format and display output
     match format {
