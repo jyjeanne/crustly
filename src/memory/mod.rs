@@ -18,8 +18,8 @@ use crate::db::repository::MemoryRepository;
 use anyhow::Result;
 use chrono::Utc;
 use model::{
-    content_hash, normalize, validate, Memory, MemoryScope, MemorySource, MemoryStatus, NewMemory,
-    ProjectId, RejectReason, SaveOutcome,
+    content_hash, normalize, validate, Memory, MemoryCategory, MemoryScope, MemorySource,
+    MemoryStatus, NewMemory, ProjectId, RejectReason, SaveOutcome,
 };
 use project::ProjectIdentity;
 use recall::Ranked;
@@ -51,6 +51,14 @@ pub struct RecallRequest<'a> {
     pub first_request: bool,
     /// Project root, where the progress log is read from.
     pub root: &'a Path,
+}
+
+/// Which memories a search covers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchScope {
+    All,
+    Global,
+    Project,
 }
 
 /// Public entry point for long-term memory.
@@ -212,6 +220,38 @@ impl MemoryStore {
             Vec::new()
         };
         Ok(recall::render_block(&selected, &recent))
+    }
+
+    /// Keyword search for the model's `search_memory` tool and the CLI.
+    /// Covers the same memories recall can see: the project's and the global
+    /// ones. `scope` and `category` narrow the result; `limit` caps it.
+    pub async fn search(
+        &self,
+        project: &ProjectIdentity,
+        query: &str,
+        scope: SearchScope,
+        category: Option<MemoryCategory>,
+        limit: usize,
+    ) -> Result<Vec<Memory>> {
+        let Some(expr) = recall::fts_match_expr(query, None) else {
+            return Ok(Vec::new());
+        };
+        let now = Utc::now();
+        let hits = self
+            .repo
+            .fts_search(&expr, &project.id, now, KEYWORD_LIMIT)
+            .await?;
+        Ok(hits
+            .into_iter()
+            .map(|(memory, _)| memory)
+            .filter(|m| match scope {
+                SearchScope::All => true,
+                SearchScope::Global => matches!(m.scope, MemoryScope::Global),
+                SearchScope::Project => matches!(m.scope, MemoryScope::Project(_)),
+            })
+            .filter(|m| category.is_none_or(|c| m.category == c))
+            .take(limit)
+            .collect())
     }
 
     /// Memories whose id starts with `prefix`, for the short ids shown to users.
