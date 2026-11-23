@@ -2,6 +2,7 @@
 //! database and recalled into later requests (docs/improve-memory.md).
 
 pub mod model;
+pub mod project;
 pub mod secret_scan;
 
 pub use model::{
