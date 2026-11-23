@@ -224,7 +224,7 @@ impl MemoryRepository {
         now: DateTime<Utc>,
         limit: i64,
     ) -> Result<Vec<(Memory, f64)>> {
-        let rows = sqlx::query(&format!(
+        let rows = sqlx::query(
             "SELECT m.id, m.scope, m.project_id, m.category, m.content, m.source, m.importance, \
              m.status, m.superseded_by, m.created_at, m.updated_at, m.last_recalled_at, \
              m.recall_count, m.expires_at, bm25(memories_fts) AS rank \
@@ -232,8 +232,8 @@ impl MemoryRepository {
              WHERE memories_fts MATCH ? AND m.status = 'active' \
              AND (m.expires_at IS NULL OR m.expires_at > ?) \
              AND (m.scope = 'global' OR m.project_id = ?) \
-             ORDER BY rank LIMIT ?"
-        ))
+             ORDER BY rank LIMIT ?",
+        )
         .bind(match_expr)
         .bind(now.timestamp())
         .bind(project_id)
