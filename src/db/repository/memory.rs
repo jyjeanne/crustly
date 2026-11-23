@@ -433,6 +433,115 @@ impl MemoryRepository {
         tx.commit().await?;
         Ok(moved)
     }
+    // ── P2.6: vectors ────────────────────────────────────────────────────
+
+    /// Store the unit-length vector of a memory for `model`, replacing any
+    /// vector already stored for that pair.
+    pub async fn put_embedding(
+        &self,
+        id: Uuid,
+        model: &str,
+        vector: &[f32],
+        now: DateTime<Utc>,
+    ) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO memory_embeddings (memory_id, model, dimensions, vector, created_at) \
+             VALUES (?, ?, ?, ?, ?) \
+             ON CONFLICT(memory_id, model) DO UPDATE SET \
+             dimensions = excluded.dimensions, vector = excluded.vector, created_at = excluded.created_at",
+        )
+        .bind(id.to_string())
+        .bind(model)
+        .bind(i64::try_from(vector.len()).unwrap_or(i64::MAX))
+        .bind(crate::memory::vector::encode(vector))
+        .bind(now.timestamp())
+        .execute(&self.pool)
+        .await
+        .context("storing memory vector")?;
+        Ok(())
+    }
+
+    /// Vectors of the memories a request may use (active, unexpired, the
+    /// project's or global), for one model only. A stored vector whose size
+    /// does not match its recorded dimensions is skipped, never compared.
+    pub async fn vectors_for(
+        &self,
+        project_id: &ProjectId,
+        model: &str,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<(Uuid, Vec<f32>)>> {
+        let rows = sqlx::query(
+            "SELECT e.memory_id, e.dimensions, e.vector FROM memory_embeddings e \
+             JOIN memories m ON m.id = e.memory_id \
+             WHERE e.model = ? AND m.status = 'active' \
+             AND (m.expires_at IS NULL OR m.expires_at > ?) \
+             AND (m.scope = 'global' OR m.project_id = ?)",
+        )
+        .bind(model)
+        .bind(now.timestamp())
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            let id: String = row.try_get("memory_id")?;
+            let dims: i64 = row.try_get("dimensions")?;
+            let bytes: Vec<u8> = row.try_get("vector")?;
+            let Ok(dims) = usize::try_from(dims) else {
+                continue;
+            };
+            if let (Ok(id), Ok(vector)) = (
+                id.parse::<Uuid>(),
+                crate::memory::vector::decode(&bytes, dims),
+            ) {
+                out.push((id, vector));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Active memories that have no vector for `model` yet, oldest first.
+    pub async fn missing_embeddings(&self, model: &str, limit: i64) -> Result<Vec<Memory>> {
+        let rows = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories m \
+             WHERE m.status = 'active' AND NOT EXISTS ( \
+               SELECT 1 FROM memory_embeddings e WHERE e.memory_id = m.id AND e.model = ?) \
+             ORDER BY m.created_at LIMIT ?"
+        ))
+        .bind(model)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(row_to_memory).collect()
+    }
+
+    /// Delete vectors made by any model other than `model`. Returns the count.
+    pub async fn prune_embeddings_except(&self, model: &str) -> Result<u64> {
+        Ok(
+            sqlx::query("DELETE FROM memory_embeddings WHERE model <> ?")
+                .bind(model)
+                .execute(&self.pool)
+                .await?
+                .rows_affected(),
+        )
+    }
+
+    /// How many active memories have a vector for `model`, and how many
+    /// active memories there are in all (for `memory status`).
+    pub async fn embedding_counts(&self, model: &str) -> Result<(i64, i64)> {
+        let indexed: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id \
+             WHERE e.model = ? AND m.status = 'active'",
+        )
+        .bind(model)
+        .fetch_one(&self.pool)
+        .await?;
+        let active: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM memories WHERE status = 'active'")
+                .fetch_one(&self.pool)
+                .await?;
+        Ok((indexed, active))
+    }
 }
 
 /// The `scope` and `project_id` columns for a scope.
