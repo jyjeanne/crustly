@@ -130,6 +130,20 @@ impl MemoryRepository {
     }
 
     /// Set `updated_at` to show the memory was seen again.
+    /// Archive a memory: kept for history, never recalled, and the event
+    /// records who archived it.
+    pub async fn archive(&self, id: Uuid, actor: &str, now: DateTime<Utc>) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("UPDATE memories SET status = 'archived', updated_at = ? WHERE id = ?")
+            .bind(now.timestamp())
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await?;
+        record_event(&mut tx, id, "archived", actor, None, now).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn touch(&self, id: Uuid, now: DateTime<Utc>) -> Result<()> {
         sqlx::query("UPDATE memories SET updated_at = ? WHERE id = ?")
             .bind(now.timestamp())
