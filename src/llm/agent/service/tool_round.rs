@@ -262,7 +262,7 @@ impl AgentService {
             // program is on `security.allow_bash` and there is no active
             // shell operator to smuggle another one in - that stands in for
             // the user's approval. Anything not allowlisted still prompts.
-            let needs_approval = tool.requires_approval()
+            let needs_approval = tool.requires_approval_for(&input)
                 && !self.auto_approve_tools
                 && !tool_context.auto_approve
                 && !self.tool_registry.is_trusted(&name, &input);

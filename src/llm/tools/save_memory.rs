@@ -243,6 +243,13 @@ impl Tool for SaveMemoryTool {
         false // Remembering a fact is low-risk, same as todo_write/session_context.
     }
 
+    /// A global save follows the user into every project, so it needs the
+    /// user's approval. Project saves stay on the same footing as the v1 file:
+    /// no approval. Without a store, the scope is ignored, so nothing needs it.
+    fn requires_approval_for(&self, input: &Value) -> bool {
+        self.store.is_some() && input.get("scope").and_then(Value::as_str) == Some("global")
+    }
+
     fn validate_input(&self, input: &Value) -> Result<()> {
         let input: SaveMemoryInput = serde_json::from_value(input.clone())
             .map_err(|e| ToolError::InvalidInput(format!("Invalid input: {}", e)))?;
@@ -536,5 +543,21 @@ mod tests {
             .error
             .unwrap_or_default()
             .contains("No memory with id"));
+    }
+
+    #[tokio::test]
+    async fn only_global_saves_with_a_store_need_approval() {
+        let (_db, store) = store_with_db().await;
+        let with_store = SaveMemoryTool::new(Some(store));
+        assert!(
+            with_store.requires_approval_for(&serde_json::json!({"fact": "x", "scope": "global"}))
+        );
+        assert!(!with_store.requires_approval_for(&serde_json::json!({"fact": "x"})));
+        assert!(!with_store
+            .requires_approval_for(&serde_json::json!({"fact": "x", "scope": "project"})));
+        let file_only = SaveMemoryTool::file_only();
+        assert!(
+            !file_only.requires_approval_for(&serde_json::json!({"fact": "x", "scope": "global"}))
+        );
     }
 }

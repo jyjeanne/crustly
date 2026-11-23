@@ -2468,6 +2468,30 @@ mod tests {
         }
     }
 
+    /// Global memory saves carry the WriteFiles capability, so AutoPlan
+    /// prompts for them, while FullAuto and --auto-approve do not.
+    #[test]
+    fn global_memory_saves_prompt_in_autoplan_but_not_fullauto() {
+        use crate::config::PlanExecMode;
+
+        let writes = vec!["WriteFiles".to_string()];
+        assert!(!auto_mode_bypasses_approval(
+            &PlanExecMode::AutoPlan,
+            "save_memory",
+            &writes
+        ));
+        assert!(auto_mode_bypasses_approval(
+            &PlanExecMode::FullAuto,
+            "save_memory",
+            &writes
+        ));
+        assert!(!auto_mode_bypasses_approval(
+            &PlanExecMode::Interactive,
+            "save_memory",
+            &writes
+        ));
+    }
+
     /// The core profile exists to fit small local windows: its system prompt
     /// and tool schemas must stay a small part of an 8,192-token window, and
     /// well under what the full set costs.

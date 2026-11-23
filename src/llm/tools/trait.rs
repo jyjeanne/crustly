@@ -283,6 +283,13 @@ pub trait Tool: Send + Sync {
             .any(|cap| dangerous_capabilities.contains(cap))
     }
 
+    /// Whether a call with this `input` needs approval. Defaults to
+    /// [`Tool::requires_approval`]. A tool whose risk depends on its input
+    /// (saving a global memory, for example) overrides it.
+    fn requires_approval_for(&self, _input: &Value) -> bool {
+        self.requires_approval()
+    }
+
     /// Execute the tool with given input
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult>;
 
