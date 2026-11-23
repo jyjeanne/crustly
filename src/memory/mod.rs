@@ -3,6 +3,7 @@
 
 pub mod model;
 pub mod project;
+pub mod recall;
 pub mod secret_scan;
 
 pub use model::{
