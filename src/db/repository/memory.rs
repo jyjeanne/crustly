@@ -1,0 +1,406 @@
+//! SQL for long-term memory (docs/improve-memory.md §6.2, §8, §9.2).
+//!
+//! This layer does no policy: validation, secret scanning and reinforcement
+//! rules live in `crate::memory`. It only reads and writes rows, and keeps the
+//! memory_events audit trail in step with every change.
+
+use crate::memory::model::{
+    Memory, MemoryCategory, MemoryScope, MemorySource, MemoryStatus, ProjectId,
+};
+use crate::memory::project::ProjectIdentity;
+use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
+use sqlx::{Row, SqlitePool};
+use uuid::Uuid;
+
+/// Columns read back for a `Memory`, in the order `row_to_memory` expects.
+const MEMORY_COLUMNS: &str = "id, scope, project_id, category, content, source, importance, \
+     status, superseded_by, created_at, updated_at, last_recalled_at, recall_count, expires_at";
+
+/// A memory row to insert, already validated and hashed.
+#[derive(Debug, Clone)]
+pub struct InsertMemory {
+    pub id: Uuid,
+    pub scope: MemoryScope,
+    pub category: MemoryCategory,
+    pub content: String,
+    pub content_hash: String,
+    pub source: MemorySource,
+    pub importance: u8,
+    pub status: MemoryStatus,
+    pub session_id: Option<Uuid>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub now: DateTime<Utc>,
+}
+
+pub struct MemoryRepository {
+    pool: SqlitePool,
+}
+
+impl MemoryRepository {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+
+    // ── P1.8: writes ─────────────────────────────────────────────────────
+
+    /// Record the project, or refresh its name, path and remote.
+    pub async fn upsert_project(
+        &self,
+        project: &ProjectIdentity,
+        now: DateTime<Utc>,
+    ) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO memory_projects (id, root_path, name, remote_url, created_at, last_seen_at) \
+             VALUES (?, ?, ?, ?, ?, ?) \
+             ON CONFLICT(id) DO UPDATE SET root_path = excluded.root_path, \
+             name = excluded.name, remote_url = excluded.remote_url, \
+             last_seen_at = excluded.last_seen_at",
+        )
+        .bind(&project.id)
+        .bind(project.root.to_string_lossy().as_ref())
+        .bind(&project.name)
+        .bind(&project.remote_url)
+        .bind(now.timestamp())
+        .bind(now.timestamp())
+        .execute(&self.pool)
+        .await
+        .context("upserting memory project")?;
+        Ok(())
+    }
+
+    /// Insert a memory and its `created` event in one transaction. `actor` is
+    /// one of the memory_events actors: user, model, extractor, consolidator
+    /// or import.
+    pub async fn insert(&self, memory: &InsertMemory, actor: &str) -> Result<()> {
+        let (scope, project_id) = scope_columns(&memory.scope);
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "INSERT INTO memories (id, scope, project_id, category, content, content_hash, \
+             source, source_session_id, importance, status, created_at, updated_at, expires_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(memory.id.to_string())
+        .bind(scope)
+        .bind(project_id)
+        .bind(memory.category.as_str())
+        .bind(&memory.content)
+        .bind(&memory.content_hash)
+        .bind(memory.source.as_str())
+        .bind(memory.session_id.map(|s| s.to_string()))
+        .bind(i64::from(memory.importance))
+        .bind(memory.status.as_str())
+        .bind(memory.now.timestamp())
+        .bind(memory.now.timestamp())
+        .bind(memory.expires_at.map(|t| t.timestamp()))
+        .execute(&mut *tx)
+        .await
+        .context("inserting memory")?;
+        record_event(
+            &mut tx,
+            memory.id,
+            "created",
+            actor,
+            memory.session_id,
+            memory.now,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// The active or pending memory in `scope` with this hash, if any.
+    pub async fn find_by_hash(&self, scope: &MemoryScope, hash: &str) -> Result<Option<Memory>> {
+        let (_, project_id) = scope_columns(scope);
+        let row = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories \
+             WHERE content_hash = ? AND status IN ('active', 'pending') \
+             AND ifnull(project_id, '') = ifnull(?, '') LIMIT 1"
+        ))
+        .bind(hash)
+        .bind(project_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        row.as_ref().map(row_to_memory).transpose()
+    }
+
+    /// Set `updated_at` to show the memory was seen again.
+    pub async fn touch(&self, id: Uuid, now: DateTime<Utc>) -> Result<()> {
+        sqlx::query("UPDATE memories SET updated_at = ? WHERE id = ?")
+            .bind(now.timestamp())
+            .bind(id.to_string())
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Raise importance by one, up to 5, and record a `reinforced` event.
+    pub async fn reinforce(&self, id: Uuid, actor: &str, now: DateTime<Utc>) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "UPDATE memories SET importance = MIN(importance + 1, 5), updated_at = ? WHERE id = ?",
+        )
+        .bind(now.timestamp())
+        .bind(id.to_string())
+        .execute(&mut *tx)
+        .await?;
+        record_event(&mut tx, id, "reinforced", actor, None, now).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    // ── P1.9: reads ──────────────────────────────────────────────────────
+
+    pub async fn get(&self, id: Uuid) -> Result<Option<Memory>> {
+        let row = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories WHERE id = ?"
+        ))
+        .bind(id.to_string())
+        .fetch_optional(&self.pool)
+        .await?;
+        row.as_ref().map(row_to_memory).transpose()
+    }
+
+    /// Memories whose id starts with `prefix` (the short ids shown to users).
+    pub async fn find_by_prefix(&self, prefix: &str) -> Result<Vec<Memory>> {
+        let pattern = format!("{}%", prefix.to_lowercase());
+        let rows = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories WHERE id LIKE ? ORDER BY created_at LIMIT 20"
+        ))
+        .bind(pattern)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(row_to_memory).collect()
+    }
+
+    /// Memories that a request for `project_id` may use: active, unexpired,
+    /// and either global or in that project (§9.2). This is the only query
+    /// recall starts from, so no ranking can bring in another project's memory.
+    pub async fn candidates(
+        &self,
+        project_id: &ProjectId,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<Memory>> {
+        let rows = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories \
+             WHERE status = 'active' \
+             AND (expires_at IS NULL OR expires_at > ?) \
+             AND (scope = 'global' OR project_id = ?) \
+             ORDER BY importance DESC, updated_at DESC"
+        ))
+        .bind(now.timestamp())
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(row_to_memory).collect()
+    }
+
+    /// Record that these memories were put into a request.
+    pub async fn record_recall(&self, ids: &[Uuid], now: DateTime<Utc>) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        for id in ids {
+            sqlx::query(
+                "UPDATE memories SET recall_count = recall_count + 1, last_recalled_at = ? \
+                 WHERE id = ?",
+            )
+            .bind(now.timestamp())
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    // ── P1.10: search and changes ────────────────────────────────────────
+
+    /// Keyword search with FTS5 `bm25` ranking (lower scores are better), over
+    /// the same candidate set as `candidates`. `match_expr` must come from
+    /// `memory::recall::fts_match_expr`, never raw user text.
+    pub async fn fts_search(
+        &self,
+        match_expr: &str,
+        project_id: &ProjectId,
+        now: DateTime<Utc>,
+        limit: i64,
+    ) -> Result<Vec<(Memory, f64)>> {
+        let rows = sqlx::query(&format!(
+            "SELECT m.id, m.scope, m.project_id, m.category, m.content, m.source, m.importance, \
+             m.status, m.superseded_by, m.created_at, m.updated_at, m.last_recalled_at, \
+             m.recall_count, m.expires_at, bm25(memories_fts) AS rank \
+             FROM memories_fts JOIN memories m ON m.seq = memories_fts.rowid \
+             WHERE memories_fts MATCH ? AND m.status = 'active' \
+             AND (m.expires_at IS NULL OR m.expires_at > ?) \
+             AND (m.scope = 'global' OR m.project_id = ?) \
+             ORDER BY rank LIMIT ?"
+        ))
+        .bind(match_expr)
+        .bind(now.timestamp())
+        .bind(project_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter()
+            .map(|row| Ok((row_to_memory(row)?, row.try_get::<f64, _>("rank")?)))
+            .collect()
+    }
+
+    /// Replace a memory's text and hash. The FTS index follows by trigger.
+    pub async fn update_content(
+        &self,
+        id: Uuid,
+        content: &str,
+        content_hash: &str,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "UPDATE memories SET content = ?, content_hash = ?, updated_at = ? WHERE id = ?",
+        )
+        .bind(content)
+        .bind(content_hash)
+        .bind(now.timestamp())
+        .bind(id.to_string())
+        .execute(&mut *tx)
+        .await?;
+        record_event(&mut tx, id, "updated", actor, None, now).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Mark `old` as superseded by `new`. The old row is kept as history.
+    pub async fn supersede(
+        &self,
+        old: Uuid,
+        new: Uuid,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "UPDATE memories SET status = 'superseded', superseded_by = ?, updated_at = ? WHERE id = ?",
+        )
+        .bind(new.to_string())
+        .bind(now.timestamp())
+        .bind(old.to_string())
+        .execute(&mut *tx)
+        .await?;
+        record_event(&mut tx, old, "superseded", actor, None, now).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Make a project memory global. The change fails if the same fact is
+    /// already a global memory.
+    pub async fn promote(&self, id: Uuid, actor: &str, now: DateTime<Utc>) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "UPDATE memories SET scope = 'global', project_id = NULL, updated_at = ? WHERE id = ?",
+        )
+        .bind(now.timestamp())
+        .bind(id.to_string())
+        .execute(&mut *tx)
+        .await
+        .context("promoting memory to global")?;
+        record_event(&mut tx, id, "promoted", actor, None, now).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Delete a memory. Its FTS entry goes by trigger, its vectors by cascade,
+    /// and the WAL is checkpointed so old pages do not stay on disk. The event
+    /// keeps the id and actor, never the content.
+    pub async fn delete(&self, id: Uuid, actor: &str, now: DateTime<Utc>) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        record_event(&mut tx, id, "forgotten", actor, None, now).await?;
+        sqlx::query("DELETE FROM memories WHERE id = ?")
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&self.pool)
+            .await
+            .context("checkpointing the WAL after a delete")?;
+        Ok(())
+    }
+
+    /// Move every memory of project `old` to project `new`, then forget `old`.
+    /// `new` must already exist in memory_projects (upsert it first).
+    pub async fn relink_project(&self, old: &ProjectId, new: &ProjectId) -> Result<u64> {
+        let mut tx = self.pool.begin().await?;
+        let moved = sqlx::query("UPDATE memories SET project_id = ? WHERE project_id = ?")
+            .bind(new)
+            .bind(old)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+        sqlx::query("DELETE FROM memory_projects WHERE id = ?")
+            .bind(old)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(moved)
+    }
+}
+
+/// The `scope` and `project_id` columns for a scope.
+fn scope_columns(scope: &MemoryScope) -> (&'static str, Option<&str>) {
+    match scope {
+        MemoryScope::Global => ("global", None),
+        MemoryScope::Project(id) => ("project", Some(id.as_str())),
+    }
+}
+
+async fn record_event(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    memory_id: Uuid,
+    event: &str,
+    actor: &str,
+    session_id: Option<Uuid>,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO memory_events (memory_id, event, actor, session_id, created_at) \
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(memory_id.to_string())
+    .bind(event)
+    .bind(actor)
+    .bind(session_id.map(|s| s.to_string()))
+    .bind(now.timestamp())
+    .execute(&mut **tx)
+    .await
+    .context("recording memory event")?;
+    Ok(())
+}
+
+fn timestamp(secs: i64) -> DateTime<Utc> {
+    DateTime::from_timestamp(secs, 0).unwrap_or_else(Utc::now)
+}
+
+fn row_to_memory(row: &sqlx::sqlite::SqliteRow) -> Result<Memory> {
+    let scope = match row.try_get::<Option<String>, _>("project_id")? {
+        Some(project) => MemoryScope::Project(project),
+        None => MemoryScope::Global,
+    };
+    let superseded_by: Option<String> = row.try_get("superseded_by")?;
+    Ok(Memory {
+        id: row.try_get::<String, _>("id")?.parse()?,
+        scope,
+        category: row.try_get::<String, _>("category")?.parse()?,
+        content: row.try_get("content")?,
+        source: row.try_get::<String, _>("source")?.parse()?,
+        importance: u8::try_from(row.try_get::<i64, _>("importance")?).unwrap_or(3),
+        status: row.try_get::<String, _>("status")?.parse()?,
+        superseded_by: superseded_by.map(|s| s.parse()).transpose()?,
+        created_at: timestamp(row.try_get("created_at")?),
+        updated_at: timestamp(row.try_get("updated_at")?),
+        last_recalled_at: row
+            .try_get::<Option<i64>, _>("last_recalled_at")?
+            .map(timestamp),
+        recall_count: u32::try_from(row.try_get::<i64, _>("recall_count")?).unwrap_or(0),
+        expires_at: row.try_get::<Option<i64>, _>("expires_at")?.map(timestamp),
+    })
+}
