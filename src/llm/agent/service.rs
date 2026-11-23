@@ -634,8 +634,8 @@ impl AgentService {
 
     /// Add the project's notes files to the system prompt.
     /// Recall long-term memory into each request (docs/improve-memory.md §9.1).
-    pub fn with_memory(mut self, store: Arc<MemoryStore>) -> Self {
-        self.memory = Some(store);
+    pub fn with_memory(mut self, store: Option<Arc<MemoryStore>>) -> Self {
+        self.memory = store;
         self
     }
 
@@ -4115,7 +4115,7 @@ mod tests {
         let provider = Arc::new(ScriptedProvider::new(8192, vec![Ok(text_reply("ok"))]));
         let service = AgentService::new(provider.clone(), context.clone())
             .with_working_directory(workdir.path().to_path_buf())
-            .with_memory(store);
+            .with_memory(Some(store));
         service
             .send_message_with_tools(
                 session,

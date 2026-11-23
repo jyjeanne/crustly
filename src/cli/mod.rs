@@ -194,6 +194,20 @@ fn configure_agent(
     Ok(service)
 }
 
+/// The long-term memory store on `pool`, when `[memory] long_term` is on.
+/// Memory is optional: with it off, the agent behaves exactly as before.
+fn memory_store(
+    pool: &sqlx::SqlitePool,
+    config: &crate::config::Config,
+) -> Option<Arc<crate::memory::MemoryStore>> {
+    config.memory.long_term.then(|| {
+        Arc::new(crate::memory::MemoryStore::new(
+            pool.clone(),
+            config.memory.clone(),
+        ))
+    })
+}
+
 fn configure_agent_loop(
     service: crate::llm::agent::AgentService,
     config: &crate::config::Config,
@@ -1148,6 +1162,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create agent service with system prompt and working directory
     let agent_service = Arc::new(configure_agent_loop(
         AgentService::new(provider.clone(), service_context.clone())
+            .with_memory(memory_store(db.pool(), config))
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_working_directory(working_directory.clone()),
         config,
@@ -1201,6 +1216,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tracing::debug!("Creating agent service with approval callback");
     let agent_service = Arc::new(configure_agent(
         AgentService::new(provider.clone(), service_context.clone())
+            .with_memory(memory_store(db.pool(), config))
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_tool_registry(Arc::new(tool_registry))
             .with_approval_callback(Some(approval_callback))
@@ -1339,6 +1355,7 @@ async fn cmd_run(
     let service_context = ServiceContext::new(db.pool().clone());
     let agent_service = configure_agent(
         AgentService::new(provider.clone(), service_context.clone())
+            .with_memory(memory_store(db.pool(), config))
             .with_tool_registry(Arc::new(tool_registry))
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_auto_approve_tools(auto_approve),
