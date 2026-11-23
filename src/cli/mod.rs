@@ -710,6 +710,9 @@ pub enum MemoryCommands {
         /// Forget it automatically after this many days (1-365)
         #[arg(long)]
         expires: Option<i64>,
+        /// A file or folder (glob, relative to the project) this fact is about; repeat for more
+        #[arg(long = "path")]
+        paths: Vec<String>,
     },
     /// Change the text of a memory
     Edit { id: String, text: String },
@@ -1223,6 +1226,7 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
             category,
             importance,
             expires,
+            paths,
         } => {
             let scope = if global {
                 MemoryScope::Global
@@ -1255,6 +1259,11 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                 .await?
             {
                 SaveOutcome::Created(id) => {
+                    if !paths.is_empty() {
+                        if let Err(reason) = store.add_paths(id, &paths).await? {
+                            anyhow::bail!("saved, but the paths were refused: {reason}");
+                        }
+                    }
                     println!("Saved [m:{}]", &id.simple().to_string()[..8])
                 }
                 SaveOutcome::Duplicate(id) => {
