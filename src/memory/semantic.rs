@@ -118,6 +118,9 @@ pub async fn embed_and_store(
         }
     }
     generation.fetch_add(1, Ordering::SeqCst);
+    if let Err(err) = archive_near_duplicates(repo, embedder.model_id(), memories, now).await {
+        tracing::warn!("near-duplicate check failed: {err:#}");
+    }
     Ok(stored)
 }
 
@@ -267,4 +270,49 @@ pub struct SemanticHits {
     /// Normalised similarity per memory, for the memories above the threshold.
     pub scores: std::collections::HashMap<Uuid, f64>,
     pub index: Arc<VectorIndex>,
+}
+
+/// Archive memories that repeat an older memory in the same project (P2.10).
+/// The older one stays active, so a batch cannot archive both copies. Global
+/// memories are not checked here: their vectors are looked up per project.
+pub async fn archive_near_duplicates(
+    repo: &MemoryRepository,
+    model: &str,
+    memories: &[Memory],
+    now: chrono::DateTime<chrono::Utc>,
+) -> anyhow::Result<usize> {
+    use super::model::{MemoryScope, MemoryStatus};
+    use super::vector::similarity;
+    let mut archived = 0;
+    for memory in memories {
+        let MemoryScope::Project(project) = &memory.scope else {
+            continue;
+        };
+        let vectors = repo.vectors_for(project, model, now).await?;
+        let Some((_, mine)) = vectors.iter().find(|(id, _)| *id == memory.id) else {
+            continue;
+        };
+        for (other_id, theirs) in &vectors {
+            if *other_id == memory.id {
+                continue;
+            }
+            let Ok(score) = similarity(mine, theirs) else {
+                continue;
+            };
+            if score < NEAR_DUPLICATE {
+                continue;
+            }
+            let Some(other) = repo.get(*other_id).await? else {
+                continue;
+            };
+            let older = (other.created_at, other.id.to_string())
+                < (memory.created_at, memory.id.to_string());
+            if other.scope == memory.scope && other.status == MemoryStatus::Active && older {
+                repo.archive(memory.id, "consolidator", now).await?;
+                archived += 1;
+                break;
+            }
+        }
+    }
+    Ok(archived)
 }

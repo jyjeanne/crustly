@@ -375,3 +375,63 @@ fn bad_embeddings_settings_fall_back_to_defaults_at_load() {
     assert_eq!(memory.embeddings.batch_size, 16);
     assert_eq!(memory.embeddings.query_timeout_ms, 1500);
 }
+
+/// Every text gets the same vector, so any two memories are near-duplicates.
+struct SameVectorEmbedder;
+
+#[async_trait]
+impl Embedder for SameVectorEmbedder {
+    fn model_id(&self) -> &str {
+        "fake:same"
+    }
+
+    async fn embed(
+        &self,
+        _purpose: EmbedPurpose,
+        texts: &[String],
+    ) -> Result<Vec<Vec<f32>>, EmbedError> {
+        Ok(texts.iter().map(|_| vec![1.0, 0.0, 0.0]).collect())
+    }
+}
+
+#[tokio::test]
+async fn a_newer_near_duplicate_is_archived_and_the_older_one_stays() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = project(dir.path());
+    let store = MemoryStore::new(
+        database(dir.path()).await.pool().clone(),
+        MemoryConfig::default(),
+    )
+    .with_embedder(
+        Arc::new(SameVectorEmbedder) as Arc<dyn Embedder>,
+        fast_runtime(),
+    );
+    store.register_project(&project).await.unwrap();
+    save(
+        &store,
+        MemoryScope::Project(project.id.clone()),
+        "Uses Tokio for async work.",
+    )
+    .await;
+    save(
+        &store,
+        MemoryScope::Project(project.id.clone()),
+        "We use the Tokio runtime.",
+    )
+    .await;
+
+    for _ in 0..200 {
+        let active = store.list(&project, false).await.unwrap();
+        if active.len() == 1 {
+            assert!(
+                active[0].content.starts_with("Uses Tokio"),
+                "the older memory stays: {active:?}"
+            );
+            let all = store.list(&project, true).await.unwrap();
+            assert_eq!(all.len(), 2, "the newer one is archived, not deleted");
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    panic!("the near-duplicate was not archived in time");
+}
