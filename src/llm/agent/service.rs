@@ -634,7 +634,6 @@ impl AgentService {
         self
     }
 
-    /// Add the project's notes files to the system prompt.
     /// Recall long-term memory into each request (docs/improve-memory.md §9.1).
     pub fn with_memory(mut self, store: Option<Arc<MemoryStore>>) -> Self {
         self.memory = store;
@@ -684,6 +683,7 @@ impl AgentService {
             .await
     }
 
+    /// Add the project's notes files to the system prompt.
     pub fn with_project_notes(mut self, enabled: bool) -> Self {
         self.project_notes = enabled;
         self

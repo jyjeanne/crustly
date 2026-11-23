@@ -1014,7 +1014,6 @@ async fn cmd_config(config: &crate::config::Config, show_secrets: bool) -> Resul
     Ok(())
 }
 
-/// Database operations
 /// A path for people to read: Windows verbatim prefixes removed.
 fn display_path(path: &std::path::Path) -> String {
     let text = path.to_string_lossy().into_owned();
@@ -1498,6 +1497,7 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
     Ok(())
 }
 
+/// Database operations
 async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result<()> {
     use crate::db::Database;
 

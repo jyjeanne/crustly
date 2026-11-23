@@ -1590,10 +1590,6 @@ impl App {
         Ok(())
     }
 
-    /// Open the `/mcp` list view. Shows the status snapshot taken once at
-    /// startup (`App::mcp_status`, set via `set_mcp_status`) rather than
-    /// reconnecting live - see the "Open Decisions" note in
-    /// ergonomy-improvment.md about deferring live reconnect-on-open.
     /// Add a note from Crustly itself to the chat, as a system message.
     fn push_memory_note(&mut self, content: String) {
         self.messages.push(DisplayMessage {
@@ -1764,6 +1760,10 @@ impl App {
         self.push_memory_note(lines.join("\n"));
     }
 
+    /// Open the `/mcp` list view. Shows the status snapshot taken once at
+    /// startup (`App::mcp_status`, set via `set_mcp_status`) rather than
+    /// reconnecting live - see the "Open Decisions" note in
+    /// ergonomy-improvment.md about deferring live reconnect-on-open.
     async fn open_mcp(&mut self) -> Result<()> {
         self.mcp_selected = 0;
         self.switch_mode(AppMode::Mcp).await
@@ -5812,5 +5812,38 @@ mod tests {
         app.working_directory = dir.path().to_path_buf();
         app.try_handle_slash_command("/memory").await.unwrap();
         assert!(last_note(&app).contains("Long-term memory is off"));
+    }
+
+    #[tokio::test]
+    async fn a_save_during_a_response_is_announced_in_the_chat() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, store) = memory_test_app(dir.path()).await;
+        app.try_handle_slash_command("/remember Uses Redis")
+            .await
+            .unwrap();
+        // The /remember path announces at once; the response path drains the
+        // queue when a response completes. Queue another save and drain it the
+        // way a completed response does.
+        let project = crate::memory::project::identify(dir.path());
+        store.take_notices();
+        store
+            .save(crate::memory::model::NewMemory {
+                content: "Uses Tokio".to_string(),
+                scope: crate::memory::model::MemoryScope::Project(project.id.clone()),
+                category: crate::memory::model::MemoryCategory::Fact,
+                source: crate::memory::model::MemorySource::Tool,
+                importance: 3,
+                replaces: None,
+                session_id: None,
+                expires_at: None,
+            })
+            .await
+            .unwrap();
+        app.announce_memory_saves();
+        let notice = app.notice().unwrap_or_default().to_string();
+        assert!(
+            notice.contains("Remembered") && notice.contains("Uses Tokio"),
+            "{notice}"
+        );
     }
 }

@@ -1,6 +1,7 @@
 //! Forget tool for long-term memory (docs/improve-memory.md §10.3).
 //!
-//! Always asks for approval, and the prompt shows the content of each memory
+//! Asks for approval unless auto-approve is on (as in FullAuto). The prompt
+//! shows the content of each memory
 //! that would be removed. The model names memories by id (or a unique id
 //! prefix) that it found with `search_memory`; there is no deletion by
 //! query, so a vague request cannot delete in bulk. Every id is resolved
@@ -86,8 +87,8 @@ impl Tool for ForgetMemoryTool {
 
     fn description(&self) -> &str {
         "Permanently delete saved memories by id, when the user asks to forget them. Find the \
-         ids with search_memory first. The user must approve each deletion, and the memories \
-         are removed for good."
+         ids with search_memory first. Unless auto-approve is on, the user is asked to approve \
+         each deletion, and the memories are removed for good."
     }
 
     fn input_schema(&self) -> Value {

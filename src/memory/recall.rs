@@ -14,6 +14,9 @@ const MAX_QUERY_WORDS: usize = 32;
 
 /// Words shorter than this (in characters) are dropped from keyword queries.
 const MIN_WORD_CHARS: usize = 3;
+/// Tokens a rendered memory line costs beyond its text: the bullet, category,
+/// scope and id prefix. Counted so the block stays within its budget.
+const LINE_OVERHEAD_TOKENS: u32 = 15;
 
 /// A request with fewer words than this also searches the previous message,
 /// so short follow-ups such as "do the same for tests" still find context.
@@ -128,7 +131,9 @@ pub fn select(
     now: DateTime<Utc>,
     min_similarity: f64,
 ) -> Vec<Memory> {
-    let cost = |m: &Memory| token_count(&m.content);
+    // Each memory is rendered on one line with a short prefix (category, scope,
+    // id), so the cost includes that overhead.
+    let cost = |m: &Memory| token_count(&m.content) + LINE_OVERHEAD_TOKENS;
     let total: u32 = candidates.iter().map(|r| cost(&r.memory)).sum();
     if total <= budget_tokens {
         return candidates.iter().map(|r| r.memory.clone()).collect();
