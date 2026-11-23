@@ -78,6 +78,9 @@ impl Database {
                     sqlx::query("PRAGMA foreign_keys = ON")
                         .execute(&mut *conn)
                         .await?;
+                    sqlx::query("PRAGMA secure_delete = ON")
+                        .execute(&mut *conn)
+                        .await?;
                     Ok(())
                 })
             })
@@ -98,6 +101,9 @@ impl Database {
                     // Match connect()'s enforcement so tests exercise the
                     // same FK behavior production runs under.
                     sqlx::query("PRAGMA foreign_keys = ON")
+                        .execute(&mut *conn)
+                        .await?;
+                    sqlx::query("PRAGMA secure_delete = ON")
                         .execute(&mut *conn)
                         .await?;
                     Ok(())
