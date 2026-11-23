@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Ready for Phase 0. All questions in §21 decided on 2026-11-21 |
+| Status | Phases 0 to 4 built on `feat/memory-v2-finish`, with fake-model tests. Phase 5: the upgrade test, docs, minor review fixes and the TUI notice test are done; the TUI memory screen (P5.1) and the reranker experiment (P5.4) are not. Phase 6 deferred (§21). Real-model runs (embedding benchmark, extraction with a local model) are pending. |
 | Revised | 2026-11-21, with ideas from `docs/harness-memory-study.md` (what was adopted and why: Appendix C), and an optional integration with [okf-rs](https://github.com/jyjeanne/okf-rs) for code knowledge (§23) |
 | Date | 2026-11-21 |
 | Target | Next minor release after 0.5.x (new migrations, new config keys) |
