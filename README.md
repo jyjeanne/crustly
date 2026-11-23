@@ -422,6 +422,48 @@ integration, AWS Bedrock support, and the native Ollama provider.
 
 ---
 
+## 🧠 Long-Term Memory
+
+Crustly keeps facts and preferences between sessions. Global memories (your preferences) apply in every repository; project memories stay in the repository they came from. Memories are stored in Crustly's database, and nothing leaves your machine unless you configure an embedding or extraction model that runs elsewhere.
+
+- Relevant memories are sent with your message, marked as data, so the model can use them without treating them as instructions.
+- Every save is announced. Model saves to the global scope ask for approval.
+- `crustly memory` lists, searches, edits, forgets, exports and imports memories. `/remember`, `/forget` and `/memory` do the same from the chat.
+- Secrets are refused on every write path; forgotten memories are removed from the database and its write-ahead log.
+
+Settings live in the `[memory]` table. The defaults:
+
+```toml
+[memory]
+long_term = true              # false: save_memory writes .crustly/memory.md as before
+recall_max_tokens = 800       # never more than a sixteenth of the context window
+pinned_min_importance = 4     # preferences, conventions and decisions at this importance are recalled first
+recent_work = true            # "recent work" on a session's first request
+
+[memory.embeddings]           # semantic recall; off unless a provider is set
+provider = "none"             # "none" | "ollama" | "openai-compatible"
+model = "nomic-embed-text"
+base_url = "http://localhost:11434"
+query_timeout_ms = 1500       # then keyword recall alone
+batch_size = 16
+min_similarity = 0.35         # depends on the model; recalibrate when it changes
+# query_prefix / document_prefix override the built-in task prefixes
+# api_key_env = "MY_EMBED_KEY"  # name of the environment variable holding a key
+
+[memory.extraction]           # learn memories from conversations; off by default
+enabled = false
+provider = "inherit"          # only the active provider is supported
+every_n_user_messages = 6     # also runs before the context is compacted
+max_per_run = 5
+min_importance = 3
+review = false                # true: extracted memories wait for `crustly memory review`
+
+[memory.lifecycle]
+episode_retention_days = 180  # episodes older than this are archived by consolidation
+```
+
+The keys `episodic_budget_tokens`, `enable_codebase_index` and `compaction_threshold` are still accepted, but they have no effect.
+
 ## 🔒 Interactive Approval System
 
 **Crustly gives you complete control over dangerous operations with beautiful interactive approval dialogs.**
