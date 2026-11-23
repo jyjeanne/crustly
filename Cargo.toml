@@ -264,3 +264,8 @@ path = "benches/parallel_tool_dispatch.rs"
 # name = "llm_processing"
 # harness = false
 # path = "benches/llm_processing.rs"
+
+[[bench]]
+name = "memory_recall"
+harness = false
+path = "benches/memory_recall.rs"
