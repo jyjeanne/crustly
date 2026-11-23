@@ -1,0 +1,24 @@
+{
+  "note": "Starting benchmark set (docs/improve-memory.md §18.4). Projects a and b are separate repositories; global memories apply everywhere. Each query lists the keys it should find (expect) and keys it must never return (forbid).",
+  "memories": [
+    {"key": "m1", "project": "a", "category": "lesson", "content": "Avoid blocking calls inside Tokio runtime threads."},
+    {"key": "m2", "project": "a", "category": "decision", "content": "This project uses PostgreSQL for storage."},
+    {"key": "m3", "project": "a", "category": "fact", "content": "The database pool is capped at 20 connections."},
+    {"key": "m4", "project": "global", "category": "preference", "content": "Prefers Tokio for asynchronous Rust."},
+    {"key": "m5", "project": "b", "category": "decision", "content": "This project uses SQLite for local storage."},
+    {"key": "m6", "project": "b", "category": "lesson", "content": "Requests slow down under heavy load in the batch job."},
+    {"key": "m7", "project": "global", "category": "preference", "content": "Keep answers concise and direct."},
+    {"key": "m8", "project": "a", "category": "convention", "content": "Run cargo clippy before committing."},
+    {"key": "m9", "project": "a", "category": "lesson", "content": "Use spawn_blocking for file reads in async code."},
+    {"key": "m10", "project": "a", "category": "fact", "content": "The release branch is named release-0.6."}
+  ],
+  "queries": [
+    {"project": "a", "text": "why does my server stall under load", "expect": ["m1", "m9"], "forbid": ["m6"]},
+    {"project": "a", "text": "which database holds our data", "expect": ["m2", "m3"], "forbid": ["m5"]},
+    {"project": "a", "text": "is asynchronous rust the right choice", "expect": ["m4", "m1"], "forbid": []},
+    {"project": "a", "text": "how should I answer questions", "expect": ["m7"], "forbid": []},
+    {"project": "a", "text": "what should I run before a commit", "expect": ["m8"], "forbid": []},
+    {"project": "b", "text": "what storage do we use", "expect": ["m5"], "forbid": ["m2", "m3"]},
+    {"project": "b", "text": "why is the batch job slow", "expect": ["m6"], "forbid": ["m1", "m9"]}
+  ]
+}
