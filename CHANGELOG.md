@@ -5,6 +5,46 @@ For the forward-looking plan, see [ROADMAP.md](ROADMAP.md).
 
 ---
 
+### Unreleased — Long-Term Memory
+
+Crustly remembers facts and preferences across sessions and repositories. Design and decisions: `docs/improve-memory.md` and ADR 0006.
+
+#### What It Does
+- **Two scopes.** Global memories (your preferences) apply in every repository. Project memories stay in the repository they came from, and a test checks one project's memory never reaches another.
+- **Recall before each request.** Relevant memories are sent with your message, marked as data that may be out of date, and are never stored in the conversation. Keyword search always works; semantic search uses a local embedding model when one is configured.
+- **Saves are announced.** Each saved memory is shown in the chat, or printed to stderr by `crustly run`.
+- **Model saves.** `save_memory` writes to the database. A global save asks for approval (Interactive and AutoPlan modes).
+- **Extraction (off by default).** With `[memory.extraction] enabled = true`, memories are learned from conversations. Extracted memories can wait for review, and session ends write an episode that starts the next session's "recent work".
+- **Path-scoped memories.** A memory can name files (`src/tui/**`). It is recalled when a request or a tool call mentions them.
+- **Consolidation.** Expired memories are archived, old episodes expire after 180 days, near-duplicates are merged, and a year-unused fact is listed for review, never archived.
+
+#### Commands
+- `crustly memory status | list | show | search | add | edit | promote | forget` (add `--global`, `--path`, `--expires`)
+- `crustly memory review | approve | reject` (extracted memories waiting for review)
+- `crustly memory consolidate [--yes]`, `crustly memory reindex [--prune]`
+- `crustly memory export FILE`, `crustly memory import FILE`, `crustly memory import --from-notes` (moves the bullets of `.crustly/memory.md` into the database, with a backup)
+- `crustly memory projects`, `crustly memory relink-project OLD_ID`
+- In the chat: `/remember [--global] <text>`, `/forget <id> [--yes]`, `/memory`
+
+#### Safety
+- Secrets are refused on every write path, and the model is never shown them during extraction. Only the rule name is reported, never the text.
+- Deleting is real: content is removed from the database, the search index and the WAL.
+- Extraction never sees tool output, and recalled memories are framed as data.
+- Plan mode refuses memory changes.
+
+#### Configuration
+Every key is optional; defaults are in the README's Long-Term Memory section.
+
+#### Not Yet
+- Automatic extraction at idle time (only at request and compaction time, and at the end of `crustly run`).
+- A full memory screen in the TUI (the chat commands and the CLI cover it).
+- Extraction with a provider other than the active one (`provider = "inherit"` only).
+- Global memories are not checked for near-duplicates on save.
+- The okf-rs code-knowledge integration (Phase 6 of the spec) is deferred until okf-rs supports it.
+- Real-model results: the embedding benchmark and extraction runs against a local model are pending. The shipped checks use fake models.
+
+---
+
 ### Unreleased — Context Budgets That Hold
 
 #### Rust 1.95 Required
