@@ -234,10 +234,12 @@ pub fn token_count(text: &str) -> u32 {
         return 0;
     }
     // cl100k_base is used by GPT-4 and gives a close approximation for Claude.
-    // The BPE object is thread-safe; initialization happens once via lazy_static inside the crate.
-    match tiktoken_rs::cl100k_base() {
-        Ok(bpe) => bpe.encode_with_special_tokens(text).len() as u32,
-        Err(_) => {
+    // Building it costs tens of milliseconds, so it is built once and shared:
+    // memory recall counts tokens for every candidate of every request.
+    static BPE: std::sync::OnceLock<Option<tiktoken_rs::CoreBPE>> = std::sync::OnceLock::new();
+    match BPE.get_or_init(|| tiktoken_rs::cl100k_base().ok()).as_ref() {
+        Some(bpe) => bpe.encode_with_special_tokens(text).len() as u32,
+        None => {
             // Fallback if vocab fails to load: word-count heuristic (~15% error).
             let words = text.split_whitespace().count();
             (words as f64 * 1.3).ceil() as u32
