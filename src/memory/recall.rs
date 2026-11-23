@@ -23,9 +23,6 @@ const SHORT_REQUEST_WORDS: usize = 4;
 const RECENCY_DAYS: f64 = 90.0;
 
 /// Relevance floor for a keyword-only memory: any keyword match passes.
-/// Semantic similarity is added in Phase 2 with its own floor.
-const NO_SIMILARITY: Option<f64> = None;
-
 /// Keyword words of `text`: letters and digits only, lower-cased, short
 /// words dropped. Punctuation, including `_`, separates words, so
 /// `connect_pool` gives `connect` and `pool`.
@@ -67,6 +64,8 @@ pub fn fts_match_expr(message: &str, previous: Option<&str>) -> Option<String> {
 pub struct Ranked {
     pub memory: Memory,
     pub keyword: Option<f64>,
+    /// Normalised semantic similarity, 0..=1, when semantic search found it.
+    pub similarity: Option<f64>,
 }
 
 /// Recency in 0..=1. Preferences, conventions and decisions do not go stale
@@ -127,6 +126,7 @@ pub fn select(
     budget_tokens: u32,
     pinned_min_importance: u8,
     now: DateTime<Utc>,
+    min_similarity: f64,
 ) -> Vec<Memory> {
     let cost = |m: &Memory| token_count(&m.content);
     let total: u32 = candidates.iter().map(|r| cost(&r.memory)).sum();
@@ -167,11 +167,11 @@ pub fn select(
     let mut others: Vec<(f64, &Ranked)> = candidates
         .iter()
         .filter(|r| !chosen.iter().any(|c| c.id == r.memory.id))
-        .filter(|r| passes_floor(r.keyword, NO_SIMILARITY, 0.0))
+        .filter(|r| passes_floor(r.keyword, r.similarity, min_similarity))
         .map(|r| {
             let kw = keyword_score(r.keyword, best);
             let rec = recency(r.memory.category, r.memory.updated_at, now);
-            (score(kw, r.memory.importance, rec, NO_SIMILARITY), r)
+            (score(kw, r.memory.importance, rec, r.similarity), r)
         })
         .collect();
     others.sort_by(|a, b| b.0.total_cmp(&a.0));
@@ -304,7 +304,11 @@ mod tests {
     }
 
     fn ranked(memory: Memory, keyword: Option<f64>) -> Ranked {
-        Ranked { memory, keyword }
+        Ranked {
+            memory,
+            keyword,
+            similarity: None,
+        }
     }
 
     // ── P1.11 ────────────────────────────────────────────────────────────
@@ -387,7 +391,7 @@ mod tests {
                 None,
             ),
         ];
-        assert_eq!(select(&input, 10_000, 4, now()).len(), 2);
+        assert_eq!(select(&input, 10_000, 4, now(), 0.0).len(), 2);
     }
 
     #[test]
@@ -420,7 +424,7 @@ mod tests {
             ),
             None,
         ));
-        let chosen = select(&input, 40, 4, now());
+        let chosen = select(&input, 40, 4, now(), 0.0);
         assert!(
             chosen.iter().all(|m| m.content != big),
             "unmatched text is not chosen"
@@ -453,7 +457,7 @@ mod tests {
             None,
         ));
         let budget = 150;
-        let chosen = select(&input, budget, 4, now());
+        let chosen = select(&input, budget, 4, now(), 0.0);
         let pinned_used: u32 = chosen
             .iter()
             .filter(|m| m.category == MemoryCategory::Convention)
