@@ -1594,6 +1594,176 @@ impl App {
     /// startup (`App::mcp_status`, set via `set_mcp_status`) rather than
     /// reconnecting live - see the "Open Decisions" note in
     /// ergonomy-improvment.md about deferring live reconnect-on-open.
+    /// Add a note from Crustly itself to the chat, as a system message.
+    fn push_memory_note(&mut self, content: String) {
+        self.messages.push(DisplayMessage {
+            id: Uuid::new_v4(),
+            role: "system".to_string(),
+            content,
+            thinking_text: None,
+            thinking_expanded: false,
+            timestamp: chrono::Utc::now(),
+            token_count: None,
+            cost: None,
+            provider_name: None,
+            perf_metrics: None,
+            tokens_per_second: None,
+        });
+    }
+
+    /// `/remember [--global] <text>`: save a memory now, without the model.
+    async fn remember_command(&mut self, args: &str) {
+        use crate::memory::model::{
+            MemoryCategory, MemoryScope, MemorySource, NewMemory, SaveOutcome,
+        };
+        let (global, text) = match args.strip_prefix("--global") {
+            Some(rest) => (true, rest.trim()),
+            None => (false, args),
+        };
+        if text.is_empty() {
+            self.push_memory_note("Usage: /remember [--global] <text to remember>".to_string());
+            return;
+        }
+        let Some(store) = self.memory.clone() else {
+            self.push_memory_note(
+                "Long-term memory is off ([memory] long_term in the config).".to_string(),
+            );
+            return;
+        };
+        let project = crate::memory::project::identify(&self.working_directory);
+        if let Err(err) = store.register_project(&project).await {
+            self.push_memory_note(format!("Could not record this project: {err}"));
+            return;
+        }
+        let scope = if global {
+            MemoryScope::Global
+        } else {
+            MemoryScope::Project(project.id.clone())
+        };
+        let category = if global {
+            MemoryCategory::Preference
+        } else {
+            MemoryCategory::Fact
+        };
+        let outcome = store
+            .save(NewMemory {
+                content: text.to_string(),
+                scope,
+                category,
+                source: MemorySource::User,
+                importance: 4,
+                replaces: None,
+                session_id: None,
+                expires_at: None,
+            })
+            .await;
+        match outcome {
+            Ok(SaveOutcome::Created(_)) => self.announce_memory_saves(),
+            Ok(SaveOutcome::Duplicate(_)) => {
+                self.push_memory_note("That is already remembered.".to_string())
+            }
+            Ok(SaveOutcome::Rejected(reason)) => {
+                self.push_memory_note(format!("Not saved: {reason}"))
+            }
+            Err(err) => self.push_memory_note(format!("Could not save: {err}")),
+        }
+    }
+
+    /// `/forget <id> [--yes]`: show the memory, then delete it once confirmed.
+    /// The chat has no modal prompt, so the confirmation is typing `--yes`.
+    async fn forget_command(&mut self, args: &str) {
+        let mut parts = args.split_whitespace();
+        let Some(prefix) = parts.next() else {
+            self.push_memory_note("Usage: /forget <id> [--yes]".to_string());
+            return;
+        };
+        let confirmed = parts.any(|p| p == "--yes");
+        let Some(store) = self.memory.clone() else {
+            self.push_memory_note(
+                "Long-term memory is off ([memory] long_term in the config).".to_string(),
+            );
+            return;
+        };
+        let matches = match store.find(prefix).await {
+            Ok(matches) => matches,
+            Err(err) => {
+                self.push_memory_note(format!("Lookup failed: {err}"));
+                return;
+            }
+        };
+        let [memory] = matches.as_slice() else {
+            self.push_memory_note(if matches.is_empty() {
+                format!("No memory with id {prefix}.")
+            } else {
+                format!(
+                    "The id {prefix} matches {} memories; use a longer prefix.",
+                    matches.len()
+                )
+            });
+            return;
+        };
+        let short = &memory.id.simple().to_string()[..8];
+        if !confirmed {
+            self.push_memory_note(format!(
+                "Forget [m:{short}] \"{}\"? Type /forget {short} --yes to delete it for good.",
+                memory.content
+            ));
+            return;
+        }
+        let content = memory.content.clone();
+        match store.forget(memory.id, "user").await {
+            Ok(()) => self.push_memory_note(format!("Forgot [m:{short}] \"{content}\".")),
+            Err(err) => self.push_memory_note(format!("Could not forget: {err}")),
+        }
+    }
+
+    /// `/memory`: the memories of this project and the global ones.
+    async fn memory_command(&mut self) {
+        let Some(store) = self.memory.clone() else {
+            self.push_memory_note(
+                "Long-term memory is off ([memory] long_term in the config).".to_string(),
+            );
+            return;
+        };
+        let project = crate::memory::project::identify(&self.working_directory);
+        let memories = match store.list(&project, false).await {
+            Ok(memories) => memories,
+            Err(err) => {
+                self.push_memory_note(format!("Could not read memory: {err}"));
+                return;
+            }
+        };
+        if memories.is_empty() {
+            self.push_memory_note("No memories yet. Use /remember <text> to add one.".to_string());
+            return;
+        }
+        const SHOWN: usize = 30;
+        let mut lines = vec![format!(
+            "Memories for {} and global ({})",
+            project.name,
+            memories.len()
+        )];
+        for memory in memories.iter().take(SHOWN) {
+            let scope = match memory.scope {
+                crate::memory::model::MemoryScope::Global => "global",
+                crate::memory::model::MemoryScope::Project(_) => "project",
+            };
+            lines.push(format!(
+                "- [{} · {scope} · m:{}] {}",
+                memory.category.as_str(),
+                &memory.id.simple().to_string()[..8],
+                memory.content
+            ));
+        }
+        if memories.len() > SHOWN {
+            lines.push(format!(
+                "…and {} more: crustly memory list",
+                memories.len() - SHOWN
+            ));
+        }
+        self.push_memory_note(lines.join("\n"));
+    }
+
     async fn open_mcp(&mut self) -> Result<()> {
         self.mcp_selected = 0;
         self.switch_mode(AppMode::Mcp).await
@@ -1628,6 +1798,20 @@ impl App {
         match command {
             "/skills" => {
                 self.open_skills().await?;
+                Ok(true)
+            }
+            "/remember" => {
+                let args = trimmed["/remember".len()..].trim();
+                self.remember_command(args).await;
+                Ok(true)
+            }
+            "/forget" => {
+                let args = trimmed["/forget".len()..].trim();
+                self.forget_command(args).await;
+                Ok(true)
+            }
+            "/memory" => {
+                self.memory_command().await;
                 Ok(true)
             }
             "/mcp" => {
@@ -5523,5 +5707,110 @@ mod tests {
             messages_before + 1,
             "session B has nothing in flight, so its own submission must go through"
         );
+    }
+
+    /// A test app with a memory store on its own database, and a working
+    /// directory that is a plain project of its own.
+    async fn memory_test_app(
+        dir: &std::path::Path,
+    ) -> (App, std::sync::Arc<crate::memory::MemoryStore>) {
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.working_directory = dir.to_path_buf();
+        let db = Database::connect_in_memory().await.expect("in-memory db");
+        db.run_migrations().await.expect("run migrations");
+        let store = std::sync::Arc::new(crate::memory::MemoryStore::new(
+            db.pool().clone(),
+            crate::config::MemoryConfig::default(),
+        ));
+        app.set_memory(Some(store.clone()));
+        (app, store)
+    }
+
+    fn last_note(app: &App) -> String {
+        app.messages
+            .last()
+            .map(|m| m.content.clone())
+            .unwrap_or_default()
+    }
+
+    #[tokio::test]
+    async fn remember_saves_a_project_memory_and_global_with_the_flag() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, store) = memory_test_app(dir.path()).await;
+
+        assert!(app
+            .try_handle_slash_command("/remember Uses PostgreSQL")
+            .await
+            .unwrap());
+        let project = crate::memory::project::identify(dir.path());
+        assert_eq!(store.list(&project, false).await.unwrap().len(), 1);
+
+        assert!(app
+            .try_handle_slash_command("/remember --global Prefers short answers")
+            .await
+            .unwrap());
+        assert_eq!(store.list(&project, false).await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn remember_without_text_shows_usage_and_saves_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, store) = memory_test_app(dir.path()).await;
+        assert!(app.try_handle_slash_command("/remember").await.unwrap());
+        assert!(last_note(&app).starts_with("Usage: /remember"));
+        let project = crate::memory::project::identify(dir.path());
+        assert!(store.list(&project, false).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn forget_asks_first_and_deletes_only_with_yes() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, store) = memory_test_app(dir.path()).await;
+        app.try_handle_slash_command("/remember Uses Redis")
+            .await
+            .unwrap();
+        let project = crate::memory::project::identify(dir.path());
+        let memory = store.list(&project, false).await.unwrap().remove(0);
+        let short = memory.id.simple().to_string()[..8].to_string();
+
+        app.try_handle_slash_command(&format!("/forget {short}"))
+            .await
+            .unwrap();
+        assert!(last_note(&app).contains("--yes"), "{}", last_note(&app));
+        assert!(
+            store.get(memory.id).await.unwrap().is_some(),
+            "no deletion without --yes"
+        );
+
+        app.try_handle_slash_command(&format!("/forget {short} --yes"))
+            .await
+            .unwrap();
+        assert!(store.get(memory.id).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn memory_lists_the_project_and_global_memories() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, _store) = memory_test_app(dir.path()).await;
+        app.try_handle_slash_command("/remember Uses Redis")
+            .await
+            .unwrap();
+        app.try_handle_slash_command("/memory").await.unwrap();
+        assert!(
+            last_note(&app).contains("Uses Redis"),
+            "{}",
+            last_note(&app)
+        );
+    }
+
+    #[tokio::test]
+    async fn memory_commands_say_so_when_memory_is_off() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.working_directory = dir.path().to_path_buf();
+        app.try_handle_slash_command("/memory").await.unwrap();
+        assert!(last_note(&app).contains("Long-term memory is off"));
     }
 }
