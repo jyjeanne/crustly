@@ -214,6 +214,11 @@ impl MemoryStore {
         Ok(recall::render_block(&selected, &recent))
     }
 
+    /// Memories whose id starts with `prefix`, for the short ids shown to users.
+    pub async fn find(&self, prefix: &str) -> Result<Vec<Memory>> {
+        self.repo.find_by_prefix(prefix).await
+    }
+
     /// Notices of saves since the last call, for the user to see.
     pub fn take_notices(&self) -> Vec<String> {
         match self.notices.lock() {
