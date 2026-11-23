@@ -8,6 +8,7 @@
 //! them and carry on, so memory never fails a request.
 
 pub mod embed;
+pub mod extract;
 pub mod model;
 pub mod project;
 pub mod recall;
