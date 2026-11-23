@@ -214,6 +214,52 @@ fn first_line(text: &str, max_chars: usize) -> String {
     short
 }
 
+/// The last `entries` entries of the progress log in `dir`, one line each
+/// (`date: request. Result: ...`), oldest first, within `max_tokens`. When
+/// they do not all fit, the oldest are dropped first. Feeds the "Recent work"
+/// section of the recall block (docs/improve-memory.md §9.3).
+pub fn recent_work(dir: &Path, entries: usize, max_tokens: u32) -> Vec<String> {
+    let Ok(log) = std::fs::read_to_string(dir.join(PROGRESS_FILE)) else {
+        return Vec::new();
+    };
+    // Each entry starts with "## <date> - <request>" and has a "- Result:" line.
+    let mut parsed: Vec<(String, String, String)> = Vec::new();
+    let mut header: Option<String> = None;
+    for line in log.lines() {
+        if let Some(rest) = line.strip_prefix("## ") {
+            header = Some(rest.to_string());
+        } else if let Some(result) = line.strip_prefix("- Result: ") {
+            if let Some(h) = header.take() {
+                let (date, request) = h.split_once(" - ").unwrap_or(("", h.as_str()));
+                parsed.push((
+                    date.to_string(),
+                    request.trim_end_matches('.').to_string(),
+                    result.to_string(),
+                ));
+            }
+        }
+    }
+
+    let start = parsed.len().saturating_sub(entries);
+    let mut kept: Vec<String> = Vec::new();
+    let mut used = 0u32;
+    for (date, request, result) in parsed[start..].iter().rev() {
+        let line = if date.is_empty() {
+            format!("{request}. Result: {result}")
+        } else {
+            format!("{date}: {request}. Result: {result}")
+        };
+        let cost = token_count(&line);
+        if used + cost > max_tokens {
+            break;
+        }
+        used += cost;
+        kept.push(line);
+    }
+    kept.reverse();
+    kept
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,5 +377,58 @@ mod tests {
         assert!(log.contains("request 199"));
         assert!(!log.contains("request 0\n") && !log.contains(" - request 0 "));
         assert!(!log.contains("second line"), "only the first line is kept");
+    }
+
+    fn log_entry(dir: &Path, request: &str, result: &str) {
+        append_progress(
+            dir,
+            &ProgressEntry {
+                request,
+                tools: "edit_file src/lib.rs",
+                result,
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn recent_work_gives_the_last_entries_oldest_first() {
+        let dir = tempfile::tempdir().unwrap();
+        for i in 1..=5 {
+            log_entry(dir.path(), &format!("Task {i}"), &format!("Done {i}"));
+        }
+        let lines = recent_work(dir.path(), 3, 150);
+        assert_eq!(lines.len(), 3);
+        assert!(
+            lines[0].contains("Task 3"),
+            "oldest of the last three first: {lines:?}"
+        );
+        assert!(lines[2].contains("Task 5"));
+        assert!(lines[2].ends_with("Result: Done 5"));
+    }
+
+    #[test]
+    fn recent_work_is_empty_without_a_log() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(recent_work(dir.path(), 3, 150).is_empty());
+    }
+
+    #[test]
+    fn recent_work_drops_the_oldest_entries_first_past_the_cap() {
+        let dir = tempfile::tempdir().unwrap();
+        for i in 1..=3 {
+            log_entry(
+                dir.path(),
+                &format!("Request number {i} with some extra words"),
+                "ok",
+            );
+        }
+        let one_line = token_count(&recent_work(dir.path(), 1, 10_000)[0]);
+        let lines = recent_work(dir.path(), 3, one_line * 2 + 2);
+        assert!(lines.len() < 3, "the cap must drop something: {lines:?}");
+        assert!(
+            lines.last().unwrap().contains("number 3"),
+            "the newest is kept"
+        );
     }
 }
