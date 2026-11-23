@@ -1005,7 +1005,10 @@ fn build_tool_registry(
     tool_registry.register(Arc::new(ContextTool));
     if let Some(store) = memory.clone() {
         tool_registry.register(Arc::new(
-            crate::llm::tools::search_memory::SearchMemoryTool::new(store),
+            crate::llm::tools::search_memory::SearchMemoryTool::new(store.clone()),
+        ));
+        tool_registry.register(Arc::new(
+            crate::llm::tools::forget_memory::ForgetMemoryTool::new(store.clone()),
         ));
     }
     tool_registry.register(Arc::new(SaveMemoryTool::new(memory)));
@@ -1108,6 +1111,7 @@ fn build_approval_callback(
                 tool_name: tool_info.tool_name,
                 tool_description: tool_info.tool_description,
                 tool_input: tool_info.tool_input,
+                preview: tool_info.preview,
                 capabilities: tool_info.capabilities,
                 response_tx,
                 requested_at: std::time::Instant::now(),

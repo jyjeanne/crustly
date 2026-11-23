@@ -141,6 +141,9 @@ pub struct ToolApprovalRequest {
     /// Tool capabilities
     pub capabilities: Vec<String>,
 
+    /// What the call will do, when the tool can say.
+    pub preview: Option<String>,
+
     /// Channel to send response back
     pub response_tx: mpsc::UnboundedSender<ToolApprovalResponse>,
 

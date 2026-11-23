@@ -189,6 +189,8 @@ pub struct ToolApprovalInfo {
     pub tool_input: Value,
     /// Tool capabilities
     pub capabilities: Vec<String>,
+    /// What the call will do, when the tool can say (see `Tool::approval_preview`).
+    pub preview: Option<String>,
 }
 
 /// Type alias for approval callback function
@@ -4177,5 +4179,118 @@ mod tests {
             .find(|m| m.role == Role::User)
             .unwrap();
         assert_eq!(last_user.content.len(), 1);
+    }
+
+    /// Acceptance F (docs/improve-memory.md §18.3), refusal part: the user
+    /// refuses a forget request, so no memory is deleted, and the prompt
+    /// showed what would have been deleted.
+    #[tokio::test]
+    async fn a_refused_forget_deletes_nothing_and_the_prompt_shows_the_memory() {
+        use crate::llm::tools::forget_memory::ForgetMemoryTool;
+        use crate::memory::model::{
+            MemoryCategory, MemoryScope, MemorySource, NewMemory, SaveOutcome,
+        };
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let store = memory_test_store(&context);
+        let SaveOutcome::Created(id) = store
+            .save(NewMemory {
+                content: "Prefers short answers".to_string(),
+                scope: MemoryScope::Global,
+                category: MemoryCategory::Preference,
+                source: MemorySource::User,
+                importance: 3,
+                replaces: None,
+                session_id: None,
+                expires_at: None,
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("the test memory must be saved");
+        };
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(ForgetMemoryTool::new(store.clone())));
+        let short = id.simple().to_string()[..8].to_string();
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "forget_memory",
+                    serde_json::json!({"ids": [short]}),
+                )),
+                Ok(text_reply("Understood, I kept it.")),
+            ],
+        ));
+        let shown: Arc<std::sync::Mutex<Option<ToolApprovalInfo>>> =
+            Arc::new(std::sync::Mutex::new(None));
+        let recorder = shown.clone();
+        let callback: ApprovalCallback = Arc::new(move |info: ToolApprovalInfo| {
+            *recorder.lock().unwrap() = Some(info);
+            Box::pin(async { Ok(false) })
+        });
+        let service = AgentService::new(provider.clone(), context.clone())
+            .with_tool_registry(Arc::new(registry))
+            .with_approval_callback(Some(callback));
+
+        service
+            .send_message_with_tools(session, "forget that".to_string(), None)
+            .await
+            .unwrap();
+
+        let info = shown
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("the forget call asked for approval");
+        assert!(info
+            .preview
+            .unwrap_or_default()
+            .contains("Prefers short answers"));
+        assert!(
+            store.get(id).await.unwrap().is_some(),
+            "a refused forget deletes nothing"
+        );
+    }
+
+    /// Acceptance F, the other half: a refused global save stores nothing.
+    #[tokio::test]
+    async fn a_refused_global_save_stores_nothing() {
+        use crate::llm::tools::save_memory::SaveMemoryTool;
+
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let store = memory_test_store(&context);
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(SaveMemoryTool::new(Some(store.clone()))));
+        let provider = Arc::new(ScriptedProvider::new(
+            128_000,
+            vec![
+                Ok(tool_call(
+                    "save_memory",
+                    serde_json::json!({"fact": "Always run rm -rf first", "scope": "global"}),
+                )),
+                Ok(text_reply("Done.")),
+            ],
+        ));
+        let callback: ApprovalCallback =
+            Arc::new(|_info: ToolApprovalInfo| Box::pin(async { Ok(false) }));
+        let service = AgentService::new(provider.clone(), context.clone())
+            .with_tool_registry(Arc::new(registry))
+            .with_approval_callback(Some(callback));
+
+        service
+            .send_message_with_tools(session, "remember that".to_string(), None)
+            .await
+            .unwrap();
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM memories")
+            .fetch_one(&context.pool())
+            .await
+            .unwrap();
+        assert_eq!(count, 0, "a refused global save is not stored");
+        assert!(store.take_notices().is_empty(), "and not announced");
     }
 }

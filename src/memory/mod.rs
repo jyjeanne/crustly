@@ -254,6 +254,16 @@ impl MemoryStore {
             .collect())
     }
 
+    /// One memory by its full id.
+    pub async fn get(&self, id: Uuid) -> Result<Option<Memory>> {
+        self.repo.get(id).await
+    }
+
+    /// Delete a memory for good. `actor` records who asked: "user" or "model".
+    pub async fn forget(&self, id: Uuid, actor: &str) -> Result<()> {
+        self.repo.delete(id, actor, Utc::now()).await
+    }
+
     /// Memories whose id starts with `prefix`, for the short ids shown to users.
     pub async fn find(&self, prefix: &str) -> Result<Vec<Memory>> {
         self.repo.find_by_prefix(prefix).await
