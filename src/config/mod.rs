@@ -130,6 +130,76 @@ pub struct MemoryConfig {
     /// Add a "Recent work" section from the progress log on a session's first request.
     #[serde(default = "default_true")]
     pub recent_work: bool,
+    /// Semantic recall (`[memory.embeddings]`, docs/improve-memory.md §16).
+    #[serde(default)]
+    pub embeddings: MemoryEmbeddingsConfig,
+}
+
+/// `[memory.embeddings]`: where vectors come from, and how they are used.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryEmbeddingsConfig {
+    /// "none" (keyword recall only), "ollama" or "openai-compatible".
+    #[serde(default = "default_embed_provider")]
+    pub provider: String,
+    #[serde(default = "default_embed_model")]
+    pub model: String,
+    #[serde(default = "default_embed_base_url")]
+    pub base_url: String,
+    /// Longest wait for a query embedding before falling back to keywords.
+    #[serde(default = "default_embed_query_timeout_ms")]
+    pub query_timeout_ms: u64,
+    /// Memories embedded per request to the server.
+    #[serde(default = "default_embed_batch_size")]
+    pub batch_size: usize,
+    /// Cosine similarity below which a memory is not relevant. Depends on the
+    /// model; recalibrate when it changes.
+    #[serde(default = "default_embed_min_similarity")]
+    pub min_similarity: f32,
+    /// Task prefix for queries; the built-in one for the model when unset.
+    #[serde(default)]
+    pub query_prefix: Option<String>,
+    /// Task prefix for stored memories; the built-in one for the model when unset.
+    #[serde(default)]
+    pub document_prefix: Option<String>,
+    /// Name of the environment variable holding the API key, for
+    /// openai-compatible servers that need one.
+    #[serde(default)]
+    pub api_key_env: Option<String>,
+}
+
+impl Default for MemoryEmbeddingsConfig {
+    fn default() -> Self {
+        Self {
+            provider: default_embed_provider(),
+            model: default_embed_model(),
+            base_url: default_embed_base_url(),
+            query_timeout_ms: default_embed_query_timeout_ms(),
+            batch_size: default_embed_batch_size(),
+            min_similarity: default_embed_min_similarity(),
+            query_prefix: None,
+            document_prefix: None,
+            api_key_env: None,
+        }
+    }
+}
+
+fn default_embed_provider() -> String {
+    "none".to_string()
+}
+fn default_embed_model() -> String {
+    "nomic-embed-text".to_string()
+}
+fn default_embed_base_url() -> String {
+    "http://localhost:11434".to_string()
+}
+fn default_embed_query_timeout_ms() -> u64 {
+    1500
+}
+fn default_embed_batch_size() -> usize {
+    16
+}
+fn default_embed_min_similarity() -> f32 {
+    0.35
 }
 
 impl Default for MemoryConfig {
@@ -144,6 +214,7 @@ impl Default for MemoryConfig {
             recall_max_tokens: default_recall_max_tokens(),
             pinned_min_importance: default_pinned_min_importance(),
             recent_work: true,
+            embeddings: MemoryEmbeddingsConfig::default(),
         }
     }
 }
@@ -167,6 +238,36 @@ impl MemoryConfig {
                 default_recall_max_tokens()
             );
             self.recall_max_tokens = default_recall_max_tokens();
+        }
+        let e = &mut self.embeddings;
+        if !matches!(e.provider.as_str(), "none" | "ollama" | "openai-compatible") {
+            tracing::warn!(
+                "memory.embeddings.provider {:?} is unknown; semantic recall is off",
+                e.provider
+            );
+            e.provider = default_embed_provider();
+        }
+        if !(0.0..1.0).contains(&e.min_similarity) {
+            tracing::warn!(
+                "memory.embeddings.min_similarity {} is outside 0-1; using {}",
+                e.min_similarity,
+                default_embed_min_similarity()
+            );
+            e.min_similarity = default_embed_min_similarity();
+        }
+        if !(1..=256).contains(&e.batch_size) {
+            tracing::warn!(
+                "memory.embeddings.batch_size {} is outside 1-256; using 16",
+                e.batch_size
+            );
+            e.batch_size = default_embed_batch_size();
+        }
+        if !(1..=60_000).contains(&e.query_timeout_ms) {
+            tracing::warn!(
+                "memory.embeddings.query_timeout_ms {} is outside 1-60000; using 1500",
+                e.query_timeout_ms
+            );
+            e.query_timeout_ms = default_embed_query_timeout_ms();
         }
         self
     }
