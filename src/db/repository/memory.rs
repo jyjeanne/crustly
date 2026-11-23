@@ -195,6 +195,80 @@ impl MemoryRepository {
         rows.iter().map(row_to_memory).collect()
     }
 
+    /// Every memory of `project_id` and the global ones, newest first. With
+    /// `include_inactive` false, only active memories are returned.
+    pub async fn list_for_project(
+        &self,
+        project_id: &ProjectId,
+        include_inactive: bool,
+    ) -> Result<Vec<Memory>> {
+        let status_filter = if include_inactive {
+            ""
+        } else {
+            "AND status = 'active'"
+        };
+        let rows = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories \
+             WHERE (scope = 'global' OR project_id = ?) {status_filter} \
+             ORDER BY updated_at DESC"
+        ))
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(row_to_memory).collect()
+    }
+
+    /// Every memory in the database, in any scope and status, for export.
+    pub async fn list_all(&self) -> Result<Vec<Memory>> {
+        let rows = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories ORDER BY created_at"
+        ))
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(row_to_memory).collect()
+    }
+
+    /// Events recorded for a memory, oldest first: (event, actor, time).
+    pub async fn events(&self, id: Uuid) -> Result<Vec<(String, String, DateTime<Utc>)>> {
+        let rows = sqlx::query(
+            "SELECT event, actor, created_at FROM memory_events WHERE memory_id = ? \
+             ORDER BY id",
+        )
+        .bind(id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter()
+            .map(|row| {
+                Ok((
+                    row.try_get::<String, _>("event")?,
+                    row.try_get::<String, _>("actor")?,
+                    timestamp(row.try_get("created_at")?),
+                ))
+            })
+            .collect()
+    }
+
+    /// Known projects with their root path and number of active memories.
+    pub async fn projects(&self) -> Result<Vec<(ProjectId, String, String, i64)>> {
+        let rows = sqlx::query(
+            "SELECT p.id, p.root_path, p.name, \
+             (SELECT COUNT(*) FROM memories m WHERE m.project_id = p.id AND m.status = 'active') AS n \
+             FROM memory_projects p ORDER BY p.name",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter()
+            .map(|row| {
+                Ok((
+                    row.try_get("id")?,
+                    row.try_get("root_path")?,
+                    row.try_get("name")?,
+                    row.try_get("n")?,
+                ))
+            })
+            .collect()
+    }
+
     /// Record that these memories were put into a request.
     pub async fn record_recall(&self, ids: &[Uuid], now: DateTime<Utc>) -> Result<()> {
         let mut tx = self.pool.begin().await?;

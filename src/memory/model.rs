@@ -213,6 +213,8 @@ pub enum RejectReason {
     ScopeMismatch,
     /// The memory was saved by the user; only the user may change it.
     SavedByUser,
+    /// The same text is already remembered in this scope.
+    Duplicate,
     NotFound,
     ReadOnly,
 }
@@ -232,6 +234,7 @@ impl fmt::Display for RejectReason {
                 "not saved: the text looks like a secret ({rule}). Never store credentials"
             ),
             Self::ScopeMismatch => write!(f, "the replaced memory is in a different scope"),
+            Self::Duplicate => write!(f, "that is already remembered"),
             Self::SavedByUser => write!(
                 f,
                 "that memory was saved by the user; only the user can change it"
