@@ -42,6 +42,11 @@ impl MemoryRepository {
         Self { pool }
     }
 
+    /// A handle to the same database, for background work.
+    pub fn pool(&self) -> SqlitePool {
+        self.pool.clone()
+    }
+
     // ── P1.8: writes ─────────────────────────────────────────────────────
 
     /// Record the project, or refresh its name, path and remote.

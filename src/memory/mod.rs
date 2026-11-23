@@ -12,6 +12,7 @@ pub mod model;
 pub mod project;
 pub mod recall;
 pub mod secret_scan;
+pub mod semantic;
 pub mod transfer;
 pub mod vector;
 pub mod vector_index;
@@ -20,7 +21,7 @@ use crate::config::MemoryConfig;
 use crate::db::repository::memory::InsertMemory;
 use crate::db::repository::MemoryRepository;
 use anyhow::Result;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use model::{
     content_hash, normalize, validate, Memory, MemoryCategory, MemoryScope, MemorySource,
     MemoryStatus, NewMemory, ProjectId, RejectReason, SaveOutcome,
@@ -28,8 +29,10 @@ use model::{
 use project::ProjectIdentity;
 use recall::Ranked;
 use sqlx::SqlitePool;
+use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use uuid::Uuid;
 
 /// Importance used when a save gives none, or an out-of-range one.
@@ -71,6 +74,14 @@ pub struct MemoryStore {
     config: MemoryConfig,
     /// Notices about saves, drained by [`MemoryStore::take_notices`].
     notices: Mutex<Vec<String>>,
+    /// Semantic search, when an embedder is configured (see `with_embedder`).
+    embed: Option<semantic::EmbedHandle>,
+    /// Bumped on every change to memories or vectors; cached indexes older
+    /// than this are rebuilt.
+    generation: Arc<std::sync::atomic::AtomicU64>,
+    index_cache: std::sync::Mutex<Option<semantic::CachedIndex>>,
+    /// Set once a failed query embedding has been logged, so it is not repeated.
+    query_warned: std::sync::atomic::AtomicBool,
 }
 
 impl MemoryStore {
@@ -79,7 +90,100 @@ impl MemoryStore {
             repo: MemoryRepository::new(pool),
             config: config.sanitized(),
             notices: Mutex::new(Vec::new()),
+            embed: None,
+            generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            index_cache: std::sync::Mutex::new(None),
+            query_warned: std::sync::atomic::AtomicBool::new(false),
         }
+    }
+
+    /// Turn on semantic recall with `embedder`, and start the background
+    /// worker that embeds memories as they are saved. Needs a running Tokio
+    /// runtime, since the worker is spawned here.
+    pub fn with_embedder(
+        self,
+        embedder: Arc<dyn embed::Embedder>,
+        runtime: semantic::EmbedRuntime,
+    ) -> Self {
+        self.attach_embedder(embedder, runtime, true)
+    }
+
+    /// Attach an embedder. With `background` false no worker is started, so
+    /// queued saves are not embedded; one-shot commands use this, and embed
+    /// through `reindex` only when asked.
+    pub fn attach_embedder(
+        mut self,
+        embedder: Arc<dyn embed::Embedder>,
+        runtime: semantic::EmbedRuntime,
+        background: bool,
+    ) -> Self {
+        let (queue_tx, queue_rx) = semantic::queue();
+        if background {
+            semantic::spawn_worker(
+                MemoryRepository::new(self.repo.pool()),
+                embedder.clone(),
+                runtime.clone(),
+                self.generation.clone(),
+                queue_rx,
+            );
+        }
+        self.embed = Some(semantic::EmbedHandle {
+            embedder,
+            queue: queue_tx,
+            runtime,
+        });
+        self
+    }
+
+    /// Mark cached indexes stale after a change to memories or vectors.
+    fn changed(&self) {
+        self.generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Embed every memory that lacks a vector, and optionally delete vectors
+    /// of other models. Returns (embedded, pruned). Errors if no embedder is
+    /// configured or the server cannot be reached.
+    pub async fn reindex(&self, prune: bool) -> Result<(usize, u64)> {
+        let Some(handle) = self.embed.as_ref() else {
+            anyhow::bail!("no embedding model is configured ([memory.embeddings] provider)");
+        };
+        let embedded = semantic::backfill(
+            &self.repo,
+            handle.embedder.as_ref(),
+            &handle.runtime,
+            &self.generation,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let pruned = if prune {
+            let n = self
+                .repo
+                .prune_embeddings_except(handle.embedder.model_id())
+                .await?;
+            self.changed();
+            n
+        } else {
+            0
+        };
+        Ok((embedded, pruned))
+    }
+
+    /// Embedding status for `memory status`: (model, memories with a vector,
+    /// active memories). `None` when no embedder is configured.
+    pub async fn embedding_status(&self) -> Result<Option<(String, i64, i64)>> {
+        let Some(handle) = self.embed.as_ref() else {
+            return Ok(None);
+        };
+        let (indexed, active) = self
+            .repo
+            .embedding_counts(handle.embedder.model_id())
+            .await?;
+        Ok(Some((
+            handle.embedder.model_id().to_string(),
+            indexed,
+            active,
+        )))
     }
 
     /// Record the project before its memories are used.
@@ -159,6 +263,11 @@ impl MemoryStore {
         if let Some(old) = replaced {
             self.repo.supersede(old.id, id, actor, now).await?;
         }
+        self.changed();
+        if let Some(handle) = &self.embed {
+            // A full queue drops the id; the backfill embeds it later.
+            let _ = handle.queue.try_send(id);
+        }
         self.notify(&new.scope, new.category.as_str(), id, &content);
         Ok(SaveOutcome::Created(id))
     }
@@ -172,6 +281,74 @@ impl MemoryStore {
                 tracing::warn!("memory recall skipped: {err:#}");
                 None
             }
+        }
+    }
+
+    /// Semantic scores for a request. `None` when semantic search is off, when
+    /// the index is empty, or when the query embedding fails or is too slow:
+    /// keyword recall then carries on alone.
+    async fn semantic_scores(
+        &self,
+        project: &ProjectId,
+        message: &str,
+        now: DateTime<Utc>,
+    ) -> Option<semantic::SemanticHits> {
+        let handle = self.embed.as_ref()?;
+        let runtime = &handle.runtime;
+        let index = match semantic::current_index(
+            &self.index_cache,
+            &self.generation,
+            &self.repo,
+            project,
+            handle.embedder.model_id(),
+            now,
+        )
+        .await
+        {
+            Ok(index) => index,
+            Err(err) => {
+                tracing::warn!("memory index unavailable: {err:#}");
+                return None;
+            }
+        };
+        if index.is_empty() {
+            return None;
+        }
+        let query = match tokio::time::timeout(
+            runtime.query_timeout,
+            handle
+                .embedder
+                .embed(embed::EmbedPurpose::Query, &[message.to_string()]),
+        )
+        .await
+        {
+            Ok(Ok(mut vectors)) if !vectors.is_empty() => vectors.remove(0),
+            Ok(Err(err)) => {
+                self.warn_query_once(&err.to_string());
+                return None;
+            }
+            Err(_) => {
+                self.warn_query_once("the query took too long");
+                return None;
+            }
+            Ok(_) => return None,
+        };
+        let min = runtime.min_similarity;
+        let scores = index
+            .search(&query, semantic::SEMANTIC_CANDIDATES, min)
+            .into_iter()
+            .map(|(id, cosine)| (id, semantic::normalise(cosine, min)))
+            .collect();
+        Some(semantic::SemanticHits { scores, index })
+    }
+
+    /// Log a failed query embedding once per session, not on every request.
+    fn warn_query_once(&self, reason: &str) {
+        if !self
+            .query_warned
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            tracing::warn!("semantic recall is off for this request: {reason}");
         }
     }
 
@@ -195,6 +372,15 @@ impl MemoryStore {
                 }
                 None => Vec::new(),
             };
+        // Semantic scores, when an embedder is configured and answers in time.
+        // Without them, recall is keyword-only, as in Phase 1.
+        let semantic = self
+            .semantic_scores(&project_id, request.message, now)
+            .await;
+        let (similarities, index) = match &semantic {
+            Some(hits) => (hits.scores.clone(), Some(hits.index.clone())),
+            None => (HashMap::new(), None),
+        };
         let ranked: Vec<Ranked> = candidates
             .into_iter()
             .map(|memory| {
@@ -202,11 +388,22 @@ impl MemoryStore {
                     .iter()
                     .find(|(hit, _)| hit.id == memory.id)
                     .map(|(_, bm25)| *bm25);
-                Ranked { memory, keyword }
+                let similarity = similarities.get(&memory.id).copied();
+                Ranked {
+                    memory,
+                    keyword,
+                    similarity,
+                }
             })
             .collect();
 
-        let selected = recall::select(&ranked, budget, self.config.pinned_min_importance, now);
+        // The search already applied the similarity threshold, so the floor
+        // here is zero: any memory with a score is relevant.
+        let mut selected =
+            recall::select(&ranked, budget, self.config.pinned_min_importance, now, 0.0);
+        if let Some(index) = &index {
+            selected = semantic::drop_near_duplicates(selected, index);
+        }
         if !selected.is_empty() {
             let ids: Vec<Uuid> = selected.iter().map(|m| m.id).collect();
             if let Err(err) = self.repo.record_recall(&ids, now).await {
@@ -265,7 +462,9 @@ impl MemoryStore {
 
     /// Delete a memory for good. `actor` records who asked: "user" or "model".
     pub async fn forget(&self, id: Uuid, actor: &str) -> Result<()> {
-        self.repo.delete(id, actor, Utc::now()).await
+        let result = self.repo.delete(id, actor, Utc::now()).await;
+        self.changed();
+        result
     }
 
     /// The project's memories and the global ones, for `crustly memory list`.
@@ -321,6 +520,7 @@ impl MemoryStore {
         self.repo
             .update_content(id, &content, &hash, actor, Utc::now())
             .await?;
+        self.changed();
         Ok(Ok(()))
     }
 
@@ -343,6 +543,7 @@ impl MemoryStore {
             return Ok(Err(RejectReason::Duplicate));
         }
         self.repo.promote(id, "user", Utc::now()).await?;
+        self.changed();
         Ok(Ok(()))
     }
 
@@ -350,7 +551,9 @@ impl MemoryStore {
     /// number moved.
     pub async fn relink(&self, old_id: &ProjectId, project: &ProjectIdentity) -> Result<u64> {
         self.repo.upsert_project(project, Utc::now()).await?;
-        self.repo.relink_project(old_id, &project.id).await
+        let moved = self.repo.relink_project(old_id, &project.id).await?;
+        self.changed();
+        Ok(moved)
     }
 
     /// Memories whose id starts with `prefix`, for the short ids shown to users.
@@ -379,6 +582,48 @@ impl MemoryStore {
         if let Ok(mut notices) = self.notices.lock() {
             notices.push(line);
         }
+    }
+}
+
+/// An embedder with the runtime that uses it.
+pub type EmbedderParts = (Arc<dyn embed::Embedder>, semantic::EmbedRuntime);
+
+/// The embedder and runtime that `[memory.embeddings]` asks for, or `None`
+/// when semantic recall is off. An error names the setting that is wrong.
+pub fn embedder_from_config(
+    config: &crate::config::MemoryEmbeddingsConfig,
+) -> Result<Option<EmbedderParts>, embed::EmbedError> {
+    let runtime = semantic::EmbedRuntime {
+        query_timeout: Duration::from_millis(config.query_timeout_ms),
+        batch_size: config.batch_size,
+        min_similarity: config.min_similarity,
+        retry_delays: semantic::EmbedRuntime::default().retry_delays,
+    };
+    let settings = embed::EmbedSettings {
+        base_url: config.base_url.clone(),
+        model: config.model.clone(),
+        prefixes: embed::Prefixes::for_model(
+            &config.model,
+            config.query_prefix.as_deref(),
+            config.document_prefix.as_deref(),
+        ),
+        // Document batches may be slow; queries have their own, shorter limit.
+        timeout: Duration::from_secs(30),
+        api_key: config
+            .api_key_env
+            .as_ref()
+            .and_then(|name| std::env::var(name).ok()),
+    };
+    match config.provider.as_str() {
+        "ollama" => Ok(Some((
+            Arc::new(embed::OllamaEmbedder::new(settings)?),
+            runtime,
+        ))),
+        "openai-compatible" => Ok(Some((
+            Arc::new(embed::OpenAiCompatibleEmbedder::new(settings)?),
+            runtime,
+        ))),
+        _ => Ok(None),
     }
 }
 
