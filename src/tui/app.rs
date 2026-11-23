@@ -155,6 +155,8 @@ pub struct App {
     pub model_download_deleting: Option<String>,
     model_download_delete_task: Option<tokio::task::JoinHandle<()>>,
     ollama_host: String,
+    /// Long-term memory, for announcing saves made during a response.
+    memory: Option<std::sync::Arc<crate::memory::MemoryStore>>,
     /// The `[providers.ollama]` config section, applied when the Ctrl+W
     /// switch rebuilds the provider - without it a switched-to model runs
     /// unconfigured (no per-model num_ctx/sampling, no keep_alive).
@@ -408,6 +410,7 @@ impl App {
             model_download_deleting: None,
             model_download_delete_task: None,
             ollama_host: "http://localhost:11434".to_string(),
+            memory: None,
             ollama_config: None,
             provider_switch_models: Vec::new(),
             provider_switch_selected: 0,
@@ -770,6 +773,23 @@ impl App {
         self.ollama_host = host;
     }
 
+    /// The long-term memory store whose saves are announced in the chat.
+    pub fn set_memory(&mut self, store: Option<std::sync::Arc<crate::memory::MemoryStore>>) {
+        self.memory = store;
+    }
+
+    /// Show a notice for each memory saved since the last drain.
+    fn announce_memory_saves(&mut self) {
+        let notices = self
+            .memory
+            .as_ref()
+            .map(|store| store.take_notices())
+            .unwrap_or_default();
+        for notice in notices {
+            self.notify(format!("💾 {notice}"));
+        }
+    }
+
     /// Record the `[providers.ollama]` config so the Ctrl+W provider switch
     /// rebuilds providers with the same settings (per-model num_ctx/sampling,
     /// keep_alive) as the one built at startup.
@@ -929,6 +949,7 @@ impl App {
             TuiEvent::ResponseComplete(session_id, response) => {
                 if self.event_belongs_to_current_session(session_id) {
                     self.complete_response(response).await?;
+                    self.announce_memory_saves();
                 } else {
                     // The request itself has genuinely finished, even
                     // though its result isn't being shown - if we don't
