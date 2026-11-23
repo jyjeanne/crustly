@@ -132,7 +132,13 @@ impl Tool for ForgetMemoryTool {
         })
     }
 
-    async fn execute(&self, input: Value, _context: &ToolExecutionContext) -> Result<ToolResult> {
+    async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult> {
+        // Plan mode changes nothing until the plan is approved (as save_memory).
+        if context.read_only_mode {
+            return Err(ToolError::PermissionDenied(
+                "Cannot forget memories in read-only (plan) mode".to_string(),
+            ));
+        }
         let input: ForgetMemoryInput = serde_json::from_value(input)?;
         let memories = match resolve(&self.store, &input.ids).await {
             Ok(memories) => memories,

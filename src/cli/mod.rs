@@ -1244,9 +1244,14 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                 anyhow::bail!("give memory ids, or one of --project, --global, --all");
             }
             let victims: Vec<crate::memory::model::Memory> = if bulk {
-                store
-                    .list(&project, true)
-                    .await?
+                // --all means every memory in the database, whichever project
+                // it belongs to; the other flags stay within this project.
+                let candidates = if all {
+                    store.all().await?
+                } else {
+                    store.list(&project, true).await?
+                };
+                candidates
                     .into_iter()
                     .filter(|m| {
                         all || (global && matches!(m.scope, MemoryScope::Global))
