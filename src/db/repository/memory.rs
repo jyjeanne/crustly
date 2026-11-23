@@ -144,6 +144,116 @@ impl MemoryRepository {
         Ok(())
     }
 
+    // ── P3: extraction ───────────────────────────────────────────────────
+
+    /// The watermark of a session: (last processed sequence, failed runs).
+    pub async fn extraction_state(&self, session: Uuid) -> Result<Option<(i64, i64)>> {
+        let row = sqlx::query(
+            "SELECT last_message_sequence, failed_attempts FROM memory_extraction_state \
+             WHERE session_id = ?",
+        )
+        .bind(session.to_string())
+        .fetch_optional(&self.pool)
+        .await?;
+        match row {
+            Some(row) => Ok(Some((
+                row.try_get("last_message_sequence")?,
+                row.try_get("failed_attempts")?,
+            ))),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn set_extraction_state(
+        &self,
+        session: Uuid,
+        sequence: i64,
+        failed: i64,
+        now: DateTime<Utc>,
+    ) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO memory_extraction_state \
+             (session_id, last_message_sequence, failed_attempts, updated_at) VALUES (?, ?, ?, ?) \
+             ON CONFLICT(session_id) DO UPDATE SET last_message_sequence = excluded.last_message_sequence, \
+             failed_attempts = excluded.failed_attempts, updated_at = excluded.updated_at",
+        )
+        .bind(session.to_string())
+        .bind(sequence)
+        .bind(failed)
+        .bind(now.timestamp())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// User and assistant messages of a session after `sequence`, in order:
+    /// (sequence, role, text). Tool output is stored apart and not read here.
+    pub async fn turns_after(
+        &self,
+        session: Uuid,
+        sequence: i64,
+    ) -> Result<Vec<(i64, String, String)>> {
+        let rows = sqlx::query(
+            "SELECT sequence, role, content FROM messages \
+             WHERE session_id = ? AND sequence > ? AND role IN ('user', 'assistant') \
+             ORDER BY sequence",
+        )
+        .bind(session.to_string())
+        .bind(sequence)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter()
+            .map(|row| {
+                Ok((
+                    row.try_get("sequence")?,
+                    row.try_get("role")?,
+                    row.try_get("content")?,
+                ))
+            })
+            .collect()
+    }
+
+    /// Move a pending memory to active, recording the approval.
+    pub async fn approve(&self, id: Uuid, now: DateTime<Utc>) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("UPDATE memories SET status = 'active', updated_at = ? WHERE id = ? AND status = 'pending'")
+            .bind(now.timestamp())
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await?;
+        record_event(&mut tx, id, "approved", "user", None, now).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Pending memories of `project_id`, oldest first.
+    pub async fn pending_for(&self, project_id: &ProjectId) -> Result<Vec<Memory>> {
+        let rows = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories \
+             WHERE status = 'pending' AND (scope = 'global' OR project_id = ?) ORDER BY created_at"
+        ))
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(row_to_memory).collect()
+    }
+
+    /// The newest active episodes of a project, oldest first among them.
+    pub async fn episodes_for(&self, project_id: &ProjectId, limit: i64) -> Result<Vec<Memory>> {
+        let rows = sqlx::query(&format!(
+            "SELECT {MEMORY_COLUMNS} FROM memories \
+             WHERE category = 'episode' AND status = 'active' AND project_id = ? \
+             ORDER BY created_at DESC LIMIT ?"
+        ))
+        .bind(project_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut episodes: Vec<Memory> = rows.iter().map(row_to_memory).collect::<Result<_>>()?;
+        episodes.reverse();
+        Ok(episodes)
+    }
+
     pub async fn touch(&self, id: Uuid, now: DateTime<Utc>) -> Result<()> {
         sqlx::query("UPDATE memories SET updated_at = ? WHERE id = ?")
             .bind(now.timestamp())

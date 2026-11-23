@@ -9,6 +9,7 @@
 
 pub mod embed;
 pub mod extract;
+pub mod extraction;
 pub mod model;
 pub mod project;
 pub mod recall;
@@ -83,6 +84,10 @@ pub struct MemoryStore {
     index_cache: std::sync::Mutex<Option<semantic::CachedIndex>>,
     /// Set once a failed query embedding has been logged, so it is not repeated.
     query_warned: std::sync::atomic::AtomicBool,
+    /// Extraction from conversations, when `[memory.extraction]` enables it.
+    extraction: Option<extraction::ExtractionHandle>,
+    /// Sessions with an extraction run in progress.
+    running: Mutex<std::collections::HashSet<Uuid>>,
 }
 
 impl MemoryStore {
@@ -95,6 +100,8 @@ impl MemoryStore {
             generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             index_cache: std::sync::Mutex::new(None),
             query_warned: std::sync::atomic::AtomicBool::new(false),
+            extraction: None,
+            running: Mutex::new(std::collections::HashSet::new()),
         }
     }
 
@@ -197,6 +204,20 @@ impl MemoryStore {
     /// then insert. Rejections are returned, not raised, so the caller can
     /// show the reason to the user or the model.
     pub async fn save(&self, new: NewMemory) -> Result<SaveOutcome> {
+        self.save_with(new, MemoryStatus::Active, false).await
+    }
+
+    /// The save rules of section 8, with the status and evidence the caller
+    /// has. `pending` holds the memory for review (it is not recalled, and its
+    /// `replaces` target is left alone until approval). `user_evidence` means
+    /// the user said it, so it may reinforce a repeat and replace a memory the
+    /// user saved.
+    async fn save_with(
+        &self,
+        new: NewMemory,
+        status: MemoryStatus,
+        user_evidence: bool,
+    ) -> Result<SaveOutcome> {
         let now = Utc::now();
         if let Err(reason) = validate(&new.content) {
             return Ok(SaveOutcome::Rejected(reason));
@@ -209,7 +230,7 @@ impl MemoryStore {
         let actor = actor_for(new.source);
         let hash = content_hash(&content);
         if let Some(existing) = self.repo.find_by_hash(&new.scope, &hash).await? {
-            if new.source == MemorySource::User {
+            if new.source == MemorySource::User || user_evidence {
                 self.repo.reinforce(existing.id, actor, now).await?;
             } else {
                 // A repeat by the model is not evidence of importance (§8 step 4).
@@ -218,7 +239,12 @@ impl MemoryStore {
             return Ok(SaveOutcome::Duplicate(existing.id));
         }
 
-        let replaced = match new.replaces {
+        let replaces = if status == MemoryStatus::Pending {
+            None
+        } else {
+            new.replaces
+        };
+        let replaced = match replaces {
             Some(old_id) => match self.repo.get(old_id).await? {
                 Some(old) if old.status != MemoryStatus::Active => {
                     return Ok(SaveOutcome::Rejected(RejectReason::NotFound))
@@ -227,7 +253,9 @@ impl MemoryStore {
                     return Ok(SaveOutcome::Rejected(RejectReason::ScopeMismatch))
                 }
                 Some(old)
-                    if old.source == MemorySource::User && new.source != MemorySource::User =>
+                    if old.source == MemorySource::User
+                        && new.source != MemorySource::User
+                        && !user_evidence =>
                 {
                     return Ok(SaveOutcome::Rejected(RejectReason::SavedByUser))
                 }
@@ -253,7 +281,7 @@ impl MemoryStore {
                     content_hash: hash,
                     source: new.source,
                     importance,
-                    status: MemoryStatus::Active,
+                    status,
                     session_id: new.session_id,
                     expires_at: new.expires_at,
                     now,
@@ -269,7 +297,9 @@ impl MemoryStore {
             // A full queue drops the id; the backfill embeds it later.
             let _ = handle.queue.try_send(id);
         }
-        self.notify(&new.scope, new.category.as_str(), id, &content);
+        if status == MemoryStatus::Active {
+            self.notify(&new.scope, new.category.as_str(), id, &content);
+        }
         Ok(SaveOutcome::Created(id))
     }
 
@@ -413,11 +443,25 @@ impl MemoryStore {
         }
 
         let recent = if request.first_request && self.config.recent_work {
-            crate::llm::agent::project_memory::recent_work(
-                request.root,
-                RECENT_WORK_ENTRIES,
-                RECENT_WORK_MAX_TOKENS.min(budget),
-            )
+            // Episodes (written at session end) describe the work better than
+            // the progress log; the log is the fallback before any exist.
+            let episodes = self
+                .repo
+                .episodes_for(&project_id, RECENT_WORK_ENTRIES as i64)
+                .await
+                .unwrap_or_default();
+            if episodes.is_empty() {
+                crate::llm::agent::project_memory::recent_work(
+                    request.root,
+                    RECENT_WORK_ENTRIES,
+                    RECENT_WORK_MAX_TOKENS.min(budget),
+                )
+            } else {
+                episodes
+                    .iter()
+                    .map(|m| format!("{}: {}", m.created_at.format("%Y-%m-%d"), m.content))
+                    .collect()
+            }
         } else {
             Vec::new()
         };
