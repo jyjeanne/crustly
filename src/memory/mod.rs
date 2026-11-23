@@ -11,6 +11,7 @@ pub mod model;
 pub mod project;
 pub mod recall;
 pub mod secret_scan;
+pub mod transfer;
 
 use crate::config::MemoryConfig;
 use crate::db::repository::memory::InsertMemory;
@@ -262,6 +263,91 @@ impl MemoryStore {
     /// Delete a memory for good. `actor` records who asked: "user" or "model".
     pub async fn forget(&self, id: Uuid, actor: &str) -> Result<()> {
         self.repo.delete(id, actor, Utc::now()).await
+    }
+
+    /// The project's memories and the global ones, for `crustly memory list`.
+    pub async fn list(
+        &self,
+        project: &ProjectIdentity,
+        include_inactive: bool,
+    ) -> Result<Vec<Memory>> {
+        self.repo
+            .list_for_project(&project.id, include_inactive)
+            .await
+    }
+
+    /// Every memory in the database, for export.
+    pub async fn all(&self) -> Result<Vec<Memory>> {
+        self.repo.list_all().await
+    }
+
+    /// The audit trail of one memory: (event, actor, time).
+    pub async fn events(&self, id: Uuid) -> Result<Vec<(String, String, chrono::DateTime<Utc>)>> {
+        self.repo.events(id).await
+    }
+
+    /// Known projects: (id, root, name, active memory count).
+    pub async fn projects(&self) -> Result<Vec<(ProjectId, String, String, i64)>> {
+        self.repo.projects().await
+    }
+
+    /// Change the text of a memory. The new text is validated, scanned and
+    /// checked for a duplicate in the same scope, like a save.
+    pub async fn edit(
+        &self,
+        id: Uuid,
+        text: &str,
+        actor: &str,
+    ) -> Result<std::result::Result<(), RejectReason>> {
+        let Some(memory) = self.repo.get(id).await? else {
+            return Ok(Err(RejectReason::NotFound));
+        };
+        if let Err(reason) = validate(text) {
+            return Ok(Err(reason));
+        }
+        let content = normalize(text);
+        if let Some(rule) = secret_scan::scan(&content) {
+            return Ok(Err(RejectReason::Secret { rule }));
+        }
+        let hash = content_hash(&content);
+        if let Some(other) = self.repo.find_by_hash(&memory.scope, &hash).await? {
+            if other.id != id {
+                return Ok(Err(RejectReason::Duplicate));
+            }
+        }
+        self.repo
+            .update_content(id, &content, &hash, actor, Utc::now())
+            .await?;
+        Ok(Ok(()))
+    }
+
+    /// Make a project memory global. Fails with a reason when it already is,
+    /// or when the same text is already a global memory.
+    pub async fn promote(&self, id: Uuid) -> Result<std::result::Result<(), RejectReason>> {
+        let Some(memory) = self.repo.get(id).await? else {
+            return Ok(Err(RejectReason::NotFound));
+        };
+        if matches!(memory.scope, MemoryScope::Global) {
+            return Ok(Err(RejectReason::ScopeMismatch));
+        }
+        let hash = content_hash(&memory.content);
+        if self
+            .repo
+            .find_by_hash(&MemoryScope::Global, &hash)
+            .await?
+            .is_some()
+        {
+            return Ok(Err(RejectReason::Duplicate));
+        }
+        self.repo.promote(id, "user", Utc::now()).await?;
+        Ok(Ok(()))
+    }
+
+    /// Move the memories of another project's root to `project`. Returns the
+    /// number moved.
+    pub async fn relink(&self, old_id: &ProjectId, project: &ProjectIdentity) -> Result<u64> {
+        self.repo.upsert_project(project, Utc::now()).await?;
+        self.repo.relink_project(old_id, &project.id).await
     }
 
     /// Memories whose id starts with `prefix`, for the short ids shown to users.

@@ -23,6 +23,12 @@ pub struct ProjectIdentity {
     pub remote_url: Option<String>,
 }
 
+/// The project id for a root path, as `identify` computes it. Used when a
+/// memory export names a project by its root.
+pub fn id_for_root(root: &Path) -> ProjectId {
+    sha256_hex(normalize_root(&root.to_string_lossy()).as_bytes())
+}
+
 /// Identify the project that `working_dir` belongs to.
 pub fn identify(working_dir: &Path) -> ProjectIdentity {
     let start = fs::canonicalize(working_dir).unwrap_or_else(|_| working_dir.to_path_buf());
