@@ -115,6 +115,21 @@ pub struct MemoryConfig {
     /// `.crustly/progress.md` in the working directory.
     #[serde(default = "default_true")]
     pub progress_file: bool,
+    /// Long-term memory (docs/improve-memory.md): stored in the database and
+    /// recalled into requests. `false` keeps `save_memory` on its v1 file.
+    #[serde(default = "default_true")]
+    pub long_term: bool,
+    /// Token budget for recalled memories, at most a sixteenth of the model's
+    /// context window (the window limit applies on top of this).
+    #[serde(default = "default_recall_max_tokens")]
+    pub recall_max_tokens: u32,
+    /// Memories at or above this importance (1-5) of kind preference,
+    /// convention or decision are always recalled first, within half the budget.
+    #[serde(default = "default_pinned_min_importance")]
+    pub pinned_min_importance: u8,
+    /// Add a "Recent work" section from the progress log on a session's first request.
+    #[serde(default = "default_true")]
+    pub recent_work: bool,
 }
 
 impl Default for MemoryConfig {
@@ -125,8 +140,44 @@ impl Default for MemoryConfig {
             compaction_threshold: default_compaction_threshold(),
             project_notes: true,
             progress_file: true,
+            long_term: true,
+            recall_max_tokens: default_recall_max_tokens(),
+            pinned_min_importance: default_pinned_min_importance(),
+            recent_work: true,
         }
     }
+}
+
+impl MemoryConfig {
+    /// Replace out-of-range values with their defaults, logging each one.
+    /// Memory settings must never stop Crustly from starting.
+    pub fn sanitized(mut self) -> Self {
+        if !(1..=5).contains(&self.pinned_min_importance) {
+            tracing::warn!(
+                "memory.pinned_min_importance {} is outside 1-5; using {}",
+                self.pinned_min_importance,
+                default_pinned_min_importance()
+            );
+            self.pinned_min_importance = default_pinned_min_importance();
+        }
+        if !(1..=4000).contains(&self.recall_max_tokens) {
+            tracing::warn!(
+                "memory.recall_max_tokens {} is outside 1-4000; using {}",
+                self.recall_max_tokens,
+                default_recall_max_tokens()
+            );
+            self.recall_max_tokens = default_recall_max_tokens();
+        }
+        self
+    }
+}
+
+fn default_recall_max_tokens() -> u32 {
+    800
+}
+
+fn default_pinned_min_importance() -> u8 {
+    4
 }
 
 /// Agent loop limits (`[agent]` section). When a limit is reached the agent
@@ -1190,6 +1241,10 @@ impl Config {
 
         merged
             .try_into::<Self>()
+            .map(|mut config| {
+                config.memory = config.memory.clone().sanitized();
+                config
+            })
             .with_context(|| format!("Invalid configuration in config files: {:?}", paths))
     }
 
@@ -2002,5 +2057,40 @@ enabled = false
         let logging = LoggingConfig::default();
         assert_eq!(logging.level, "info");
         assert!(logging.file.is_none());
+    }
+
+    #[test]
+    fn memory_keys_default_when_absent() {
+        // An existing [memory] section written before long-term memory
+        // must still load, with the new keys at their defaults.
+        let memory: MemoryConfig = toml::from_str("project_notes = true").unwrap();
+        assert!(memory.long_term);
+        assert_eq!(memory.recall_max_tokens, 800);
+        assert_eq!(memory.pinned_min_importance, 4);
+        assert!(memory.recent_work);
+    }
+
+    #[test]
+    fn memory_sanitized_restores_defaults_for_out_of_range_values() {
+        let memory = MemoryConfig {
+            pinned_min_importance: 9,
+            recall_max_tokens: 0,
+            ..MemoryConfig::default()
+        }
+        .sanitized();
+        assert_eq!(memory.pinned_min_importance, 4);
+        assert_eq!(memory.recall_max_tokens, 800);
+    }
+
+    #[test]
+    fn memory_sanitized_keeps_valid_values() {
+        let memory = MemoryConfig {
+            pinned_min_importance: 2,
+            recall_max_tokens: 1200,
+            ..MemoryConfig::default()
+        }
+        .sanitized();
+        assert_eq!(memory.pinned_min_importance, 2);
+        assert_eq!(memory.recall_max_tokens, 1200);
     }
 }
