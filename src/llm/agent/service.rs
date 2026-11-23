@@ -654,6 +654,11 @@ impl AgentService {
         if let Err(err) = store.register_project(&project).await {
             tracing::warn!("memory project not recorded: {err:#}");
         }
+        // Extraction runs in the background (§12.1). Before compaction would
+        // drop messages (context at 80% of the window), it runs even below the
+        // every-N count, so nothing is lost when the old turns are removed.
+        let near_compaction = context.token_count * 10 >= window as usize * 8;
+        store.trigger(context.session_id, project.clone(), false, near_compaction);
         let user_texts = |m: &Message| -> Option<String> {
             m.content.iter().find_map(|b| match b {
                 ContentBlock::Text { text } => Some(text.clone()),
