@@ -166,18 +166,18 @@ pub async fn import(store: &MemoryStore, file: &ExportFile) -> Result<TransferRe
                 expires_at: None,
             })
             .await?;
-        record(&mut report, outcome, &item.content);
+        record(&mut report, outcome);
     }
     Ok(report)
 }
 
-fn record(report: &mut TransferReport, outcome: SaveOutcome, content: &str) {
+/// Count an outcome. A rejection keeps only its reason: the text may be a
+/// secret, and it must not be echoed to the terminal or logs.
+fn record(report: &mut TransferReport, outcome: SaveOutcome) {
     match outcome {
         SaveOutcome::Created(_) => report.created += 1,
         SaveOutcome::Duplicate(_) => report.duplicates += 1,
-        SaveOutcome::Rejected(reason) => report
-            .rejected
-            .push(format!("{} ({content})", reason_text(&reason))),
+        SaveOutcome::Rejected(reason) => report.rejected.push(reason_text(&reason)),
     }
 }
 
@@ -320,7 +320,7 @@ pub async fn import_from_notes(
             SaveOutcome::Created(_) | SaveOutcome::Duplicate(_) => moved.push(bullet.clone()),
             SaveOutcome::Rejected(_) => {}
         }
-        record(&mut report, outcome, bullet);
+        record(&mut report, outcome);
     }
 
     std::fs::write(notes, remove_bullets(&text, &moved)).context("updating memory.md")?;

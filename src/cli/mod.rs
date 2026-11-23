@@ -292,6 +292,11 @@ pub enum Commands {
         show_secrets: bool,
     },
 
+    /// Long-term memory management
+    Memory {
+        #[command(subcommand)]
+        operation: MemoryCommands,
+    },
     /// Database operations
     Db {
         #[command(subcommand)]
@@ -633,6 +638,99 @@ pub enum LogCommands {
     ShowCacheStats,
 }
 
+/// Long-term memory management (docs/improve-memory.md §15.1).
+#[derive(Subcommand, Debug)]
+pub enum MemoryCommands {
+    /// Show whether memory is on, and how much is stored for this project
+    Status,
+    /// List memories for this project and the global ones
+    List {
+        /// project, global or all
+        #[arg(long, default_value = "all")]
+        scope: String,
+        /// preference, convention, decision, fact, lesson or episode
+        #[arg(long)]
+        category: Option<String>,
+        /// Include superseded and archived memories
+        #[arg(long)]
+        archived: bool,
+        /// Print JSON instead of lines
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show one memory and its history
+    Show {
+        /// Id, or a unique prefix of it
+        id: String,
+    },
+    /// Search memories by words
+    Search {
+        query: String,
+        /// project, global or all
+        #[arg(long, default_value = "all")]
+        scope: String,
+        #[arg(long, default_value_t = 8)]
+        limit: usize,
+    },
+    /// Save a memory yourself
+    Add {
+        text: String,
+        /// Save as a global memory, for every project
+        #[arg(long)]
+        global: bool,
+        #[arg(long)]
+        category: Option<String>,
+        /// 1 (minor) to 5 (critical)
+        #[arg(long, default_value_t = 3)]
+        importance: u8,
+        /// Forget it automatically after this many days (1-365)
+        #[arg(long)]
+        expires: Option<i64>,
+    },
+    /// Change the text of a memory
+    Edit { id: String, text: String },
+    /// Make a project memory global
+    Promote { id: String },
+    /// Delete memories for good, by id, or every memory of a scope
+    Forget {
+        /// Ids, or unique prefixes, of memories to delete
+        ids: Vec<String>,
+        /// Delete every memory of this project
+        #[arg(long)]
+        project: bool,
+        /// Delete every global memory
+        #[arg(long)]
+        global: bool,
+        /// Delete every memory, global and project
+        #[arg(long)]
+        all: bool,
+        /// Do not ask for confirmation
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Write memories to a JSON file
+    Export {
+        file: std::path::PathBuf,
+        /// project, global or all
+        #[arg(long, default_value = "all")]
+        scope: String,
+    },
+    /// Read memories from a JSON file, or move memory.md's bullets in
+    Import {
+        file: Option<std::path::PathBuf>,
+        /// Move the bullets of .crustly/memory.md into the database
+        #[arg(long)]
+        from_notes: bool,
+    },
+    /// List known projects and their memory counts
+    Projects,
+    /// Move the memories of an old project id to this project
+    RelinkProject {
+        /// Id, or a unique prefix, of the old project
+        old: String,
+    },
+}
+
 #[derive(Subcommand, Debug)]
 pub enum DbCommands {
     /// Initialize database
@@ -744,6 +842,7 @@ pub async fn run() -> Result<std::process::ExitCode> {
         Some(Commands::Init { force }) => cmd_init(&config, force).await,
         Some(Commands::Config { show_secrets }) => cmd_config(&config, show_secrets).await,
         Some(Commands::Db { operation }) => cmd_db(&config, operation).await,
+        Some(Commands::Memory { operation }) => cmd_memory(&config, operation).await,
         Some(Commands::Logs { operation }) => cmd_logs(operation).await,
         Some(Commands::Keyring { operation }) => cmd_keyring(operation).await,
         Some(Commands::Run {
@@ -865,6 +964,413 @@ async fn cmd_config(config: &crate::config::Config, show_secrets: bool) -> Resul
 }
 
 /// Database operations
+/// A path for people to read: Windows verbatim prefixes removed.
+fn display_path(path: &std::path::Path) -> String {
+    let text = path.to_string_lossy().into_owned();
+    text.strip_prefix(r"\\?\")
+        .map(str::to_string)
+        .unwrap_or(text)
+}
+
+/// One line per memory: id, scope, category, status, and the text.
+fn memory_line(memory: &crate::memory::model::Memory) -> String {
+    use crate::memory::model::MemoryScope;
+    let scope = match memory.scope {
+        MemoryScope::Global => "global",
+        MemoryScope::Project(_) => "project",
+    };
+    format!(
+        "{}  {:<7} {:<10} {:<10} {}",
+        &memory.id.simple().to_string()[..8],
+        scope,
+        memory.category.as_str(),
+        memory.status.as_str(),
+        memory.content
+    )
+}
+
+/// Parse a scope flag: project, global or all.
+fn parse_scope(text: &str) -> Result<crate::memory::SearchScope> {
+    use crate::memory::SearchScope;
+    match text {
+        "all" => Ok(SearchScope::All),
+        "global" => Ok(SearchScope::Global),
+        "project" => Ok(SearchScope::Project),
+        other => anyhow::bail!("scope must be project, global or all, not {other}"),
+    }
+}
+
+/// The one memory an id prefix names. Ambiguous and unknown prefixes are
+/// errors that list what matched, never a guess.
+async fn resolve_memory(
+    store: &crate::memory::MemoryStore,
+    prefix: &str,
+) -> Result<crate::memory::model::Memory> {
+    let mut matches = store.find(prefix).await?;
+    match matches.len() {
+        0 => anyhow::bail!("no memory with id {prefix}"),
+        1 => Ok(matches.remove(0)),
+        _ => {
+            let lines: Vec<String> = matches.iter().map(memory_line).collect();
+            anyhow::bail!(
+                "the id {prefix} matches {} memories; use a longer prefix:\n{}",
+                matches.len(),
+                lines.join("\n")
+            )
+        }
+    }
+}
+
+/// Ask the user to type `yes`; anything else cancels.
+fn confirm(question: &str) -> Result<bool> {
+    use std::io::{self, Write};
+    print!("{question} Type 'yes' to confirm: ");
+    io::stdout().flush()?;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim().eq_ignore_ascii_case("yes"))
+}
+
+/// `crustly memory ...`: inspect and manage long-term memory.
+async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -> Result<()> {
+    use crate::memory::model::{
+        MemoryCategory, MemoryScope, MemorySource, MemoryStatus, NewMemory, SaveOutcome,
+    };
+    use crate::memory::{project::identify, transfer, MemoryStore, SearchScope};
+
+    let db = crate::db::Database::connect(&config.database.path)
+        .await
+        .context("Failed to connect to database")?;
+    db.run_migrations().await?;
+    let store = MemoryStore::new(db.pool().clone(), config.memory.clone());
+    let cwd = std::env::current_dir()?;
+    let project = identify(&cwd);
+    store.register_project(&project).await?;
+
+    match operation {
+        MemoryCommands::Status => {
+            let memories = store.list(&project, true).await?;
+            let active = |m: &crate::memory::model::Memory| m.status == MemoryStatus::Active;
+            let global = memories
+                .iter()
+                .filter(|m| active(m) && matches!(m.scope, MemoryScope::Global))
+                .count();
+            let here = memories
+                .iter()
+                .filter(|m| active(m) && matches!(m.scope, MemoryScope::Project(_)))
+                .count();
+            let history = memories.iter().filter(|m| !active(m)).count();
+            println!("Crustly memory");
+            println!(
+                "  Long-term memory:  {}",
+                if config.memory.long_term { "on" } else { "off" }
+            );
+            println!("  Database:          {}", config.database.path.display());
+            println!(
+                "  Project:           {} ({}), id {}",
+                project.name,
+                display_path(&project.root),
+                &project.id[..8]
+            );
+            println!(
+                "  Memories:          {global} global, {here} in this project ({history} superseded or archived)"
+            );
+            println!(
+                "  Recall:            keyword, up to {} tokens",
+                config.memory.recall_max_tokens
+            );
+            println!("  Extraction:        off");
+        }
+        MemoryCommands::List {
+            scope,
+            category,
+            archived,
+            json,
+        } => {
+            let wanted = parse_scope(&scope)?;
+            let category = category.map(|c| c.parse::<MemoryCategory>()).transpose()?;
+            let memories: Vec<_> = store
+                .list(&project, archived)
+                .await?
+                .into_iter()
+                .filter(|m| match wanted {
+                    SearchScope::All => true,
+                    SearchScope::Global => matches!(m.scope, MemoryScope::Global),
+                    SearchScope::Project => matches!(m.scope, MemoryScope::Project(_)),
+                })
+                .filter(|m| category.is_none_or(|c| m.category == c))
+                .collect();
+            if json {
+                let rows: Vec<serde_json::Value> = memories
+                    .iter()
+                    .map(|m| {
+                        serde_json::json!({
+                            "id": m.id.to_string(),
+                            "scope": if matches!(m.scope, MemoryScope::Global) { "global" } else { "project" },
+                            "category": m.category.as_str(),
+                            "status": m.status.as_str(),
+                            "importance": m.importance,
+                            "content": m.content,
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&rows)?);
+            } else if memories.is_empty() {
+                println!("No memories.");
+            } else {
+                for memory in &memories {
+                    println!("{}", memory_line(memory));
+                }
+            }
+        }
+        MemoryCommands::Show { id } => {
+            let memory = resolve_memory(&store, &id).await?;
+            let scope = match &memory.scope {
+                MemoryScope::Global => "global".to_string(),
+                MemoryScope::Project(p) => format!("project {}", &p[..8.min(p.len())]),
+            };
+            println!("ID:          {}", memory.id);
+            println!("Scope:       {scope}");
+            println!("Category:    {}", memory.category.as_str());
+            println!("Importance:  {}/5", memory.importance);
+            println!("Status:      {}", memory.status.as_str());
+            println!("Source:      {:?}", memory.source);
+            println!(
+                "Created:     {}",
+                memory.created_at.format("%Y-%m-%d %H:%M")
+            );
+            println!(
+                "Updated:     {}",
+                memory.updated_at.format("%Y-%m-%d %H:%M")
+            );
+            println!("Recalled:    {} times", memory.recall_count);
+            println!("\n{}", memory.content);
+            let events = store.events(memory.id).await?;
+            if !events.is_empty() {
+                println!("\nHistory:");
+                for (event, actor, at) in events {
+                    println!("  {}  {event} by {actor}", at.format("%Y-%m-%d %H:%M"));
+                }
+            }
+        }
+        MemoryCommands::Search {
+            query,
+            scope,
+            limit,
+        } => {
+            let found = store
+                .search(&project, &query, parse_scope(&scope)?, None, limit)
+                .await?;
+            if found.is_empty() {
+                println!("No memories match '{query}'.");
+            } else {
+                for memory in &found {
+                    println!("{}", memory_line(memory));
+                }
+            }
+        }
+        MemoryCommands::Add {
+            text,
+            global,
+            category,
+            importance,
+            expires,
+        } => {
+            let scope = if global {
+                MemoryScope::Global
+            } else {
+                MemoryScope::Project(project.id.clone())
+            };
+            let category = match category {
+                Some(text) => text.parse::<MemoryCategory>()?,
+                None if global => MemoryCategory::Preference,
+                None => MemoryCategory::Fact,
+            };
+            let expires_at = match expires {
+                None => None,
+                Some(days) if (1..=365).contains(&days) => {
+                    Some(chrono::Utc::now() + chrono::Duration::days(days))
+                }
+                Some(_) => anyhow::bail!("--expires must be between 1 and 365 days"),
+            };
+            match store
+                .save(NewMemory {
+                    content: text,
+                    scope,
+                    category,
+                    source: MemorySource::User,
+                    importance,
+                    replaces: None,
+                    session_id: None,
+                    expires_at,
+                })
+                .await?
+            {
+                SaveOutcome::Created(id) => {
+                    println!("Saved [m:{}]", &id.simple().to_string()[..8])
+                }
+                SaveOutcome::Duplicate(id) => {
+                    println!("Already remembered [m:{}]", &id.simple().to_string()[..8])
+                }
+                SaveOutcome::Rejected(reason) => anyhow::bail!("not saved: {reason}"),
+            }
+        }
+        MemoryCommands::Edit { id, text } => {
+            let memory = resolve_memory(&store, &id).await?;
+            match store.edit(memory.id, &text, "user").await? {
+                Ok(()) => println!("Updated [m:{}]", &memory.id.simple().to_string()[..8]),
+                Err(reason) => anyhow::bail!("not changed: {reason}"),
+            }
+        }
+        MemoryCommands::Promote { id } => {
+            let memory = resolve_memory(&store, &id).await?;
+            match store.promote(memory.id).await? {
+                Ok(()) => println!(
+                    "Now a global memory [m:{}]",
+                    &memory.id.simple().to_string()[..8]
+                ),
+                Err(reason) => anyhow::bail!("not promoted: {reason}"),
+            }
+        }
+        MemoryCommands::Forget {
+            ids,
+            project: this_project,
+            global,
+            all,
+            yes,
+        } => {
+            let bulk = this_project || global || all;
+            if bulk == !ids.is_empty() {
+                anyhow::bail!("give memory ids, or one of --project, --global, --all");
+            }
+            let victims: Vec<crate::memory::model::Memory> = if bulk {
+                store
+                    .list(&project, true)
+                    .await?
+                    .into_iter()
+                    .filter(|m| {
+                        all || (global && matches!(m.scope, MemoryScope::Global))
+                            || (this_project && matches!(m.scope, MemoryScope::Project(_)))
+                    })
+                    .collect()
+            } else {
+                let mut found = Vec::new();
+                for id in &ids {
+                    found.push(resolve_memory(&store, id).await?);
+                }
+                found
+            };
+            if victims.is_empty() {
+                println!("Nothing to forget.");
+                return Ok(());
+            }
+            if !yes && (bulk || victims.len() > 1) {
+                println!("This deletes {} memories for good:", victims.len());
+                for memory in &victims {
+                    println!("{}", memory_line(memory));
+                }
+                if !confirm("")? {
+                    println!("Cancelled - nothing was deleted");
+                    return Ok(());
+                }
+            }
+            for memory in &victims {
+                store.forget(memory.id, "user").await?;
+            }
+            println!(
+                "Forgot {} memor{}",
+                victims.len(),
+                if victims.len() == 1 { "y" } else { "ies" }
+            );
+        }
+        MemoryCommands::Export { file, scope } => {
+            let scope = match parse_scope(&scope)? {
+                SearchScope::All => transfer::ExportScope::All,
+                SearchScope::Global => transfer::ExportScope::Global,
+                SearchScope::Project => transfer::ExportScope::Project,
+            };
+            let export = transfer::export(&store, scope).await?;
+            std::fs::write(&file, serde_json::to_string_pretty(&export)?)?;
+            println!(
+                "Exported {} memories to {}. The file is plain text: keep it private.",
+                export.memories.len(),
+                file.display()
+            );
+        }
+        MemoryCommands::Import { file, from_notes } => {
+            if from_notes {
+                let notes = cwd.join(".crustly").join("memory.md");
+                let stamp = transfer::backup_stamp(chrono::Utc::now());
+                let (report, backup) =
+                    transfer::import_from_notes(&store, &project, &notes, &stamp).await?;
+                println!(
+                    "Moved {} bullets from {}: {} saved, {} already remembered, {} kept in the file.",
+                    report.created + report.duplicates + report.rejected.len(),
+                    notes.display(),
+                    report.created,
+                    report.duplicates,
+                    report.rejected.len()
+                );
+                for reason in &report.rejected {
+                    println!("  kept: {reason}");
+                }
+                match backup {
+                    Some(path) => println!("Backup written to {}", path.display()),
+                    None => println!("Nothing to import."),
+                }
+            } else {
+                let Some(file) = file else {
+                    anyhow::bail!("give a file to import, or --from-notes");
+                };
+                let parsed: transfer::ExportFile =
+                    serde_json::from_str(&std::fs::read_to_string(&file)?)
+                        .context("the file is not a Crustly memory export")?;
+                let report = transfer::import(&store, &parsed).await?;
+                println!(
+                    "Imported: {} created, {} already remembered, {} skipped, {} rejected.",
+                    report.created,
+                    report.duplicates,
+                    report.skipped,
+                    report.rejected.len()
+                );
+                for reason in &report.rejected {
+                    println!("  rejected: {reason}");
+                }
+            }
+        }
+        MemoryCommands::Projects => {
+            let projects = store.projects().await?;
+            if projects.is_empty() {
+                println!("No projects yet.");
+            }
+            for (id, root, name, count) in projects {
+                println!(
+                    "{}  {:<20} {:>4} memories  {}",
+                    &id[..8.min(id.len())],
+                    name,
+                    count,
+                    display_path(std::path::Path::new(&root))
+                );
+            }
+        }
+        MemoryCommands::RelinkProject { old } => {
+            let projects = store.projects().await?;
+            let matches: Vec<&(String, String, String, i64)> = projects
+                .iter()
+                .filter(|(id, ..)| id.starts_with(&old))
+                .collect();
+            let old_id = match matches.len() {
+                1 => matches[0].0.clone(),
+                0 => anyhow::bail!("no project with id {old}"),
+                _ => anyhow::bail!("the id {old} matches more than one project"),
+            };
+            let moved = store.relink(&old_id, &project).await?;
+            println!("Moved {moved} memories to {}", project.name);
+        }
+    }
+    Ok(())
+}
+
 async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result<()> {
     use crate::db::Database;
 
@@ -3020,5 +3526,55 @@ mod tests {
         assert_eq!(status[0].name, "broken");
         assert!(!status[0].connected);
         assert!(status[0].error.is_some());
+    }
+}
+
+#[cfg(test)]
+mod memory_cli_tests {
+    use super::*;
+
+    #[test]
+    fn scope_flags_accept_three_values_and_refuse_others() {
+        assert!(parse_scope("all").is_ok());
+        assert!(parse_scope("global").is_ok());
+        assert!(parse_scope("project").is_ok());
+        assert!(parse_scope("everywhere").is_err());
+    }
+
+    #[test]
+    fn display_path_drops_the_windows_verbatim_prefix() {
+        assert_eq!(
+            display_path(std::path::Path::new(r"\\?\C:\work\repo")),
+            r"C:\work\repo"
+        );
+        assert_eq!(
+            display_path(std::path::Path::new("/home/me/repo")),
+            "/home/me/repo"
+        );
+    }
+
+    #[test]
+    fn memory_lines_show_a_short_id_scope_category_and_text() {
+        use crate::memory::model::{
+            Memory, MemoryCategory, MemoryScope, MemorySource, MemoryStatus,
+        };
+        let memory = Memory {
+            id: uuid::Uuid::parse_str("3f2a9c1e-0000-4000-8000-000000000000").unwrap(),
+            scope: MemoryScope::Global,
+            category: MemoryCategory::Preference,
+            content: "Prefers tabs".to_string(),
+            source: MemorySource::User,
+            importance: 3,
+            status: MemoryStatus::Active,
+            superseded_by: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            last_recalled_at: None,
+            recall_count: 0,
+            expires_at: None,
+        };
+        let line = memory_line(&memory);
+        assert!(line.starts_with("3f2a9c1e  global"), "{line}");
+        assert!(line.ends_with("Prefers tabs"), "{line}");
     }
 }
