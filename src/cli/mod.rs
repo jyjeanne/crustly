@@ -200,12 +200,30 @@ fn memory_store(
     pool: &sqlx::SqlitePool,
     config: &crate::config::Config,
 ) -> Option<Arc<crate::memory::MemoryStore>> {
-    config.memory.long_term.then(|| {
-        Arc::new(crate::memory::MemoryStore::new(
-            pool.clone(),
-            config.memory.clone(),
-        ))
-    })
+    config
+        .memory
+        .long_term
+        .then(|| Arc::new(build_memory_store(pool, config, true)))
+}
+
+/// A memory store on `pool`, with semantic recall when `[memory.embeddings]`
+/// asks for it. A bad embeddings setting is logged and leaves keyword recall
+/// on: memory never stops Crustly from starting. `background` starts the
+/// embedding worker (chat and run); one-shot commands pass false.
+fn build_memory_store(
+    pool: &sqlx::SqlitePool,
+    config: &crate::config::Config,
+    background: bool,
+) -> crate::memory::MemoryStore {
+    let store = crate::memory::MemoryStore::new(pool.clone(), config.memory.clone());
+    match crate::memory::embedder_from_config(&config.memory.embeddings) {
+        Ok(Some((embedder, runtime))) => store.attach_embedder(embedder, runtime, background),
+        Ok(None) => store,
+        Err(err) => {
+            tracing::warn!("semantic recall is off: {err}");
+            store
+        }
+    }
 }
 
 fn configure_agent_loop(
@@ -722,6 +740,12 @@ pub enum MemoryCommands {
         #[arg(long)]
         from_notes: bool,
     },
+    /// Embed memories that lack a vector (needs [memory.embeddings])
+    Reindex {
+        /// Also delete vectors made by other embedding models
+        #[arg(long)]
+        prune: bool,
+    },
     /// List known projects and their memory counts
     Projects,
     /// Move the memories of an old project id to this project
@@ -1036,13 +1060,13 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
     use crate::memory::model::{
         MemoryCategory, MemoryScope, MemorySource, MemoryStatus, NewMemory, SaveOutcome,
     };
-    use crate::memory::{project::identify, transfer, MemoryStore, SearchScope};
+    use crate::memory::{project::identify, transfer, SearchScope};
 
     let db = crate::db::Database::connect(&config.database.path)
         .await
         .context("Failed to connect to database")?;
     db.run_migrations().await?;
-    let store = MemoryStore::new(db.pool().clone(), config.memory.clone());
+    let store = build_memory_store(db.pool(), config, false);
     let cwd = std::env::current_dir()?;
     let project = identify(&cwd);
     store.register_project(&project).await?;
@@ -1079,6 +1103,12 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                 "  Recall:            keyword, up to {} tokens",
                 config.memory.recall_max_tokens
             );
+            match store.embedding_status().await? {
+                Some((model, indexed, active)) => {
+                    println!("  Embeddings:        {model}, {indexed} of {active} memories indexed")
+                }
+                None => println!("  Embeddings:        off (keyword recall only)"),
+            }
             println!("  Extraction:        off");
         }
         MemoryCommands::List {
@@ -1356,6 +1386,13 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                     count,
                     display_path(std::path::Path::new(&root))
                 );
+            }
+        }
+        MemoryCommands::Reindex { prune } => {
+            let (embedded, pruned) = store.reindex(prune).await?;
+            println!("Embedded {embedded} memories.");
+            if prune {
+                println!("Removed {pruned} vectors from other models.");
             }
         }
         MemoryCommands::RelinkProject { old } => {
