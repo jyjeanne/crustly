@@ -2,6 +2,7 @@
 //! database and recalled into later requests (docs/improve-memory.md).
 
 pub mod model;
+pub mod secret_scan;
 
 pub use model::{
     content_hash, normalize, validate, Memory, MemoryCategory, MemoryScope, MemorySource,
