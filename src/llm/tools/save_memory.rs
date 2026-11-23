@@ -123,9 +123,23 @@ impl SaveMemoryTool {
                 expires_at,
             })
             .await;
+        // Paths attach to a saved memory, not to the save itself, so a bad
+        // path is reported without losing the fact.
+        let mut path_note = String::new();
+        if let (Ok(SaveOutcome::Created(id)), Some(paths)) = (&outcome, &input.paths) {
+            if !paths.is_empty() {
+                if let Err(reason) = store
+                    .add_paths(*id, paths)
+                    .await
+                    .unwrap_or_else(|e| Err(e.to_string()))
+                {
+                    path_note = format!(" (paths not added: {reason})");
+                }
+            }
+        }
         Ok(match outcome {
             Ok(SaveOutcome::Created(id)) => ToolResult::success(format!(
-                "Saved{} [m:{}]: {fact}",
+                "Saved{} [m:{}]: {fact}{path_note}",
                 if global { " to global memory" } else { "" },
                 &id.simple().to_string()[..8]
             )),
@@ -153,6 +167,9 @@ struct SaveMemoryInput {
     /// For facts that stop being true at a known time.
     #[serde(default)]
     expires_in_days: Option<i64>,
+    /// Project paths (globs) this fact is about, up to five.
+    #[serde(default)]
+    paths: Option<Vec<String>>,
 }
 
 const MEMORY_FILE: &str = "memory.md";
@@ -223,6 +240,12 @@ impl Tool for SaveMemoryTool {
                 "replaces": {
                     "type": "string",
                     "description": "Id of a recalled memory that this fact corrects or updates. The old memory is kept as history."
+                },
+                "paths": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "maxItems": 5,
+                    "description": "Files or folders this fact is about, relative to the project root, e.g. src/tui/**. Recalled when a request or a tool call mentions them."
                 },
                 "expires_in_days": {
                     "type": "integer",

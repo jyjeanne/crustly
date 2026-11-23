@@ -11,6 +11,7 @@ pub mod embed;
 pub mod extract;
 pub mod extraction;
 pub mod model;
+pub mod paths;
 pub mod project;
 pub mod recall;
 pub mod secret_scan;
@@ -88,6 +89,8 @@ pub struct MemoryStore {
     extraction: Option<extraction::ExtractionHandle>,
     /// Sessions with an extraction run in progress.
     running: Mutex<std::collections::HashSet<Uuid>>,
+    /// (session, memory) pairs already shown through a tool result.
+    shown: Mutex<std::collections::HashSet<(Uuid, Uuid)>>,
 }
 
 impl MemoryStore {
@@ -102,6 +105,7 @@ impl MemoryStore {
             query_warned: std::sync::atomic::AtomicBool::new(false),
             extraction: None,
             running: Mutex::new(std::collections::HashSet::new()),
+            shown: Mutex::new(std::collections::HashSet::new()),
         }
     }
 
@@ -412,13 +416,38 @@ impl MemoryStore {
             Some(hits) => (hits.scores.clone(), Some(hits.index.clone())),
             None => (HashMap::new(), None),
         };
+        // Memories about a path the message mentions count as a keyword match
+        // at the best score (K = 1 in section 13.5), so they pass the floor.
+        let mentioned = paths::mentioned_paths(request.message);
+        let mut path_hits: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
+        if !mentioned.is_empty() {
+            for (id, glob) in self.repo.path_globs_for(&project_id).await? {
+                if mentioned
+                    .iter()
+                    .any(|m| paths::matches(std::slice::from_ref(&glob), m))
+                {
+                    path_hits.insert(id);
+                }
+            }
+        }
+        let best_keyword = keyword_hits
+            .iter()
+            .map(|(_, bm25)| *bm25)
+            .fold(f64::INFINITY, f64::min);
+        let best_keyword = if best_keyword.is_finite() {
+            best_keyword
+        } else {
+            -1.0
+        };
+
         let ranked: Vec<Ranked> = candidates
             .into_iter()
             .map(|memory| {
                 let keyword = keyword_hits
                     .iter()
                     .find(|(hit, _)| hit.id == memory.id)
-                    .map(|(_, bm25)| *bm25);
+                    .map(|(_, bm25)| *bm25)
+                    .or_else(|| path_hits.contains(&memory.id).then_some(best_keyword));
                 let similarity = similarities.get(&memory.id).copied();
                 Ranked {
                     memory,
@@ -599,6 +628,72 @@ impl MemoryStore {
         let moved = self.repo.relink_project(old_id, &project.id).await?;
         self.changed();
         Ok(moved)
+    }
+
+    /// Attach path globs to a memory: at most five in all, each relative to
+    /// the project root. A refusal says which glob was wrong.
+    pub async fn add_paths(
+        &self,
+        id: Uuid,
+        globs: &[String],
+    ) -> Result<std::result::Result<(), String>> {
+        if self.repo.get(id).await?.is_none() {
+            return Ok(Err("no memory with that id".to_string()));
+        }
+        let mut valid = Vec::new();
+        for glob in globs {
+            match paths::validate_glob(glob) {
+                Ok(v) => valid.push(v),
+                Err(reason) => return Ok(Err(reason)),
+            }
+        }
+        let mut all: std::collections::HashSet<String> =
+            self.repo.paths_of(id).await?.into_iter().collect();
+        all.extend(valid.iter().cloned());
+        if all.len() > paths::MAX_GLOBS {
+            return Ok(Err(format!(
+                "a memory can name at most {} paths",
+                paths::MAX_GLOBS
+            )));
+        }
+        self.repo.add_paths(id, &valid).await?;
+        self.changed();
+        Ok(Ok(()))
+    }
+
+    /// Memories about `path` that this session has not been shown yet. Each
+    /// memory is shown once per session, since the tool result that carried it
+    /// stays in the conversation.
+    pub async fn memories_for_path(
+        &self,
+        project: &ProjectIdentity,
+        session: Uuid,
+        path: &str,
+    ) -> Result<Vec<Memory>> {
+        let mut hits: Vec<Uuid> = self
+            .repo
+            .path_globs_for(&project.id)
+            .await?
+            .into_iter()
+            .filter(|(_, glob)| paths::matches(std::slice::from_ref(glob), path))
+            .map(|(id, _)| id)
+            .collect();
+        hits.sort();
+        hits.dedup();
+        let mut out = Vec::new();
+        for id in hits {
+            let fresh = self
+                .shown
+                .lock()
+                .map(|mut shown| shown.insert((session, id)))
+                .unwrap_or(false);
+            if fresh {
+                if let Some(memory) = self.repo.get(id).await? {
+                    out.push(memory);
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// Memories whose id starts with `prefix`, for the short ids shown to users.

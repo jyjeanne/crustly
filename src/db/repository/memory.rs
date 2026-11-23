@@ -254,6 +254,63 @@ impl MemoryRepository {
         Ok(episodes)
     }
 
+    // ── P4: path-scoped memories and sources ─────────────────────────────
+
+    /// Attach globs to a memory. Duplicates are ignored.
+    pub async fn add_paths(&self, id: Uuid, globs: &[String]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        for glob in globs {
+            sqlx::query("INSERT OR IGNORE INTO memory_paths (memory_id, glob) VALUES (?, ?)")
+                .bind(id.to_string())
+                .bind(glob)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// The globs of one memory.
+    pub async fn paths_of(&self, id: Uuid) -> Result<Vec<String>> {
+        let rows = sqlx::query("SELECT glob FROM memory_paths WHERE memory_id = ? ORDER BY glob")
+            .bind(id.to_string())
+            .fetch_all(&self.pool)
+            .await?;
+        rows.iter().map(|r| Ok(r.try_get("glob")?)).collect()
+    }
+
+    /// Every (memory, glob) pair of the active memories `project_id` may use.
+    pub async fn path_globs_for(&self, project_id: &ProjectId) -> Result<Vec<(Uuid, String)>> {
+        let rows = sqlx::query(
+            "SELECT mp.memory_id, mp.glob FROM memory_paths mp \
+             JOIN memories m ON m.id = mp.memory_id \
+             WHERE m.status = 'active' AND (m.scope = 'global' OR m.project_id = ?)",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter()
+            .map(|r| {
+                let id: String = r.try_get("memory_id")?;
+                Ok((id.parse()?, r.try_get("glob")?))
+            })
+            .collect()
+    }
+
+    /// Record that `sources` were folded into `consolidated` (section 13.3).
+    pub async fn add_sources(&self, consolidated: Uuid, sources: &[Uuid]) -> Result<()> {
+        for source in sources {
+            sqlx::query(
+                "INSERT OR IGNORE INTO memory_sources (memory_id, source_id) VALUES (?, ?)",
+            )
+            .bind(consolidated.to_string())
+            .bind(source.to_string())
+            .execute(&self.pool)
+            .await?;
+        }
+        Ok(())
+    }
+
     pub async fn touch(&self, id: Uuid, now: DateTime<Utc>) -> Result<()> {
         sqlx::query("UPDATE memories SET updated_at = ? WHERE id = ?")
             .bind(now.timestamp())
