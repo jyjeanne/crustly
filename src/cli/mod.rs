@@ -972,7 +972,9 @@ async fn cmd_db(config: &crate::config::Config, operation: DbCommands) -> Result
 /// the interactive chat agent (MCP servers are registered separately, since
 /// that requires network I/O and per-server config - see
 /// `connect_configured_mcp_servers`).
-fn build_tool_registry() -> crate::llm::tools::registry::ToolRegistry {
+fn build_tool_registry(
+    memory: Option<Arc<crate::memory::MemoryStore>>,
+) -> crate::llm::tools::registry::ToolRegistry {
     use crate::llm::tools::{
         agent::AgentTool, apply_patch::ApplyPatchTool, ask_user::AskUserTool, bash::BashTool,
         code_exec::CodeExecTool, context::ContextTool, doc_parser::DocParserTool, edit::EditTool,
@@ -1001,7 +1003,7 @@ fn build_tool_registry() -> crate::llm::tools::registry::ToolRegistry {
     // Phase 3: Workflow & integration
     tool_registry.register(Arc::new(TaskTool));
     tool_registry.register(Arc::new(ContextTool));
-    tool_registry.register(Arc::new(SaveMemoryTool));
+    tool_registry.register(Arc::new(SaveMemoryTool::new(memory)));
     tool_registry.register(Arc::new(HttpClientTool));
     tool_registry.register(Arc::new(PlanTool));
     // Phase 4: Claw Code parity
@@ -1150,7 +1152,8 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
 
     // Create tool registry
     tracing::debug!("Setting up tool registry");
-    let mut tool_registry = build_tool_registry();
+    let memory = memory_store(db.pool(), config);
+    let mut tool_registry = build_tool_registry(memory.clone());
     let mcp_status = connect_configured_mcp_servers(&mut tool_registry, config).await;
 
     // Create service context
@@ -1162,7 +1165,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     // Create agent service with system prompt and working directory
     let agent_service = Arc::new(configure_agent_loop(
         AgentService::new(provider.clone(), service_context.clone())
-            .with_memory(memory_store(db.pool(), config))
+            .with_memory(memory.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_working_directory(working_directory.clone()),
         config,
@@ -1216,7 +1219,7 @@ async fn cmd_chat(config: &crate::config::Config, _session_id: Option<String>) -
     tracing::debug!("Creating agent service with approval callback");
     let agent_service = Arc::new(configure_agent(
         AgentService::new(provider.clone(), service_context.clone())
-            .with_memory(memory_store(db.pool(), config))
+            .with_memory(memory.clone())
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_tool_registry(Arc::new(tool_registry))
             .with_approval_callback(Some(approval_callback))
@@ -1323,7 +1326,8 @@ async fn cmd_run(
 
     // Create tool registry (same built-in set as the interactive chat agent
     // - see build_tool_registry's doc comment).
-    let mut tool_registry = build_tool_registry();
+    let memory = memory_store(db.pool(), config);
+    let mut tool_registry = build_tool_registry(memory.clone());
 
     // Connect to configured MCP servers, same as cmd_chat - see its
     // comment for why this needs to happen at all (config.mcp.servers was
@@ -1355,7 +1359,7 @@ async fn cmd_run(
     let service_context = ServiceContext::new(db.pool().clone());
     let agent_service = configure_agent(
         AgentService::new(provider.clone(), service_context.clone())
-            .with_memory(memory_store(db.pool(), config))
+            .with_memory(memory.clone())
             .with_tool_registry(Arc::new(tool_registry))
             .with_system_prompt(SYSTEM_PROMPT.to_string())
             .with_auto_approve_tools(auto_approve),
@@ -2451,7 +2455,7 @@ mod tests {
     fn autoplan_prompts_for_the_registered_code_and_shell_tool_names() {
         use crate::config::PlanExecMode;
 
-        let registry = build_tool_registry();
+        let registry = build_tool_registry(None);
         for tool in ["execute_code", "powershell"] {
             assert!(
                 registry.has_tool(tool),
@@ -2473,7 +2477,7 @@ mod tests {
         use crate::llm::agent::budget::ContextBudget;
         use crate::llm::agent::tool_profile::{ToolSelection, CORE_TOOLS};
 
-        let all_tools = build_tool_registry().get_tool_definitions();
+        let all_tools = build_tool_registry(None).get_tool_definitions();
         let selection = ToolSelection::resolve(ToolProfile::Core, &[], 8192);
         let core_tools: Vec<_> = all_tools
             .iter()
@@ -2915,7 +2919,7 @@ mod tests {
 
     #[test]
     fn build_tool_registry_registers_every_built_in_tool() {
-        let registry = build_tool_registry();
+        let registry = build_tool_registry(None);
 
         // One entry per Phase 1-4 tool registered in build_tool_registry.
         assert_eq!(registry.count(), 23);
@@ -2951,7 +2955,7 @@ mod tests {
     #[tokio::test]
     async fn connect_configured_mcp_servers_returns_empty_status_with_no_servers() {
         let config = crate::config::Config::default();
-        let mut registry = build_tool_registry();
+        let mut registry = build_tool_registry(None);
 
         let status = connect_configured_mcp_servers(&mut registry, &config).await;
 
@@ -2966,7 +2970,7 @@ mod tests {
             command: "definitely-not-a-real-binary".to_string(),
             args: vec![],
         });
-        let mut registry = build_tool_registry();
+        let mut registry = build_tool_registry(None);
 
         let status = connect_configured_mcp_servers(&mut registry, &config).await;
 
