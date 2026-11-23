@@ -19,10 +19,11 @@ use crate::config::ToolProfile;
 use crate::llm::provider::router::ModelRouter;
 use crate::llm::provider::{
     ContentBlock, ContentDelta, LLMRequest, LLMResponse, Message, PerfMetrics, Provider,
-    ProviderStream, StopReason, StreamEvent, TokenUsage, Tool,
+    ProviderStream, Role, StopReason, StreamEvent, TokenUsage, Tool,
 };
 use crate::llm::tools::cache::{ToolResultCache, ToolTtlConfig};
 use crate::llm::tools::{FileReadCache, ToolExecutionContext, ToolRegistry};
+use crate::memory::{MemoryStore, RecallRequest};
 use crate::services::{MessageService, ServiceContext, SessionService};
 use futures::StreamExt as _;
 use serde_json::Value;
@@ -239,6 +240,10 @@ pub struct AgentService {
     /// SQLite pool for compaction records (T032). Defaults to the session
     /// database in `context`; set only to write them elsewhere.
     pool: Option<Arc<sqlx::SqlitePool>>,
+
+    /// Long-term memory for recall before each request (docs/improve-memory.md
+    /// §9.1). `None` for sub-agents and when `[memory] long_term` is off.
+    memory: Option<Arc<MemoryStore>>,
 
     /// Whether this service may wire a SubAgentLauncher into tool contexts.
     /// Always false for services created by AgentServiceLauncher to prevent
@@ -531,6 +536,24 @@ async fn drain_stream_to_response(
     })
 }
 
+/// The user message as it goes into the context: the recall block, when there
+/// is one, as its own text block in front of the user's text. The block is for
+/// this request only and is never stored (docs/improve-memory.md D5).
+fn user_turn(block: Option<String>, text: &str) -> Message {
+    match block {
+        Some(block) => Message {
+            role: Role::User,
+            content: vec![
+                ContentBlock::Text { text: block },
+                ContentBlock::Text {
+                    text: text.to_string(),
+                },
+            ],
+        },
+        None => Message::user(text.to_string()),
+    }
+}
+
 impl AgentService {
     /// Create a new agent service
     pub fn new(provider: Arc<dyn Provider>, context: ServiceContext) -> Self {
@@ -557,6 +580,7 @@ impl AgentService {
             verification: false,
             verification_command: None,
             project_notes: false,
+            memory: None,
             progress_file: false,
             tool_allowlist: None,
             fallback: None,
@@ -609,6 +633,50 @@ impl AgentService {
     }
 
     /// Add the project's notes files to the system prompt.
+    /// Recall long-term memory into each request (docs/improve-memory.md §9.1).
+    pub fn with_memory(mut self, store: Arc<MemoryStore>) -> Self {
+        self.memory = Some(store);
+        self
+    }
+
+    /// The recall block for a new user message, or `None`. Failures are
+    /// logged by the store and never reach the request.
+    async fn memory_block(
+        &self,
+        context: &AgentContext,
+        message: &str,
+        window: u32,
+    ) -> Option<String> {
+        let store = self.memory.as_ref()?;
+        let project = crate::memory::project::identify(&self.working_directory);
+        if let Err(err) = store.register_project(&project).await {
+            tracing::warn!("memory project not recorded: {err:#}");
+        }
+        let user_texts = |m: &Message| -> Option<String> {
+            m.content.iter().find_map(|b| match b {
+                ContentBlock::Text { text } => Some(text.clone()),
+                _ => None,
+            })
+        };
+        let previous = context
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == Role::User)
+            .and_then(user_texts);
+        let first_request = !context.messages.iter().any(|m| m.role == Role::User);
+        store
+            .recall(&RecallRequest {
+                project: &project,
+                message,
+                previous: previous.as_deref(),
+                window,
+                first_request,
+                root: &self.working_directory,
+            })
+            .await
+    }
+
     pub fn with_project_notes(mut self, enabled: bool) -> Self {
         self.project_notes = enabled;
         self
@@ -1301,9 +1369,12 @@ impl AgentService {
         )
         .await;
 
-        // Add user message
-        let user_msg = Message::user(user_message.clone());
-        context.add_message(user_msg);
+        // Add user message. The recall block goes in front of this turn's text
+        // in the context only; the database keeps the plain message (D5).
+        let block = self
+            .memory_block(&context, &user_message, context_window)
+            .await;
+        context.add_message(user_turn(block, &user_message));
 
         // Save user message to database
         let _user_db_msg = message_service
@@ -1504,9 +1575,11 @@ impl AgentService {
         )
         .await;
 
-        // Add user message
-        let user_msg = Message::user(user_message.clone());
-        context.add_message(user_msg);
+        // Add user message, with the recall block in front (see send_message_with_tools_inner).
+        let block = self
+            .memory_block(&context, &user_message, context_window)
+            .await;
+        context.add_message(user_turn(block, &user_message));
 
         // Size the answer from what the configured provider context window
         // leaves after the system prompt. A prompt that already fills it
@@ -4007,5 +4080,102 @@ mod tests {
             requests[0].max_tokens < requests[1].max_tokens,
             "the small routed model must use its smaller context-window budget"
         );
+    }
+
+    fn memory_test_store(context: &ServiceContext) -> Arc<crate::memory::MemoryStore> {
+        Arc::new(crate::memory::MemoryStore::new(
+            context.pool(),
+            crate::config::MemoryConfig::default(),
+        ))
+    }
+
+    #[tokio::test]
+    async fn recall_block_reaches_the_model_but_not_the_database() {
+        use crate::memory::model::MemoryScope;
+        use crate::memory::model::{MemoryCategory, MemorySource, NewMemory};
+
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let store = memory_test_store(&context);
+        store
+            .save(NewMemory {
+                content: "Prefers Tokio for async work".to_string(),
+                scope: MemoryScope::Global,
+                category: MemoryCategory::Preference,
+                source: MemorySource::User,
+                importance: 4,
+                replaces: None,
+                session_id: None,
+                expires_at: None,
+            })
+            .await
+            .unwrap();
+
+        let provider = Arc::new(ScriptedProvider::new(8192, vec![Ok(text_reply("ok"))]));
+        let service = AgentService::new(provider.clone(), context.clone())
+            .with_working_directory(workdir.path().to_path_buf())
+            .with_memory(store);
+        service
+            .send_message_with_tools(
+                session,
+                "which async runtime should I use?".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        // The model sees the block in front of the user's text...
+        let sent = provider.requests();
+        let last_user = sent[0]
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == Role::User)
+            .unwrap();
+        let texts: Vec<&str> = last_user
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(texts[0].contains("<recalled_memories>") && texts[0].contains("Prefers Tokio"));
+        assert_eq!(texts[1], "which async runtime should I use?");
+
+        // ...but the stored conversation keeps only the user's own words.
+        let stored: Vec<String> =
+            sqlx::query_scalar("SELECT content FROM messages WHERE role = 'user'")
+                .fetch_all(&context.pool())
+                .await
+                .unwrap();
+        assert!(
+            stored.iter().all(|c| !c.contains("<recalled_memories>")),
+            "{stored:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn without_memory_the_user_turn_is_unchanged() {
+        let workdir = tempfile::tempdir().unwrap();
+        let context = test_context().await;
+        let session = session_for(&context).await;
+        let provider = Arc::new(ScriptedProvider::new(8192, vec![Ok(text_reply("ok"))]));
+        let service = AgentService::new(provider.clone(), context)
+            .with_working_directory(workdir.path().to_path_buf());
+        service
+            .send_message_with_tools(session, "hello".to_string(), None)
+            .await
+            .unwrap();
+
+        let sent = provider.requests();
+        let last_user = sent[0]
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == Role::User)
+            .unwrap();
+        assert_eq!(last_user.content.len(), 1);
     }
 }
