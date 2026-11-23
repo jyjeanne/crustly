@@ -31,6 +31,7 @@ pub mod web_search;
 
 // Tool implementations - Phase 3: Workflow & Integration
 pub mod context;
+pub mod forget_memory;
 pub mod http;
 pub mod plan_tool;
 pub mod save_memory;

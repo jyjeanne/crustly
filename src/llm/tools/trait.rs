@@ -290,6 +290,13 @@ pub trait Tool: Send + Sync {
         self.requires_approval()
     }
 
+    /// Text shown in the approval prompt in place of the raw input, for tools
+    /// whose input does not say what will happen (for example, the content of
+    /// the memories a call will forget). `None` shows the input as before.
+    async fn approval_preview(&self, _input: &Value) -> Option<String> {
+        None
+    }
+
     /// Execute the tool with given input
     async fn execute(&self, input: Value, context: &ToolExecutionContext) -> Result<ToolResult>;
 

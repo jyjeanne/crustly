@@ -283,6 +283,7 @@ impl AgentService {
                     continue;
                 };
 
+                let preview = tool.approval_preview(&input).await;
                 let info = ToolApprovalInfo {
                     tool_name: name.clone(),
                     tool_description: tool.description().to_string(),
@@ -292,6 +293,7 @@ impl AgentService {
                         .iter()
                         .map(|c| format!("{:?}", c))
                         .collect(),
+                    preview,
                 };
                 // Log the inputs: for `bash` the command decides whether the
                 // allowlist trusts it, and without it a prompt here is

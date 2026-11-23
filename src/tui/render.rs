@@ -1612,6 +1612,26 @@ fn render_approval_capabilities(request: &super::events::ToolApprovalRequest) ->
     lines
 }
 
+/// What the tool says the call will do (for example, the memories a forget
+/// call removes), shown above the raw input. Empty when the tool gave none.
+fn render_approval_preview(request: &super::events::ToolApprovalRequest) -> Vec<Line<'_>> {
+    let Some(preview) = &request.preview else {
+        return Vec::new();
+    };
+    let mut lines = vec![Line::from(vec![Span::styled(
+        "What will happen:",
+        Style::default().fg(Color::DarkGray),
+    )])];
+    for line in preview.lines() {
+        lines.push(Line::from(vec![Span::styled(
+            line.to_string(),
+            Style::default().fg(Color::Yellow),
+        )]));
+    }
+    lines.push(Line::from(""));
+    lines
+}
+
 /// Full pretty-printed JSON of the tool input, used when the user has
 /// toggled "View Details".
 fn render_approval_input_detailed(request: &super::events::ToolApprovalRequest) -> Vec<Line<'_>> {
@@ -1724,8 +1744,10 @@ fn render_approval(f: &mut Frame, app: &App, area: Rect) {
     let mut lines = render_approval_header(request, model_name);
     lines.extend(render_approval_capabilities(request));
     if app.show_approval_details {
+        lines.extend(render_approval_preview(request));
         lines.extend(render_approval_input_detailed(request));
     } else {
+        lines.extend(render_approval_preview(request));
         lines.extend(render_approval_input_summary(request));
     }
     lines.push(Line::from(""));
@@ -3869,6 +3891,7 @@ mod tests {
             request_id: uuid::Uuid::new_v4(),
             tool_name: "write_file".to_string(),
             tool_description: "Writes contents to a file".to_string(),
+            preview: None,
             tool_input,
             capabilities,
             response_tx,
