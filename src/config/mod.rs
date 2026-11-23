@@ -136,6 +136,9 @@ pub struct MemoryConfig {
     /// Automatic extraction of memories from conversations (`[memory.extraction]`).
     #[serde(default)]
     pub extraction: MemoryExtractionConfig,
+    /// Retention and consolidation (`[memory.lifecycle]`, section 13.4).
+    #[serde(default)]
+    pub lifecycle: MemoryLifecycleConfig,
 }
 
 /// `[memory.embeddings]`: where vectors come from, and how they are used.
@@ -273,6 +276,7 @@ impl Default for MemoryConfig {
             recent_work: true,
             embeddings: MemoryEmbeddingsConfig::default(),
             extraction: MemoryExtractionConfig::default(),
+            lifecycle: MemoryLifecycleConfig::default(),
         }
     }
 }
@@ -296,6 +300,14 @@ impl MemoryConfig {
                 default_recall_max_tokens()
             );
             self.recall_max_tokens = default_recall_max_tokens();
+        }
+        let life = &mut self.lifecycle;
+        if !(1..=3650).contains(&life.episode_retention_days) {
+            tracing::warn!(
+                "memory.lifecycle.episode_retention_days {} is outside 1-3650; using 180",
+                life.episode_retention_days
+            );
+            life.episode_retention_days = 180;
         }
         let x = &mut self.extraction;
         if !(1..=100).contains(&x.every_n_user_messages) {
@@ -2281,4 +2293,24 @@ enabled = false
         assert_eq!(memory.pinned_min_importance, 2);
         assert_eq!(memory.recall_max_tokens, 1200);
     }
+}
+
+/// `[memory.lifecycle]`: how long episodes are kept (section 13.4).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryLifecycleConfig {
+    /// Episodes older than this many days are archived by consolidation.
+    #[serde(default = "default_episode_retention_days")]
+    pub episode_retention_days: i64,
+}
+
+impl Default for MemoryLifecycleConfig {
+    fn default() -> Self {
+        Self {
+            episode_retention_days: default_episode_retention_days(),
+        }
+    }
+}
+
+fn default_episode_retention_days() -> i64 {
+    180
 }

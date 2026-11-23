@@ -7,6 +7,7 @@
 //! inside the store are returned as `Result`; callers on the request path log
 //! them and carry on, so memory never fails a request.
 
+pub mod consolidate;
 pub mod embed;
 pub mod extract;
 pub mod extraction;

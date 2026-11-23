@@ -749,6 +749,12 @@ pub enum MemoryCommands {
         #[arg(long)]
         from_notes: bool,
     },
+    /// Expire, archive, merge and summarise memories; reports unless --yes
+    Consolidate {
+        /// Apply the changes (archive, merge, write lessons)
+        #[arg(long)]
+        yes: bool,
+    },
     /// Memories extracted from conversations, waiting for approval
     Review,
     /// Approve a pending memory, so it is recalled from now on
@@ -1413,6 +1419,34 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                     count,
                     display_path(std::path::Path::new(&root))
                 );
+            }
+        }
+        MemoryCommands::Consolidate { yes } => {
+            let report = store.consolidate(&project, yes).await?;
+            let verb = if yes { "Changed" } else { "Would change" };
+            println!("{verb}: {} expired, {} old episodes archived, {} duplicates merged, {} lessons written.",
+                report.expired,
+                report.episodes_archived,
+                report.merged,
+                report.lessons_written
+            );
+            for (older, newer, score) in &report.merge_candidates {
+                println!(
+                    "  near-duplicate ({score:.2}): {} [m:{}] is superseded by {} [m:{}]",
+                    older.content,
+                    &older.id.simple().to_string()[..8],
+                    newer.content,
+                    &newer.id.simple().to_string()[..8]
+                );
+            }
+            if !report.stale.is_empty() {
+                println!("Not used for a year (keep them or forget them yourself):");
+                for memory in &report.stale {
+                    println!("{}", memory_line(memory));
+                }
+            }
+            if !yes {
+                println!("Run with --yes to apply.");
             }
         }
         MemoryCommands::Review => {
