@@ -241,6 +241,23 @@ impl MemoryStore {
                 // A repeat by the model is not evidence of importance (§8 step 4).
                 self.repo.touch(existing.id, now).await?;
             }
+            // The text is already remembered, but a `replaces` target is still
+            // superseded by it, as long as the same rules allow the replacement.
+            if let Some(old_id) = new.replaces.filter(|old| *old != existing.id) {
+                if status == MemoryStatus::Active {
+                    if let Some(old) = self.repo.get(old_id).await? {
+                        let allowed = old.status == MemoryStatus::Active
+                            && old.scope == new.scope
+                            && !(old.source == MemorySource::User
+                                && new.source != MemorySource::User
+                                && !user_evidence);
+                        if allowed {
+                            self.repo.supersede(old.id, existing.id, actor, now).await?;
+                            self.changed();
+                        }
+                    }
+                }
+            }
             return Ok(SaveOutcome::Duplicate(existing.id));
         }
 

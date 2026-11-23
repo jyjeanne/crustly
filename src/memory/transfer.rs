@@ -221,52 +221,53 @@ pub fn split_notes(text: &str) -> NotesSplit {
 /// section. The heading goes too when no bullet is left under it. Everything
 /// else is kept exactly as it was.
 pub fn remove_bullets(text: &str, remove: &[String]) -> String {
-    let lines: Vec<&str> = text.lines().collect();
-    let heading_at = lines.iter().position(|l| l.trim() == NOTES_HEADING);
+    // Each piece keeps its own line ending, so lines that stay are unchanged
+    // byte for byte (a CRLF file stays CRLF).
+    let pieces: Vec<&str> = text.split_inclusive('\n').collect();
+    let content = |p: &str| p.trim_end_matches(['\r', '\n']).to_string();
+    let heading_at = pieces
+        .iter()
+        .position(|p| content(p).trim() == NOTES_HEADING);
     let section_end = heading_at.map(|h| {
-        lines[h + 1..]
+        pieces[h + 1..]
             .iter()
-            .position(|l| l.starts_with("## "))
+            .position(|p| content(p).starts_with("## "))
             .map(|i| h + 1 + i)
-            .unwrap_or(lines.len())
+            .unwrap_or(pieces.len())
     });
 
     let mut kept: Vec<&str> = Vec::new();
-    for (index, line) in lines.iter().enumerate() {
+    for (index, piece) in pieces.iter().enumerate() {
         let in_section = match (heading_at, section_end) {
             (Some(h), Some(end)) => index > h && index < end,
             _ => false,
         };
         if in_section {
+            let line = content(piece);
             if let Some(bullet) = line.strip_prefix("- ") {
                 if remove.iter().any(|r| r == bullet.trim()) {
                     continue;
                 }
             }
         }
-        kept.push(line);
+        kept.push(piece);
     }
 
     // Drop the heading when its section now holds no bullets.
     if heading_at.is_some() {
         let section_has_bullet = kept
             .iter()
-            .skip_while(|l| l.trim() != NOTES_HEADING)
+            .skip_while(|p| content(p).trim() != NOTES_HEADING)
             .skip(1)
-            .take_while(|l| !l.starts_with("## "))
-            .any(|l| l.starts_with("- "));
+            .take_while(|p| !content(p).starts_with("## "))
+            .any(|p| content(p).starts_with("- "));
         if !section_has_bullet {
-            if let Some(pos) = kept.iter().position(|l| l.trim() == NOTES_HEADING) {
+            if let Some(pos) = kept.iter().position(|p| content(p).trim() == NOTES_HEADING) {
                 kept.remove(pos);
             }
         }
     }
-
-    let mut out = kept.join("\n");
-    if text.ends_with('\n') {
-        out.push('\n');
-    }
-    out
+    kept.concat()
 }
 
 /// Move the `## Memories` bullets of `notes` into the database, as project

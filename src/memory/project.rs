@@ -58,6 +58,13 @@ fn find_root(start: &Path) -> Option<(PathBuf, Option<PathBuf>)> {
             let text = fs::read_to_string(&dot_git).ok()?;
             let linked = text.trim().strip_prefix("gitdir:")?.trim();
             let linked = dir.join(linked);
+            // Only a worktree belongs to its main repository. A submodule's
+            // ".git" file points into <super>/.git/modules/, and a submodule
+            // is its own project.
+            let is_worktree = linked.components().any(|c| c.as_os_str() == "worktrees");
+            if !is_worktree {
+                return Some((dir.to_path_buf(), None));
+            }
             // <main>/.git/worktrees/<name> -> <main>/.git -> <main>
             let main_git = linked.parent()?.parent()?.to_path_buf();
             let main_root = fs::canonicalize(main_git.parent()?).ok()?;
