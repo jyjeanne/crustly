@@ -403,13 +403,29 @@ impl MemoryRepository {
     /// Move every memory of project `old` to project `new`, then forget `old`.
     /// `new` must already exist in memory_projects (upsert it first).
     pub async fn relink_project(&self, old: &ProjectId, new: &ProjectId) -> Result<u64> {
+        // Relinking a project to itself would delete it: the final DELETE
+        // cascades to its memories. Refuse before anything is written.
+        if old == new {
+            anyhow::bail!("that is already this project; nothing to relink");
+        }
         let mut tx = self.pool.begin().await?;
-        let moved = sqlx::query("UPDATE memories SET project_id = ? WHERE project_id = ?")
-            .bind(new)
-            .bind(old)
-            .execute(&mut *tx)
-            .await?
-            .rows_affected();
+        // A memory whose text the target project already holds as an active
+        // or pending copy would break the unique index if moved as active. It
+        // moves as archived instead, keeping its history. Everything else
+        // moves unchanged.
+        let moved = sqlx::query(
+            "UPDATE memories SET project_id = ?1, \
+             status = CASE WHEN status IN ('active', 'pending') AND content_hash IN ( \
+                 SELECT content_hash FROM memories \
+                 WHERE project_id = ?1 AND status IN ('active', 'pending')) \
+               THEN 'archived' ELSE status END \
+             WHERE project_id = ?2",
+        )
+        .bind(new)
+        .bind(old)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
         sqlx::query("DELETE FROM memory_projects WHERE id = ?")
             .bind(old)
             .execute(&mut *tx)
