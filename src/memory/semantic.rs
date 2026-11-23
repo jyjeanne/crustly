@@ -305,9 +305,18 @@ pub async fn archive_near_duplicates(
             let Some(other) = repo.get(*other_id).await? else {
                 continue;
             };
-            let older = (other.created_at, other.id.to_string())
-                < (memory.created_at, memory.id.to_string());
-            if other.scope == memory.scope && other.status == MemoryStatus::Active && older {
+            if other.scope != memory.scope || other.status != MemoryStatus::Active {
+                continue;
+            }
+            // Whichever of the two is newer is archived, however the check
+            // was reached, so the outcome does not depend on the order the
+            // worker embeds them in.
+            let other_is_newer = (other.created_at, other.id.to_string())
+                > (memory.created_at, memory.id.to_string());
+            if other_is_newer {
+                repo.archive(other.id, "consolidator", now).await?;
+                archived += 1;
+            } else {
                 repo.archive(memory.id, "consolidator", now).await?;
                 archived += 1;
                 break;
