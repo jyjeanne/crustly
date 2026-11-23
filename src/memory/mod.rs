@@ -12,6 +12,7 @@ pub mod project;
 pub mod recall;
 pub mod secret_scan;
 pub mod transfer;
+pub mod vector;
 
 use crate::config::MemoryConfig;
 use crate::db::repository::memory::InsertMemory;
