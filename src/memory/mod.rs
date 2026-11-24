@@ -436,7 +436,16 @@ impl MemoryStore {
         };
         // Memories about a path the message mentions count as a keyword match
         // at the best score (K = 1 in section 13.5), so they pass the floor.
-        let mentioned = paths::mentioned_paths(request.message);
+        // An absolute path in the message is matched in its project-relative
+        // form too, as globs are written.
+        let root = &request.project.root;
+        let mentioned: Vec<String> = paths::mentioned_paths(request.message)
+            .into_iter()
+            .flat_map(|m| {
+                let relative = paths::project_relative(&m, root, root).filter(|r| *r != m);
+                std::iter::once(m).chain(relative)
+            })
+            .collect();
         let mut path_hits: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
         if !mentioned.is_empty() {
             for (id, glob) in self.repo.path_globs_for(&project_id).await? {
@@ -679,39 +688,58 @@ impl MemoryStore {
         Ok(Ok(()))
     }
 
-    /// Memories about `path` that this session has not been shown yet. Each
-    /// memory is shown once per session, since the tool result that carried it
-    /// stays in the conversation.
+    /// Memories about `path` that this session has not been shown yet. `path`
+    /// is a tool's path argument: relative to `working_dir`, or absolute; it
+    /// is matched in its project-relative form, as globs are written.
+    ///
+    /// Nothing is marked here: the caller passes the memories it actually
+    /// sends to `mark_shown`, so one cut by a size cap is offered again later.
     pub async fn memories_for_path(
         &self,
         project: &ProjectIdentity,
         session: Uuid,
         path: &str,
+        working_dir: &Path,
     ) -> Result<Vec<Memory>> {
+        let Some(relative) = paths::project_relative(path, working_dir, &project.root) else {
+            return Ok(Vec::new());
+        };
         let mut hits: Vec<Uuid> = self
             .repo
             .path_globs_for(&project.id)
             .await?
             .into_iter()
-            .filter(|(_, glob)| paths::matches(std::slice::from_ref(glob), path))
+            .filter(|(_, glob)| paths::matches(std::slice::from_ref(glob), &relative))
             .map(|(id, _)| id)
             .collect();
         hits.sort();
         hits.dedup();
+        let shown: Vec<Uuid> = match self.shown.lock() {
+            Ok(shown) => hits
+                .iter()
+                .copied()
+                .filter(|id| shown.contains(&(session, *id)))
+                .collect(),
+            Err(_) => Vec::new(),
+        };
         let mut out = Vec::new();
-        for id in hits {
-            let fresh = self
-                .shown
-                .lock()
-                .map(|mut shown| shown.insert((session, id)))
-                .unwrap_or(false);
-            if fresh {
-                if let Some(memory) = self.repo.get(id).await? {
-                    out.push(memory);
-                }
+        for id in hits.into_iter().filter(|id| !shown.contains(id)) {
+            if let Some(memory) = self.repo.get(id).await? {
+                out.push(memory);
             }
         }
         Ok(out)
+    }
+
+    /// Record that these memories were sent with a tool result in `session`.
+    /// Each is sent once per session, since the tool result that carried it
+    /// stays in the conversation.
+    pub fn mark_shown(&self, session: Uuid, ids: &[Uuid]) {
+        if let Ok(mut shown) = self.shown.lock() {
+            for id in ids {
+                shown.insert((session, *id));
+            }
+        }
     }
 
     /// Memories whose id starts with `prefix`, for the short ids shown to users.

@@ -334,6 +334,11 @@ impl OllamaProvider {
                 for content in tool_results {
                     messages.push(ChatMessage::tool(content));
                 }
+                // Text sent with the results (notes saved about the files the
+                // tools used) follows them as a user message.
+                if !text_parts.is_empty() {
+                    messages.push(ChatMessage::new(MessageRole::User, text_parts.join("\n")));
+                }
             } else {
                 let mut chat_msg = ChatMessage::new(role, text_parts.join("\n"));
                 if !images.is_empty() {
@@ -1555,6 +1560,35 @@ mod tests {
         );
         assert_eq!(ollama_request.messages[1].role, MessageRole::Tool);
         assert_eq!(ollama_request.messages[1].content, "file contents");
+    }
+
+    /// Notes about the files a tool used ride in the tool-result message as a
+    /// text block; they must reach the model, after the tool messages.
+    #[test]
+    fn to_ollama_request_keeps_text_sent_with_tool_results() {
+        let provider = OllamaProvider::default_local();
+        let request = LLMRequest::new(
+            "llama3.2",
+            vec![Message {
+                role: Role::User,
+                content: vec![
+                    ContentBlock::ToolResult {
+                        tool_use_id: "call_1".to_string(),
+                        content: "file contents".to_string(),
+                        is_error: None,
+                    },
+                    ContentBlock::Text {
+                        text: "<recalled_memories>note</recalled_memories>".to_string(),
+                    },
+                ],
+            }],
+        );
+
+        let ollama_request = provider.to_ollama_request(request);
+        assert_eq!(ollama_request.messages.len(), 2);
+        assert_eq!(ollama_request.messages[0].role, MessageRole::Tool);
+        assert_eq!(ollama_request.messages[1].role, MessageRole::User);
+        assert!(ollama_request.messages[1].content.contains("note"));
     }
 
     #[test]

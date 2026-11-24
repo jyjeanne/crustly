@@ -824,6 +824,16 @@ impl QwenProvider {
                         }
                     }
                 }
+                // Text sent with the results (notes saved about the files the
+                // tools used) follows them as a user message.
+                if !text_parts.is_empty() {
+                    messages.push(QwenMessage {
+                        role: "user".to_string(),
+                        content: Some(text_parts.join("\n")),
+                        tool_calls: None,
+                        tool_call_id: None,
+                    });
+                }
             }
             // Handle regular text messages
             else {
@@ -2413,6 +2423,36 @@ Here's my analysis of the code."#;
         assert_eq!(qwen_request.top_p, Some(0.8));
         assert_eq!(qwen_request.top_k, None);
         assert_eq!(qwen_request.repetition_penalty, Some(1.05));
+    }
+
+    /// Notes about the files a tool used ride in the tool-result message as a
+    /// text block; they must reach the model after the tool results.
+    #[test]
+    fn test_text_sent_with_tool_results_follows_them() {
+        let provider = QwenProvider::local("http://localhost:8000/v1/chat/completions".to_string());
+        let request = LLMRequest::new(
+            "qwen2.5-coder-7b-instruct",
+            vec![Message {
+                role: Role::User,
+                content: vec![
+                    ContentBlock::ToolResult {
+                        tool_use_id: "call_1".to_string(),
+                        content: "file contents".to_string(),
+                        is_error: None,
+                    },
+                    ContentBlock::Text {
+                        text: "<recalled_memories>note</recalled_memories>".to_string(),
+                    },
+                ],
+            }],
+        );
+
+        let qwen_request = provider.to_qwen_request(request);
+        let last = qwen_request.messages.last().expect("messages");
+        assert_eq!(last.role, "user");
+        assert!(last.content.as_deref().unwrap_or("").contains("note"));
+        let n = qwen_request.messages.len();
+        assert!(n >= 2, "the tool result comes first");
     }
 
     /// Qwen3 non-thinking gets top_p=0.8/top_k=20 and no repetition penalty
