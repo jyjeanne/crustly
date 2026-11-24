@@ -7,6 +7,7 @@
 use crate::memory::model::{
     Memory, MemoryCategory, MemoryScope, MemorySource, MemoryStatus, ProjectId,
 };
+use crate::db::retry::{retry_db_sqlx, DbRetryConfig};
 use crate::memory::project::ProjectIdentity;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -79,38 +80,48 @@ impl MemoryRepository {
     /// or import.
     pub async fn insert(&self, memory: &InsertMemory, actor: &str) -> Result<()> {
         let (scope, project_id) = scope_columns(&memory.scope);
-        let mut tx = self.pool.begin().await?;
-        sqlx::query(
-            "INSERT INTO memories (id, scope, project_id, category, content, content_hash, \
-             source, source_session_id, importance, status, created_at, updated_at, expires_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        // The whole transaction is retried on a busy lock. A deferred
+        // transaction that reads, then writes, can get SQLITE_BUSY at once
+        // without waiting, so `busy_timeout` alone does not cover it.
+        let (scope, project_id) = (&scope, &project_id);
+        retry_db_sqlx(
+            || async move {
+                let mut tx = self.pool.begin().await?;
+                sqlx::query(
+                    "INSERT INTO memories (id, scope, project_id, category, content, content_hash, \
+                     source, source_session_id, importance, status, created_at, updated_at, expires_at) \
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                )
+                .bind(memory.id.to_string())
+                .bind(*scope)
+                .bind(*project_id)
+                .bind(memory.category.as_str())
+                .bind(&memory.content)
+                .bind(&memory.content_hash)
+                .bind(memory.source.as_str())
+                .bind(memory.session_id.map(|s| s.to_string()))
+                .bind(i64::from(memory.importance))
+                .bind(memory.status.as_str())
+                .bind(memory.now.timestamp())
+                .bind(memory.now.timestamp())
+                .bind(memory.expires_at.map(|t| t.timestamp()))
+                .execute(&mut *tx)
+                .await?;
+                record_event(
+                    &mut tx,
+                    memory.id,
+                    "created",
+                    actor,
+                    memory.session_id,
+                    memory.now,
+                )
+                .await?;
+                tx.commit().await
+            },
+            &DbRetryConfig::default(),
         )
-        .bind(memory.id.to_string())
-        .bind(scope)
-        .bind(project_id)
-        .bind(memory.category.as_str())
-        .bind(&memory.content)
-        .bind(&memory.content_hash)
-        .bind(memory.source.as_str())
-        .bind(memory.session_id.map(|s| s.to_string()))
-        .bind(i64::from(memory.importance))
-        .bind(memory.status.as_str())
-        .bind(memory.now.timestamp())
-        .bind(memory.now.timestamp())
-        .bind(memory.expires_at.map(|t| t.timestamp()))
-        .execute(&mut *tx)
         .await
         .context("inserting memory")?;
-        record_event(
-            &mut tx,
-            memory.id,
-            "created",
-            actor,
-            memory.session_id,
-            memory.now,
-        )
-        .await?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -745,7 +756,7 @@ async fn record_event(
     actor: &str,
     session_id: Option<Uuid>,
     now: DateTime<Utc>,
-) -> Result<()> {
+) -> sqlx::Result<()> {
     sqlx::query(
         "INSERT INTO memory_events (memory_id, event, actor, session_id, created_at) \
          VALUES (?, ?, ?, ?, ?)",
@@ -756,8 +767,7 @@ async fn record_event(
     .bind(session_id.map(|s| s.to_string()))
     .bind(now.timestamp())
     .execute(&mut **tx)
-    .await
-    .context("recording memory event")?;
+    .await?;
     Ok(())
 }
 

@@ -224,6 +224,63 @@ impl PoolExt for SqlitePool {
     }
 }
 
+
+/// The same SQL with its line endings switched between LF and CRLF.
+fn other_line_endings(sql: &str) -> String {
+    if sql.contains("\r\n") {
+        sql.replace("\r\n", "\n")
+    } else {
+        sql.replace('\n', "\r\n")
+    }
+}
+
+/// sqlx checksums each migration's file bytes, so the same SQL checked out
+/// with other line endings (CRLF on a Windows checkout, LF elsewhere) has a
+/// different checksum, and the database would refuse it as "modified". A
+/// stored checksum that equals the other line-ending form is the same
+/// migration, so it is updated to this build's value. Any other mismatch is
+/// left for sqlx to refuse.
+async fn reconcile_line_endings(
+    conn: &mut sqlx::SqliteConnection,
+    migrator: &sqlx::migrate::Migrator,
+) -> anyhow::Result<()> {
+    use sha2::{Digest, Sha384};
+    let has_table: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    if has_table == 0 {
+        return Ok(());
+    }
+    for migration in migrator.iter() {
+        let other = other_line_endings(&migration.sql);
+        if other == migration.sql {
+            continue;
+        }
+        let other_checksum = Sha384::digest(other.as_bytes()).to_vec();
+        let stored: Option<Vec<u8>> =
+            sqlx::query_scalar("SELECT checksum FROM _sqlx_migrations WHERE version = ?")
+                .bind(migration.version)
+                .fetch_optional(&mut *conn)
+                .await?;
+        if let Some(stored) = stored {
+            if stored == other_checksum && stored.as_slice() != migration.checksum.as_ref() {
+                tracing::info!(
+                    "migration {} was recorded with other line endings; updating its checksum",
+                    migration.version
+                );
+                sqlx::query("UPDATE _sqlx_migrations SET checksum = ? WHERE version = ?")
+                    .bind(migration.checksum.as_ref().to_vec())
+                    .bind(migration.version)
+                    .execute(&mut *conn)
+                    .await?;
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -476,60 +533,4 @@ mod tests {
             "upgrading from the pre-modernization schema must not lose existing messages"
         );
     }
-}
-
-/// The same SQL with its line endings switched between LF and CRLF.
-fn other_line_endings(sql: &str) -> String {
-    if sql.contains("\r\n") {
-        sql.replace("\r\n", "\n")
-    } else {
-        sql.replace('\n', "\r\n")
-    }
-}
-
-/// sqlx checksums each migration's file bytes, so the same SQL checked out
-/// with other line endings (CRLF on a Windows checkout, LF elsewhere) has a
-/// different checksum, and the database would refuse it as "modified". A
-/// stored checksum that equals the other line-ending form is the same
-/// migration, so it is updated to this build's value. Any other mismatch is
-/// left for sqlx to refuse.
-async fn reconcile_line_endings(
-    conn: &mut sqlx::SqliteConnection,
-    migrator: &sqlx::migrate::Migrator,
-) -> anyhow::Result<()> {
-    use sha2::{Digest, Sha384};
-    let has_table: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
-    )
-    .fetch_one(&mut *conn)
-    .await?;
-    if has_table == 0 {
-        return Ok(());
-    }
-    for migration in migrator.iter() {
-        let other = other_line_endings(&migration.sql);
-        if other == migration.sql {
-            continue;
-        }
-        let other_checksum = Sha384::digest(other.as_bytes()).to_vec();
-        let stored: Option<Vec<u8>> =
-            sqlx::query_scalar("SELECT checksum FROM _sqlx_migrations WHERE version = ?")
-                .bind(migration.version)
-                .fetch_optional(&mut *conn)
-                .await?;
-        if let Some(stored) = stored {
-            if stored == other_checksum && stored.as_slice() != migration.checksum.as_ref() {
-                tracing::info!(
-                    "migration {} was recorded with other line endings; updating its checksum",
-                    migration.version
-                );
-                sqlx::query("UPDATE _sqlx_migrations SET checksum = ? WHERE version = ?")
-                    .bind(migration.checksum.as_ref().to_vec())
-                    .bind(migration.version)
-                    .execute(&mut *conn)
-                    .await?;
-            }
-        }
-    }
-    Ok(())
 }
