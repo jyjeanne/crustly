@@ -8,11 +8,13 @@
 
 use super::model::{Memory, MemoryCategory, MemoryScope, MemorySource, NewMemory, SaveOutcome};
 use super::project::ProjectIdentity;
+use super::semantic::near_duplicate_to_archive;
 use super::vector::similarity;
 use super::MemoryStore;
 use crate::llm::provider::{ContentBlock, LLMRequest, Message};
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
+use std::collections::HashSet;
 use uuid::Uuid;
 
 /// Lower bound of the merge-candidate band; above it a pair is a duplicate
@@ -35,7 +37,7 @@ const EPISODES_PER_LESSON: usize = 10;
 pub struct ConsolidationReport {
     pub expired: usize,
     pub episodes_archived: usize,
-    /// Near-duplicate pairs (older, newer, similarity) and whether they were merged.
+    /// Near-duplicate pairs: (superseded, kept, similarity).
     pub merge_candidates: Vec<(Memory, Memory, f32)>,
     pub merged: usize,
     /// Facts and lessons not used for a year, for the user to keep or forget.
@@ -75,6 +77,9 @@ impl MemoryStore {
         let now = Utc::now();
         let mut report = ConsolidationReport::default();
         let active = self.repo.list_for_project(&project.id, false).await?;
+        // What this run archives (or would): the later steps leave it alone,
+        // so a report without `apply` matches what `apply` does.
+        let mut gone: HashSet<Uuid> = HashSet::new();
 
         // Expiry: a memory past its date is no longer true for the user.
         for memory in active
@@ -82,6 +87,7 @@ impl MemoryStore {
             .filter(|m| m.expires_at.is_some_and(|t| t <= now))
         {
             report.expired += 1;
+            gone.insert(memory.id);
             if apply {
                 self.repo.archive(memory.id, "consolidator", now).await?;
             }
@@ -89,11 +95,13 @@ impl MemoryStore {
 
         // Episodes past the retention period are archived.
         let retention = self.config.lifecycle.episode_retention_days;
-        for memory in active
+        let old_episodes: Vec<&Memory> = active
             .iter()
-            .filter(|m| is_expired_episode(m, retention, now))
-        {
+            .filter(|m| !gone.contains(&m.id) && is_expired_episode(m, retention, now))
+            .collect();
+        for memory in old_episodes {
             report.episodes_archived += 1;
+            gone.insert(memory.id);
             if apply {
                 self.repo.archive(memory.id, "consolidator", now).await?;
             }
@@ -106,13 +114,17 @@ impl MemoryStore {
             .cloned()
             .collect();
 
-        // Near-duplicates: pairs in the merge band, the older superseded by the newer.
+        // Near-duplicates: pairs in the merge band. Which one is superseded
+        // follows the near-duplicate rules: same category only, never
+        // episodes, the user's copy first, then the newer one.
         if let Some(model) = self.embedding_model() {
             let vectors = self.repo.vectors_for(&project.id, &model, now).await?;
-            let by_id: std::collections::HashMap<Uuid, &Memory> =
-                active.iter().map(|m| (m.id, m)).collect();
-            let mut merged_already: std::collections::HashSet<Uuid> =
-                std::collections::HashSet::new();
+            let by_id: std::collections::HashMap<Uuid, &Memory> = active
+                .iter()
+                .filter(|m| !gone.contains(&m.id))
+                .map(|m| (m.id, m))
+                .collect();
+            let mut merged_already: HashSet<Uuid> = HashSet::new();
             for (i, (a_id, a_vec)) in vectors.iter().enumerate() {
                 for (b_id, b_vec) in vectors.iter().skip(i + 1) {
                     let (Some(a), Some(b)) = (by_id.get(a_id), by_id.get(b_id)) else {
@@ -127,22 +139,21 @@ impl MemoryStore {
                     if !(MERGE_LOW..MERGE_HIGH).contains(&score) {
                         continue;
                     }
-                    let (older, newer) = if (a.created_at, a.id) <= (b.created_at, b.id) {
-                        (*a, *b)
-                    } else {
-                        (*b, *a)
+                    let Some(loser) = near_duplicate_to_archive(a, b) else {
+                        continue;
                     };
+                    let (superseded, kept) = if loser.id == a.id { (*a, *b) } else { (*b, *a) };
                     report
                         .merge_candidates
-                        .push((older.clone(), newer.clone(), score));
+                        .push((superseded.clone(), kept.clone(), score));
                     if apply
-                        && !merged_already.contains(&older.id)
-                        && !merged_already.contains(&newer.id)
+                        && !merged_already.contains(&superseded.id)
+                        && !merged_already.contains(&kept.id)
                     {
                         self.repo
-                            .supersede(older.id, newer.id, "consolidator", now)
+                            .supersede(superseded.id, kept.id, "consolidator", now)
                             .await?;
-                        merged_already.insert(older.id);
+                        merged_already.insert(superseded.id);
                         report.merged += 1;
                     }
                 }
@@ -151,7 +162,7 @@ impl MemoryStore {
 
         // Episodes become one lesson once there are enough of them.
         if apply {
-            report.lessons_written = self.lesson_from_episodes(project, &active).await?;
+            report.lessons_written = self.lesson_from_episodes(project, &active, &gone).await?;
         }
         Ok(report)
     }
@@ -164,18 +175,30 @@ impl MemoryStore {
     }
 
     /// Write one lesson from the active episodes that do not yet feed one.
-    /// Needs extraction's model; without it, nothing is written.
+    /// Needs extraction on and its model; without them, nothing is written.
+    /// `gone` holds what this run archived, which is left out.
     async fn lesson_from_episodes(
         &self,
         project: &ProjectIdentity,
         active: &[Memory],
+        gone: &HashSet<Uuid>,
     ) -> Result<usize> {
+        if !self.config.extraction.enabled {
+            return Ok(0);
+        }
         let Some(handle) = self.extraction.as_ref() else {
             return Ok(0);
         };
+        // An episode feeds one lesson at most; without this, every run wrote
+        // the same lesson again in other words.
+        let folded = self.repo.folded_sources(&project.id).await?;
         let mut episodes: Vec<&Memory> = active
             .iter()
-            .filter(|m| m.category == MemoryCategory::Episode)
+            .filter(|m| {
+                m.category == MemoryCategory::Episode
+                    && !gone.contains(&m.id)
+                    && !folded.contains(&m.id)
+            })
             .collect();
         if episodes.len() < EPISODES_FOR_LESSON {
             return Ok(0);

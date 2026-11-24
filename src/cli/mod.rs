@@ -1421,6 +1421,24 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
             }
         }
         MemoryCommands::Consolidate { yes } => {
+            // Lessons are written by the extraction model, so the provider is
+            // built only when they can be: on apply, with extraction on.
+            let with_provider;
+            let store = if yes && config.memory.extraction.enabled {
+                match crate::llm::provider::create_provider(config) {
+                    Ok(provider) => {
+                        with_provider =
+                            build_memory_store(db.pool(), config, false, Some(&provider));
+                        &with_provider
+                    }
+                    Err(err) => {
+                        eprintln!("No lessons this time: the provider is not available ({err:#}).");
+                        &store
+                    }
+                }
+            } else {
+                &store
+            };
             let report = store.consolidate(&project, yes).await?;
             let verb = if yes { "Changed" } else { "Would change" };
             println!("{verb}: {} expired, {} old episodes archived, {} duplicates merged, {} lessons written.",
@@ -1429,13 +1447,16 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                 report.merged,
                 report.lessons_written
             );
-            for (older, newer, score) in &report.merge_candidates {
+            if yes && !config.memory.extraction.enabled {
+                println!("Lessons from episodes need [memory.extraction] enabled = true.");
+            }
+            for (superseded, kept, score) in &report.merge_candidates {
                 println!(
                     "  near-duplicate ({score:.2}): {} [m:{}] is superseded by {} [m:{}]",
-                    older.content,
-                    &older.id.simple().to_string()[..8],
-                    newer.content,
-                    &newer.id.simple().to_string()[..8]
+                    superseded.content,
+                    &superseded.id.simple().to_string()[..8],
+                    kept.content,
+                    &kept.id.simple().to_string()[..8]
                 );
             }
             if !report.stale.is_empty() {
