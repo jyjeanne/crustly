@@ -524,3 +524,44 @@ async fn an_approved_memory_is_embedded() {
     store.approve(id).await.unwrap().unwrap();
     wait_for_vector(&db, &project, id, &topic_vector("blocking")).await;
 }
+
+/// With embeddings on, a weak keyword match the semantic search did not
+/// return must not outrank a clear semantic match when only one fits.
+#[tokio::test]
+async fn a_clear_semantic_match_beats_a_weak_keyword_match_under_a_tight_budget() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = project(dir.path());
+    let store = MemoryStore::new(
+        database(dir.path()).await.pool().clone(),
+        MemoryConfig::default(),
+    )
+    .with_embedder(FakeEmbedder::working(), fast_runtime());
+    store.register_project(&project).await.unwrap();
+    let scope = MemoryScope::Project(project.id.clone());
+    // Shares the word "server" with the request, but not its topic.
+    save(
+        &store,
+        scope.clone(),
+        "The server config lives in config/server.toml.",
+    )
+    .await;
+    // Shares no word with the request, but its topic.
+    save(
+        &store,
+        scope,
+        "Avoid blocking operations inside Tokio runtime threads.",
+    )
+    .await;
+    wait_until_indexed(&store, 2).await;
+
+    // A budget of 35 tokens: room for one of the two.
+    let block = recall_in_window(
+        &store,
+        &project,
+        "Why does the server stall under load?",
+        560,
+    )
+    .await;
+    assert!(block.contains("blocking operations"), "{block}");
+    assert!(!block.contains("server config"), "{block}");
+}

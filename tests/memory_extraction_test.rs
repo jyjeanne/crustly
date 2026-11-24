@@ -665,3 +665,91 @@ async fn a_session_end_run_over_a_long_backlog_reads_the_newest_turns() {
     store.extract(session, &project, true, false).await.unwrap();
     assert!(provider.last_prompt().contains("ship the CSV export"));
 }
+
+async fn save_episode(store: &MemoryStore, project: &ProjectIdentity, content: &str) {
+    let outcome = store
+        .save(NewMemory {
+            content: content.into(),
+            scope: MemoryScope::Project(project.id.clone()),
+            category: MemoryCategory::Episode,
+            source: MemorySource::Extracted,
+            importance: 3,
+            replaces: None,
+            session_id: None,
+            expires_at: None,
+        })
+        .await
+        .unwrap();
+    assert!(matches!(outcome, SaveOutcome::Created(_)), "{outcome:?}");
+}
+
+async fn first_request_block(
+    store: &MemoryStore,
+    project: &ProjectIdentity,
+    window: u32,
+) -> String {
+    store
+        .recall(&RecallRequest {
+            project,
+            message: "carry on",
+            previous: None,
+            window,
+            first_request: true,
+            root: Path::new("/nonexistent"),
+        })
+        .await
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn an_episode_in_recent_work_is_not_listed_twice() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = database(dir.path()).await;
+    let store = MemoryStore::new(db.pool().clone(), MemoryConfig::default());
+    let project = project(dir.path());
+    store.register_project(&project).await.unwrap();
+    save_episode(
+        &store,
+        &project,
+        "Added CSV export; tests for empty reports are left.",
+    )
+    .await;
+    save_episode(&store, &project, "Fixed the login redirect loop.").await;
+
+    let block = first_request_block(&store, &project, 128_000).await;
+    assert_eq!(block.matches("Added CSV export").count(), 1, "{block}");
+    assert_eq!(block.matches("login redirect loop").count(), 1, "{block}");
+    assert!(block.contains("Recent work"), "{block}");
+}
+
+#[tokio::test]
+async fn recent_work_from_episodes_keeps_to_its_cap_and_keeps_the_newest() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = database(dir.path()).await;
+    let store = MemoryStore::new(db.pool().clone(), MemoryConfig::default());
+    let project = project(dir.path());
+    store.register_project(&project).await.unwrap();
+    for (i, topic) in ["billing", "search", "exports"].iter().enumerate() {
+        let text = format!(
+            "Session {i} on {topic}: {}",
+            "reworked the module, moved helpers, renamed types, updated tests; ".repeat(4)
+        );
+        save_episode(&store, &project, &text).await;
+        // Distinct creation times, so "newest" is well defined.
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    }
+
+    // Window 2048: a budget of 128 tokens, so recent work gets at most 128.
+    let block = first_request_block(&store, &project, 2048).await;
+    let recent = block
+        .split("Recent work")
+        .nth(1)
+        .unwrap_or_else(|| panic!("no recent work: {block}"));
+    let tokens = crustly::llm::agent::context::token_count(recent);
+    assert!(
+        tokens <= 128 + 10,
+        "recent work is capped: {tokens} tokens\n{block}"
+    );
+    assert!(recent.contains("exports"), "the newest is kept: {block}");
+    assert_eq!(block.matches("Session 2 on exports").count(), 1, "{block}");
+}
