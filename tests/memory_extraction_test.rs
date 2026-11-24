@@ -67,6 +67,12 @@ impl Provider for Scripted {
             .unwrap()
             .pop_front()
             .unwrap_or_else(|| r#"{"memories": []}"#.to_string());
+        // A scripted failure, as when the prompt is too long for the model.
+        if text == "!error" {
+            return Err(crustly::llm::provider::ProviderError::InvalidRequest(
+                "prompt is too long".into(),
+            ));
+        }
         Ok(LLMResponse {
             id: "r".into(),
             model: "scripted".into(),
@@ -572,4 +578,90 @@ async fn the_user_saying_a_pending_memory_approves_it() {
     assert!(recall(&store, &project, "async rust runtime")
         .await
         .contains("Tokio"));
+}
+
+#[tokio::test]
+async fn a_range_the_provider_always_fails_on_is_skipped_after_three_tries() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = database(dir.path()).await;
+    let provider = Scripted::new(&["!error", "!error", "!error", "!error"]);
+    let store = MemoryStore::new(db.pool().clone(), enabled_config(false))
+        .with_extraction(provider.clone(), "scripted-model".into());
+    let session = session_with(&db, &chat(3)).await;
+    let project = project(dir.path());
+    store.register_project(&project).await.unwrap();
+
+    for _ in 0..3 {
+        assert!(store
+            .extract(session, &project, false, false)
+            .await
+            .is_err());
+    }
+    // The range was passed over: no new messages, so no fourth call.
+    assert_eq!(
+        store
+            .extract(session, &project, false, false)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(provider.calls(), 3);
+}
+
+#[tokio::test]
+async fn a_long_backlog_is_read_over_several_runs() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = database(dir.path()).await;
+    let provider = Scripted::new(&[]);
+    let store = MemoryStore::new(db.pool().clone(), enabled_config(false))
+        .with_extraction(provider.clone(), "scripted-model".into());
+    // 50 exchanges: 100 turns, more than one run reads.
+    let session = session_with(&db, &chat(50)).await;
+    let project = project(dir.path());
+    store.register_project(&project).await.unwrap();
+
+    let watermark = || async {
+        let (seq,): (i64,) = sqlx::query_as(
+            "SELECT last_message_sequence FROM memory_extraction_state WHERE session_id = ?",
+        )
+        .bind(session.to_string())
+        .fetch_one(db.pool())
+        .await
+        .unwrap();
+        seq
+    };
+    store
+        .extract(session, &project, false, false)
+        .await
+        .unwrap();
+    assert_eq!(watermark().await, 40, "the first run reads the oldest 40");
+    store
+        .extract(session, &project, false, false)
+        .await
+        .unwrap();
+    assert_eq!(watermark().await, 80);
+    store
+        .extract(session, &project, false, false)
+        .await
+        .unwrap();
+    assert_eq!(watermark().await, 100);
+    assert_eq!(provider.calls(), 3);
+}
+
+#[tokio::test]
+async fn a_session_end_run_over_a_long_backlog_reads_the_newest_turns() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = database(dir.path()).await;
+    let provider = Scripted::new(&[]);
+    let store = MemoryStore::new(db.pool().clone(), enabled_config(false))
+        .with_extraction(provider.clone(), "scripted-model".into());
+    let mut messages = chat(30);
+    messages.push(("user", "Last thing: ship the CSV export."));
+    messages.push(("assistant", "Done."));
+    let session = session_with(&db, &messages).await;
+    let project = project(dir.path());
+    store.register_project(&project).await.unwrap();
+
+    store.extract(session, &project, true, false).await.unwrap();
+    assert!(provider.last_prompt().contains("ship the CSV export"));
 }

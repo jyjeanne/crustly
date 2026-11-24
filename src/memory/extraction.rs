@@ -4,9 +4,11 @@
 //!
 //! Extraction is off unless `[memory.extraction] enabled` is set. It runs in
 //! the background from the store, one run per session at a time, and never
-//! blocks a request. A failed run leaves the watermark where it was; after
-//! three failures on the same range the watermark moves on, so one bad
-//! conversation cannot block extraction forever.
+//! blocks a request. A failed run (the provider fails, the answer is
+//! unusable, or a save fails) leaves the watermark where it was; after three
+//! failures on the same range the watermark moves on, so one bad
+//! conversation cannot block extraction forever. A run reads at most 40
+//! turns, so a long backlog is read over several runs.
 
 use super::extract::{self, Turn};
 use super::model::{MemoryScope, MemorySource, MemoryStatus, NewMemory, SaveOutcome};
@@ -23,6 +25,11 @@ const MAX_FAILURES: i64 = 3;
 
 /// Saved memories a run shows the model, so it can update rather than repeat.
 const EXISTING_SHOWN: usize = 10;
+
+/// Turns (user messages and answers) one run reads. A longer backlog, as when
+/// extraction is turned on in a long session, is read over several runs, so
+/// one prompt cannot outgrow the model's context window.
+const MAX_TURNS_PER_RUN: usize = 40;
 
 /// The model and provider that extraction uses (provider "inherit").
 pub struct ExtractionHandle {
@@ -83,7 +90,7 @@ impl MemoryStore {
         };
         let now = Utc::now();
         let (last, failed) = self.repo.extraction_state(session).await?.unwrap_or((0, 0));
-        let rows = self.repo.turns_after(session, last).await?;
+        let mut rows = self.repo.turns_after(session, last).await?;
         let new_users = rows.iter().filter(|(_, role, _)| role == "user").count();
         if !force
             && !extract::should_extract(
@@ -93,6 +100,17 @@ impl MemoryStore {
             )
         {
             return Ok(0);
+        }
+        if rows.len() > MAX_TURNS_PER_RUN {
+            if session_end {
+                // The last run of the session: its episode should say how the
+                // session ended, so it reads the newest turns.
+                rows = rows.split_off(rows.len() - MAX_TURNS_PER_RUN);
+            } else {
+                // The oldest first; the watermark stops after them and the
+                // next run reads on.
+                rows.truncate(MAX_TURNS_PER_RUN);
+            }
         }
         let Some(highest) = rows.iter().map(|(seq, _, _)| *seq).max() else {
             return Ok(0);
@@ -126,8 +144,7 @@ impl MemoryStore {
         let response = match handle.provider.complete(request).await {
             Ok(response) => response,
             Err(err) => {
-                self.repo
-                    .set_extraction_state(session, last, failed + 1, now)
+                self.record_failure(session, last, highest, failed, now)
                     .await?;
                 return Err(err).context("the model did not answer the extraction request");
             }
@@ -151,15 +168,8 @@ impl MemoryStore {
             Ok(candidates) => candidates,
             Err(_) => {
                 // Unusable answer: count it, and move on after the last try.
-                if failed + 1 >= MAX_FAILURES {
-                    self.repo
-                        .set_extraction_state(session, highest, 0, now)
-                        .await?;
-                } else {
-                    self.repo
-                        .set_extraction_state(session, last, failed + 1, now)
-                        .await?;
-                }
+                self.record_failure(session, last, highest, failed, now)
+                    .await?;
                 return Ok(0);
             }
         };
@@ -178,7 +188,7 @@ impl MemoryStore {
             } else {
                 MemoryStatus::Active
             };
-            let outcome = self
+            let outcome = match self
                 .save_with(
                     NewMemory {
                         content: candidate.content,
@@ -195,7 +205,17 @@ impl MemoryStore {
                     status,
                     candidate.evidence_user,
                 )
-                .await?;
+                .await
+            {
+                Ok(outcome) => outcome,
+                Err(err) => {
+                    // Saves made before the error are kept; a retry finds them
+                    // as exact duplicates.
+                    self.record_failure(session, last, highest, failed, now)
+                        .await?;
+                    return Err(err).context("saving an extracted memory");
+                }
+            };
             if matches!(outcome, SaveOutcome::Created(_)) {
                 saved += 1;
             }
@@ -204,6 +224,32 @@ impl MemoryStore {
             .set_extraction_state(session, highest, 0, now)
             .await?;
         Ok(saved)
+    }
+
+    /// Count a failed run on the range after `last`. After `MAX_FAILURES`
+    /// failures the watermark moves to `highest` anyway, so one range that
+    /// always fails (too long for the model, an answer it cannot give) does
+    /// not cost a model call on every request.
+    async fn record_failure(
+        &self,
+        session: Uuid,
+        last: i64,
+        highest: i64,
+        failed: i64,
+        now: chrono::DateTime<Utc>,
+    ) -> Result<()> {
+        if failed + 1 >= MAX_FAILURES {
+            tracing::warn!(
+                "memory extraction failed {MAX_FAILURES} times on session {session}; skipping its messages up to {highest}"
+            );
+            self.repo
+                .set_extraction_state(session, highest, 0, now)
+                .await
+        } else {
+            self.repo
+                .set_extraction_state(session, last, failed + 1, now)
+                .await
+        }
     }
 
     /// Approve a pending memory, so it is recalled from now on. A memory it
