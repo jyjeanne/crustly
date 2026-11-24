@@ -596,6 +596,7 @@ The watermark (`memory_extraction_state.last_message_sequence`) is kept per sess
 
 - Only the user's messages and the assistant's final text answers past the watermark. No tool calls, tool results or thinking blocks.
 - User messages are cut to 2,000 characters and assistant answers to 600. Fenced code longer than 20 lines becomes `[code omitted]`.
+- One run reads at most 40 turns past the watermark. A longer backlog, as when extraction is turned on in a long session, is read oldest first over several runs; a session-end run reads the newest 40, so its episode covers how the session ended.
 - The secret scan runs on this input too. Here it redacts, since this is input, not storage.
 - Up to 10 existing memories that match these messages by keyword, with their ids, so the model can report duplicates and updates instead of creating new rows.
 
