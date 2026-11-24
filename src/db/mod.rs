@@ -224,7 +224,6 @@ impl PoolExt for SqlitePool {
     }
 }
 
-
 /// The same SQL with its line endings switched between LF and CRLF.
 fn other_line_endings(sql: &str) -> String {
     if sql.contains("\r\n") {
