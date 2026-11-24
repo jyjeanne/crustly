@@ -485,15 +485,27 @@ impl MemoryStore {
             -1.0
         };
 
+        // When semantic search answered, every relevant candidate is scored
+        // with the same weights. A keyword hit it did not return scores 0 on
+        // similarity; without that, the keyword-only weighting (meant for
+        // when semantic search is off) would put a weak keyword match above a
+        // clear semantic one. A path match counts as the best match on both.
+        let semantic_on = semantic.is_some();
         let ranked: Vec<Ranked> = candidates
             .into_iter()
             .map(|memory| {
+                let path_hit = path_hits.contains(&memory.id);
                 let keyword = keyword_hits
                     .iter()
                     .find(|(hit, _)| hit.id == memory.id)
                     .map(|(_, bm25)| *bm25)
-                    .or_else(|| path_hits.contains(&memory.id).then_some(best_keyword));
-                let similarity = similarities.get(&memory.id).copied();
+                    .or_else(|| path_hit.then_some(best_keyword));
+                let similarity = match similarities.get(&memory.id).copied() {
+                    _ if semantic_on && path_hit => Some(1.0),
+                    Some(s) => Some(s),
+                    None if semantic_on && keyword.is_some() => Some(0.0),
+                    None => None,
+                };
                 Ranked {
                     memory,
                     keyword,
@@ -502,10 +514,27 @@ impl MemoryStore {
             })
             .collect();
 
+        let (recent, recent_ids) = self.recent_work(request, &project_id, budget).await;
+        // Recent work is taken from the budget (§9.3), and an episode shown
+        // there is not listed a second time among the project's memories.
+        let recent_tokens: u32 = recent
+            .iter()
+            .map(|line| crate::llm::agent::context::token_count(line))
+            .sum();
+        let ranked: Vec<Ranked> = ranked
+            .into_iter()
+            .filter(|r| !recent_ids.contains(&r.memory.id))
+            .collect();
+
         // The search already applied the similarity threshold, so the floor
         // here is zero: any memory with a score is relevant.
-        let mut selected =
-            recall::select(&ranked, budget, self.config.pinned_min_importance, now, 0.0);
+        let mut selected = recall::select(
+            &ranked,
+            budget.saturating_sub(recent_tokens),
+            self.config.pinned_min_importance,
+            now,
+            0.0,
+        );
         if let Some(index) = &index {
             selected = semantic::drop_near_duplicates(selected, index);
         }
@@ -515,31 +544,57 @@ impl MemoryStore {
                 tracing::warn!("could not record recall: {err:#}");
             }
         }
-
-        let recent = if request.first_request && self.config.recent_work {
-            // Episodes (written at session end) describe the work better than
-            // the progress log; the log is the fallback before any exist.
-            let episodes = self
-                .repo
-                .episodes_for(&project_id, RECENT_WORK_ENTRIES as i64)
-                .await
-                .unwrap_or_default();
-            if episodes.is_empty() {
-                crate::llm::agent::project_memory::recent_work(
-                    request.root,
-                    RECENT_WORK_ENTRIES,
-                    RECENT_WORK_MAX_TOKENS.min(budget),
-                )
-            } else {
-                episodes
-                    .iter()
-                    .map(|m| format!("{}: {}", m.created_at.format("%Y-%m-%d"), m.content))
-                    .collect()
-            }
-        } else {
-            Vec::new()
-        };
         Ok(recall::render_block(&selected, &recent))
+    }
+
+    /// The "Recent work" lines for a session's first request, at most
+    /// `RECENT_WORK_MAX_TOKENS` (and never more than the budget), with the ids
+    /// of the episodes they come from. Episodes, written at session end,
+    /// describe the work better than the progress log; the log is the
+    /// fallback before any exist. The newest entries are kept first.
+    async fn recent_work(
+        &self,
+        request: &RecallRequest<'_>,
+        project_id: &ProjectId,
+        budget: u32,
+    ) -> (Vec<String>, Vec<Uuid>) {
+        if !(request.first_request && self.config.recent_work) {
+            return (Vec::new(), Vec::new());
+        }
+        let cap = RECENT_WORK_MAX_TOKENS.min(budget);
+        let episodes = self
+            .repo
+            .episodes_for(project_id, RECENT_WORK_ENTRIES as i64)
+            .await
+            .unwrap_or_default();
+        if episodes.is_empty() {
+            let lines = crate::llm::agent::project_memory::recent_work(
+                request.root,
+                RECENT_WORK_ENTRIES,
+                cap,
+            );
+            return (lines, Vec::new());
+        }
+        let mut lines = Vec::new();
+        let mut ids = Vec::new();
+        let mut used = 0u32;
+        // `episodes_for` lists them oldest first.
+        for memory in episodes.iter().rev() {
+            let line = format!(
+                "{}: {}",
+                memory.created_at.format("%Y-%m-%d"),
+                memory.content
+            );
+            let cost = crate::llm::agent::context::token_count(&line);
+            if used + cost > cap {
+                break;
+            }
+            used += cost;
+            lines.push(line);
+            ids.push(memory.id);
+        }
+        lines.reverse();
+        (lines, ids)
     }
 
     /// Keyword search for the model's `search_memory` tool and the CLI.
