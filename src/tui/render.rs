@@ -82,6 +82,9 @@ pub fn render(f: &mut Frame, app: &App) {
         AppMode::Mcp => {
             render_mcp(f, app, chunks[1]);
         }
+        AppMode::Memory => {
+            render_memory(f, app, chunks[1]);
+        }
     }
 
     render_status_bar(f, app, chunks[3]);
@@ -873,6 +876,126 @@ fn render_skills(f: &mut Frame, app: &App, area: Rect) {
 }
 
 /// Render the `/mcp` list view.
+/// The `/memories` screen: a filtered list, the selected memory's details
+/// and history, and the status line.
+fn render_memory(f: &mut Frame, app: &App, area: Rect) {
+    use super::app::visible_memories;
+    use crate::memory::model::{MemoryScope, MemoryStatus};
+
+    let view = &app.memory_view;
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from(Span::styled(
+        "Memories (↑/↓ move · Enter details · f scope · c category · / search · a approve · r reject · d forget · Esc close)",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )));
+    let scope = ["all", "project", "global"][view.scope as usize % 3];
+    let category = view.category.map(|c| c.as_str()).unwrap_or("any");
+    let search = if let Some(typing) = &view.typing {
+        format!("typing: {typing}_")
+    } else if view.query.is_empty() {
+        "no search".to_string()
+    } else {
+        format!("search: \"{}\"", view.query)
+    };
+    lines.push(Line::from(Span::styled(
+        format!(
+            "scope: {scope} · category: {category} · {search} · {}",
+            view.embedding
+        ),
+        Style::default().fg(Color::DarkGray),
+    )));
+    lines.push(Line::from(""));
+
+    let visible = visible_memories(view);
+    if visible.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "No memories match. Use /remember <text> to add one.",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+    for (idx, memory) in visible.iter().enumerate() {
+        let selected = idx == view.selected;
+        let prefix = if selected { "> " } else { "  " };
+        let scope_name = match memory.scope {
+            MemoryScope::Global => "global",
+            MemoryScope::Project(_) => "project",
+        };
+        let status = memory.status.as_str();
+        let style = if selected {
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+        } else if memory.status == MemoryStatus::Pending {
+            Style::default().fg(Color::Magenta)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        lines.push(Line::from(Span::styled(
+            format!(
+                "{prefix}{} {:<7} {:<10} {:<8} {}",
+                &memory.id.simple().to_string()[..8],
+                scope_name,
+                memory.category.as_str(),
+                status,
+                memory.content
+            ),
+            style,
+        )));
+    }
+
+    if view.detail {
+        if let Some(memory) = visible.get(view.selected) {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "Id {} · importance {}/5 · source {:?} · created {} · updated {} · recalled {} times",
+                    memory.id,
+                    memory.importance,
+                    memory.source,
+                    memory.created_at.format("%Y-%m-%d %H:%M"),
+                    memory.updated_at.format("%Y-%m-%d %H:%M"),
+                    memory.recall_count
+                ),
+                Style::default().fg(Color::DarkGray),
+            )));
+            for (event, actor, at) in &view.history {
+                lines.push(Line::from(Span::styled(
+                    format!("  {at}  {event} by {actor}"),
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+        }
+    }
+
+    if !view.note.is_empty() {
+        let colour = if view.confirm_forget {
+            Color::Red
+        } else {
+            Color::Green
+        };
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            view.note.clone(),
+            Style::default().fg(colour),
+        )));
+    }
+
+    let widget = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(Span::styled(
+                    " /memories ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: false });
+    f.render_widget(widget, area);
+}
+
 fn render_mcp(f: &mut Frame, app: &App, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
 
@@ -2906,6 +3029,7 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         AppMode::LlamaCppModelPicker => "LOCAL MODELS",
         AppMode::Skills => "/SKILLS",
         AppMode::Mcp => "/MCP",
+        AppMode::Memory => "MEMORIES",
     };
 
     let auto_mode = app.auto_mode();
@@ -3931,5 +4055,35 @@ mod tests {
         let screen = render_to_string(&app, 100, 30);
         assert!(screen.contains("Tool Input (JSON)"));
         assert!(screen.contains("\"path\""));
+    }
+
+    #[tokio::test]
+    async fn the_memories_screen_shows_its_filters_and_the_memory() {
+        use crate::memory::model::{
+            Memory, MemoryCategory, MemoryScope, MemorySource, MemoryStatus,
+        };
+        let mut app = test_app().await;
+        app.mode = AppMode::Memory;
+        app.memory_view.rows = vec![Memory {
+            id: uuid::Uuid::new_v4(),
+            scope: MemoryScope::Global,
+            category: MemoryCategory::Preference,
+            content: "Prefers short answers".to_string(),
+            source: MemorySource::User,
+            importance: 4,
+            status: MemoryStatus::Active,
+            superseded_by: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            last_recalled_at: None,
+            recall_count: 0,
+            expires_at: None,
+        }];
+        app.memory_view.embedding = "embeddings: off (keyword recall only)".to_string();
+        let screen = render_to_string(&app, 160, 30);
+        assert!(screen.contains("/memories"), "{screen}");
+        assert!(screen.contains("scope: all"), "{screen}");
+        assert!(screen.contains("Prefers short answers"), "{screen}");
+        assert!(screen.contains("keyword recall only"), "{screen}");
     }
 }

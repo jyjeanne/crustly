@@ -64,6 +64,50 @@ impl From<Message> for DisplayMessage {
 }
 
 /// Main application state
+/// The memories the `/memories` screen shows: the rows that pass the scope,
+/// category and search filters, in their loaded order.
+pub fn visible_memories(view: &MemoryView) -> Vec<&crate::memory::model::Memory> {
+    use crate::memory::model::MemoryScope;
+    let query = view.query.to_lowercase();
+    view.rows
+        .iter()
+        .filter(|m| match view.scope {
+            1 => matches!(m.scope, MemoryScope::Project(_)),
+            2 => matches!(m.scope, MemoryScope::Global),
+            _ => true,
+        })
+        .filter(|m| view.category.is_none_or(|c| m.category == c))
+        .filter(|m| query.is_empty() || m.content.to_lowercase().contains(&query))
+        .collect()
+}
+
+/// State of the `/memories` screen.
+#[derive(Debug, Default, Clone)]
+pub struct MemoryView {
+    /// Rows loaded from the store: pending first, then active.
+    pub rows: Vec<crate::memory::model::Memory>,
+    /// Index into the visible rows (after filters and search).
+    pub selected: usize,
+    /// 0: all, 1: project, 2: global.
+    pub scope: u8,
+    /// None: any category.
+    pub category: Option<crate::memory::model::MemoryCategory>,
+    /// The applied search text (case-insensitive).
+    pub query: String,
+    /// Some while the user is typing a search.
+    pub typing: Option<String>,
+    /// Whether the selected memory's details are shown.
+    pub detail: bool,
+    /// The selected memory's history: (event, actor, time).
+    pub history: Vec<(String, String, String)>,
+    /// Set after `d`, until the user answers `y` or anything else.
+    pub confirm_forget: bool,
+    /// Status line about the last action.
+    pub note: String,
+    /// Embedding status, for the header.
+    pub embedding: String,
+}
+
 pub struct App {
     // Core state
     pub current_session: Option<Session>,
@@ -224,6 +268,8 @@ pub struct App {
 
     // `/mcp` slash command state
     pub mcp_selected: usize,
+    /// State of the `/memories` screen (docs/improve-memory.md §10.3, P5.1).
+    pub memory_view: MemoryView,
 
     // Working directory
     pub working_directory: std::path::PathBuf,
@@ -442,6 +488,7 @@ impl App {
             skills_list: Vec::new(),
             skills_selected: 0,
             mcp_selected: 0,
+            memory_view: MemoryView::default(),
             working_directory: std::env::current_dir().unwrap_or_default(),
             session_service: SessionService::new(context.clone()),
             message_service: MessageService::new(context.clone()),
@@ -1392,6 +1439,7 @@ impl App {
             AppMode::LlamaCppModelPicker => self.handle_llama_cpp_models_key(event).await?,
             AppMode::Skills => self.handle_skills_key(event).await?,
             AppMode::Mcp => self.handle_mcp_key(event).await?,
+            AppMode::Memory => self.handle_memory_key(event).await?,
             AppMode::Help => {
                 let max = self.help_max_scroll.get();
                 if keys::is_cancel(&event) {
@@ -1764,6 +1812,210 @@ impl App {
     /// startup (`App::mcp_status`, set via `set_mcp_status`) rather than
     /// reconnecting live - see the "Open Decisions" note in
     /// ergonomy-improvment.md about deferring live reconnect-on-open.
+    /// Open `/memories`: load this project's memories and the global ones.
+    pub async fn open_memory_view(&mut self) {
+        self.memory_view = MemoryView::default();
+        self.reload_memory_rows().await;
+        let _ = self.switch_mode(AppMode::Memory).await;
+    }
+
+    /// Load the rows and the embedding status from the store.
+    async fn reload_memory_rows(&mut self) {
+        let Some(store) = self.memory.clone() else {
+            self.memory_view.rows.clear();
+            self.memory_view.note =
+                "Long-term memory is off ([memory] long_term in the config).".to_string();
+            return;
+        };
+        let project = crate::memory::project::identify(&self.working_directory);
+        let mut rows = store.pending(&project).await.unwrap_or_default();
+        for memory in store.list(&project, false).await.unwrap_or_default() {
+            if !rows.iter().any(|r| r.id == memory.id) {
+                rows.push(memory);
+            }
+        }
+        self.memory_view.rows = rows;
+        self.memory_view.embedding = match store.embedding_status().await {
+            Ok(Some((model, indexed, active))) => {
+                format!("embeddings: {model}, {indexed} of {active} indexed")
+            }
+            _ => "embeddings: off (keyword recall only)".to_string(),
+        };
+        self.clamp_memory_selection();
+        self.load_memory_history().await;
+    }
+
+    fn clamp_memory_selection(&mut self) {
+        let visible = visible_memories(&self.memory_view).len();
+        self.memory_view.selected = self.memory_view.selected.min(visible.saturating_sub(1));
+    }
+
+    /// The history of the selected memory, when its details are open.
+    async fn load_memory_history(&mut self) {
+        self.memory_view.history.clear();
+        if !self.memory_view.detail {
+            return;
+        }
+        let Some(store) = self.memory.clone() else {
+            return;
+        };
+        let visible = visible_memories(&self.memory_view);
+        let Some(memory) = visible.get(self.memory_view.selected) else {
+            return;
+        };
+        let id = memory.id;
+        if let Ok(events) = store.events(id).await {
+            self.memory_view.history = events
+                .into_iter()
+                .map(|(event, actor, at)| (event, actor, at.format("%Y-%m-%d %H:%M").to_string()))
+                .collect();
+        }
+    }
+
+    /// Keys on the `/memories` screen.
+    async fn handle_memory_key(&mut self, event: crossterm::event::KeyEvent) -> Result<()> {
+        use super::events::keys;
+        use crate::memory::model::{MemoryCategory, MemoryStatus};
+        use crossterm::event::KeyCode;
+
+        // Typing a search: text goes to the query until Enter or Esc.
+        if let Some(typing) = self.memory_view.typing.clone() {
+            let mut text = typing;
+            match event.code {
+                KeyCode::Enter => {
+                    self.memory_view.query = text;
+                    self.memory_view.typing = None;
+                    self.memory_view.selected = 0;
+                    self.clamp_memory_selection();
+                    self.load_memory_history().await;
+                }
+                KeyCode::Esc => self.memory_view.typing = None,
+                KeyCode::Backspace => {
+                    text.pop();
+                    self.memory_view.typing = Some(text);
+                }
+                KeyCode::Char(c) => {
+                    text.push(c);
+                    self.memory_view.typing = Some(text);
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
+        // A forget waits for `y`; any other key cancels it.
+        if self.memory_view.confirm_forget {
+            self.memory_view.confirm_forget = false;
+            if event.code == KeyCode::Char('y') {
+                self.forget_selected_memory().await;
+            } else {
+                self.memory_view.note = "Cancelled.".to_string();
+            }
+            return Ok(());
+        }
+
+        if keys::is_cancel(&event) {
+            self.switch_mode(AppMode::Chat).await?;
+            return Ok(());
+        }
+        let visible_count = visible_memories(&self.memory_view).len();
+        match event.code {
+            KeyCode::Up => {
+                self.memory_view.selected = self.memory_view.selected.saturating_sub(1);
+                self.load_memory_history().await;
+            }
+            KeyCode::Down => {
+                if visible_count > 0 {
+                    self.memory_view.selected =
+                        (self.memory_view.selected + 1).min(visible_count - 1);
+                }
+                self.load_memory_history().await;
+            }
+            KeyCode::Enter => {
+                self.memory_view.detail = !self.memory_view.detail;
+                self.load_memory_history().await;
+            }
+            KeyCode::Char('f') => {
+                self.memory_view.scope = (self.memory_view.scope + 1) % 3;
+                self.memory_view.selected = 0;
+                self.clamp_memory_selection();
+                self.load_memory_history().await;
+            }
+            KeyCode::Char('c') => {
+                self.memory_view.category = match self.memory_view.category {
+                    None => Some(MemoryCategory::Preference),
+                    Some(MemoryCategory::Preference) => Some(MemoryCategory::Convention),
+                    Some(MemoryCategory::Convention) => Some(MemoryCategory::Decision),
+                    Some(MemoryCategory::Decision) => Some(MemoryCategory::Fact),
+                    Some(MemoryCategory::Fact) => Some(MemoryCategory::Lesson),
+                    Some(MemoryCategory::Lesson) => Some(MemoryCategory::Episode),
+                    Some(MemoryCategory::Episode) => None,
+                };
+                self.memory_view.selected = 0;
+                self.clamp_memory_selection();
+                self.load_memory_history().await;
+            }
+            KeyCode::Char('/') => self.memory_view.typing = Some(self.memory_view.query.clone()),
+            KeyCode::Char('a') => {
+                if let Some(memory) = self.selected_memory() {
+                    if memory.status == MemoryStatus::Pending {
+                        self.approve_selected_memory().await;
+                    } else {
+                        self.memory_view.note = "Only pending memories need approval.".to_string();
+                    }
+                }
+            }
+            KeyCode::Char('r') => {
+                if let Some(memory) = self.selected_memory() {
+                    if memory.status == MemoryStatus::Pending {
+                        self.forget_selected_memory().await;
+                    } else {
+                        self.memory_view.note =
+                            "Only pending memories can be rejected.".to_string();
+                    }
+                }
+            }
+            KeyCode::Char('d') if self.selected_memory().is_some() => {
+                self.memory_view.confirm_forget = true;
+                self.memory_view.note =
+                    "Forget this memory for good? Press y to confirm, any other key to cancel."
+                        .to_string();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// The memory under the cursor, if any.
+    fn selected_memory(&self) -> Option<crate::memory::model::Memory> {
+        visible_memories(&self.memory_view)
+            .get(self.memory_view.selected)
+            .map(|m| (*m).clone())
+    }
+
+    async fn approve_selected_memory(&mut self) {
+        let (Some(store), Some(memory)) = (self.memory.clone(), self.selected_memory()) else {
+            return;
+        };
+        self.memory_view.note = match store.approve(memory.id).await {
+            Ok(Ok(())) => "Approved: it is recalled from now on.".to_string(),
+            Ok(Err(reason)) => format!("Not approved: {reason}"),
+            Err(err) => format!("Could not approve: {err}"),
+        };
+        self.reload_memory_rows().await;
+    }
+
+    async fn forget_selected_memory(&mut self) {
+        let (Some(store), Some(memory)) = (self.memory.clone(), self.selected_memory()) else {
+            return;
+        };
+        self.memory_view.note = match store.forget(memory.id, "user").await {
+            Ok(()) => "Forgotten.".to_string(),
+            Err(err) => format!("Could not forget: {err}"),
+        };
+        self.reload_memory_rows().await;
+    }
+
     async fn open_mcp(&mut self) -> Result<()> {
         self.mcp_selected = 0;
         self.switch_mode(AppMode::Mcp).await
@@ -1808,6 +2060,10 @@ impl App {
             "/forget" => {
                 let args = trimmed["/forget".len()..].trim();
                 self.forget_command(args).await;
+                Ok(true)
+            }
+            "/memories" => {
+                self.open_memory_view().await;
                 Ok(true)
             }
             "/memory" => {
@@ -5845,5 +6101,200 @@ mod tests {
             notice.contains("Remembered") && notice.contains("Uses Tokio"),
             "{notice}"
         );
+    }
+
+    /// The memory screen's test app: a store on its own database with one
+    /// active project memory, one global memory, and one pending memory.
+    async fn memory_screen_app(
+        dir: &std::path::Path,
+    ) -> (
+        App,
+        std::sync::Arc<crate::memory::MemoryStore>,
+        crate::db::Database,
+    ) {
+        use crate::memory::model::{
+            MemoryCategory, MemoryScope, MemorySource, MemoryStatus, NewMemory,
+        };
+        let mut app = test_app().await;
+        app.mode = AppMode::Chat;
+        app.working_directory = dir.to_path_buf();
+        let db = crate::db::Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        let store = std::sync::Arc::new(crate::memory::MemoryStore::new(
+            db.pool().clone(),
+            crate::config::MemoryConfig::default(),
+        ));
+        app.set_memory(Some(store.clone()));
+
+        let project = crate::memory::project::identify(dir);
+        store.register_project(&project).await.unwrap();
+        for (content, scope, category) in [
+            (
+                "Uses Redis for caching",
+                MemoryScope::Project(project.id.clone()),
+                MemoryCategory::Fact,
+            ),
+            (
+                "Prefers short answers",
+                MemoryScope::Global,
+                MemoryCategory::Preference,
+            ),
+        ] {
+            store
+                .save(NewMemory {
+                    content: content.into(),
+                    scope,
+                    category,
+                    source: MemorySource::User,
+                    importance: 3,
+                    replaces: None,
+                    session_id: None,
+                    expires_at: None,
+                })
+                .await
+                .unwrap();
+        }
+        // A pending memory, inserted as review mode holds one.
+        let repo = crate::db::repository::MemoryRepository::new(db.pool().clone());
+        let pending_id = uuid::Uuid::new_v4();
+        repo.insert(
+            &crate::db::repository::memory::InsertMemory {
+                id: pending_id,
+                scope: MemoryScope::Project(project.id.clone()),
+                category: MemoryCategory::Decision,
+                content: "Use SQLite for the cache".into(),
+                content_hash: format!("pending-{pending_id}"),
+                source: MemorySource::Extracted,
+                importance: 3,
+                status: MemoryStatus::Pending,
+                session_id: None,
+                expires_at: None,
+                now: chrono::Utc::now(),
+            },
+            "extractor",
+        )
+        .await
+        .unwrap();
+        (app, store, db)
+    }
+
+    #[tokio::test]
+    async fn memories_opens_the_screen_with_pending_memories_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, _store, _db) = memory_screen_app(dir.path()).await;
+        app.try_handle_slash_command("/memories").await.unwrap();
+        assert_eq!(app.mode, AppMode::Memory);
+        assert_eq!(app.memory_view.rows.len(), 3);
+        assert_eq!(
+            crate::tui::app::visible_memories(&app.memory_view)[0].content,
+            "Use SQLite for the cache"
+        );
+    }
+
+    #[tokio::test]
+    async fn scope_and_category_filters_narrow_the_list() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, _store, _db) = memory_screen_app(dir.path()).await;
+        app.try_handle_slash_command("/memories").await.unwrap();
+        app.handle_key_event(key(KeyCode::Char('f'))).await.unwrap(); // project
+        let shown: Vec<String> = crate::tui::app::visible_memories(&app.memory_view)
+            .iter()
+            .map(|m| m.content.clone())
+            .collect();
+        assert!(
+            shown.iter().all(|c| c != "Prefers short answers"),
+            "{shown:?}"
+        );
+        app.handle_key_event(key(KeyCode::Char('c'))).await.unwrap(); // preference
+        assert!(crate::tui::app::visible_memories(&app.memory_view).is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_filters_by_words_in_the_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, _store, _db) = memory_screen_app(dir.path()).await;
+        app.try_handle_slash_command("/memories").await.unwrap();
+        app.handle_key_event(key(KeyCode::Char('/'))).await.unwrap();
+        for c in "redis".chars() {
+            app.handle_key_event(key(KeyCode::Char(c))).await.unwrap();
+        }
+        app.handle_key_event(key(KeyCode::Enter)).await.unwrap();
+        let shown = crate::tui::app::visible_memories(&app.memory_view);
+        assert_eq!(shown.len(), 1);
+        assert!(shown[0].content.contains("Redis"));
+    }
+
+    #[tokio::test]
+    async fn approve_makes_a_pending_memory_active() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, store, _db) = memory_screen_app(dir.path()).await;
+        app.try_handle_slash_command("/memories").await.unwrap();
+        app.handle_key_event(key(KeyCode::Char('a'))).await.unwrap();
+        let project = crate::memory::project::identify(dir.path());
+        assert!(store
+            .list(&project, false)
+            .await
+            .unwrap()
+            .iter()
+            .any(|m| m.content == "Use SQLite for the cache"));
+    }
+
+    #[tokio::test]
+    async fn reject_deletes_a_pending_memory() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, store, _db) = memory_screen_app(dir.path()).await;
+        app.try_handle_slash_command("/memories").await.unwrap();
+        // The first row is the pending one.
+        app.handle_key_event(key(KeyCode::Char('r'))).await.unwrap();
+        let project = crate::memory::project::identify(dir.path());
+        assert!(!store
+            .list(&project, true)
+            .await
+            .unwrap()
+            .iter()
+            .any(|m| m.content == "Use SQLite for the cache"));
+    }
+
+    #[tokio::test]
+    async fn forget_asks_first_and_deletes_only_on_y() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, store, _db) = memory_screen_app(dir.path()).await;
+        app.try_handle_slash_command("/memories").await.unwrap();
+        let target = app
+            .memory_view
+            .rows
+            .iter()
+            .find(|m| m.content == "Prefers short answers")
+            .unwrap()
+            .id;
+        app.memory_view.selected = crate::tui::app::visible_memories(&app.memory_view)
+            .iter()
+            .position(|m| m.id == target)
+            .unwrap();
+
+        app.handle_key_event(key(KeyCode::Char('d'))).await.unwrap();
+        app.handle_key_event(key(KeyCode::Char('n'))).await.unwrap();
+        assert!(
+            store.get(target).await.unwrap().is_some(),
+            "any key but y cancels"
+        );
+
+        app.handle_key_event(key(KeyCode::Char('d'))).await.unwrap();
+        app.handle_key_event(key(KeyCode::Char('y'))).await.unwrap();
+        assert!(store.get(target).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn enter_shows_details_with_the_history() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, _store, _db) = memory_screen_app(dir.path()).await;
+        app.try_handle_slash_command("/memories").await.unwrap();
+        app.handle_key_event(key(KeyCode::Enter)).await.unwrap();
+        assert!(app.memory_view.detail);
+        assert!(app
+            .memory_view
+            .history
+            .iter()
+            .any(|(event, _, _)| event == "created"));
     }
 }
