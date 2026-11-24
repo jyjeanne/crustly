@@ -206,7 +206,9 @@ impl MemoryStore {
         Ok(saved)
     }
 
-    /// Approve a pending memory, so it is recalled from now on.
+    /// Approve a pending memory, so it is recalled from now on. A memory it
+    /// was proposed to replace is superseded by it now, if that memory is
+    /// still active in the same scope.
     pub async fn approve(
         &self,
         id: Uuid,
@@ -217,8 +219,19 @@ impl MemoryStore {
         if memory.status != MemoryStatus::Pending {
             return Ok(Err(super::model::RejectReason::NotFound));
         }
-        self.repo.approve(id, Utc::now()).await?;
+        let now = Utc::now();
+        let target = self.repo.pending_replaces(id).await?;
+        self.repo.approve(id, now).await?;
+        if let Some(old_id) = target {
+            if let Some(old) = self.repo.get(old_id).await? {
+                if old.status == MemoryStatus::Active && old.scope == memory.scope {
+                    self.repo.supersede(old.id, id, "user", now).await?;
+                }
+            }
+        }
         self.changed();
+        // The embedding worker skips pending memories; now it is active.
+        self.queue_embedding(id);
         Ok(Ok(()))
     }
 

@@ -482,3 +482,94 @@ async fn the_background_trigger_runs_once_per_session_at_a_time() {
     assert_eq!(provider.calls(), 1, "the background run reached the model");
     let _ = (MemoryScope::Global, PathBuf::new());
 }
+
+#[tokio::test]
+async fn an_approved_correction_supersedes_the_memory_it_corrects() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = database(dir.path()).await;
+    let store = MemoryStore::new(db.pool().clone(), enabled_config(true));
+    let project = project(dir.path());
+    store.register_project(&project).await.unwrap();
+    let SaveOutcome::Created(old_id) = store
+        .save(NewMemory {
+            content: "The service runs on PostgreSQL 15.".into(),
+            scope: MemoryScope::Project(project.id.clone()),
+            category: MemoryCategory::Fact,
+            source: MemorySource::Extracted,
+            importance: 3,
+            replaces: None,
+            session_id: None,
+            expires_at: None,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("the old memory is saved");
+    };
+
+    let correction = r#"{"memories": [{"content": "The service runs on PostgreSQL 16.", "scope": "project", "category": "fact", "importance": 3, "evidence": "user", "replaces": "UID", "expires_in_days": null}]}"#
+        .replace("UID", &old_id.to_string());
+    let store = store.with_extraction(Scripted::new(&[&correction]), "scripted-model".into());
+    let session = session_with(&db, &chat(3)).await;
+    store
+        .extract(session, &project, false, false)
+        .await
+        .unwrap();
+
+    let pending = store.pending(&project).await.unwrap();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(
+        store.get(old_id).await.unwrap().unwrap().status,
+        MemoryStatus::Active,
+        "the old memory stays until the correction is approved"
+    );
+
+    store.approve(pending[0].id).await.unwrap().unwrap();
+    assert_eq!(
+        store.get(old_id).await.unwrap().unwrap().status,
+        MemoryStatus::Superseded,
+        "approval applies the correction"
+    );
+    let block = recall(&store, &project, "which PostgreSQL version").await;
+    assert!(block.contains("PostgreSQL 16"), "{block}");
+    assert!(!block.contains("PostgreSQL 15"), "{block}");
+}
+
+#[tokio::test]
+async fn the_user_saying_a_pending_memory_approves_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = database(dir.path()).await;
+    let store = MemoryStore::new(db.pool().clone(), enabled_config(true))
+        .with_extraction(Scripted::new(&[TOKIO_ANSWER]), "scripted-model".into());
+    let session = session_with(&db, &chat(3)).await;
+    let project = project(dir.path());
+    store.register_project(&project).await.unwrap();
+    store
+        .extract(session, &project, false, false)
+        .await
+        .unwrap();
+    let pending = store.pending(&project).await.unwrap();
+    assert_eq!(pending.len(), 1);
+
+    let outcome = store
+        .save(NewMemory {
+            content: "The user prefers Tokio for asynchronous Rust.".into(),
+            scope: MemoryScope::Global,
+            category: MemoryCategory::Preference,
+            source: MemorySource::User,
+            importance: 4,
+            replaces: None,
+            session_id: None,
+            expires_at: None,
+        })
+        .await
+        .unwrap();
+    assert!(matches!(outcome, SaveOutcome::Duplicate(id) if id == pending[0].id));
+    assert_eq!(
+        store.get(pending[0].id).await.unwrap().unwrap().status,
+        MemoryStatus::Active
+    );
+    assert!(recall(&store, &project, "async rust runtime")
+        .await
+        .contains("Tokio"));
+}

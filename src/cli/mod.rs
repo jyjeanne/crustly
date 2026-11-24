@@ -1469,8 +1469,16 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
         }
         MemoryCommands::Reject { id } => {
             let memory = resolve_memory(&store, &id).await?;
+            let short = &memory.id.simple().to_string()[..8];
+            // Rejecting deletes without asking, so it only applies to memories
+            // waiting for review; `forget` asks first.
+            if memory.status != MemoryStatus::Pending {
+                anyhow::bail!(
+                    "[m:{short}] is not waiting for review; use `crustly memory forget {short}` to delete it"
+                );
+            }
             store.forget(memory.id, "user").await?;
-            println!("Rejected [m:{}]", &memory.id.simple().to_string()[..8]);
+            println!("Rejected [m:{short}]");
         }
         MemoryCommands::Reindex { prune } => {
             let (embedded, pruned) = store.reindex(prune).await?;
@@ -3713,5 +3721,82 @@ mod memory_cli_tests {
         let line = memory_line(&memory);
         assert!(line.starts_with("3f2a9c1e  global"), "{line}");
         assert!(line.ends_with("Prefers tabs"), "{line}");
+    }
+
+    /// `reject` deletes without asking, so it refuses a memory that is not
+    /// waiting for review.
+    #[tokio::test]
+    async fn reject_refuses_a_memory_that_is_not_pending() {
+        use crate::db::repository::memory::InsertMemory;
+        use crate::memory::model::{
+            MemoryCategory, MemoryScope, MemorySource, MemoryStatus, NewMemory, SaveOutcome,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = crate::config::Config::default();
+        config.database.path = dir.path().join("crustly.db");
+        let db = crate::db::Database::connect(&config.database.path)
+            .await
+            .unwrap();
+        db.run_migrations().await.unwrap();
+        let store = crate::memory::MemoryStore::new(
+            db.pool().clone(),
+            crate::config::MemoryConfig::default(),
+        );
+        let SaveOutcome::Created(active) = store
+            .save(NewMemory {
+                content: "Prefers tabs".into(),
+                scope: MemoryScope::Global,
+                category: MemoryCategory::Preference,
+                source: MemorySource::User,
+                importance: 3,
+                replaces: None,
+                session_id: None,
+                expires_at: None,
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("saved");
+        };
+        let pending = uuid::Uuid::new_v4();
+        crate::db::repository::MemoryRepository::new(db.pool().clone())
+            .insert(
+                &InsertMemory {
+                    id: pending,
+                    scope: MemoryScope::Global,
+                    category: MemoryCategory::Preference,
+                    content: "Prefers spaces".into(),
+                    content_hash: format!("pending-{pending}"),
+                    source: MemorySource::Extracted,
+                    importance: 3,
+                    status: MemoryStatus::Pending,
+                    session_id: None,
+                    expires_at: None,
+                    now: chrono::Utc::now(),
+                },
+                "extractor",
+            )
+            .await
+            .unwrap();
+
+        let refused = cmd_memory(
+            &config,
+            MemoryCommands::Reject {
+                id: active.to_string(),
+            },
+        )
+        .await;
+        assert!(refused.is_err());
+        assert!(store.get(active).await.unwrap().is_some(), "not deleted");
+
+        cmd_memory(
+            &config,
+            MemoryCommands::Reject {
+                id: pending.to_string(),
+            },
+        )
+        .await
+        .unwrap();
+        assert!(store.get(pending).await.unwrap().is_none());
     }
 }

@@ -227,14 +227,38 @@ impl MemoryRepository {
     /// Move a pending memory to active, recording the approval.
     pub async fn approve(&self, id: Uuid, now: DateTime<Utc>) -> Result<()> {
         let mut tx = self.pool.begin().await?;
-        sqlx::query("UPDATE memories SET status = 'active', updated_at = ? WHERE id = ? AND status = 'pending'")
-            .bind(now.timestamp())
-            .bind(id.to_string())
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            "UPDATE memories SET status = 'active', pending_replaces = NULL, updated_at = ? \
+             WHERE id = ? AND status = 'pending'",
+        )
+        .bind(now.timestamp())
+        .bind(id.to_string())
+        .execute(&mut *tx)
+        .await?;
         record_event(&mut tx, id, "approved", "user", None, now).await?;
         tx.commit().await?;
         Ok(())
+    }
+
+    /// Record the memory a pending one replaces once it is approved.
+    pub async fn set_pending_replaces(&self, id: Uuid, old: Uuid) -> Result<()> {
+        sqlx::query("UPDATE memories SET pending_replaces = ? WHERE id = ? AND status = 'pending'")
+            .bind(old.to_string())
+            .bind(id.to_string())
+            .execute(&self.pool)
+            .await
+            .context("recording a pending replacement")?;
+        Ok(())
+    }
+
+    /// The memory a pending one replaces once it is approved, if any.
+    pub async fn pending_replaces(&self, id: Uuid) -> Result<Option<Uuid>> {
+        let target: Option<Option<String>> =
+            sqlx::query_scalar("SELECT pending_replaces FROM memories WHERE id = ?")
+                .bind(id.to_string())
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(target.flatten().and_then(|t| t.parse().ok()))
     }
 
     /// Pending memories of `project_id`, oldest first.
@@ -516,7 +540,8 @@ impl MemoryRepository {
             .collect()
     }
 
-    /// Replace a memory's text and hash. The FTS index follows by trigger.
+    /// Replace a memory's text and hash. The FTS index follows by trigger;
+    /// the vectors of the old text are deleted, so it is embedded again.
     pub async fn update_content(
         &self,
         id: Uuid,
@@ -535,6 +560,10 @@ impl MemoryRepository {
         .bind(id.to_string())
         .execute(&mut *tx)
         .await?;
+        sqlx::query("DELETE FROM memory_embeddings WHERE memory_id = ?")
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await?;
         record_event(&mut tx, id, "updated", actor, None, now).await?;
         tx.commit().await?;
         Ok(())

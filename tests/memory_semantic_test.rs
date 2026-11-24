@@ -440,3 +440,87 @@ async fn a_newer_near_duplicate_is_archived_and_the_older_one_stays() {
     }
     panic!("the near-duplicate was not archived in time");
 }
+
+/// The vector stored for `id`, once there is one equal to `expected`.
+async fn wait_for_vector(
+    db: &Database,
+    project: &ProjectIdentity,
+    id: uuid::Uuid,
+    expected: &[f32],
+) {
+    let repo = crustly::db::repository::MemoryRepository::new(db.pool().clone());
+    for _ in 0..200 {
+        let vectors = repo
+            .vectors_for(&project.id, "fake:topics", chrono::Utc::now())
+            .await
+            .unwrap();
+        if vectors
+            .iter()
+            .any(|(v_id, v)| *v_id == id && v.as_slice() == expected)
+        {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    panic!("the memory was not embedded with the expected vector in time");
+}
+
+#[tokio::test]
+async fn an_edited_memory_is_embedded_again_from_its_new_text() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = project(dir.path());
+    let db = database(dir.path()).await;
+    let store = MemoryStore::new(db.pool().clone(), MemoryConfig::default())
+        .with_embedder(FakeEmbedder::working(), fast_runtime());
+    store.register_project(&project).await.unwrap();
+    save(
+        &store,
+        MemoryScope::Project(project.id.clone()),
+        "Deploys migrate the database first.",
+    )
+    .await;
+    let id = store.list(&project, false).await.unwrap()[0].id;
+    wait_for_vector(&db, &project, id, &topic_vector("database")).await;
+
+    store
+        .edit(id, "Deploys are slow under load.", "user")
+        .await
+        .unwrap()
+        .unwrap();
+    wait_for_vector(&db, &project, id, &topic_vector("slow")).await;
+}
+
+#[tokio::test]
+async fn an_approved_memory_is_embedded() {
+    use crustly::db::repository::memory::InsertMemory;
+    use crustly::memory::model::MemoryStatus;
+    let dir = tempfile::tempdir().unwrap();
+    let project = project(dir.path());
+    let db = database(dir.path()).await;
+    let store = MemoryStore::new(db.pool().clone(), MemoryConfig::default())
+        .with_embedder(FakeEmbedder::working(), fast_runtime());
+    store.register_project(&project).await.unwrap();
+    let id = uuid::Uuid::new_v4();
+    crustly::db::repository::MemoryRepository::new(db.pool().clone())
+        .insert(
+            &InsertMemory {
+                id,
+                scope: MemoryScope::Project(project.id.clone()),
+                category: MemoryCategory::Lesson,
+                content: "Blocking calls stall the runtime.".into(),
+                content_hash: format!("pending-{id}"),
+                source: MemorySource::Extracted,
+                importance: 3,
+                status: MemoryStatus::Pending,
+                session_id: None,
+                expires_at: None,
+                now: chrono::Utc::now(),
+            },
+            "extractor",
+        )
+        .await
+        .unwrap();
+
+    store.approve(id).await.unwrap().unwrap();
+    wait_for_vector(&db, &project, id, &topic_vector("blocking")).await;
+}
