@@ -263,17 +263,29 @@ async fn near_duplicates_in_the_merge_band_are_merged_on_apply() {
     );
 }
 
-/// A model that answers every request with the same text.
-struct FixedAnswer(&'static str);
+/// A model that answers every request with the same text, where `{n}`
+/// becomes the call number (a model rewording its answer), and counts calls.
+struct FixedAnswer(&'static str, std::sync::atomic::AtomicUsize);
+
+impl FixedAnswer {
+    fn new(text: &'static str) -> Arc<Self> {
+        Arc::new(Self(text, std::sync::atomic::AtomicUsize::new(0)))
+    }
+
+    fn calls(&self) -> usize {
+        self.1.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
 
 #[async_trait]
 impl Provider for FixedAnswer {
     async fn complete(&self, _request: LLMRequest) -> ProviderResult<LLMResponse> {
+        let n = self.1.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
         Ok(LLMResponse {
             id: "r".into(),
             model: "fixed".into(),
             content: vec![ContentBlock::Text {
-                text: self.0.to_string(),
+                text: self.0.replace("{n}", &n.to_string()),
             }],
             stop_reason: Some(StopReason::EndTurn),
             usage: TokenUsage {
@@ -321,9 +333,7 @@ async fn three_episodes_become_one_lesson_with_its_sources() {
         ..MemoryConfig::default()
     };
     let store = MemoryStore::new(db.pool().clone(), config).with_extraction(
-        Arc::new(FixedAnswer(
-            r#"{"lesson": "Keep blocking work off the async runtime."}"#,
-        )),
+        FixedAnswer::new(r#"{"lesson": "Keep blocking work off the async runtime."}"#),
         "fixed-model".into(),
     );
     for i in 0..3 {
@@ -351,5 +361,202 @@ async fn three_episodes_become_one_lesson_with_its_sources() {
     assert_eq!(
         lessons,
         vec!["Keep blocking work off the async runtime.".to_string()]
+    );
+}
+
+fn extraction_on() -> MemoryConfig {
+    MemoryConfig {
+        extraction: crustly::config::MemoryExtractionConfig {
+            enabled: true,
+            ..Default::default()
+        },
+        ..MemoryConfig::default()
+    }
+}
+
+#[tokio::test]
+async fn episodes_feed_one_lesson_only() {
+    let (db, _store, project) = setup().await;
+    // The model words the lesson differently each time, as models do.
+    let provider =
+        FixedAnswer::new(r#"{"lesson": "Lesson {n}: keep blocking work off the runtime."}"#);
+    let store = MemoryStore::new(db.pool().clone(), extraction_on())
+        .with_extraction(provider.clone(), "fixed-model".into());
+    for i in 0..3 {
+        insert_at(
+            &db,
+            &project,
+            MemoryCategory::Episode,
+            &format!("Session {i} on blocking calls"),
+            now() - Duration::days(i),
+            None,
+        )
+        .await;
+    }
+
+    assert_eq!(
+        store
+            .consolidate(&project, true)
+            .await
+            .unwrap()
+            .lessons_written,
+        1
+    );
+    assert_eq!(
+        store
+            .consolidate(&project, true)
+            .await
+            .unwrap()
+            .lessons_written,
+        0
+    );
+    assert_eq!(
+        provider.calls(),
+        1,
+        "the second run has no new episodes to ask about"
+    );
+}
+
+#[tokio::test]
+async fn episodes_archived_by_the_same_run_do_not_feed_a_lesson() {
+    let (db, _store, project) = setup().await;
+    let provider = FixedAnswer::new(r#"{"lesson": "Keep blocking work off the runtime."}"#);
+    let store = MemoryStore::new(db.pool().clone(), extraction_on())
+        .with_extraction(provider.clone(), "fixed-model".into());
+    // Two of the three are past the 180-day retention.
+    for (i, age) in [200, 190, 1].iter().enumerate() {
+        insert_at(
+            &db,
+            &project,
+            MemoryCategory::Episode,
+            &format!("Session {i} on blocking calls"),
+            now() - Duration::days(*age),
+            None,
+        )
+        .await;
+    }
+
+    let report = store.consolidate(&project, true).await.unwrap();
+    assert_eq!(report.episodes_archived, 2);
+    assert_eq!(report.lessons_written, 0, "one episode is left, not three");
+    assert_eq!(provider.calls(), 0);
+}
+
+#[tokio::test]
+async fn lessons_need_extraction_on() {
+    let (db, _store, project) = setup().await;
+    let provider = FixedAnswer::new(r#"{"lesson": "Keep blocking work off the runtime."}"#);
+    let store = MemoryStore::new(db.pool().clone(), MemoryConfig::default())
+        .with_extraction(provider.clone(), "fixed-model".into());
+    for i in 0..3 {
+        insert_at(
+            &db,
+            &project,
+            MemoryCategory::Episode,
+            &format!("Session {i} on blocking calls"),
+            now() - Duration::days(i),
+            None,
+        )
+        .await;
+    }
+    assert_eq!(
+        store
+            .consolidate(&project, true)
+            .await
+            .unwrap()
+            .lessons_written,
+        0
+    );
+    assert_eq!(provider.calls(), 0);
+}
+
+/// Two stored vectors at cosine 0.85, inside the merge band.
+async fn merge_band_vectors(db: &Database, a: Uuid, b: Uuid) {
+    let repo = MemoryRepository::new(db.pool().clone());
+    repo.put_embedding(a, "fake:fixed", &[1.0, 0.0], now())
+        .await
+        .unwrap();
+    repo.put_embedding(
+        b,
+        "fake:fixed",
+        &[0.85, (1.0f32 - 0.85 * 0.85).sqrt()],
+        now(),
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn the_merge_keeps_categories_apart() {
+    let (db, store, project) = setup().await;
+    let store = store.attach_embedder(Arc::new(FixedEmbedder), EmbedRuntime::default(), false);
+    let fact = insert_at(
+        &db,
+        &project,
+        MemoryCategory::Fact,
+        "The export module writes CSV with the csv crate.",
+        now() - Duration::days(2),
+        None,
+    )
+    .await;
+    let episode = insert_at(
+        &db,
+        &project,
+        MemoryCategory::Episode,
+        "Worked on the CSV export module; tests are left.",
+        now() - Duration::days(1),
+        None,
+    )
+    .await;
+    merge_band_vectors(&db, fact, episode).await;
+
+    let report = store.consolidate(&project, true).await.unwrap();
+    assert!(report.merge_candidates.is_empty(), "{report:?}");
+    assert_eq!(
+        store.get(fact).await.unwrap().unwrap().status,
+        MemoryStatus::Active
+    );
+}
+
+#[tokio::test]
+async fn the_merge_keeps_the_users_copy_over_a_newer_extracted_one() {
+    let (db, store, project) = setup().await;
+    let store = store.attach_embedder(Arc::new(FixedEmbedder), EmbedRuntime::default(), false);
+    let user = insert_at(
+        &db,
+        &project,
+        MemoryCategory::Fact,
+        "Releases are tagged from master.",
+        now() - Duration::days(3),
+        None,
+    )
+    .await;
+    let extracted = match store
+        .save(NewMemory {
+            content: "Release tags are cut from the master branch.".into(),
+            scope: MemoryScope::Project(project.id.clone()),
+            category: MemoryCategory::Fact,
+            source: MemorySource::Extracted,
+            importance: 3,
+            replaces: None,
+            session_id: None,
+            expires_at: None,
+        })
+        .await
+        .unwrap()
+    {
+        SaveOutcome::Created(id) => id,
+        other => panic!("{other:?}"),
+    };
+    merge_band_vectors(&db, user, extracted).await;
+
+    store.consolidate(&project, true).await.unwrap();
+    assert_eq!(
+        store.get(user).await.unwrap().unwrap().status,
+        MemoryStatus::Active
+    );
+    assert_eq!(
+        store.get(extracted).await.unwrap().unwrap().superseded_by,
+        Some(user)
     );
 }

@@ -332,6 +332,22 @@ impl MemoryRepository {
             .collect()
     }
 
+    /// Memories of `project_id` already folded into another one (the
+    /// `source_id`s of memory_sources), so consolidation does not use them twice.
+    pub async fn folded_sources(
+        &self,
+        project_id: &ProjectId,
+    ) -> Result<std::collections::HashSet<Uuid>> {
+        let rows: Vec<String> = sqlx::query_scalar(
+            "SELECT s.source_id FROM memory_sources s \
+             JOIN memories m ON m.id = s.memory_id WHERE m.project_id = ?",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.iter().filter_map(|id| id.parse().ok()).collect())
+    }
+
     /// Record that `sources` were folded into `consolidated` (section 13.3).
     pub async fn add_sources(&self, consolidated: Uuid, sources: &[Uuid]) -> Result<()> {
         for source in sources {
