@@ -3,10 +3,9 @@
 //! the same migration set this build embeds; the current migrations then
 //! apply on top, and existing data must survive.
 //!
-//! This checks the schema upgrade on this build's own bytes. It does not check
-//! databases written by a different build: sqlx checksums each migration's
-//! bytes, so a build with different line endings refuses them (a known issue,
-//! recorded in the spec's open questions).
+//! This checks the schema upgrade on this build's own bytes. Databases written
+//! by a build with the other line endings are handled separately: see the
+//! checksum tests below and `reconcile_line_endings` in src/db/mod.rs.
 
 use crustly::db::Database;
 use std::borrow::Cow;
@@ -69,4 +68,72 @@ async fn a_database_from_before_memory_upgrades_and_keeps_its_sessions() {
     .await
     .unwrap();
     assert_eq!(kept_tables, 2);
+}
+
+/// A database whose stored checksum is the other line-ending form of a
+/// migration (a database written by a build with other line endings) must open,
+/// and its checksum is updated to this build's value.
+#[tokio::test]
+async fn a_checksum_recorded_with_other_line_endings_is_accepted_and_updated() {
+    use sha2::{Digest, Sha384};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("crustly.db");
+    let db = Database::connect(&path).await.unwrap();
+    db.run_migrations().await.unwrap();
+
+    let migrator = sqlx::migrate!("./migrations");
+    let target = migrator
+        .iter()
+        .find(|m| m.version == 20251028000001)
+        .expect("the initial migration exists");
+    let other = if target.sql.contains("\r\n") {
+        target.sql.replace("\r\n", "\n")
+    } else {
+        target.sql.replace('\n', "\r\n")
+    };
+    let other_checksum = Sha384::digest(other.as_bytes()).to_vec();
+    sqlx::query("UPDATE _sqlx_migrations SET checksum = ? WHERE version = 20251028000001")
+        .bind(&other_checksum)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    db.pool().close().await;
+
+    let reopened = Database::connect(&path).await.unwrap();
+    reopened
+        .run_migrations()
+        .await
+        .expect("the other line endings are accepted");
+    let stored: Vec<u8> =
+        sqlx::query_scalar("SELECT checksum FROM _sqlx_migrations WHERE version = 20251028000001")
+            .fetch_one(reopened.pool())
+            .await
+            .unwrap();
+    assert_eq!(
+        stored,
+        target.checksum.as_ref().to_vec(),
+        "the stored checksum is this build's"
+    );
+}
+
+/// A checksum that is not the other line-ending form is still a modified
+/// migration, and is refused.
+#[tokio::test]
+async fn an_unrelated_checksum_mismatch_is_still_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("crustly.db");
+    let db = Database::connect(&path).await.unwrap();
+    db.run_migrations().await.unwrap();
+    sqlx::query("UPDATE _sqlx_migrations SET checksum = ? WHERE version = 20251028000001")
+        .bind(vec![0u8; 48])
+        .execute(db.pool())
+        .await
+        .unwrap();
+    db.pool().close().await;
+
+    let reopened = Database::connect(&path).await.unwrap();
+    assert!(
+        reopened.run_migrations().await.is_err(),
+        "a real modification is refused"
+    );
 }

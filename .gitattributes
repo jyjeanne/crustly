@@ -1,0 +1,3 @@
+# Migration files are checksummed byte for byte: keep them LF in the
+# repository and in every checkout, so every build embeds the same bytes.
+migrations/*.sql text eol=lf
