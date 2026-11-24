@@ -183,9 +183,15 @@ impl GeminiProvider {
                     parts,
                 });
             } else if !function_responses.is_empty() {
+                // Text sent with the results (notes saved about the files the
+                // tools used) goes in the same user turn, after the responses.
+                let mut parts = function_responses;
+                if !text_parts.is_empty() {
+                    parts.push(GeminiPart::text(text_parts.join("\n")));
+                }
                 contents.push(GeminiContent {
                     role: Some("user".to_string()),
-                    parts: function_responses,
+                    parts,
                 });
             } else if !text_parts.is_empty() {
                 contents.push(GeminiContent {
@@ -997,6 +1003,34 @@ mod tests {
             .as_ref()
             .expect("expected functionResponse part");
         assert_eq!(function_response.name, "read_file");
+    }
+
+    /// Notes about the files a tool used ride in the tool-result message as a
+    /// text block; they must reach the model, after the function responses.
+    #[test]
+    fn test_to_gemini_request_keeps_text_sent_with_tool_results() {
+        let provider = GeminiProvider::new("test-key".to_string());
+        let messages = vec![Message {
+            role: Role::User,
+            content: vec![
+                ContentBlock::ToolResult {
+                    tool_use_id: "call_1".to_string(),
+                    content: "file contents".to_string(),
+                    is_error: None,
+                },
+                ContentBlock::Text {
+                    text: "<recalled_memories>note</recalled_memories>".to_string(),
+                },
+            ],
+        }];
+        let request = LLMRequest::new("gemini-2.5-flash", messages);
+        let gemini_req = provider.to_gemini_request(&request);
+
+        assert_eq!(gemini_req.contents.len(), 1);
+        let parts = &gemini_req.contents[0].parts;
+        assert_eq!(parts.len(), 2);
+        assert!(parts[0].function_response.is_some());
+        assert!(parts[1].text.as_deref().unwrap_or("").contains("note"));
     }
 
     #[test]

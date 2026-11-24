@@ -5,6 +5,7 @@
 //! memory is recalled when a request mentions a matching path.
 
 use glob::{MatchOptions, Pattern};
+use std::path::{Component, Path, PathBuf};
 
 /// Most globs one memory may carry.
 pub const MAX_GLOBS: usize = 5;
@@ -61,6 +62,79 @@ pub fn mentioned_paths(message: &str) -> Vec<String> {
         }
     }
     found
+}
+
+/// `path` in the form globs are written in: relative to the project `root`,
+/// with forward slashes. A relative `path` is taken from `working_dir`, as
+/// tools resolve it; an absolute one is used as given. The file's real path
+/// is used when it exists (symlinks, `\\?\` on Windows), otherwise `.` and
+/// `..` are resolved in the text. None when the path is outside the project.
+pub fn project_relative(path: &str, working_dir: &Path, root: &Path) -> Option<String> {
+    let path = path.trim();
+    if path.is_empty() {
+        return None;
+    }
+    // A canonical Windows path (`\\?\C:\...`) does not treat `/` as a
+    // separator, so a joined relative path must use `\` there.
+    let given = if cfg!(windows) {
+        PathBuf::from(path.replace('/', "\\"))
+    } else {
+        PathBuf::from(path)
+    };
+    let base = std::fs::canonicalize(working_dir).unwrap_or_else(|_| working_dir.to_path_buf());
+    let joined = if given.is_absolute() {
+        given
+    } else {
+        base.join(given)
+    };
+    let full = std::fs::canonicalize(&joined).unwrap_or_else(|_| lexical(&joined));
+    let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    strip_root(&as_text(&full), &as_text(&root))
+}
+
+/// `path` with `.` and `..` resolved without touching the file system.
+fn lexical(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !out.pop() {
+                    out.push("..");
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
+/// A path as comparable text: no `\\?\` prefix, a lowercase drive letter,
+/// forward slashes, no trailing slash.
+fn as_text(path: &Path) -> String {
+    crate::memory::project::normalize_root(&path.to_string_lossy())
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_string()
+}
+
+/// The part of `full` below `root`, if `full` is inside it. Windows paths
+/// compare without case.
+fn strip_root(full: &str, root: &str) -> Option<String> {
+    if full.len() <= root.len() || !full.is_char_boundary(root.len()) {
+        return None;
+    }
+    let (head, rest) = full.split_at(root.len());
+    let same = if cfg!(windows) {
+        head.eq_ignore_ascii_case(root)
+    } else {
+        head == root
+    };
+    if !same {
+        return None;
+    }
+    let rest = rest.strip_prefix('/')?;
+    (!rest.is_empty()).then(|| rest.to_string())
 }
 
 /// Whether any of `globs` matches `path`. A `*` does not cross a directory

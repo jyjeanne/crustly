@@ -276,6 +276,18 @@ impl OpenAIProvider {
                         reasoning_content: None,
                     });
                 }
+                // Text sent with the results (notes saved about the files the
+                // tools used) follows them as a user message; `tool` messages
+                // carry only results.
+                if !text_parts.is_empty() {
+                    messages.push(OpenAIMessage {
+                        role: "user".to_string(),
+                        content: Some(text_parts.join("\n")),
+                        tool_calls: None,
+                        tool_call_id: None,
+                        reasoning_content: None,
+                    });
+                }
             }
             // Handle regular text messages
             else {
@@ -1352,6 +1364,42 @@ mod tests {
         assert_eq!(openai_req.frequency_penalty, Some(0.2));
         assert_eq!(openai_req.presence_penalty, Some(0.1));
         assert!(openai_req.response_format.is_some());
+    }
+
+    /// Notes about the files a tool used ride in the tool-result message as a
+    /// text block; they must reach the model as a user message after the
+    /// `tool` messages, not be dropped.
+    #[test]
+    fn test_text_sent_with_tool_results_follows_them() {
+        use crate::llm::provider::types::{ContentBlock, LLMRequest, Message, Role};
+        let provider = OpenAIProvider::new("test-key".to_string());
+        let req = LLMRequest::new(
+            "gpt-4",
+            vec![Message {
+                role: Role::User,
+                content: vec![
+                    ContentBlock::ToolResult {
+                        tool_use_id: "call_1".to_string(),
+                        content: "file contents".to_string(),
+                        is_error: None,
+                    },
+                    ContentBlock::Text {
+                        text: "<recalled_memories>note</recalled_memories>".to_string(),
+                    },
+                ],
+            }],
+        );
+
+        let openai_req = provider.to_openai_request(req);
+        let n = openai_req.messages.len();
+        assert!(n >= 2);
+        assert_eq!(openai_req.messages[n - 2].role, "tool");
+        assert_eq!(openai_req.messages[n - 1].role, "user");
+        assert!(openai_req.messages[n - 1]
+            .content
+            .as_deref()
+            .unwrap_or("")
+            .contains("note"));
     }
 
     #[test]
