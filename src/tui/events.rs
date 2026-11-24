@@ -215,6 +215,9 @@ pub enum AppMode {
     /// locally-present `.gguf` file to switch to, or download a new one by
     /// URL/`hf:org/repo/file.gguf` shorthand.
     LlamaCppModelPicker,
+    /// `/memories` screen: browse, filter, search, inspect, approve and forget
+    /// long-term memories.
+    Memory,
 }
 
 /// Event handler for the TUI
