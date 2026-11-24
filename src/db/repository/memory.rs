@@ -4,10 +4,10 @@
 //! rules live in `crate::memory`. It only reads and writes rows, and keeps the
 //! memory_events audit trail in step with every change.
 
+use crate::db::retry::{retry_db_sqlx, DbRetryConfig};
 use crate::memory::model::{
     Memory, MemoryCategory, MemoryScope, MemorySource, MemoryStatus, ProjectId,
 };
-use crate::db::retry::{retry_db_sqlx, DbRetryConfig};
 use crate::memory::project::ProjectIdentity;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
