@@ -154,6 +154,14 @@ impl MemoryStore {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
+    /// Queue a memory for embedding, when semantic search is on. A full queue
+    /// drops the id; the backfill at the next start embeds it.
+    fn queue_embedding(&self, id: Uuid) {
+        if let Some(handle) = &self.embed {
+            let _ = handle.queue.try_send(id);
+        }
+    }
+
     /// Embed every memory that lacks a vector, and optionally delete vectors
     /// of other models. Returns (embedded, pruned). Errors if no embedder is
     /// configured or the server cannot be reached.
@@ -213,9 +221,10 @@ impl MemoryStore {
     }
 
     /// The save rules of section 8, with the status and evidence the caller
-    /// has. `pending` holds the memory for review (it is not recalled, and its
-    /// `replaces` target is left alone until approval). `user_evidence` means
-    /// the user said it, so it may reinforce a repeat and replace a memory the
+    /// has. `pending` holds the memory for review: it is not recalled, and its
+    /// `replaces` target, checked by the same rules, is superseded only when
+    /// the user approves it. `user_evidence` means the user said it, so it may
+    /// reinforce a repeat, approve a pending repeat, and replace a memory the
     /// user saved.
     async fn save_with(
         &self,
@@ -235,16 +244,27 @@ impl MemoryStore {
         let actor = actor_for(new.source);
         let hash = content_hash(&content);
         if let Some(existing) = self.repo.find_by_hash(&new.scope, &hash).await? {
-            if new.source == MemorySource::User || user_evidence {
+            let user_said_it = new.source == MemorySource::User || user_evidence;
+            if user_said_it {
                 self.repo.reinforce(existing.id, actor, now).await?;
             } else {
                 // A repeat by the model is not evidence of importance (§8 step 4).
                 self.repo.touch(existing.id, now).await?;
             }
+            // A pending memory the user now says themselves is reviewed: it is
+            // approved, and recalled from now on.
+            let mut existing_active = existing.status == MemoryStatus::Active;
+            if existing.status == MemoryStatus::Pending
+                && status == MemoryStatus::Active
+                && user_said_it
+            {
+                existing_active = self.approve(existing.id).await?.is_ok();
+            }
             // The text is already remembered, but a `replaces` target is still
-            // superseded by it, as long as the same rules allow the replacement.
+            // superseded by it, as long as the same rules allow the replacement
+            // and the remembered copy is active.
             if let Some(old_id) = new.replaces.filter(|old| *old != existing.id) {
-                if status == MemoryStatus::Active {
+                if status == MemoryStatus::Active && existing_active {
                     if let Some(old) = self.repo.get(old_id).await? {
                         let allowed = old.status == MemoryStatus::Active
                             && old.scope == new.scope
@@ -261,12 +281,7 @@ impl MemoryStore {
             return Ok(SaveOutcome::Duplicate(existing.id));
         }
 
-        let replaces = if status == MemoryStatus::Pending {
-            None
-        } else {
-            new.replaces
-        };
-        let replaced = match replaces {
+        let replaced = match new.replaces {
             Some(old_id) => match self.repo.get(old_id).await? {
                 Some(old) if old.status != MemoryStatus::Active => {
                     return Ok(SaveOutcome::Rejected(RejectReason::NotFound))
@@ -312,14 +327,17 @@ impl MemoryStore {
             )
             .await?;
         if let Some(old) = replaced {
-            self.repo.supersede(old.id, id, actor, now).await?;
+            if status == MemoryStatus::Active {
+                self.repo.supersede(old.id, id, actor, now).await?;
+            } else {
+                // Held until the user approves this memory (§12.4).
+                self.repo.set_pending_replaces(id, old.id).await?;
+            }
         }
         self.changed();
-        if let Some(handle) = &self.embed {
-            // A full queue drops the id; the backfill embeds it later.
-            let _ = handle.queue.try_send(id);
-        }
         if status == MemoryStatus::Active {
+            // A pending memory is embedded when it is approved.
+            self.queue_embedding(id);
             self.notify(&new.scope, new.category.as_str(), id, &content);
         }
         Ok(SaveOutcome::Created(id))
@@ -622,6 +640,10 @@ impl MemoryStore {
             .update_content(id, &content, &hash, actor, Utc::now())
             .await?;
         self.changed();
+        // The old vector was deleted with the old text.
+        if memory.status == MemoryStatus::Active {
+            self.queue_embedding(id);
+        }
         Ok(Ok(()))
     }
 
