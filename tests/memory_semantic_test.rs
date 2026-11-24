@@ -397,7 +397,7 @@ impl Embedder for SameVectorEmbedder {
 }
 
 #[tokio::test]
-async fn a_newer_near_duplicate_is_archived_and_the_older_one_stays() {
+async fn one_of_two_near_duplicates_is_archived_not_deleted() {
     let dir = tempfile::tempdir().unwrap();
     let project = project(dir.path());
     let store = MemoryStore::new(
@@ -433,7 +433,7 @@ async fn a_newer_near_duplicate_is_archived_and_the_older_one_stays() {
                 "one of the two stays: {active:?}"
             );
             let all = store.list(&project, true).await.unwrap();
-            assert_eq!(all.len(), 2, "the newer one is archived, not deleted");
+            assert_eq!(all.len(), 2, "the other one is archived, not deleted");
             return;
         }
         tokio::time::sleep(Duration::from_millis(25)).await;

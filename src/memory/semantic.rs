@@ -272,9 +272,36 @@ pub struct SemanticHits {
     pub index: Arc<VectorIndex>,
 }
 
-/// Archive memories that repeat an older memory in the same project (P2.10).
-/// The older one stays active, so a batch cannot archive both copies. Global
-/// memories are not checked here: their vectors are looked up per project.
+/// Which of two near-duplicate memories to archive, or `None` to keep both.
+///
+/// - Episodes are records of different sessions, alike in shape; never.
+/// - Memories of different categories say different kinds of things; never.
+/// - A memory the user saved beats one they did not.
+/// - Otherwise the newer one stays: a near-copy saved later is usually a
+///   correction ("listens on port 8080" after "port 8081").
+///
+/// The ordering is total (ties broken by id), so the outcome does not
+/// depend on which of the two is checked first.
+pub fn near_duplicate_to_archive<'a>(a: &'a Memory, b: &'a Memory) -> Option<&'a Memory> {
+    use super::model::{MemoryCategory, MemorySource};
+    if a.category == MemoryCategory::Episode
+        || b.category == MemoryCategory::Episode
+        || a.category != b.category
+    {
+        return None;
+    }
+    let a_user = a.source == MemorySource::User;
+    let b_user = b.source == MemorySource::User;
+    if a_user != b_user {
+        return Some(if a_user { b } else { a });
+    }
+    let a_newer = (a.created_at, a.id.to_string()) > (b.created_at, b.id.to_string());
+    Some(if a_newer { b } else { a })
+}
+
+/// Archive memories that repeat another memory in the same project (P2.10),
+/// by the rules of `near_duplicate_to_archive`. Global memories are not
+/// checked here: their vectors are looked up per project.
 pub async fn archive_near_duplicates(
     repo: &MemoryRepository,
     model: &str,
@@ -308,20 +335,80 @@ pub async fn archive_near_duplicates(
             if other.scope != memory.scope || other.status != MemoryStatus::Active {
                 continue;
             }
-            // Whichever of the two is newer is archived, however the check
-            // was reached, so the outcome does not depend on the order the
-            // worker embeds them in.
-            let other_is_newer = (other.created_at, other.id.to_string())
-                > (memory.created_at, memory.id.to_string());
-            if other_is_newer {
-                repo.archive(other.id, "consolidator", now).await?;
-                archived += 1;
-            } else {
-                repo.archive(memory.id, "consolidator", now).await?;
-                archived += 1;
-                break;
+            match near_duplicate_to_archive(memory, &other) {
+                Some(loser) if loser.id == other.id => {
+                    repo.archive(other.id, "consolidator", now).await?;
+                    archived += 1;
+                }
+                Some(_) => {
+                    repo.archive(memory.id, "consolidator", now).await?;
+                    archived += 1;
+                    break;
+                }
+                None => {}
             }
         }
     }
     Ok(archived)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory::model::{MemoryCategory, MemoryScope, MemorySource, MemoryStatus};
+    use chrono::{DateTime, Duration, Utc};
+    use uuid::Uuid;
+
+    fn memory(category: MemoryCategory, source: MemorySource, age_days: i64) -> Memory {
+        let at = DateTime::from_timestamp(1_800_000_000, 0).unwrap() - Duration::days(age_days);
+        Memory {
+            id: Uuid::new_v4(),
+            scope: MemoryScope::Project("p".into()),
+            category,
+            content: "text".into(),
+            source,
+            importance: 3,
+            status: MemoryStatus::Active,
+            superseded_by: None,
+            created_at: at,
+            updated_at: at,
+            last_recalled_at: None,
+            recall_count: 0,
+            expires_at: None,
+        }
+    }
+
+    fn loser(a: &Memory, b: &Memory) -> Option<Uuid> {
+        near_duplicate_to_archive(a, b).map(|m| m.id)
+    }
+
+    #[test]
+    fn the_newer_near_duplicate_stays() {
+        let old = memory(MemoryCategory::Fact, MemorySource::Extracted, 5);
+        let new = memory(MemoryCategory::Fact, MemorySource::Extracted, 0);
+        assert_eq!(loser(&old, &new), Some(old.id));
+        assert_eq!(
+            loser(&new, &old),
+            Some(old.id),
+            "whichever is checked first"
+        );
+    }
+
+    #[test]
+    fn a_user_memory_beats_a_newer_one_the_user_did_not_save() {
+        let user = memory(MemoryCategory::Fact, MemorySource::User, 5);
+        let model = memory(MemoryCategory::Fact, MemorySource::Extracted, 0);
+        assert_eq!(loser(&user, &model), Some(model.id));
+        assert_eq!(loser(&model, &user), Some(model.id));
+    }
+
+    #[test]
+    fn episodes_and_different_categories_are_both_kept() {
+        let a = memory(MemoryCategory::Episode, MemorySource::Extracted, 5);
+        let b = memory(MemoryCategory::Episode, MemorySource::Extracted, 0);
+        assert_eq!(loser(&a, &b), None);
+        let fact = memory(MemoryCategory::Fact, MemorySource::User, 5);
+        let lesson = memory(MemoryCategory::Lesson, MemorySource::User, 0);
+        assert_eq!(loser(&fact, &lesson), None);
+    }
 }
