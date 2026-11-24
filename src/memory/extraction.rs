@@ -74,6 +74,45 @@ impl MemoryStore {
         });
     }
 
+    /// Whether extraction is on (enabled, with a model to call).
+    pub fn extraction_on(&self) -> bool {
+        self.extraction.is_some()
+    }
+
+    /// Whether `session` has user messages past its watermark, which a
+    /// session-end run would read.
+    pub async fn has_unread_turns(&self, session: Uuid) -> Result<bool> {
+        let (last, _) = self.repo.extraction_state(session).await?.unwrap_or((0, 0));
+        let rows = self.repo.turns_after(session, last).await?;
+        Ok(rows.iter().any(|(_, role, _)| role == "user"))
+    }
+
+    /// The session-end run in the foreground, for when the TUI quits: its
+    /// saves, and the episode that starts the next session's recent work,
+    /// are made before the process exits. A background run on the same
+    /// session is waited for first, so the two do not overlap.
+    pub async fn finish_session(&self, session: Uuid, project: &ProjectIdentity) -> Result<usize> {
+        if self.extraction.is_none() {
+            return Ok(0);
+        }
+        loop {
+            let free = self
+                .running
+                .lock()
+                .map(|mut running| running.insert(session))
+                .unwrap_or(true);
+            if free {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        let result = self.extract(session, project, true, false).await;
+        if let Ok(mut running) = self.running.lock() {
+            running.remove(&session);
+        }
+        result
+    }
+
     /// One extraction run now: returns how many memories were saved. `force`
     /// runs it even below the every-N count (before compaction). Does
     /// nothing when extraction is off or the session has no new messages to
@@ -115,6 +154,9 @@ impl MemoryStore {
         let Some(highest) = rows.iter().map(|(seq, _, _)| *seq).max() else {
             return Ok(0);
         };
+        // Project memories need their project recorded; a run at session end
+        // can come before any request did it.
+        self.repo.upsert_project(project, now).await?;
 
         let turns: Vec<Turn> = rows
             .into_iter()

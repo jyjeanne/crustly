@@ -75,6 +75,11 @@ pub async fn run(mut app: App) -> Result<()> {
         crossterm::cursor::Show
     );
 
+    // The session ends here: what it taught is saved before exit.
+    if result.is_ok() {
+        app.finish_memory().await;
+    }
+
     result
 }
 

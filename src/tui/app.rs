@@ -825,6 +825,51 @@ impl App {
         self.memory = store;
     }
 
+    /// The current session is ending because another one takes its place:
+    /// start its session-end extraction run in the background (§12.1).
+    fn end_session_in_background(&self, next: Option<Uuid>) {
+        let (Some(store), Some(session)) = (&self.memory, &self.current_session) else {
+            return;
+        };
+        if Some(session.id) == next {
+            return;
+        }
+        let project = crate::memory::project::identify(&self.working_directory);
+        store.trigger(session.id, project, true, false);
+    }
+
+    /// At quit, after the terminal is restored: the session-end extraction
+    /// run in the foreground, so its saves, and the episode that starts the
+    /// next session's recent work, are made before the process exits.
+    /// Ctrl+C or `QUIT_EXTRACTION_LIMIT` skip it.
+    pub async fn finish_memory(&self) {
+        const QUIT_EXTRACTION_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
+        let (Some(store), Some(session)) = (self.memory.clone(), self.current_session.as_ref())
+        else {
+            return;
+        };
+        if !store.extraction_on() || !store.has_unread_turns(session.id).await.unwrap_or(false) {
+            return;
+        }
+        let project = crate::memory::project::identify(&self.working_directory);
+        eprintln!("Saving what to remember from this session... (Ctrl+C to skip)");
+        let run = tokio::time::timeout(
+            QUIT_EXTRACTION_LIMIT,
+            store.finish_session(session.id, &project),
+        );
+        tokio::select! {
+            result = run => match result {
+                Ok(Ok(_)) => {}
+                Ok(Err(err)) => eprintln!("Not saved: {err:#}"),
+                Err(_) => eprintln!("Skipped: the model took too long."),
+            },
+            _ = tokio::signal::ctrl_c() => eprintln!("Skipped."),
+        }
+        for notice in store.take_notices() {
+            eprintln!("💾 {notice}");
+        }
+    }
+
     /// Show a notice for each memory saved since the last drain.
     fn announce_memory_saves(&mut self) {
         let notices = self
@@ -2216,6 +2261,7 @@ impl App {
 
     /// Create a new session
     async fn create_new_session(&mut self) -> Result<()> {
+        self.end_session_in_background(None);
         let mut session = self
             .session_service
             .create_session(Some("New Chat".to_string()))
@@ -2255,6 +2301,7 @@ impl App {
             .message_service
             .list_messages_for_session(session_id)
             .await?;
+        self.end_session_in_background(Some(session_id));
 
         // Sessions created before the model was recorded (and any created
         // outside the TUI) carry a NULL model, which the header renders as
@@ -6296,5 +6343,120 @@ mod tests {
             .history
             .iter()
             .any(|(event, _, _)| event == "created"));
+    }
+
+    /// Answers every extraction request with one episode.
+    struct EpisodeProvider;
+
+    #[async_trait::async_trait]
+    impl Provider for EpisodeProvider {
+        async fn complete(&self, _request: LLMRequest) -> ProviderResult<LLMResponse> {
+            Ok(LLMResponse {
+                id: "r".into(),
+                model: "episode-model".into(),
+                content: vec![crate::llm::provider::ContentBlock::Text {
+                    text: r#"{"memories": [{"content": "Worked on the CSV export; tests are left.", "scope": "project", "category": "episode", "importance": 3, "evidence": "user", "replaces": null, "expires_in_days": null}]}"#.into(),
+                }],
+                stop_reason: Some(crate::llm::provider::StopReason::EndTurn),
+                usage: crate::llm::provider::TokenUsage {
+                    input_tokens: 0,
+                    output_tokens: 0,
+                },
+                cache_metrics: None,
+                perf_metrics: None,
+            })
+        }
+        async fn stream(&self, _request: LLMRequest) -> ProviderResult<ProviderStream> {
+            unimplemented!("extraction does not stream")
+        }
+        fn name(&self) -> &str {
+            "episode"
+        }
+        fn default_model(&self) -> &str {
+            "episode-model"
+        }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["episode-model".to_string()]
+        }
+        fn context_window(&self, _model: &str) -> Option<u32> {
+            Some(128_000)
+        }
+        fn calculate_cost(&self, _model: &str, _input: u32, _output: u32) -> f64 {
+            0.0
+        }
+    }
+
+    /// An app whose memory store shares its database and has extraction on,
+    /// with a current session holding one user message.
+    async fn app_with_extraction(
+        dir: &std::path::Path,
+    ) -> (App, Arc<crate::memory::MemoryStore>, Database, Uuid) {
+        let db = Database::connect_in_memory().await.unwrap();
+        db.run_migrations().await.unwrap();
+        let context = ServiceContext::new(db.pool().clone());
+        let agent_service = Arc::new(AgentService::new(Arc::new(DummyProvider), context.clone()));
+        let mut app = App::new(agent_service, context);
+        app.working_directory = dir.to_path_buf();
+        let config = crate::config::MemoryConfig {
+            extraction: crate::config::MemoryExtractionConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let store = Arc::new(
+            crate::memory::MemoryStore::new(db.pool().clone(), config)
+                .with_extraction(Arc::new(EpisodeProvider), "episode-model".into()),
+        );
+        app.set_memory(Some(store.clone()));
+        app.create_new_session().await.unwrap();
+        let session = app.current_session.as_ref().unwrap().id;
+        sqlx::query(
+            "INSERT INTO messages (id, session_id, role, content, sequence, created_at) \
+             VALUES (?, ?, 'user', 'Add a CSV export to the reports page.', 1, 0)",
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(session.to_string())
+        .execute(db.pool())
+        .await
+        .unwrap();
+        (app, store, db, session)
+    }
+
+    async fn episodes(
+        store: &crate::memory::MemoryStore,
+        dir: &std::path::Path,
+    ) -> Vec<crate::memory::model::Memory> {
+        let project = crate::memory::project::identify(dir);
+        store
+            .list(&project, false)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|m| m.category == crate::memory::model::MemoryCategory::Episode)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn quitting_writes_the_session_episode_before_exit() {
+        let dir = tempfile::tempdir().unwrap();
+        let (app, store, _db, _session) = app_with_extraction(dir.path()).await;
+        app.finish_memory().await;
+        let found = episodes(&store, dir.path()).await;
+        assert_eq!(found.len(), 1, "{found:?}");
+    }
+
+    #[tokio::test]
+    async fn starting_a_new_session_ends_the_previous_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut app, store, _db, _session) = app_with_extraction(dir.path()).await;
+        app.create_new_session().await.unwrap();
+        for _ in 0..200 {
+            if !episodes(&store, dir.path()).await.is_empty() {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        panic!("the previous session's episode was not written");
     }
 }

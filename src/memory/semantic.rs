@@ -356,7 +356,7 @@ pub async fn archive_near_duplicates(
 mod tests {
     use super::*;
     use crate::memory::model::{MemoryCategory, MemoryScope, MemorySource, MemoryStatus};
-    use chrono::{DateTime, Duration, Utc};
+    use chrono::{DateTime, Duration};
     use uuid::Uuid;
 
     fn memory(category: MemoryCategory, source: MemorySource, age_days: i64) -> Memory {
