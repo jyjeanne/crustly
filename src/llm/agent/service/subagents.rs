@@ -49,6 +49,7 @@ pub(crate) struct ChildTemplate {
     pub core_system_prompt: Option<String>,
     pub tool_profile: ToolProfile,
     pub extra_tools: Vec<String>,
+    pub mcp_exposure: Vec<(String, crate::config::McpExpose)>,
     pub approval_callback: Option<ApprovalCallback>,
     pub auto_approve_tools: bool,
     pub verification: bool,
@@ -70,6 +71,7 @@ impl ChildTemplate {
             .with_allow_sub_agents(false)
             .with_max_tool_iterations(profile.max_rounds)
             .with_tool_profile(self.tool_profile, self.extra_tools.clone())
+            .with_mcp_exposure(self.mcp_exposure.clone())
             // Same approval rules as the parent: the user is asked (with the
             // sub-agent named) whenever the parent would ask. Without a
             // callback, approval-requiring tools are refused, never run.

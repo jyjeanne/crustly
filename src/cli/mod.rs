@@ -240,6 +240,14 @@ fn configure_agent_loop(
     service
         .with_core_system_prompt(CORE_SYSTEM_PROMPT.to_string())
         .with_tool_profile(config.tools.profile, config.tools.extra.clone())
+        .with_mcp_exposure(
+            config
+                .mcp
+                .servers
+                .iter()
+                .map(|server| (server.name.clone(), server.expose))
+                .collect(),
+        )
         .with_max_tool_iterations(config.agent.max_tool_rounds)
         .with_request_limits(
             config.agent.max_wall_time(),
@@ -3726,6 +3734,7 @@ mod tests {
             name: "broken".to_string(),
             command: "definitely-not-a-real-binary".to_string(),
             args: vec![],
+            expose: crate::config::McpExpose::Always,
         });
         let mut registry = build_tool_registry(None);
 
