@@ -65,6 +65,9 @@ fn match_response_line(line: &str, expected_id: u64) -> ResponseMatch {
 pub struct McpToolDef {
     pub name: String,
     pub description: Option<String>,
+    /// MCP names it `inputSchema`. Read under that name, every MCP tool
+    /// reached the model with an empty schema.
+    #[serde(rename = "inputSchema", alias = "input_schema")]
     pub input_schema: Option<Value>,
 }
 
@@ -373,6 +376,22 @@ impl Tool for McpTool {
 #[cfg(test)]
 mod response_matching_tests {
     use super::*;
+
+    /// Regression: MCP's `tools/list` names the schema `inputSchema`; read
+    /// as `input_schema`, every MCP tool was offered with an empty schema.
+    #[test]
+    fn a_tool_definition_keeps_its_input_schema() {
+        let def: McpToolDef = serde_json::from_value(serde_json::json!({
+            "name": "explore",
+            "description": "One-call context for a concept",
+            "inputSchema": { "type": "object", "properties": { "query": { "type": "string" } } }
+        }))
+        .unwrap();
+        assert_eq!(
+            def.input_schema.unwrap()["properties"]["query"]["type"],
+            "string"
+        );
+    }
 
     /// Regression: `send_request` used to blindly trust "whatever line
     /// comes back next" as the answer to its own request, with no `id`
