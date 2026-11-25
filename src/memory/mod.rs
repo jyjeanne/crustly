@@ -7,6 +7,8 @@
 //! inside the store are returned as `Result`; callers on the request path log
 //! them and carry on, so memory never fails a request.
 
+pub mod anchors;
+pub mod code_knowledge;
 pub mod consolidate;
 pub mod embed;
 pub mod extract;
@@ -92,6 +94,10 @@ pub struct MemoryStore {
     running: Mutex<std::collections::HashSet<Uuid>>,
     /// (session, memory) pairs already shown through a tool result.
     shown: Mutex<std::collections::HashSet<(Uuid, Uuid)>>,
+    /// Code knowledge from an okf-rs bundle (§23), when detected.
+    code: Option<Arc<code_knowledge::CodeKnowledge>>,
+    /// Why code knowledge is off, for `crustly memory status`.
+    code_off: Option<String>,
 }
 
 impl MemoryStore {
@@ -107,6 +113,8 @@ impl MemoryStore {
             extraction: None,
             running: Mutex::new(std::collections::HashSet::new()),
             shown: Mutex::new(std::collections::HashSet::new()),
+            code: None,
+            code_off: None,
         }
     }
 
@@ -340,6 +348,13 @@ impl MemoryStore {
             self.queue_embedding(id);
             self.notify(&new.scope, new.category.as_str(), id, &content);
         }
+        // Code anchors (§23.3): a memory naming a function or a type is tied
+        // to it. A failure only means no anchor; the memory is saved.
+        if matches!(new.scope, MemoryScope::Project(_)) {
+            if let Err(err) = self.anchor_automatically(id).await {
+                tracing::warn!("could not anchor memory {id}: {err:#}");
+            }
+        }
         Ok(SaveOutcome::Created(id))
     }
 
@@ -491,17 +506,28 @@ impl MemoryStore {
         // when semantic search is off) would put a weak keyword match above a
         // clear semantic one. A path match counts as the best match on both.
         let semantic_on = semantic.is_some();
+        // Code knowledge (§23.3): a memory anchored to a concept the message
+        // names counts like a path match (K = 1); one anchored to a direct
+        // caller or callee of such a concept counts as half a match.
+        let anchor = self.anchor_hits(&project_id, request.message).await;
         let ranked: Vec<Ranked> = candidates
             .into_iter()
             .map(|memory| {
-                let path_hit = path_hits.contains(&memory.id);
+                let path_hit = path_hits.contains(&memory.id) || anchor.direct.contains(&memory.id);
+                let near_hit = !path_hit && anchor.neighbours.contains(&memory.id);
+                // bm25 is negative, best most negative: half of it is K = 0.5.
+                let half = best_keyword * 0.5;
                 let keyword = keyword_hits
                     .iter()
                     .find(|(hit, _)| hit.id == memory.id)
                     .map(|(_, bm25)| *bm25)
-                    .or_else(|| path_hit.then_some(best_keyword));
+                    .or_else(|| path_hit.then_some(best_keyword))
+                    .map(|k| if near_hit { k.min(half) } else { k })
+                    .or_else(|| near_hit.then_some(half));
                 let similarity = match similarities.get(&memory.id).copied() {
                     _ if semantic_on && path_hit => Some(1.0),
+                    Some(s) if near_hit => Some(s.max(0.5)),
+                    None if semantic_on && near_hit => Some(0.5),
                     Some(s) => Some(s),
                     None if semantic_on && keyword.is_some() => Some(0.0),
                     None => None,
@@ -544,7 +570,9 @@ impl MemoryStore {
                 tracing::warn!("could not record recall: {err:#}");
             }
         }
-        Ok(recall::render_block(&selected, &recent))
+        // An anchored memory shows where its code is now (§23.3).
+        let locations = self.anchor_locations(&project_id, &selected).await;
+        Ok(recall::render_block_located(&selected, &recent, &locations))
     }
 
     /// The "Recent work" lines for a session's first request, at most
@@ -767,7 +795,9 @@ impl MemoryStore {
 
     /// Memories about `path` that this session has not been shown yet. `path`
     /// is a tool's path argument: relative to `working_dir`, or absolute; it
-    /// is matched in its project-relative form, as globs are written.
+    /// is matched in its project-relative form, as globs are written. With
+    /// code knowledge, memories anchored to a concept defined in that file
+    /// come too (§23.3).
     ///
     /// Nothing is marked here: the caller passes the memories it actually
     /// sends to `mark_shown`, so one cut by a size cap is offered again later.
@@ -789,6 +819,8 @@ impl MemoryStore {
             .filter(|(_, glob)| paths::matches(std::slice::from_ref(glob), &relative))
             .map(|(id, _)| id)
             .collect();
+        // Memories anchored to a concept defined in this file (§23.3).
+        hits.extend(self.anchored_in_file(&project.id, &relative).await);
         hits.sort();
         hits.dedup();
         let shown: Vec<Uuid> = match self.shown.lock() {

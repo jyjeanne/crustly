@@ -139,6 +139,53 @@ pub struct MemoryConfig {
     /// Retention and consolidation (`[memory.lifecycle]`, section 13.4).
     #[serde(default)]
     pub lifecycle: MemoryLifecycleConfig,
+    /// Code knowledge from an okf-rs bundle, through okf-mcp
+    /// (`[memory.code_knowledge]`, section 23).
+    #[serde(default)]
+    pub code_knowledge: MemoryCodeKnowledgeConfig,
+}
+
+/// `[memory.code_knowledge]` (docs/improve-memory.md §23): memories
+/// anchored to the functions and types of an okf-rs bundle.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MemoryCodeKnowledgeConfig {
+    /// "auto" (on when the command is found and the project has a bundle),
+    /// "on" (the same, and a missing command or bundle is reported), or
+    /// "off" (no trace of the feature).
+    #[serde(default = "default_code_knowledge_enabled")]
+    pub enabled: String,
+    /// The okf-mcp executable, a name on PATH or a path.
+    #[serde(default = "default_code_knowledge_command")]
+    pub command: String,
+    /// Longest wait for one okf-mcp query; past it, recall carries on
+    /// without code knowledge for that request.
+    #[serde(default = "default_code_knowledge_timeout_ms")]
+    pub query_timeout_ms: u64,
+    /// Also offer okf-mcp's tools to the model, with the full tool profile
+    /// only (their schemas cost about 1,300 tokens per request).
+    #[serde(default)]
+    pub expose_tools: bool,
+}
+
+impl Default for MemoryCodeKnowledgeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_code_knowledge_enabled(),
+            command: default_code_knowledge_command(),
+            query_timeout_ms: default_code_knowledge_timeout_ms(),
+            expose_tools: false,
+        }
+    }
+}
+
+fn default_code_knowledge_enabled() -> String {
+    "auto".to_string()
+}
+fn default_code_knowledge_command() -> String {
+    "okf-mcp".to_string()
+}
+fn default_code_knowledge_timeout_ms() -> u64 {
+    300
 }
 
 /// `[memory.embeddings]`: where vectors come from, and how they are used.
@@ -277,6 +324,7 @@ impl Default for MemoryConfig {
             embeddings: MemoryEmbeddingsConfig::default(),
             extraction: MemoryExtractionConfig::default(),
             lifecycle: MemoryLifecycleConfig::default(),
+            code_knowledge: MemoryCodeKnowledgeConfig::default(),
         }
     }
 }
@@ -300,6 +348,24 @@ impl MemoryConfig {
                 default_recall_max_tokens()
             );
             self.recall_max_tokens = default_recall_max_tokens();
+        }
+        let code = &mut self.code_knowledge;
+        if !matches!(code.enabled.as_str(), "auto" | "on" | "off") {
+            tracing::warn!(
+                "memory.code_knowledge.enabled {:?} is not auto, on or off; using auto",
+                code.enabled
+            );
+            code.enabled = default_code_knowledge_enabled();
+        }
+        if !(10..=10_000).contains(&code.query_timeout_ms) {
+            tracing::warn!(
+                "memory.code_knowledge.query_timeout_ms {} is outside 10-10000; using 300",
+                code.query_timeout_ms
+            );
+            code.query_timeout_ms = default_code_knowledge_timeout_ms();
+        }
+        if code.command.trim().is_empty() {
+            code.command = default_code_knowledge_command();
         }
         let life = &mut self.lifecycle;
         if !(1..=3650).contains(&life.episode_retention_days) {
