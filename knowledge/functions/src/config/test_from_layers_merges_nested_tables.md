@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_from_layers_merges_nested_tables
-resource: src/config/mod.rs#L2047-L2059
+resource: src/config/mod.rs#L2157-L2169
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/config_file

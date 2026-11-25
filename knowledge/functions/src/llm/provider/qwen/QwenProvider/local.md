@@ -3,7 +3,7 @@ type: Rust Method
 title: local
 resource: src/llm/provider/qwen.rs#L133-L145
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/qwen/QwenProvider/build_client

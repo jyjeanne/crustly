@@ -3,7 +3,7 @@ type: Rust Module
 title: profiles
 resource: src/llm/agent/profiles.rs#L1-L182
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crate-config-agentprofileconfig

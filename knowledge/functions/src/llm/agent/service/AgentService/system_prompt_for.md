@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: system_prompt_for
-resource: src/llm/agent/service.rs#L781-L798
+resource: src/llm/agent/service.rs#L793-L810
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/tool_profile/ToolSelection/is_core_only

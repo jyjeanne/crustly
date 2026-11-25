@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: project_notes_are_added_to_the_system_prompt_when_enabled
-resource: src/llm/agent/service.rs#L3426-L3459
+resource: src/llm/agent/service.rs#L3440-L3473
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/write

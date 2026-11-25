@@ -3,7 +3,7 @@ type: Rust Function
 title: encode
 resource: src/memory/vector.rs#L63-L65
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/repository/memory/MemoryRepository/put_embedding

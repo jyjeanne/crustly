@@ -3,7 +3,7 @@ type: Rust Method
 title: with_default_model
 resource: src/llm/provider/gemini.rs#L73-L76
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/gemini/test_custom_default_model

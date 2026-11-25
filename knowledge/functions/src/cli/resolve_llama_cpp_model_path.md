@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: resolve_llama_cpp_model_path
-resource: src/cli/mod.rs#L2402-L2409
+resource: src/cli/mod.rs#L2575-L2582
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_llama_cpp

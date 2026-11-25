@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/skill.rs#L120-L162
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

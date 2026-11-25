@@ -3,7 +3,7 @@ type: Rust Method
 title: fraction
 resource: src/llm/provider/ollama_models.rs#L47-L51
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/ollama_models/pull_progress_fraction

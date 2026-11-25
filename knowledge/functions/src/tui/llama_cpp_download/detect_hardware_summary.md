@@ -3,7 +3,7 @@ type: Rust Function
 title: detect_hardware_summary
 resource: src/tui/llama_cpp_download.rs#L129-L144
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/hardware_detect/detect_hardware

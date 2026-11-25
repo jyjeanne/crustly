@@ -3,7 +3,7 @@ type: Rust Method
 title: with_debug_mode
 resource: src/logging.rs#L53-L59
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/logging/setup_from_cli

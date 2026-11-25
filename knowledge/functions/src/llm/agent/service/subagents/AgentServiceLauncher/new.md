@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: new
-resource: src/llm/agent/service/subagents.rs#L419-L421
+resource: src/llm/agent/service/subagents.rs#L421-L423
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

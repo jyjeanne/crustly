@@ -4,7 +4,7 @@ title: default
 resource: src/llm/provider/router.rs#L103-L105
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/router/ModelRouter/default_anthropic

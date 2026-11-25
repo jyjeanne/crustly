@@ -4,7 +4,7 @@ title: QwenFunctionCallDelta
 resource: src/llm/provider/qwen.rs#L1856-L1861
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

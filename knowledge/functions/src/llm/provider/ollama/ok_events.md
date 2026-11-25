@@ -4,7 +4,7 @@ title: ok_events
 resource: src/llm/provider/ollama.rs#L701-L703
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

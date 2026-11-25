@@ -3,9 +3,12 @@ type: Rust Method
 title: connect
 resource: src/db/mod.rs#L34-L93
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/tui/error/ErrorInfo/with_context
     resolved_by: tree-sitter
     confidence: exact
@@ -52,6 +55,12 @@ relationships:
   - target: functions/tests/memory_benchmark_test/run
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/setup
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/tests/memory_extraction_test/database
     resolved_by: tree-sitter-receiver
     confidence: semantic
@@ -84,6 +93,7 @@ relationships:
 
 # Calls
 
+- [exists](../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [with_context](../../../../functions/src/tui/error/ErrorInfo/with_context.md)
 - [context](../../../../functions/src/services/ServiceManager/context.md)
 
@@ -102,6 +112,8 @@ relationships:
 - [test_database_persistence](../../../../functions/tests/integration_test/test_database_persistence.md)
 - [open](../../../../functions/tests/memory_acceptance_test/open.md)
 - [run](../../../../functions/tests/memory_benchmark_test/run.md)
+- [setup](../../../../functions/tests/memory_code_knowledge_test/setup.md)
+- [without_code_knowledge_nothing_changes](../../../../functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes.md)
 - [database](../../../../functions/tests/memory_extraction_test/database.md)
 - [a_database_from_before_memory_upgrades_and_keeps_its_sessions](../../../../functions/tests/memory_migration_test/a_database_from_before_memory_upgrades_and_keeps_its_sessions.md)
 - [a_checksum_recorded_with_other_line_endings_is_accepted_and_updated](../../../../functions/tests/memory_migration_test/a_checksum_recorded_with_other_line_endings_is_accepted_and_updated.md)

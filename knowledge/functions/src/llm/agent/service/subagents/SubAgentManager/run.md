@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: run
-resource: src/llm/agent/service/subagents.rs#L178-L187
+resource: src/llm/agent/service/subagents.rs#L180-L189
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/profile_name

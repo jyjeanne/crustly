@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: full
-resource: src/llm/agent/tool_profile.rs#L36-L42
+resource: src/llm/agent/tool_profile.rs#L39-L46
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/tool_profile/full_exposes_everything

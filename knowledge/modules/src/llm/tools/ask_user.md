@@ -3,7 +3,7 @@ type: Rust Module
 title: ask_user
 resource: src/llm/tools/ask_user.rs#L1-L177
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-error-result-toolerror

@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: MemoryEmbeddingsConfig
-resource: src/config/mod.rs#L146-L174
+resource: src/config/mod.rs#L193-L221
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

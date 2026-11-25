@@ -3,7 +3,7 @@ type: Rust Method
 title: is_archived
 resource: src/db/models.rs#L239-L241
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/models/test_session_new

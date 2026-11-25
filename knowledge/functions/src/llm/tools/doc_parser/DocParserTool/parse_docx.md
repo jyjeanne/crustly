@@ -4,7 +4,7 @@ title: parse_docx
 resource: src/llm/tools/doc_parser.rs#L286-L331
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/tests/memory_acceptance_test/open

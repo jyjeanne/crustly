@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_llama_cpp
-resource: src/cli/mod.rs#L2412-L2644
+resource: src/cli/mod.rs#L2585-L2817
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/ProviderConfigs/llama_cpp_models_dir

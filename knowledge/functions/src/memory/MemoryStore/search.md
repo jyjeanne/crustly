@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: search
-resource: src/memory/mod.rs#L603-L630
+resource: src/memory/mod.rs#L631-L658
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/fts_match_expr

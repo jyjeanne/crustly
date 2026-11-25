@@ -3,7 +3,7 @@ type: Rust Method
 title: is_empty
 resource: src/config/secrets.rs#L144-L146
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/secrets/test_secret_string_creation

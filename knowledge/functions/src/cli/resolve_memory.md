@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: resolve_memory
-resource: src/cli/mod.rs#L1130-L1147
+resource: src/cli/mod.rs#L1174-L1191
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/find

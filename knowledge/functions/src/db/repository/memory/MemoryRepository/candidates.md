@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: candidates
-resource: src/db/repository/memory.rs#L423-L440
+resource: src/db/repository/memory.rs#L496-L513
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/try_recall

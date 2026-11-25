@@ -3,7 +3,7 @@ type: Rust Module
 title: plan_tests
 resource: src/plan/plan_tests.rs#L1-L568
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crate-plan

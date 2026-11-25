@@ -4,7 +4,7 @@ title: render_llama_cpp_models
 resource: src/tui/render.rs#L2762-L2883
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/render/render_llama_cpp_confirm_delete

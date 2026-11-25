@@ -3,7 +3,7 @@ type: Rust Function
 title: list_all_local_models
 resource: src/llm/provider/llama_cpp_models.rs#L277-L331
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_models/list_local_models

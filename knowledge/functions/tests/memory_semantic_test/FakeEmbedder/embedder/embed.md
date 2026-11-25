@@ -4,7 +4,7 @@ title: embed
 resource: tests/memory_semantic_test.rs#L59-L72
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/tests/memory_semantic_test/topic_vector

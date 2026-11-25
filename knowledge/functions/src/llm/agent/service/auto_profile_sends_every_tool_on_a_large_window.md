@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: auto_profile_sends_every_tool_on_a_large_window
-resource: src/llm/agent/service.rs#L2730-L2748
+resource: src/llm/agent/service.rs#L2744-L2762
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

@@ -4,7 +4,7 @@ title: on_chunk
 resource: src/llm/provider/ollama.rs#L755-L797
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/tool_call_recovery/maybe_tool_call_json

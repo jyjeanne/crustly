@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_db_path
-resource: src/config/mod.rs#L1246-L1251
+resource: src/config/mod.rs#L1331-L1336
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/DatabaseConfig/default/default

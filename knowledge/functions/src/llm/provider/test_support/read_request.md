@@ -4,7 +4,7 @@ title: read_request
 resource: src/llm/provider/test_support.rs#L49-L76
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/test_support/held_response_server

@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/db/repository/session.rs#L30-L32
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/repository/file/test_file_crud

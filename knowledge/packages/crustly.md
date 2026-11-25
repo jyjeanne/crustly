@@ -3,7 +3,7 @@ type: Rust Package
 title: crustly
 resource: Cargo.toml#L1
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Contains
@@ -112,6 +112,8 @@ generated:
 - [client](../modules/src/mcp/client.md)
 - [mcp](../modules/src/mcp.md)
 - [transport](../modules/src/mcp/transport.md)
+- [anchors](../modules/src/memory/anchors.md)
+- [code_knowledge](../modules/src/memory/code_knowledge.md)
 - [consolidate](../modules/src/memory/consolidate.md)
 - [embed](../modules/src/memory/embed.md)
 - [extract](../modules/src/memory/extract.md)
@@ -162,7 +164,9 @@ generated:
 - [integration_test](../modules/tests/integration_test.md)
 - [mcp_contract_test](../modules/tests/mcp_contract_test.md)
 - [memory_acceptance_test](../modules/tests/memory_acceptance_test.md)
+- [memory_anchors_test](../modules/tests/memory_anchors_test.md)
 - [memory_benchmark_test](../modules/tests/memory_benchmark_test.md)
+- [memory_code_knowledge_test](../modules/tests/memory_code_knowledge_test.md)
 - [memory_consolidate_test](../modules/tests/memory_consolidate_test.md)
 - [memory_extraction_test](../modules/tests/memory_extraction_test.md)
 - [memory_migration_test](../modules/tests/memory_migration_test.md)

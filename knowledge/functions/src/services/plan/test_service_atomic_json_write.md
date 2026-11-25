@@ -6,13 +6,16 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/plan/setup_test_service
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/services/plan/PlanService/export_to_json
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
     resolved_by: tree-sitter
     confidence: exact
 ---
@@ -25,3 +28,4 @@ relationships:
 
 - [setup_test_service](../../../../functions/src/services/plan/setup_test_service.md)
 - [export_to_json](../../../../functions/src/services/plan/PlanService/export_to_json.md)
+- [exists](../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)

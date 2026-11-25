@@ -3,7 +3,7 @@ type: Rust Method
 title: with_frequency_penalty
 resource: src/llm/provider/types.rs#L228-L231
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/openai/test_llm_request_new_fields

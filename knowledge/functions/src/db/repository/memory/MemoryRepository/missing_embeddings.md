@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: missing_embeddings
-resource: src/db/repository/memory.rs#L753-L765
+resource: src/db/repository/memory.rs#L826-L838
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/semantic/backfill

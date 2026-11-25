@@ -4,7 +4,7 @@ title: llama_cpp_fit_tag
 resource: src/tui/render.rs#L2585-L2605
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_models/hardware_fit

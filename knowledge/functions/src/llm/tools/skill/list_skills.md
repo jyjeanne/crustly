@@ -3,7 +3,7 @@ type: Rust Function
 title: list_skills
 resource: src/llm/tools/skill.rs#L299-L358
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/skill/skill_lookup_roots

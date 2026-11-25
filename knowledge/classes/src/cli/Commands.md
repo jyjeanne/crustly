@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: Commands
-resource: src/cli/mod.rs#L283-L367
+resource: src/cli/mod.rs#L310-L394
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

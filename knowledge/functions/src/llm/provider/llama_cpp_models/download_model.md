@@ -3,7 +3,7 @@ type: Rust Function
 title: download_model
 resource: src/llm/provider/llama_cpp_models.rs#L995-L1143
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/error/ErrorInfo/with_context
@@ -13,6 +13,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/status
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/provider/llama_cpp_models/check_disk_space
@@ -63,6 +66,7 @@ relationships:
 - [with_context](../../../../../functions/src/tui/error/ErrorInfo/with_context.md)
 - [next](../../../../../functions/src/tui/events/EventHandler/next.md)
 - [context](../../../../../functions/src/services/ServiceManager/context.md)
+- [status](../../../../../functions/src/memory/code_knowledge/CodeKnowledge/status.md)
 - [check_disk_space](../../../../../functions/src/llm/provider/llama_cpp_models/check_disk_space.md)
 - [available_space_at](../../../../../functions/src/llm/provider/llama_cpp_models/available_space_at.md)
 - [open](../../../../../functions/tests/memory_acceptance_test/open.md)

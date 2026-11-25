@@ -3,7 +3,7 @@ type: Rust Function
 title: augment_message_with_pdf
 resource: src/llm/pdf_context.rs#L78-L127
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/pdf_context/looks_like_pdf_path

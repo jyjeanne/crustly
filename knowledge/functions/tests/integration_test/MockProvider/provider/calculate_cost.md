@@ -4,7 +4,7 @@ title: calculate_cost
 resource: tests/integration_test.rs#L88-L91
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

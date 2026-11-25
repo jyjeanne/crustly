@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: override_default_model
-resource: src/config/mod.rs#L797-L829
+resource: src/config/mod.rs#L882-L914
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/run

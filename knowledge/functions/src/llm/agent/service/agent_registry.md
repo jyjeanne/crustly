@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: agent_registry
-resource: src/llm/agent/service.rs#L3559-L3569
+resource: src/llm/agent/service.rs#L3573-L3583
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/registry/ToolRegistry/new

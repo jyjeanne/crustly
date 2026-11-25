@@ -3,7 +3,7 @@ type: Rust Module
 title: render
 resource: src/tui/render.rs#L1-L4173
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-app-app-displaymessage

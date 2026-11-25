@@ -4,7 +4,7 @@ title: row_to_plan_task
 resource: src/db/repository/plan.rs#L654-L708
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/models/PlanTaskStatus/parse

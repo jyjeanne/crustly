@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: llama_cpp_doctor_findings_always_reports_detected_hardware
-resource: src/cli/mod.rs#L3614-L3635
+resource: src/cli/mod.rs#L3787-L3808
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

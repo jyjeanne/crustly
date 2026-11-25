@@ -4,7 +4,7 @@ title: model_id
 resource: src/memory/embed.rs#L269-L271
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/embed/openai_orders_by_index_and_sends_the_key

@@ -4,7 +4,7 @@ title: serialize
 resource: src/config/secrets.rs#L168-L174
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

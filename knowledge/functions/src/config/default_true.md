@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_true
-resource: src/config/mod.rs#L552-L554
+resource: src/config/mod.rs#L618-L620
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

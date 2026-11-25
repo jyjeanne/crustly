@@ -3,7 +3,7 @@ type: Rust Method
 title: warning
 resource: src/tui/error.rs#L134-L136
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/error/ErrorInfo/new

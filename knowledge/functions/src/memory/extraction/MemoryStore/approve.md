@@ -3,7 +3,7 @@ type: Rust Method
 title: approve
 resource: src/memory/extraction.rs#L300-L324
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/get
@@ -25,6 +25,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   called_by:
+  - target: functions/src/cli/cmd_memory
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/src/memory/MemoryStore/save_with
     resolved_by: tree-sitter-receiver
     confidence: semantic
@@ -54,6 +57,7 @@ relationships:
 
 # Called by
 
+- [cmd_memory](../../../../../functions/src/cli/cmd_memory.md)
 - [save_with](../../../../../functions/src/memory/MemoryStore/save_with.md)
 - [review_holds_memories_until_approved_and_rejection_deletes_them](../../../../../functions/tests/memory_extraction_test/review_holds_memories_until_approved_and_rejection_deletes_them.md)
 - [an_approved_correction_supersedes_the_memory_it_corrects](../../../../../functions/tests/memory_extraction_test/an_approved_correction_supersedes_the_memory_it_corrects.md)

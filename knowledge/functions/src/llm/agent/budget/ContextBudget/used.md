@@ -3,7 +3,7 @@ type: Rust Method
 title: used
 resource: src/llm/agent/budget.rs#L118-L120
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/budget/ContextBudget/estimated_prompt_tokens

@@ -3,7 +3,7 @@ type: Rust Method
 title: open_memory_view
 resource: src/tui/app.rs#L1857-L1861
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/reload_memory_rows

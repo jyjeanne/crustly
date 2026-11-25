@@ -4,7 +4,7 @@ title: supports_vision
 resource: src/llm/provider/gemini.rs#L657-L660
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

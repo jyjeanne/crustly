@@ -3,7 +3,7 @@ type: Rust Method
 title: update_stats
 resource: src/db/repository/session.rs#L204-L225
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

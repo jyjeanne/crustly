@@ -3,7 +3,7 @@ type: Rust Method
 title: count_files_in_session
 resource: src/services/file.rs#L129-L134
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/file/FileRepository/new

@@ -3,7 +3,7 @@ type: Rust Module
 title: llama_cpp_download
 resource: src/tui/llama_cpp_download.rs#L1-L539
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-events-tuievent

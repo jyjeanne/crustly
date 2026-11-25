@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_embed_query_timeout_ms
-resource: src/config/mod.rs#L201-L203
+resource: src/config/mod.rs#L248-L250
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryEmbeddingsConfig/default/default

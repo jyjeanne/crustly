@@ -4,7 +4,7 @@ title: database
 resource: tests/memory_semantic_test.rs#L93-L97
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect

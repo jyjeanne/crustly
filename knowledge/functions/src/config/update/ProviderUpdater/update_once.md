@@ -3,7 +3,7 @@ type: Rust Method
 title: update_once
 resource: src/config/update.rs#L184-L188
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/crabrace/CrabraceIntegration/new

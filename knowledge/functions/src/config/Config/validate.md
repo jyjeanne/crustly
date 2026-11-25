@@ -1,11 +1,14 @@
 ---
 type: Rust Method
 title: validate
-resource: src/config/mod.rs#L1642-L1672
+resource: src/config/mod.rs#L1727-L1757
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/vector_index/VectorIndex/contains
     resolved_by: tree-sitter
     confidence: exact
@@ -30,6 +33,7 @@ relationships:
 
 # Calls
 
+- [exists](../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [contains](../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 
 # Called by

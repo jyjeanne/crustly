@@ -4,10 +4,13 @@ title: execute
 resource: src/llm/tools/plan_tool.rs#L325-L994
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/plan_tool/validate_plan_file_path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/tools/plan_tool/validate_string
@@ -104,6 +107,7 @@ relationships:
 # Calls
 
 - [validate_plan_file_path](../../../../../../../functions/src/llm/tools/plan_tool/validate_plan_file_path.md)
+- [exists](../../../../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [validate_string](../../../../../../../functions/src/llm/tools/plan_tool/validate_string.md)
 - [error](../../../../../../../functions/src/llm/tools/trait/ToolResult/error.md)
 - [new](../../../../../../../functions/src/plan/PlanDocument/new.md)

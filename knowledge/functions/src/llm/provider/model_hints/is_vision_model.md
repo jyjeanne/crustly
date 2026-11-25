@@ -3,7 +3,7 @@ type: Rust Function
 title: is_vision_model
 resource: src/llm/provider/model_hints.rs#L10-L28
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

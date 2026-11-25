@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: build
-resource: src/llm/agent/service/subagents.rs#L62-L100
+resource: src/llm/agent/service/subagents.rs#L63-L102
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/new
@@ -25,6 +25,9 @@ relationships:
   - target: functions/src/llm/agent/service/AgentService/with_tool_profile
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/llm/agent/service/AgentService/with_mcp_exposure
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/src/llm/agent/service/AgentService/with_auto_approve_tools
     resolved_by: tree-sitter
     confidence: exact
@@ -109,6 +112,7 @@ relationships:
 - [with_allow_sub_agents](../../../../../../../functions/src/llm/agent/service/AgentService/with_allow_sub_agents.md)
 - [with_max_tool_iterations](../../../../../../../functions/src/llm/agent/service/AgentService/with_max_tool_iterations.md)
 - [with_tool_profile](../../../../../../../functions/src/llm/agent/service/AgentService/with_tool_profile.md)
+- [with_mcp_exposure](../../../../../../../functions/src/llm/agent/service/AgentService/with_mcp_exposure.md)
 - [with_auto_approve_tools](../../../../../../../functions/src/llm/agent/service/AgentService/with_auto_approve_tools.md)
 - [with_approval_callback](../../../../../../../functions/src/llm/agent/service/AgentService/with_approval_callback.md)
 - [labelled](../../../../../../../functions/src/llm/agent/service/subagents/labelled.md)

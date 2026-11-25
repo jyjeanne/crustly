@@ -3,7 +3,7 @@ type: Rust Method
 title: delete_from_keyring
 resource: src/config/secrets.rs#L265-L276
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/secrets/SecretString/delete_from_keyring

@@ -4,7 +4,7 @@ title: default_complexity
 resource: src/llm/tools/plan_tool.rs#L117-L119
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/plan_tool_security_tests/test_default_complexity

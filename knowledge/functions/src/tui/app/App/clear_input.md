@@ -4,7 +4,7 @@ title: clear_input
 resource: src/tui/app.rs#L565-L567
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/plain_textarea

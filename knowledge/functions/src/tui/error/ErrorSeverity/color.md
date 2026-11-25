@@ -3,7 +3,7 @@ type: Rust Method
 title: color
 resource: src/tui/error.rs#L22-L30
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/error/test_error_severity_color

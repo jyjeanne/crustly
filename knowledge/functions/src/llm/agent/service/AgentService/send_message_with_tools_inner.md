@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: send_message_with_tools_inner
-resource: src/llm/agent/service.rs#L1303-L1512
+resource: src/llm/agent/service.rs#L1317-L1526
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/session/SessionService/new

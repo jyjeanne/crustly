@@ -3,7 +3,7 @@ type: Rust Method
 title: as_str
 resource: src/db/models.rs#L126-L134
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/repository/plan/PlanTaskRepository/update_task_status

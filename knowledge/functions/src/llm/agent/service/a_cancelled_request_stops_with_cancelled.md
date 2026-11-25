@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: a_cancelled_request_stops_with_cancelled
-resource: src/llm/agent/service.rs#L3222-L3244
+resource: src/llm/agent/service.rs#L3236-L3258
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

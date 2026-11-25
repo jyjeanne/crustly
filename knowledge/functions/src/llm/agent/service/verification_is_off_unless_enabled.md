@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: verification_is_off_unless_enabled
-resource: src/llm/agent/service.rs#L3331-L3353
+resource: src/llm/agent/service.rs#L3345-L3367
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/write

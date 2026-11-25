@@ -4,7 +4,7 @@ title: create_plan
 resource: tests/plan_crash_recovery_test.rs#L26-L42
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/plan_crash_recovery_test/crash_recovery_resumes_at_correct_task

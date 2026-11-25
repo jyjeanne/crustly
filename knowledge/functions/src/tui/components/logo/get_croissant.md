@@ -3,7 +3,7 @@ type: Rust Function
 title: get_croissant
 resource: src/tui/components/logo.rs#L54-L56
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/components/logo/test_logo_not_empty

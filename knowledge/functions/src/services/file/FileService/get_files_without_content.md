@@ -3,7 +3,7 @@ type: Rust Method
 title: get_files_without_content
 resource: src/services/file.rs#L165-L168
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/file/FileService/list_files_for_session

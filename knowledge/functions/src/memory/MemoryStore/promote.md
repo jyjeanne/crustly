@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: promote
-resource: src/memory/mod.rs#L707-L726
+resource: src/memory/mod.rs#L735-L754
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/get

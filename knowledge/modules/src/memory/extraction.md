@@ -3,7 +3,7 @@ type: Rust Module
 title: extraction
 resource: src/memory/extraction.rs#L1-L330
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-extract-self-turn

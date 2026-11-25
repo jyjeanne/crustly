@@ -3,7 +3,7 @@ type: Rust Module
 title: memory_review_fixes_test
 resource: tests/memory_review_fixes_test.rs#L1-L166
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/chrono-datetime-utc

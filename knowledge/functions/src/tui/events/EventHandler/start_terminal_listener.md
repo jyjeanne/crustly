@@ -3,7 +3,7 @@ type: Rust Method
 title: start_terminal_listener
 resource: src/tui/events.rs#L265-L272
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/read_terminal_events

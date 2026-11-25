@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_memory
-resource: src/cli/mod.rs#L1160-L1570
+resource: src/cli/mod.rs#L1204-L1715
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect
@@ -25,6 +25,9 @@ relationships:
   - target: functions/src/memory/MemoryStore/register_project
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/anchors/MemoryStore/start_code_knowledge
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/MemoryStore/list
     resolved_by: tree-sitter-receiver
     confidence: semantic
@@ -34,10 +37,25 @@ relationships:
   - target: functions/src/cli/memory_status_lines
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/anchors/MemoryStore/code_knowledge
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/is_ready
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/bundle_is_older_than_sources
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/anchors/MemoryStore/drifted
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/cli/parse_scope
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/cli/resolve_memory
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/anchors/MemoryStore/anchors
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/memory/MemoryStore/events
@@ -53,6 +71,9 @@ relationships:
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/src/memory/MemoryStore/add_paths
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/memory/anchors/MemoryStore/set_anchors
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/src/memory/MemoryStore/edit
@@ -97,21 +118,27 @@ relationships:
   - target: functions/src/memory/extraction/MemoryStore/pending
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/extraction/MemoryStore/approve
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/memory/anchors/MemoryStore/anchor_automatically
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/location
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/MemoryStore/reindex
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/memory/MemoryStore/relink
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/anchors/MemoryStore/code_knowledge_status
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/cli/memory_line
     resolved_by: tree-sitter
     confidence: exact
-  - target: functions/src/memory/model/MemoryCategory/as_str
-    resolved_by: tree-sitter-receiver
-    confidence: semantic
-  - target: functions/src/memory/model/MemoryStatus/as_str
-    resolved_by: tree-sitter-receiver
-    confidence: semantic
   - target: functions/src/llm/tools/skill/SkillSource/display
     resolved_by: tree-sitter
     confidence: exact
@@ -139,16 +166,23 @@ relationships:
 - [build_memory_store](../../../functions/src/cli/build_memory_store.md)
 - [identify](../../../functions/src/memory/project/identify.md)
 - [register_project](../../../functions/src/memory/MemoryStore/register_project.md)
+- [start_code_knowledge](../../../functions/src/memory/anchors/MemoryStore/start_code_knowledge.md)
 - [list](../../../functions/src/memory/MemoryStore/list.md)
 - [embedding_status](../../../functions/src/memory/MemoryStore/embedding_status.md)
 - [memory_status_lines](../../../functions/src/cli/memory_status_lines.md)
+- [code_knowledge](../../../functions/src/memory/anchors/MemoryStore/code_knowledge.md)
+- [is_ready](../../../functions/src/memory/code_knowledge/CodeKnowledge/is_ready.md)
+- [bundle_is_older_than_sources](../../../functions/src/memory/code_knowledge/CodeKnowledge/bundle_is_older_than_sources.md)
+- [drifted](../../../functions/src/memory/anchors/MemoryStore/drifted.md)
 - [parse_scope](../../../functions/src/cli/parse_scope.md)
 - [resolve_memory](../../../functions/src/cli/resolve_memory.md)
+- [anchors](../../../functions/src/memory/anchors/MemoryStore/anchors.md)
 - [events](../../../functions/src/memory/MemoryStore/events.md)
 - [search](../../../functions/src/memory/MemoryStore/search.md)
 - [contains](../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 - [save](../../../functions/src/memory/MemoryStore/save.md)
 - [add_paths](../../../functions/src/memory/MemoryStore/add_paths.md)
+- [set_anchors](../../../functions/src/memory/anchors/MemoryStore/set_anchors.md)
 - [edit](../../../functions/src/memory/MemoryStore/edit.md)
 - [promote](../../../functions/src/memory/MemoryStore/promote.md)
 - [all](../../../functions/src/memory/MemoryStore/all.md)
@@ -163,11 +197,13 @@ relationships:
 - [create_provider](../../../functions/src/llm/provider/factory/create_provider.md)
 - [consolidate](../../../functions/src/memory/consolidate/MemoryStore/consolidate.md)
 - [pending](../../../functions/src/memory/extraction/MemoryStore/pending.md)
+- [approve](../../../functions/src/memory/extraction/MemoryStore/approve.md)
+- [anchor_automatically](../../../functions/src/memory/anchors/MemoryStore/anchor_automatically.md)
+- [location](../../../functions/src/memory/code_knowledge/CodeKnowledge/location.md)
 - [reindex](../../../functions/src/memory/MemoryStore/reindex.md)
 - [relink](../../../functions/src/memory/MemoryStore/relink.md)
+- [code_knowledge_status](../../../functions/src/memory/anchors/MemoryStore/code_knowledge_status.md)
 - [memory_line](../../../functions/src/cli/memory_line.md)
-- [as_str](../../../functions/src/memory/model/MemoryCategory/as_str.md)
-- [as_str](../../../functions/src/memory/model/MemoryStatus/as_str.md)
 - [display](../../../functions/src/llm/tools/skill/SkillSource/display.md)
 - [display_path](../../../functions/src/cli/display_path.md)
 

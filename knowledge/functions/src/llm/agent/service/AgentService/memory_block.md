@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: memory_block
-resource: src/llm/agent/service.rs#L645-L684
+resource: src/llm/agent/service.rs#L650-L689
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/identify

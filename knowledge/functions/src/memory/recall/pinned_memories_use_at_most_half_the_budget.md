@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: pinned_memories_use_at_most_half_the_budget
-resource: src/memory/recall.rs#L441-L475
+resource: src/memory/recall.rs#L454-L488
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/ranked

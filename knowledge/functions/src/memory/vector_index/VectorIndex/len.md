@@ -3,7 +3,7 @@ type: Rust Method
 title: len
 resource: src/memory/vector_index.rs#L51-L53
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/vector_index/insert_replaces_and_remove_deletes

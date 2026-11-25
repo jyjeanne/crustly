@@ -4,7 +4,7 @@ title: validate_plan_file_path
 resource: src/llm/tools/plan_tool.rs#L127-L164
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/plan_tool/PlanTool/tool/execute

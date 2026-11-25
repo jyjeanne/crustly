@@ -3,7 +3,7 @@ type: Rust Method
 title: set_llama_cpp_models_dir
 resource: src/tui/app.rs#L895-L897
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_chat

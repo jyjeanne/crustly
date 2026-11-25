@@ -3,7 +3,7 @@ type: Rust Function
 title: retry_db_sqlx
 resource: src/db/retry.rs#L175-L233
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/retry/is_database_locked

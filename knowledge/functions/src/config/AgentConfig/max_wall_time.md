@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: max_wall_time
-resource: src/config/mod.rs#L414-L417
+resource: src/config/mod.rs#L480-L483
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/configure_agent_loop

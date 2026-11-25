@@ -3,7 +3,7 @@ type: Rust Module
 title: budget
 resource: src/llm/agent/budget.rs#L1-L319
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-context-token-count

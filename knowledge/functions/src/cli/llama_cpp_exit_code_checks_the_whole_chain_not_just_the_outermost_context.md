@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: llama_cpp_exit_code_checks_the_whole_chain_not_just_the_outermost_context
-resource: src/cli/mod.rs#L3512-L3521
+resource: src/cli/mod.rs#L3685-L3694
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

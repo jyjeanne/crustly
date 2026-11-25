@@ -3,7 +3,7 @@ type: Rust Module
 title: tool_call_recovery
 resource: src/llm/provider/tool_call_recovery.rs#L1-L493
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-types-tool

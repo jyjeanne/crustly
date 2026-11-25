@@ -4,7 +4,7 @@ title: build_client
 resource: src/llm/provider/qwen.rs#L213-L221
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/ChildTemplate/build

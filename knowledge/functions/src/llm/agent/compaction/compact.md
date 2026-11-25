@@ -3,7 +3,7 @@ type: Rust Function
 title: compact
 resource: src/llm/agent/compaction.rs#L46-L48
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/compaction/compact_keeping

@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_tool_profile
-resource: src/llm/agent/service.rs#L700-L704
+resource: src/llm/agent/service.rs#L705-L709
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/configure_agent_loop

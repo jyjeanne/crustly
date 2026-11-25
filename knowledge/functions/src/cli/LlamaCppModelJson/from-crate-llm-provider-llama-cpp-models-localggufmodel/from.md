@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: from
-resource: src/cli/mod.rs#L499-L539
+resource: src/cli/mod.rs#L526-L566
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/llama_cpp_model_json_from_local_gguf_model_carries_every_field

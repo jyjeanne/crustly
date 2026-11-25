@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/code_exec.rs#L128-L265
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/trait/ToolResult/error

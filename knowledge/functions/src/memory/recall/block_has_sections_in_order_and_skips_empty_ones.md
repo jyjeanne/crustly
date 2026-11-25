@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: block_has_sections_in_order_and_skips_empty_ones
-resource: src/memory/recall.rs#L518-L555
+resource: src/memory/recall.rs#L531-L568
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/render_block

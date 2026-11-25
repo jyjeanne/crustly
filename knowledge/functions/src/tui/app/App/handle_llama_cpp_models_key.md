@@ -4,7 +4,7 @@ title: handle_llama_cpp_models_key
 resource: src/tui/app.rs#L3714-L3803
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/start_llama_cpp_delete

@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: subagents
-resource: src/llm/agent/service/subagents.rs#L1-L462
+resource: src/llm/agent/service/subagents.rs#L1-L464
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-agentservice-approvalcallback-fallback-toolapprovalinfo

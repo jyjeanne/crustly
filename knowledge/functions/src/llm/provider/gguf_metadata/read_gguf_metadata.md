@@ -3,7 +3,7 @@ type: Rust Function
 title: read_gguf_metadata
 resource: src/llm/provider/gguf_metadata.rs#L102-L106
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/tests/memory_acceptance_test/open

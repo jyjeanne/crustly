@@ -24,7 +24,9 @@
 - [LlamaCppProviderConfig](../classes/src/config/LlamaCppProviderConfig.md) — Rust Struct
 - [LoggingConfig](../classes/src/config/LoggingConfig.md) — Rust Struct
 - [McpConfig](../classes/src/config/McpConfig.md) — Rust Struct
+- [McpExpose](../classes/src/config/McpExpose.md) — Rust Enum
 - [McpServerConfig](../classes/src/config/McpServerConfig.md) — Rust Struct
+- [MemoryCodeKnowledgeConfig](../classes/src/config/MemoryCodeKnowledgeConfig.md) — Rust Struct
 - [MemoryConfig](../classes/src/config/MemoryConfig.md) — Rust Struct
 - [MemoryEmbeddingsConfig](../classes/src/config/MemoryEmbeddingsConfig.md) — Rust Struct
 - [MemoryExtractionConfig](../classes/src/config/MemoryExtractionConfig.md) — Rust Struct
@@ -355,6 +357,12 @@
 - [MemoryStore](../classes/src/memory/MemoryStore.md) — Rust Struct
 - [RecallRequest](../classes/src/memory/RecallRequest.md) — Rust Struct
 - [SearchScope](../classes/src/memory/SearchScope.md) — Rust Enum
+- [AnchorHits](../classes/src/memory/anchors/AnchorHits.md) — Rust Struct
+- [Drift](../classes/src/memory/anchors/Drift.md) — Rust Struct
+- [CodeKnowledge](../classes/src/memory/code_knowledge/CodeKnowledge.md) — Rust Struct
+- [Detection](../classes/src/memory/code_knowledge/Detection.md) — Rust Enum
+- [Identifier](../classes/src/memory/code_knowledge/Identifier.md) — Rust Struct
+- [Status](../classes/src/memory/code_knowledge/Status.md) — Rust Enum
 - [ConsolidationReport](../classes/src/memory/consolidate/ConsolidationReport.md) — Rust Struct
 - [EmbedError](../classes/src/memory/embed/EmbedError.md) — Rust Enum
 - [EmbedPurpose](../classes/src/memory/embed/EmbedPurpose.md) — Rust Enum
@@ -448,6 +456,9 @@
 - [FixtureQuery](../classes/tests/memory_benchmark_test/FixtureQuery.md) — Rust Struct
 - [Metrics](../classes/tests/memory_benchmark_test/Metrics.md) — Rust Struct
 - [TopicEmbedder](../classes/tests/memory_benchmark_test/TopicEmbedder.md) — Rust Struct
+- [Concept](../classes/tests/memory_code_knowledge_test/Concept.md) — Rust Struct
+- [Scripted](../classes/tests/memory_code_knowledge_test/Scripted.md) — Rust Struct
+- [Setup](../classes/tests/memory_code_knowledge_test/Setup.md) — Rust Struct
 - [FixedAnswer](../classes/tests/memory_consolidate_test/FixedAnswer.md) — Rust Struct
 - [FixedEmbedder](../classes/tests/memory_consolidate_test/FixedEmbedder.md) — Rust Struct
 - [Scripted](../classes/tests/memory_extraction_test/Scripted.md) — Rust Struct

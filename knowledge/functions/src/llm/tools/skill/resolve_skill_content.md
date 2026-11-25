@@ -3,7 +3,7 @@ type: Rust Function
 title: resolve_skill_content
 resource: src/llm/tools/skill.rs#L198-L209
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

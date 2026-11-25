@@ -4,7 +4,7 @@ title: start_llama_cpp_switch
 resource: src/tui/app.rs#L3696-L3711
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/event_sender

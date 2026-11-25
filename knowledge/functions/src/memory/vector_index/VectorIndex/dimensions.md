@@ -3,7 +3,7 @@ type: Rust Method
 title: dimensions
 resource: src/memory/vector_index.rs#L47-L49
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

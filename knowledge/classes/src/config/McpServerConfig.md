@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: McpServerConfig
-resource: src/config/mod.rs#L558-L563
+resource: src/config/mod.rs#L624-L634
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: render_model_info
 resource: src/tui/render.rs#L2062-L2241
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/provider_context_window

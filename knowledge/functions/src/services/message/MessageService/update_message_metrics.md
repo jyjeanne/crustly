@@ -3,7 +3,7 @@ type: Rust Method
 title: update_message_metrics
 resource: src/services/message.rs#L133-L157
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/message/MessageService/get_message_required

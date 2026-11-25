@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: send_message_with_tools_and_mode_streaming
-resource: src/llm/agent/service.rs#L1282-L1300
+resource: src/llm/agent/service.rs#L1296-L1314
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

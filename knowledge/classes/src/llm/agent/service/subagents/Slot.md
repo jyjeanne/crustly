@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: Slot
-resource: src/llm/agent/service/subagents.rs#L115-L120
+resource: src/llm/agent/service/subagents.rs#L117-L122
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

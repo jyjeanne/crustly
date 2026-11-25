@@ -3,7 +3,7 @@ type: Rust Function
 title: is_copy_response
 resource: src/tui/events.rs#L500-L502
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/key_matches

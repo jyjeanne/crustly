@@ -3,7 +3,7 @@ type: Rust Method
 title: next_executable_task_mut
 resource: src/plan/mod.rs#L270-L286
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/find

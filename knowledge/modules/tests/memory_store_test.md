@@ -3,7 +3,7 @@ type: Rust Module
 title: memory_store_test
 resource: tests/memory_store_test.rs#L1-L371
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crustly-config-memoryconfig

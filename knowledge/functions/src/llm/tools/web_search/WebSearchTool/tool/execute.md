@@ -4,10 +4,13 @@ title: execute
 resource: src/llm/tools/web_search.rs#L129-L225
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/ChildTemplate/build
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/status
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/provider/ollama_models/PullProgress/is_success
@@ -31,6 +34,7 @@ relationships:
 # Calls
 
 - [build](../../../../../../../functions/src/llm/agent/service/subagents/ChildTemplate/build.md)
+- [status](../../../../../../../functions/src/memory/code_knowledge/CodeKnowledge/status.md)
 - [is_success](../../../../../../../functions/src/llm/provider/ollama_models/PullProgress/is_success.md)
 - [error](../../../../../../../functions/src/llm/tools/trait/ToolResult/error.md)
 - [success](../../../../../../../functions/src/llm/tools/trait/ToolResult/success.md)

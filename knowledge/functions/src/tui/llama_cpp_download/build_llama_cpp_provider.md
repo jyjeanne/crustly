@@ -3,7 +3,7 @@ type: Rust Function
 title: build_llama_cpp_provider
 resource: src/tui/llama_cpp_download.rs#L246-L255
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp/LlamaCppProvider/new

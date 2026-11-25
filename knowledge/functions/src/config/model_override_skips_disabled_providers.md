@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: model_override_skips_disabled_providers
-resource: src/config/mod.rs#L1770-L1795
+resource: src/config/mod.rs#L1855-L1880
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/ProviderConfigs/override_default_model

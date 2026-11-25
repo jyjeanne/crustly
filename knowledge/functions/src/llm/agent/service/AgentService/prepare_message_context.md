@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: prepare_message_context
-resource: src/llm/agent/service.rs#L1536-L1617
+resource: src/llm/agent/service.rs#L1550-L1631
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/session/SessionService/new

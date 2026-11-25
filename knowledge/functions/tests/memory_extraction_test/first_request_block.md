@@ -4,7 +4,7 @@ title: first_request_block
 resource: tests/memory_extraction_test.rs#L686-L702
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/recall

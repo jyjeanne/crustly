@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: prune_embeddings_except
-resource: src/db/repository/memory.rs#L768-L776
+resource: src/db/repository/memory.rs#L841-L849
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/reindex

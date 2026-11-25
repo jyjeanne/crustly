@@ -4,7 +4,7 @@ title: on_bytes
 resource: src/llm/provider/openai.rs#L994-L1013
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/openai/OpenAIStreamState/on_line

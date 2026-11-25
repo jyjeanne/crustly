@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: tool_call
-resource: src/llm/agent/service.rs#L2574-L2591
+resource: src/llm/agent/service.rs#L2588-L2605
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/stopping_mid_round_answers_every_pending_tool_call

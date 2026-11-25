@@ -3,7 +3,7 @@ type: Rust Function
 title: coalesce_input
 resource: src/tui/events.rs#L350-L376
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/typed_char

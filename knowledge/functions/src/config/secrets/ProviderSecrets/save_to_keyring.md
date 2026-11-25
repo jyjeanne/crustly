@@ -3,7 +3,7 @@ type: Rust Method
 title: save_to_keyring
 resource: src/config/secrets.rs#L248-L262
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -3,7 +3,7 @@ type: Rust Function
 title: drop_near_duplicates
 resource: src/memory/semantic.rs#L253-L266
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/similarity_between

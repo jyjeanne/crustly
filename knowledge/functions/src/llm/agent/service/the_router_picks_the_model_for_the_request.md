@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: the_router_picks_the_model_for_the_request
-resource: src/llm/agent/service.rs#L4045-L4090
+resource: src/llm/agent/service.rs#L4059-L4104
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

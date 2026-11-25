@@ -1,12 +1,15 @@
 ---
 type: Rust Function
 title: cmd_logs
-resource: src/cli/mod.rs#L2938-L3100
+resource: src/cli/mod.rs#L3111-L3273
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/logging/get_log_path
     resolved_by: tree-sitter
     confidence: exact
@@ -34,6 +37,7 @@ relationships:
 
 # Calls
 
+- [exists](../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [get_log_path](../../../functions/src/logging/get_log_path.md)
 - [open](../../../functions/tests/memory_acceptance_test/open.md)
 - [cleanup_old_logs](../../../functions/src/logging/cleanup_old_logs.md)

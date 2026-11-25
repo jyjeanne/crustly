@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: memory
-resource: src/memory/mod.rs#L1-L902
+resource: src/memory/mod.rs#L1-L934
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crate-config-memoryconfig

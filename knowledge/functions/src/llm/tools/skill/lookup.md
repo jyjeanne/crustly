@@ -3,7 +3,7 @@ type: Rust Function
 title: lookup
 resource: src/llm/tools/skill.rs#L34-L39
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/find

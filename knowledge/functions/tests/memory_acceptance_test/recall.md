@@ -4,7 +4,7 @@ title: recall
 resource: tests/memory_acceptance_test.rs#L56-L73
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/recall

@@ -3,7 +3,7 @@ type: Rust Method
 title: dashscope_intl
 resource: src/llm/provider/qwen.rs#L123-L125
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/qwen/QwenProvider/with_base_url

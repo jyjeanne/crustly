@@ -3,7 +3,7 @@ type: Rust Function
 title: describe_arguments
 resource: src/llm/tools/schema_check.rs#L54-L102
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/schema_check/declared_types

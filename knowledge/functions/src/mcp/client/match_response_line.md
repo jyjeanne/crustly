@@ -4,7 +4,7 @@ title: match_response_line
 resource: src/mcp/client.rs#L48-L60
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/mcp/client/MCPClient/send_request

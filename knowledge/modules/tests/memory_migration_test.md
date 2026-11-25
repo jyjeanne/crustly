@@ -3,7 +3,7 @@ type: Rust Module
 title: memory_migration_test
 resource: tests/memory_migration_test.rs#L1-L139
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crustly-db-database

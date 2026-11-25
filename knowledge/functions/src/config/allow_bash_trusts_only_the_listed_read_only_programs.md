@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: allow_bash_trusts_only_the_listed_read_only_programs
-resource: src/config/mod.rs#L1869-L1921
+resource: src/config/mod.rs#L1954-L2006
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/SecurityConfig/to_policy

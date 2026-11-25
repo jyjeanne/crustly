@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: save
-resource: src/config/mod.rs#L1675-L1690
+resource: src/config/mod.rs#L1760-L1775
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

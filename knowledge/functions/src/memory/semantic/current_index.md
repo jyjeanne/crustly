@@ -3,7 +3,7 @@ type: Rust Function
 title: current_index
 resource: src/memory/semantic.rs#L209-L243
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/model

@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: embedder_from_config
-resource: src/memory/mod.rs#L856-L891
+resource: src/memory/mod.rs#L888-L923
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/semantic/EmbedRuntime/default/default

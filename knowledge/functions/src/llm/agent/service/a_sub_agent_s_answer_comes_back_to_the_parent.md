@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: a_sub_agent_s_answer_comes_back_to_the_parent
-resource: src/llm/agent/service.rs#L3575-L3632
+resource: src/llm/agent/service.rs#L3589-L3646
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

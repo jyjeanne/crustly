@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: registry_of
-resource: src/llm/agent/service.rs#L2633-L2642
+resource: src/llm/agent/service.rs#L2647-L2656
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/registry/ToolRegistry/new

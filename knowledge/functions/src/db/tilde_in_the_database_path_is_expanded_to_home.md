@@ -6,7 +6,7 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect
@@ -15,6 +15,9 @@ relationships:
   - target: functions/src/db/Database/is_connected
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -25,3 +28,4 @@ relationships:
 
 - [connect](../../../functions/src/db/Database/connect.md)
 - [is_connected](../../../functions/src/db/Database/is_connected.md)
+- [exists](../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)

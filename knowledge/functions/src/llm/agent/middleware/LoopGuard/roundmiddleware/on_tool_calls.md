@@ -4,7 +4,7 @@ title: on_tool_calls
 resource: src/llm/agent/middleware.rs#L260-L372
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/middleware/tool_call_signature

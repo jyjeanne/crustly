@@ -4,7 +4,7 @@ title: completed
 resource: src/llm/agent/service/tool_round.rs#L72-L111
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/schema_check/describe_arguments

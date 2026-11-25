@@ -3,7 +3,7 @@ type: Rust Function
 title: retry_db_anyhow
 resource: src/db/retry.rs#L164-L172
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/retry/retry_db_operation

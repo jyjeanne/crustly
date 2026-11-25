@@ -3,7 +3,7 @@ type: Rust Method
 title: resolve
 resource: src/llm/provider/router.rs#L42-L48
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/router/all_tiers_resolve_to_non_empty_model

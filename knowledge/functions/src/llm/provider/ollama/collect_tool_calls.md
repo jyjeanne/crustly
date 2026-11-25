@@ -4,7 +4,7 @@ title: collect_tool_calls
 resource: src/llm/provider/ollama.rs#L685-L690
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/ollama/OllamaStreamState/on_chunk

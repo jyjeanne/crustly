@@ -3,7 +3,7 @@ type: Rust Method
 title: analyze_and_transform_for
 resource: src/tui/prompt_analyzer.rs#L136-L210
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/app/App/send_message

@@ -4,7 +4,7 @@ title: description
 resource: src/llm/tools/notebook.rs#L94-L96
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

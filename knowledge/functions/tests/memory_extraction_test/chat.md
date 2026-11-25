@@ -4,7 +4,7 @@ title: chat
 resource: tests/memory_extraction_test.rs#L166-L173
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_extraction_test/extraction_is_off_by_default_and_calls_nothing

@@ -4,7 +4,7 @@ title: load_plan_for_viewing
 resource: src/tui/app.rs#L2674-L2742
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/plan/PlanService/get_most_recent_plan

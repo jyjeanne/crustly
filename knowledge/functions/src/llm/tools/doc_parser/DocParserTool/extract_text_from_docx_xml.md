@@ -4,7 +4,7 @@ title: extract_text_from_docx_xml
 resource: src/llm/tools/doc_parser.rs#L354-L393
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/doc_parser/DocParserTool/resolve_general_ref

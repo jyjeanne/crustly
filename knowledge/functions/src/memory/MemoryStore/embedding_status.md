@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: embedding_status
-resource: src/memory/mod.rs#L195-L208
+resource: src/memory/mod.rs#L203-L216
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/embedding_counts

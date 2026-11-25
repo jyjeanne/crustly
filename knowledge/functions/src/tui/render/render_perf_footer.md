@@ -4,7 +4,7 @@ title: render_perf_footer
 resource: src/tui/render.rs#L353-L386
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/tool_round/ToolRound/push

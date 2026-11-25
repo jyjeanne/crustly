@@ -3,7 +3,7 @@ type: Rust Method
 title: retriable_tasks
 resource: src/plan/mod.rs#L350-L352
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/plan/PlanTask/can_retry

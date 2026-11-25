@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: paths_of
-resource: src/db/repository/memory.rs#L308-L314
+resource: src/db/repository/memory.rs#L381-L387
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/add_paths

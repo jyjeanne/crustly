@@ -4,7 +4,7 @@ title: read_u32
 resource: src/llm/provider/gguf_metadata.rs#L197-L201
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/gguf_metadata/BoundedReader/read_exact

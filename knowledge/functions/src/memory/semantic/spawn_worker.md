@@ -3,7 +3,7 @@ type: Rust Function
 title: spawn_worker
 resource: src/memory/semantic.rs#L158-L200
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/semantic/backfill

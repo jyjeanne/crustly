@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: memory_sanitized_restores_defaults_for_out_of_range_values
-resource: src/config/mod.rs#L2274-L2283
+resource: src/config/mod.rs#L2384-L2393
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/MemoryConfig/default/default

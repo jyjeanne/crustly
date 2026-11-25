@@ -3,7 +3,7 @@ type: Rust Method
 title: has_any
 resource: src/config/secrets.rs#L279-L284
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/secrets/test_provider_secrets_empty

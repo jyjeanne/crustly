@@ -4,7 +4,7 @@ title: update_provider_config
 resource: src/config/update.rs#L109-L153
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/update/ProviderUpdater/update

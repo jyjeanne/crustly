@@ -3,7 +3,7 @@ type: Rust Function
 title: notes_budget
 resource: src/llm/agent/project_memory.rs#L36-L38
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/project_memory/notes_budget_is_an_eighth_of_the_window_up_to_2000

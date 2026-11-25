@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: route_text_delta
-resource: src/llm/agent/service.rs#L325-L370
+resource: src/llm/agent/service.rs#L329-L374
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/drain_stream_to_response

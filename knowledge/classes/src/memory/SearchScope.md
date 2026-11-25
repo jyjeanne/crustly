@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: SearchScope
-resource: src/memory/mod.rs#L69-L73
+resource: src/memory/mod.rs#L71-L75
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

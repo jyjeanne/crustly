@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: send_message_with_tools_and_mode
-resource: src/llm/agent/service.rs#L1218-L1234
+resource: src/llm/agent/service.rs#L1231-L1247
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

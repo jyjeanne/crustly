@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: load_from_path
-resource: src/config/mod.rs#L1378-L1392
+resource: src/config/mod.rs#L1463-L1477
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/from_layers

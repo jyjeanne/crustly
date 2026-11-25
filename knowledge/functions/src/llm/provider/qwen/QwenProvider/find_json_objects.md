@@ -4,7 +4,7 @@ title: find_json_objects
 resource: src/llm/provider/qwen.rs#L350-L405
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls

@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: complete
-resource: src/llm/agent/service.rs#L2514-L2521
+resource: src/llm/agent/service.rs#L2528-L2535
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/text_reply

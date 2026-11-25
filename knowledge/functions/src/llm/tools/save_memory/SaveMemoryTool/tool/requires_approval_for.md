@@ -4,7 +4,7 @@ title: requires_approval_for
 resource: src/llm/tools/save_memory.rs#L272-L274
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

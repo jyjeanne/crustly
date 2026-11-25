@@ -3,7 +3,7 @@ type: Rust Method
 title: tokens_per_second
 resource: src/llm/provider/types.rs#L335-L338
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/ollama/test_perf_metrics_from_final_data

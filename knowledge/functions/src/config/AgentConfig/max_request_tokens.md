@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: max_request_tokens
-resource: src/config/mod.rs#L420-L422
+resource: src/config/mod.rs#L486-L488
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/configure_agent_loop

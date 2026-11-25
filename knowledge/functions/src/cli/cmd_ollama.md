@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_ollama
-resource: src/cli/mod.rs#L2297-L2388
+resource: src/cli/mod.rs#L2470-L2561
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/ollama_host

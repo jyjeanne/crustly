@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: new
-resource: src/memory/mod.rs#L98-L111
+resource: src/memory/mod.rs#L104-L119
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/new
@@ -52,7 +52,16 @@ relationships:
   - target: functions/tests/memory_acceptance_test/open
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/tests/memory_anchors_test/setup
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/setup
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/tests/memory_consolidate_test/setup
@@ -195,7 +204,10 @@ relationships:
 - [memory_screen_app](../../../../functions/src/tui/app/memory_screen_app.md)
 - [app_with_extraction](../../../../functions/src/tui/app/app_with_extraction.md)
 - [open](../../../../functions/tests/memory_acceptance_test/open.md)
+- [setup](../../../../functions/tests/memory_anchors_test/setup.md)
 - [run](../../../../functions/tests/memory_benchmark_test/run.md)
+- [setup](../../../../functions/tests/memory_code_knowledge_test/setup.md)
+- [without_code_knowledge_nothing_changes](../../../../functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes.md)
 - [setup](../../../../functions/tests/memory_consolidate_test/setup.md)
 - [three_episodes_become_one_lesson_with_its_sources](../../../../functions/tests/memory_consolidate_test/three_episodes_become_one_lesson_with_its_sources.md)
 - [episodes_feed_one_lesson_only](../../../../functions/tests/memory_consolidate_test/episodes_feed_one_lesson_only.md)

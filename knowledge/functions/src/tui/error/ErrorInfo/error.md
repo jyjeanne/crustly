@@ -3,7 +3,7 @@ type: Rust Method
 title: error
 resource: src/tui/error.rs#L139-L141
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/error/ErrorInfo/new

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: display_path
-resource: src/cli/mod.rs#L1018-L1023
+resource: src/cli/mod.rs#L1062-L1067
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/memory_status_lines

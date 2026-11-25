@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: log_progress
-resource: src/llm/agent/service.rs#L1038-L1064
+resource: src/llm/agent/service.rs#L1051-L1077
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/middleware/is_file_edit

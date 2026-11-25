@@ -3,7 +3,7 @@ type: Rust Method
 title: status_code
 resource: src/llm/provider/error.rs#L99-L104
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/error/test_status_code

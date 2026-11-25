@@ -4,7 +4,7 @@ title: GlobInput
 resource: src/llm/tools/glob.rs#L16-L31
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

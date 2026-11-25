@@ -3,7 +3,7 @@ type: Rust Method
 title: skip
 resource: src/plan/mod.rs#L697-L702
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/qwen/QwenProvider/parse_native_qwen_tool_calls
@@ -16,6 +16,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/tools/sandbox/strip_verbatim_prefix
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/is_camel_case
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/memory/consolidate/MemoryStore/consolidate
@@ -48,6 +51,7 @@ relationships:
 - [search_file](../../../../functions/src/llm/tools/grep/GrepTool/search_file.md)
 - [execute](../../../../functions/src/llm/tools/plan_tool/PlanTool/tool/execute.md)
 - [strip_verbatim_prefix](../../../../functions/src/llm/tools/sandbox/strip_verbatim_prefix.md)
+- [is_camel_case](../../../../functions/src/memory/code_knowledge/is_camel_case.md)
 - [consolidate](../../../../functions/src/memory/consolidate/MemoryStore/consolidate.md)
 - [remove_bullets](../../../../functions/src/memory/transfer/remove_bullets.md)
 - [test_task_skip](../../../../functions/src/plan/plan_tests/test_task_skip.md)

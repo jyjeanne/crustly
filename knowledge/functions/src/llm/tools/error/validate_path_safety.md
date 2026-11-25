@@ -3,9 +3,12 @@ type: Rust Function
 title: validate_path_safety
 resource: src/llm/tools/error.rs#L58-L110
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/llm/tools/skill/SkillSource/display
     resolved_by: tree-sitter
     confidence: exact
@@ -30,6 +33,7 @@ relationships:
 
 # Calls
 
+- [exists](../../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [display](../../../../../functions/src/llm/tools/skill/SkillSource/display.md)
 
 # Called by

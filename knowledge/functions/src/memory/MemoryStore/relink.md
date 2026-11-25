@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: relink
-resource: src/memory/mod.rs#L730-L735
+resource: src/memory/mod.rs#L758-L763
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/upsert_project

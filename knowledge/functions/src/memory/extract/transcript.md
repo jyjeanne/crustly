@@ -3,7 +3,7 @@ type: Rust Function
 title: transcript
 resource: src/memory/extract.rs#L30-L43
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/extract/redact_and_omit

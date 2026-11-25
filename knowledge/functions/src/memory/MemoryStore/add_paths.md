@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: add_paths
-resource: src/memory/mod.rs#L739-L766
+resource: src/memory/mod.rs#L767-L794
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/get

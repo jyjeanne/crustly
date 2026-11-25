@@ -4,7 +4,7 @@ title: detect_windows_dxgi
 resource: src/llm/provider/hardware_detect.rs#L317-L357
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/hardware_detect/gpu_vendor_from_pci_id

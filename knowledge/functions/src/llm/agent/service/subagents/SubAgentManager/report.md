@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: report
-resource: src/llm/agent/service/subagents.rs#L212-L234
+resource: src/llm/agent/service/subagents.rs#L214-L236
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/SubAgentManager/agents

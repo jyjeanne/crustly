@@ -4,7 +4,7 @@ title: open_model_download
 resource: src/tui/app.rs#L3342-L3360
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/refresh_model_download_suggestions

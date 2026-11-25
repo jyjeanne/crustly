@@ -3,7 +3,7 @@ type: Rust Module
 title: llama_cpp_models
 resource: src/llm/provider/llama_cpp_models.rs#L1-L2135
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/anyhow-context-result

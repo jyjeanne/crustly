@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_web_search_ttl
-resource: src/config/mod.rs#L591-L593
+resource: src/config/mod.rs#L676-L678
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/ToolCacheConfig/default/default

@@ -3,7 +3,7 @@ type: Rust Module
 title: tool_round
 resource: src/llm/agent/service/tool_round.rs#L1-L386
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-has-mutating-capability-is-parallelizable-plan-completion-rejection-agentservice-requesttools-toolapprovalinfo

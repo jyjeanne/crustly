@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: sub_agents_without_an_approval_prompt_cannot_run_gated_tools
-resource: src/llm/agent/service.rs#L3637-L3673
+resource: src/llm/agent/service.rs#L3651-L3687
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

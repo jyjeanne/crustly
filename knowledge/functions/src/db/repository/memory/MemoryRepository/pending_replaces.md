@@ -3,7 +3,7 @@ type: Rust Method
 title: pending_replaces
 resource: src/db/repository/memory.rs#L254-L261
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/models/PlanTaskStatus/parse

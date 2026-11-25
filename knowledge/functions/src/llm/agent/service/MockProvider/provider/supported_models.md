@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: supported_models
-resource: src/llm/agent/service.rs#L1799-L1801
+resource: src/llm/agent/service.rs#L1813-L1815
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

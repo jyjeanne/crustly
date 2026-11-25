@@ -4,7 +4,7 @@ title: llama_cpp_hardware_line
 resource: src/tui/render.rs#L2734-L2757
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/render/render_llama_cpp_models

@@ -3,7 +3,7 @@ type: Rust Module
 title: trait
 resource: src/llm/tools/trait.rs#L1-L344
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-error-result

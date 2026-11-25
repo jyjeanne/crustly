@@ -4,7 +4,7 @@ title: calls
 resource: tests/memory_consolidate_test.rs#L275-L277
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_consolidate_test/episodes_feed_one_lesson_only

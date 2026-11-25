@@ -4,7 +4,7 @@ title: connect_file
 resource: src/db/mod.rs#L212-L215
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect

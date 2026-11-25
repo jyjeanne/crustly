@@ -4,7 +4,7 @@ title: tool_call_index_in_bounds
 resource: src/llm/provider/openai.rs#L41-L43
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

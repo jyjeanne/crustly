@@ -4,7 +4,7 @@ title: centered_rect
 resource: src/tui/components/dialogs/mod.rs#L153-L171
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/components/dialogs/render_crash_recovery_dialog

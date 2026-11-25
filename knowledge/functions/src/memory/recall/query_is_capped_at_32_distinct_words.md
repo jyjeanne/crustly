@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: query_is_capped_at_32_distinct_words
-resource: src/memory/recall.rs#L348-L352
+resource: src/memory/recall.rs#L361-L365
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/fts_match_expr

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: record_calibration
-resource: src/llm/agent/service.rs#L905-L917
+resource: src/llm/agent/service.rs#L918-L930
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/budget/calibration_from

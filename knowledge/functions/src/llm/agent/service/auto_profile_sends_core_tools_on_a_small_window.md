@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: auto_profile_sends_core_tools_on_a_small_window
-resource: src/llm/agent/service.rs#L2673-L2727
+resource: src/llm/agent/service.rs#L2687-L2741
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

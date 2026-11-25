@@ -3,7 +3,7 @@ type: Rust Method
 title: assistant
 resource: src/llm/provider/types.rs#L39-L44
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/compaction/compaction_refuses_when_nothing_would_be_dropped

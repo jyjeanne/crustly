@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: AgentStreamResponse
-resource: src/llm/agent/service.rs#L1737-L1749
+resource: src/llm/agent/service.rs#L1751-L1763
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

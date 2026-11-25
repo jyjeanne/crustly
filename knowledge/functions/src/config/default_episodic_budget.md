@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_episodic_budget
-resource: src/config/mod.rs#L546-L548
+resource: src/config/mod.rs#L612-L614
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryConfig/default/default

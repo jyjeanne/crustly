@@ -3,7 +3,7 @@ type: Rust Method
 title: code
 resource: src/error.rs#L56-L63
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/bash/BashTool/tool/execute

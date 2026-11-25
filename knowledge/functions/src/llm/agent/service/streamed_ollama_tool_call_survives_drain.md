@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: streamed_ollama_tool_call_survives_drain
-resource: src/llm/agent/service.rs#L2309-L2354
+resource: src/llm/agent/service.rs#L2323-L2368
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/ollama/OllamaProvider/default_local

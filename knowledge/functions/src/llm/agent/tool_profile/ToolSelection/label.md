@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: label
-resource: src/llm/agent/tool_profile.rs#L90-L98
+resource: src/llm/agent/tool_profile.rs#L123-L131
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/tool_round/AgentService/execute_tool_round

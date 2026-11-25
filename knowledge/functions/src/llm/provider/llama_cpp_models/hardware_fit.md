@@ -3,7 +3,7 @@ type: Rust Function
 title: hardware_fit
 resource: src/llm/provider/llama_cpp_models.rs#L782-L793
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_llama_cpp

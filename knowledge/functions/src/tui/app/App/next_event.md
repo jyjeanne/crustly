@@ -3,7 +3,7 @@ type: Rust Method
 title: next_event
 resource: src/tui/app.rs#L991-L993
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/EventHandler/next

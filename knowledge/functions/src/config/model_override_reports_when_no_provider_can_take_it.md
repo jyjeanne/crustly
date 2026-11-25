@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: model_override_reports_when_no_provider_can_take_it
-resource: src/config/mod.rs#L1754-L1764
+resource: src/config/mod.rs#L1839-L1849
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/ProviderConfigs/override_default_model

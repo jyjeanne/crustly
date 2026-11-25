@@ -3,7 +3,7 @@ type: Rust Method
 title: with_read_only_mode
 resource: src/llm/tools/trait.rs#L176-L179
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

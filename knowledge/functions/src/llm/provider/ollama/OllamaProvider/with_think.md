@@ -3,7 +3,7 @@ type: Rust Method
 title: with_think
 resource: src/llm/provider/ollama.rs#L204-L207
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/ollama/parse_think

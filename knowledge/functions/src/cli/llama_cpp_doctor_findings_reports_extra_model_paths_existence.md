@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: llama_cpp_doctor_findings_reports_extra_model_paths_existence
-resource: src/cli/mod.rs#L3563-L3580
+resource: src/cli/mod.rs#L3736-L3753
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

@@ -3,7 +3,7 @@ type: Rust Method
 title: upsert_project
 resource: src/db/repository/memory.rs#L54-L76
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

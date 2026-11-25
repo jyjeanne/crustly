@@ -3,7 +3,7 @@ type: Rust Function
 title: frame
 resource: src/tui/components/ferris.rs#L33-L61
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/components/ferris/walking_lines

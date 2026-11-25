@@ -4,7 +4,7 @@ title: describe
 resource: src/llm/tools/forget_memory.rs#L69-L80
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/model/MemoryCategory/as_str

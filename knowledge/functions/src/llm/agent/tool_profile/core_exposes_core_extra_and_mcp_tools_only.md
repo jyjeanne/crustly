@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: core_exposes_core_extra_and_mcp_tools_only
-resource: src/llm/agent/tool_profile.rs#L120-L133
+resource: src/llm/agent/tool_profile.rs#L153-L166
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/tool_profile/ToolSelection/resolve

@@ -3,7 +3,7 @@ type: Rust Method
 title: import_from_json
 resource: src/services/plan.rs#L141-L145
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/services/plan/test_service_import_from_json

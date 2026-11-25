@@ -3,7 +3,7 @@ type: Rust Function
 title: mentioned_paths
 resource: src/memory/paths.rs#L41-L65
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

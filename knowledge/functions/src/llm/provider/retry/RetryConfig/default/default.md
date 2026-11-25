@@ -4,7 +4,7 @@ title: default
 resource: src/llm/provider/retry.rs#L32-L40
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

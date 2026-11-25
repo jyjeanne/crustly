@@ -3,7 +3,7 @@ type: Rust Method
 title: default_anthropic
 resource: src/llm/provider/router.rs#L77-L86
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/router/ModelRouter/new

@@ -3,7 +3,7 @@ type: Rust Function
 title: is_model_download
 resource: src/tui/events.rs#L479-L481
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/key_matches

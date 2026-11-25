@@ -3,7 +3,7 @@ type: Rust Module
 title: types
 resource: src/llm/provider/types.rs#L1-L611
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/serde-deserialize-serialize

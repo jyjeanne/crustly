@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: describe_context_usage
-resource: src/cli/mod.rs#L2005-L2018
+resource: src/cli/mod.rs#L2178-L2191
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_run

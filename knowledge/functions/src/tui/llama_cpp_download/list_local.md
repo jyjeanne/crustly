@@ -3,7 +3,7 @@ type: Rust Function
 title: list_local
 resource: src/tui/llama_cpp_download.rs#L169-L227
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_models/list_all_local_models

@@ -4,7 +4,7 @@ title: default
 resource: src/llm/agent/middleware.rs#L388-L394
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/middleware/limits_finish_with_a_notice_after_the_last_round

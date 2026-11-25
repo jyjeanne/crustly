@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: save_with
-resource: src/memory/mod.rs#L229-L344
+resource: src/memory/mod.rs#L237-L359
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/model/validate
@@ -58,6 +58,9 @@ relationships:
   - target: functions/src/memory/model/MemoryCategory/as_str
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/src/memory/anchors/MemoryStore/anchor_automatically
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
   - target: functions/src/memory/extraction/MemoryStore/extract
     resolved_by: tree-sitter
@@ -90,6 +93,7 @@ relationships:
 - [queue_embedding](../../../../functions/src/memory/MemoryStore/queue_embedding.md)
 - [notify](../../../../functions/src/memory/MemoryStore/notify.md)
 - [as_str](../../../../functions/src/memory/model/MemoryCategory/as_str.md)
+- [anchor_automatically](../../../../functions/src/memory/anchors/MemoryStore/anchor_automatically.md)
 
 # Called by
 

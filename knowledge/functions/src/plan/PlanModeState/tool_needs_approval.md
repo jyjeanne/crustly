@@ -3,7 +3,7 @@ type: Rust Method
 title: tool_needs_approval
 resource: src/plan/mod.rs#L864-L874
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/plan/PlanModeState/is_high_risk_tool

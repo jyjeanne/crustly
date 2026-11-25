@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: changed
-resource: src/memory/mod.rs#L152-L155
+resource: src/memory/mod.rs#L160-L163
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/extraction/MemoryStore/approve

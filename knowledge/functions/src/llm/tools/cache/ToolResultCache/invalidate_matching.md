@@ -3,7 +3,7 @@ type: Rust Method
 title: invalidate_matching
 resource: src/llm/tools/cache.rs#L132-L134
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/tool_round/AgentService/execute_tool_round

@@ -3,7 +3,7 @@ type: Rust Struct
 title: LogConfig
 resource: src/logging.rs#L12-L30
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

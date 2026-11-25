@@ -3,7 +3,7 @@ type: Rust Function
 title: tool_call_signature
 resource: src/llm/agent/middleware.rs#L165-L234
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/middleware/LoopGuard/roundmiddleware/on_tool_calls

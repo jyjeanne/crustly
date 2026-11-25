@@ -3,7 +3,7 @@ type: Rust Struct
 title: OrPolicy
 resource: src/llm/tools/sandbox.rs#L359
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

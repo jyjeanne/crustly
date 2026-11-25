@@ -4,7 +4,7 @@ title: apply_hunks
 resource: src/llm/tools/apply_patch.rs#L235-L285
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/apply_patch/find_subsequence

@@ -3,7 +3,7 @@ type: Rust Module
 title: error
 resource: src/llm/agent/error.rs#L1-L51
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crate-llm-provider-providererror

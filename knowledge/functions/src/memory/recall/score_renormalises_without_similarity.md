@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: score_renormalises_without_similarity
-resource: src/memory/recall.rs#L495-L500
+resource: src/memory/recall.rs#L508-L513
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/score

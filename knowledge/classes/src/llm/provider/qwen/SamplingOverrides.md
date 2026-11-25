@@ -4,7 +4,7 @@ title: SamplingOverrides
 resource: src/llm/provider/qwen.rs#L85-L89
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

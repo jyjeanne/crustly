@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_progress_file
-resource: src/llm/agent/service.rs#L693-L696
+resource: src/llm/agent/service.rs#L698-L701
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/configure_agent_loop

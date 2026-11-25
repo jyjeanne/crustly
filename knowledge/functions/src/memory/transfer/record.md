@@ -4,7 +4,7 @@ title: record
 resource: src/memory/transfer.rs#L176-L182
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/transfer/reason_text

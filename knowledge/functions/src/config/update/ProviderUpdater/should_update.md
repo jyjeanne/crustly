@@ -3,7 +3,7 @@ type: Rust Method
 title: should_update
 resource: src/config/update.rs#L31-L47
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/update/ProviderUpdater/start_auto_update_loop

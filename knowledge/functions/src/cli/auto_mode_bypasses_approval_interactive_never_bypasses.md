@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: auto_mode_bypasses_approval_interactive_never_bypasses
-resource: src/cli/mod.rs#L3130-L3146
+resource: src/cli/mod.rs#L3303-L3319
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/auto_mode_bypasses_approval

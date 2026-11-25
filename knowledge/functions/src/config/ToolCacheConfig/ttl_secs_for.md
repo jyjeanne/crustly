@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: ttl_secs_for
-resource: src/config/mod.rs#L608-L616
+resource: src/config/mod.rs#L693-L701
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

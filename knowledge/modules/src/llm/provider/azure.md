@@ -3,7 +3,7 @@ type: Rust Module
 title: azure
 resource: src/llm/provider/azure.rs#L1-L196
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-openai-openaiprovider-llmrequest-llmresponse-provider-result

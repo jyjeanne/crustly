@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: new
-resource: src/mcp/client.rs#L310-L316
+resource: src/mcp/client.rs#L313-L319
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/mcp/client/namespaced_tool_name

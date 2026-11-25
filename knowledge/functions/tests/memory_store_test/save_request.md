@@ -4,7 +4,7 @@ title: save_request
 resource: tests/memory_store_test.rs#L31-L42
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_store_test/saving_twice_gives_one_memory

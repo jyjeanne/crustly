@@ -3,7 +3,7 @@ type: Rust Function
 title: tool_schema_tokens
 resource: src/llm/agent/budget.rs#L212-L219
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/context/token_count

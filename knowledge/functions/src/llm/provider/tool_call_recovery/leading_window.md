@@ -4,7 +4,7 @@ title: leading_window
 resource: src/llm/provider/tool_call_recovery.rs#L98-L104
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/tool_call_recovery/commits_to_an_offered_tool_call

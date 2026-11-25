@@ -4,7 +4,7 @@ title: flush_current_line
 resource: src/tui/markdown.rs#L54-L59
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/markdown/MarkdownRenderer/start_code_block

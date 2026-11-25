@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_recall_max_tokens
-resource: src/config/mod.rs#L375-L377
+resource: src/config/mod.rs#L441-L443
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryConfig/default/default

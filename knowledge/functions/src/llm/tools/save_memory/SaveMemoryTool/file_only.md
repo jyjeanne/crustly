@@ -3,7 +3,7 @@ type: Rust Method
 title: file_only
 resource: src/llm/tools/save_memory.rs#L44-L46
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/save_memory/execute_creates_memory_file_with_header_and_fact

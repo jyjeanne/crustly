@@ -3,7 +3,7 @@ type: Rust Function
 title: append_progress
 resource: src/llm/agent/project_memory.rs#L169-L201
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/tool_round/ToolRound/push

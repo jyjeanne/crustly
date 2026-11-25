@@ -3,7 +3,7 @@ type: Rust Method
 title: delete_message
 resource: src/services/message.rs#L160-L166
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/message/MessageRepository/new

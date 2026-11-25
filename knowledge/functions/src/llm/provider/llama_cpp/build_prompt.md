@@ -4,7 +4,7 @@ title: build_prompt
 resource: src/llm/provider/llama_cpp.rs#L1426-L1476
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp/merged_system_prompt

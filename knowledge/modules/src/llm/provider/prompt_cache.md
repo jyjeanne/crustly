@@ -3,7 +3,7 @@ type: Rust Module
 title: prompt_cache
 resource: src/llm/provider/prompt_cache.rs#L1-L79
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/std-ops-range

@@ -4,7 +4,7 @@ title: validate_input
 resource: src/llm/tools/trait.rs#L304-L307
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

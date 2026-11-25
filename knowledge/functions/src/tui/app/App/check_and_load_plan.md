@@ -4,10 +4,13 @@ title: check_and_load_plan
 resource: src/tui/app.rs#L2747-L2897
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/plan/PlanService/get_most_recent_plan
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/services/plan/PlanService/create
@@ -29,6 +32,7 @@ relationships:
 # Calls
 
 - [get_most_recent_plan](../../../../../functions/src/services/plan/PlanService/get_most_recent_plan.md)
+- [exists](../../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [create](../../../../../functions/src/services/plan/PlanService/create.md)
 - [display](../../../../../functions/src/llm/tools/skill/SkillSource/display.md)
 

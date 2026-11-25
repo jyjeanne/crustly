@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_provider_config_api_keys_from_env
-resource: src/config/mod.rs#L2138-L2166
+resource: src/config/mod.rs#L2248-L2276
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

@@ -4,7 +4,7 @@ title: default
 resource: src/logging.rs#L33-L43
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/logging/LogConfig/new

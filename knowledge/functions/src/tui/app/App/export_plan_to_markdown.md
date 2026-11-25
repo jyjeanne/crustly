@@ -4,7 +4,7 @@ title: export_plan_to_markdown
 resource: src/tui/app.rs#L2902-L2979
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/find

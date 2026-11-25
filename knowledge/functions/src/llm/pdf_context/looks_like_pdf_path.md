@@ -3,8 +3,12 @@ type: Rust Function
 title: looks_like_pdf_path
 resource: src/llm/pdf_context.rs#L28-L49
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
+  calls:
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
   - target: functions/src/llm/pdf_context/augment_message_with_pdf
     resolved_by: tree-sitter
@@ -32,6 +36,10 @@ relationships:
 # Signature
 
 `pub fn looks_like_pdf_path(text: &str, cwd: &Path) -> Option<PathBuf>`
+
+# Calls
+
+- [exists](../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 
 # Called by
 

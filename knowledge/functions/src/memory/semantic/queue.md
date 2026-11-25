@@ -3,7 +3,7 @@ type: Rust Function
 title: queue
 resource: src/memory/semantic.rs#L203-L205
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/attach_embedder

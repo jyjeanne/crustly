@@ -4,7 +4,7 @@ title: set_input_text
 resource: src/tui/app.rs#L572-L575
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/plain_textarea

@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: llama_cpp_exit_code_falls_back_to_one_for_an_unrecognized_error
-resource: src/cli/mod.rs#L3524-L3527
+resource: src/cli/mod.rs#L3697-L3700
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/llama_cpp_exit_code

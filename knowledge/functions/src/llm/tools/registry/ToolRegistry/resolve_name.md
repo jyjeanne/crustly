@@ -3,7 +3,7 @@ type: Rust Method
 title: resolve_name
 resource: src/llm/tools/registry.rs#L97-L99
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/registry/ToolRegistry/canonical_name

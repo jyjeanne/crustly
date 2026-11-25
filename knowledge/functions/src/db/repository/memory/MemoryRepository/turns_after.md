@@ -3,7 +3,7 @@ type: Rust Method
 title: turns_after
 resource: src/db/repository/memory.rs#L201-L224
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/extraction/MemoryStore/has_unread_turns

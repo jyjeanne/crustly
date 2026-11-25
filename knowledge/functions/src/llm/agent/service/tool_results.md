@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: tool_results
-resource: src/llm/agent/service.rs#L3501-L3511
+resource: src/llm/agent/service.rs#L3515-L3525
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/bad_tool_arguments_get_the_expected_arguments_back

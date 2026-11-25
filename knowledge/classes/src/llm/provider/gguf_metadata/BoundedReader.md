@@ -4,7 +4,7 @@ title: BoundedReader
 resource: src/llm/provider/gguf_metadata.rs#L174-L177
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

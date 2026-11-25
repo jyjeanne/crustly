@@ -4,7 +4,7 @@ title: stream
 resource: tests/streaming_test.rs#L92-L96
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/streaming_test/test_streaming_basic

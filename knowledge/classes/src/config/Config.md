@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: Config
-resource: src/config/mod.rs#L658-L722
+resource: src/config/mod.rs#L743-L807
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

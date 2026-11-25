@@ -4,7 +4,7 @@ title: parse_anthropic_sse_stream
 resource: src/llm/provider/anthropic.rs#L387-L438
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream

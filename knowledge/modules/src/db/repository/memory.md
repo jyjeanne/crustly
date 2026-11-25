@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: memory
-resource: src/db/repository/memory.rs#L1-L853
+resource: src/db/repository/memory.rs#L1-L926
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crate-db-retry-retry-db-sqlx-dbretryconfig
@@ -52,6 +52,9 @@ relationships:
 - [pending_for](../../../../functions/src/db/repository/memory/MemoryRepository/pending_for.md)
 - [episodes_for](../../../../functions/src/db/repository/memory/MemoryRepository/episodes_for.md)
 - [add_paths](../../../../functions/src/db/repository/memory/MemoryRepository/add_paths.md)
+- [set_anchors](../../../../functions/src/db/repository/memory/MemoryRepository/set_anchors.md)
+- [anchors_of](../../../../functions/src/db/repository/memory/MemoryRepository/anchors_of.md)
+- [anchors_for](../../../../functions/src/db/repository/memory/MemoryRepository/anchors_for.md)
 - [paths_of](../../../../functions/src/db/repository/memory/MemoryRepository/paths_of.md)
 - [path_globs_for](../../../../functions/src/db/repository/memory/MemoryRepository/path_globs_for.md)
 - [folded_sources](../../../../functions/src/db/repository/memory/MemoryRepository/folded_sources.md)

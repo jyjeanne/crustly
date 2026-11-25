@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: reject_refuses_a_memory_that_is_not_pending
-resource: src/cli/mod.rs#L3793-L3865
+resource: src/cli/mod.rs#L3967-L4039
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

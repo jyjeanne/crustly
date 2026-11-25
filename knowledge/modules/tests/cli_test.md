@@ -3,7 +3,7 @@ type: Rust Module
 title: cli_test
 resource: tests/cli_test.rs#L1-L273
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/clap-parser

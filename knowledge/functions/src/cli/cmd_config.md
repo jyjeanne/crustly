@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_config
-resource: src/cli/mod.rs#L965-L1015
+resource: src/cli/mod.rs#L1009-L1059
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/run

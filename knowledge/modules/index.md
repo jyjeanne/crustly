@@ -105,6 +105,8 @@
 - [client](../modules/src/mcp/client.md) — Rust Module
 - [transport](../modules/src/mcp/transport.md) — Rust Module
 - [memory](../modules/src/memory.md) — Rust Module
+- [anchors](../modules/src/memory/anchors.md) — Rust Module
+- [code_knowledge](../modules/src/memory/code_knowledge.md) — Rust Module
 - [consolidate](../modules/src/memory/consolidate.md) — Rust Module
 - [embed](../modules/src/memory/embed.md) — Rust Module
 - [extract](../modules/src/memory/extract.md) — Rust Module
@@ -154,7 +156,9 @@
 - [integration_test](../modules/tests/integration_test.md) — Rust Module
 - [mcp_contract_test](../modules/tests/mcp_contract_test.md) — Rust Module
 - [memory_acceptance_test](../modules/tests/memory_acceptance_test.md) — Rust Module
+- [memory_anchors_test](../modules/tests/memory_anchors_test.md) — Rust Module
 - [memory_benchmark_test](../modules/tests/memory_benchmark_test.md) — Rust Module
+- [memory_code_knowledge_test](../modules/tests/memory_code_knowledge_test.md) — Rust Module
 - [memory_consolidate_test](../modules/tests/memory_consolidate_test.md) — Rust Module
 - [memory_extraction_test](../modules/tests/memory_extraction_test.md) — Rust Module
 - [memory_migration_test](../modules/tests/memory_migration_test.md) — Rust Module

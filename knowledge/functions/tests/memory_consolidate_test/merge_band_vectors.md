@@ -4,7 +4,7 @@ title: merge_band_vectors
 resource: tests/memory_consolidate_test.rs#L474-L487
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/new

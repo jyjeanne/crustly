@@ -4,7 +4,7 @@ title: try_handle_slash_command
 resource: src/tui/app.rs#L2089-L2159
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/EventHandler/next

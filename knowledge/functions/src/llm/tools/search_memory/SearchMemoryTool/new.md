@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/llm/tools/search_memory.rs#L27-L29
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/build_tool_registry

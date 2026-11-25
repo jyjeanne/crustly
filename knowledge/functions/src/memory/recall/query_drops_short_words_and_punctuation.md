@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: query_drops_short_words_and_punctuation
-resource: src/memory/recall.rs#L322-L327
+resource: src/memory/recall.rs#L335-L340
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/fts_match_expr

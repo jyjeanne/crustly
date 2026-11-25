@@ -3,7 +3,7 @@ type: Rust Struct
 title: Tool
 resource: src/llm/provider/types.rs#L261-L268
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

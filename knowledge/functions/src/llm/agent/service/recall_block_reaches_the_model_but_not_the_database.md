@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: recall_block_reaches_the_model_but_not_the_database
-resource: src/llm/agent/service.rs#L4100-L4164
+resource: src/llm/agent/service.rs#L4114-L4178
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

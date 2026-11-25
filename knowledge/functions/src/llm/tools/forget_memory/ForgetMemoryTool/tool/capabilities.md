@@ -4,7 +4,7 @@ title: capabilities
 resource: src/llm/tools/forget_memory.rs#L110-L112
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: a_failing_provider_falls_back_and_says_so
-resource: src/llm/agent/service.rs#L3920-L3955
+resource: src/llm/agent/service.rs#L3934-L3969
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

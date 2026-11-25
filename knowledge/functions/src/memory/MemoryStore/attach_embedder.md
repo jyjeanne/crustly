@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: attach_embedder
-resource: src/memory/mod.rs#L127-L149
+resource: src/memory/mod.rs#L135-L157
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/semantic/queue

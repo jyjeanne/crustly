@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: name
-resource: src/llm/agent/service.rs#L2530-L2532
+resource: src/llm/agent/service.rs#L2544-L2546
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

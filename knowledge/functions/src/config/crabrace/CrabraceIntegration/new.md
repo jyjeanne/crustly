@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/config/crabrace.rs#L64-L68
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/crabrace/test_create_integration

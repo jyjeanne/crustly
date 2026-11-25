@@ -4,7 +4,7 @@ title: last_prompt
 resource: tests/memory_extraction_test.rs#L40-L47
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_extraction_test/the_model_is_never_shown_tool_output_or_secrets

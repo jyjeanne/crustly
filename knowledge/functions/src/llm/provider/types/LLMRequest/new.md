@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/llm/provider/types.rs#L157-L175
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/build_request

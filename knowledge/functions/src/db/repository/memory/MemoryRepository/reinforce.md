@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: reinforce
-resource: src/db/repository/memory.rs#L382-L394
+resource: src/db/repository/memory.rs#L455-L467
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/record_event

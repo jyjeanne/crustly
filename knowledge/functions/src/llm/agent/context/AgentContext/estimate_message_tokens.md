@@ -4,7 +4,7 @@ title: estimate_message_tokens
 resource: src/llm/agent/context.rs#L166-L193
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/context/AgentContext/estimate_tokens

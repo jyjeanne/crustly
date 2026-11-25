@@ -3,7 +3,7 @@ type: Rust Function
 title: setup_from_cli
 resource: src/logging.rs#L236-L239
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/logging/LogConfig/new

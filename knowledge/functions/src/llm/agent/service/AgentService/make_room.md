@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: make_room
-resource: src/llm/agent/service.rs#L943-L1007
+resource: src/llm/agent/service.rs#L956-L1020
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/measure_budget

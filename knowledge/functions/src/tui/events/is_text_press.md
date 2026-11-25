@@ -4,7 +4,7 @@ title: is_text_press
 resource: src/tui/events.rs#L409-L415
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/typed_char

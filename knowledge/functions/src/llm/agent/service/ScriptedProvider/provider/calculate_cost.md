@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: calculate_cost
-resource: src/llm/agent/service.rs#L2552-L2554
+resource: src/llm/agent/service.rs#L2566-L2568
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

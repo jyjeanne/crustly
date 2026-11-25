@@ -4,7 +4,7 @@ title: default_true
 resource: src/llm/tools/edit.rs#L78-L80
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

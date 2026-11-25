@@ -3,7 +3,7 @@ type: Rust Method
 title: get_statistics
 resource: src/services/plan.rs#L270-L326
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/plan/PlanService/find_by_session_id

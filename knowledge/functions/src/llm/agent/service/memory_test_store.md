@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: memory_test_store
-resource: src/llm/agent/service.rs#L4092-L4097
+resource: src/llm/agent/service.rs#L4106-L4111
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/new

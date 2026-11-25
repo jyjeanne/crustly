@@ -3,7 +3,7 @@ type: Rust Module
 title: memory_consolidate_test
 resource: tests/memory_consolidate_test.rs#L1-L562
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/async-trait-async-trait

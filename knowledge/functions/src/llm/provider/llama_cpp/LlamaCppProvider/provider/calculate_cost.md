@@ -4,7 +4,7 @@ title: calculate_cost
 resource: src/llm/provider/llama_cpp.rs#L1559-L1562
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

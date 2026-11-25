@@ -4,7 +4,7 @@ title: new
 resource: tests/memory_consolidate_test.rs#L271-L273
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_consolidate_test/three_episodes_become_one_lesson_with_its_sources

@@ -3,7 +3,7 @@ type: Rust Function
 title: summarize_tool_calls
 resource: src/llm/agent/project_memory.rs#L107-L131
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/project_memory/call_target

@@ -3,7 +3,7 @@ type: Rust Function
 title: project_relative
 resource: src/memory/paths.rs#L72-L93
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/paths/lexical

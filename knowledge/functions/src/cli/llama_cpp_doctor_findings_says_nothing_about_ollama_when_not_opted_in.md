@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: llama_cpp_doctor_findings_says_nothing_about_ollama_when_not_opted_in
-resource: src/cli/mod.rs#L3584-L3596
+resource: src/cli/mod.rs#L3757-L3769
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

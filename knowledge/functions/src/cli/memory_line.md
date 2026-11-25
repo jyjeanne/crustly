@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: memory_line
-resource: src/cli/mod.rs#L1101-L1115
+resource: src/cli/mod.rs#L1145-L1159
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/model/MemoryCategory/as_str

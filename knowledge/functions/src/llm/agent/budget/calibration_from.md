@@ -3,7 +3,7 @@ type: Rust Function
 title: calibration_from
 resource: src/llm/agent/budget.rs#L227-L233
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/budget/calibration_from_keeps_upward_corrections_only

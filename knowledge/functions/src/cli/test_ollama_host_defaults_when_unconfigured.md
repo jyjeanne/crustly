@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_ollama_host_defaults_when_unconfigured
-resource: src/cli/mod.rs#L3113-L3116
+resource: src/cli/mod.rs#L3286-L3289
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

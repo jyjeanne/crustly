@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/grep.rs#L141-L234
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/sandbox/check_path
@@ -14,6 +14,9 @@ relationships:
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/src/llm/agent/service/subagents/ChildTemplate/build
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/tools/grep/GrepTool/search_file
@@ -52,6 +55,7 @@ relationships:
 - [check_path](../../../../../../../functions/src/llm/tools/sandbox/check_path.md)
 - [error](../../../../../../../functions/src/llm/tools/trait/ToolResult/error.md)
 - [build](../../../../../../../functions/src/llm/agent/service/subagents/ChildTemplate/build.md)
+- [exists](../../../../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [search_file](../../../../../../../functions/src/llm/tools/grep/GrepTool/search_file.md)
 - [collect_searchable_files](../../../../../../../functions/src/llm/tools/grep/collect_searchable_files.md)
 - [success](../../../../../../../functions/src/llm/tools/trait/ToolResult/success.md)

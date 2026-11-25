@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: new
-resource: src/llm/agent/service.rs#L561-L592
+resource: src/llm/agent/service.rs#L565-L597
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/registry/ToolRegistry/new

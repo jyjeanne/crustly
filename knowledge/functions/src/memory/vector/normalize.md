@@ -3,7 +3,7 @@ type: Rust Function
 title: normalize
 resource: src/memory/vector.rs#L47-L60
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

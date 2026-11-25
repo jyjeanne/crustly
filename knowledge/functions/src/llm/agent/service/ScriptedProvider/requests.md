@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: requests
-resource: src/llm/agent/service.rs#L2507-L2509
+resource: src/llm/agent/service.rs#L2521-L2523
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/auto_profile_sends_core_tools_on_a_small_window

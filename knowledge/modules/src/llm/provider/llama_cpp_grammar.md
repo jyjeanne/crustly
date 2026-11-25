@@ -3,7 +3,7 @@ type: Rust Module
 title: llama_cpp_grammar
 resource: src/llm/provider/llama_cpp_grammar.rs#L1-L231
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-types-tool

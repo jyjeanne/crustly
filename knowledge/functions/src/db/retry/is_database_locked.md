@@ -4,7 +4,7 @@ title: is_database_locked
 resource: src/db/retry.rs#L72-L80
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

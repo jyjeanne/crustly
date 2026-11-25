@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/db/retry.rs#L42-L48
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/retry/test_retry_success_after_retries

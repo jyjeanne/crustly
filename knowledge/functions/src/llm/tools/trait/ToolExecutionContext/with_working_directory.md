@@ -3,7 +3,7 @@ type: Rust Method
 title: with_working_directory
 resource: src/llm/tools/trait.rs#L158-L161
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

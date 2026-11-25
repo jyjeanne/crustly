@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: try_recall
-resource: src/memory/mod.rs#L426-L548
+resource: src/memory/mod.rs#L441-L576
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/candidates
@@ -31,6 +31,9 @@ relationships:
   - target: functions/src/memory/paths/matches
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/anchors/MemoryStore/anchor_hits
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/MemoryStore/find
     resolved_by: tree-sitter
     confidence: exact
@@ -52,7 +55,10 @@ relationships:
   - target: functions/src/db/repository/memory/MemoryRepository/record_recall
     resolved_by: tree-sitter
     confidence: exact
-  - target: functions/src/memory/recall/render_block
+  - target: functions/src/memory/anchors/MemoryStore/anchor_locations
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/recall/render_block_located
     resolved_by: tree-sitter
     confidence: exact
   called_by:
@@ -75,6 +81,7 @@ relationships:
 - [project_relative](../../../../functions/src/memory/paths/project_relative.md)
 - [path_globs_for](../../../../functions/src/db/repository/memory/MemoryRepository/path_globs_for.md)
 - [matches](../../../../functions/src/memory/paths/matches.md)
+- [anchor_hits](../../../../functions/src/memory/anchors/MemoryStore/anchor_hits.md)
 - [find](../../../../functions/src/memory/MemoryStore/find.md)
 - [recent_work](../../../../functions/src/memory/MemoryStore/recent_work.md)
 - [token_count](../../../../functions/src/llm/agent/context/token_count.md)
@@ -82,7 +89,8 @@ relationships:
 - [select](../../../../functions/src/memory/recall/select.md)
 - [drop_near_duplicates](../../../../functions/src/memory/semantic/drop_near_duplicates.md)
 - [record_recall](../../../../functions/src/db/repository/memory/MemoryRepository/record_recall.md)
-- [render_block](../../../../functions/src/memory/recall/render_block.md)
+- [anchor_locations](../../../../functions/src/memory/anchors/MemoryStore/anchor_locations.md)
+- [render_block_located](../../../../functions/src/memory/recall/render_block_located.md)
 
 # Called by
 

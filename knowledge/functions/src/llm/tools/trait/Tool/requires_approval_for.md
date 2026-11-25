@@ -4,7 +4,7 @@ title: requires_approval_for
 resource: src/llm/tools/trait.rs#L289-L291
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/forget_memory/the_preview_shows_each_memory_before_anything_is_deleted

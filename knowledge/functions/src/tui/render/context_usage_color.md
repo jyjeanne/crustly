@@ -4,7 +4,7 @@ title: context_usage_color
 resource: src/tui/render.rs#L190-L199
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/budget/ContextUsage/overhead_is_tight

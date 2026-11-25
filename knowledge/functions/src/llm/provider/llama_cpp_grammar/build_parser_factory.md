@@ -3,7 +3,7 @@ type: Rust Function
 title: build_parser_factory
 resource: src/llm/provider/llama_cpp_grammar.rs#L118-L122
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/llama_cpp/build_grammar_env

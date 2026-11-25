@@ -1,16 +1,19 @@
 ---
 type: Rust Method
 title: tool_selection
-resource: src/llm/agent/service.rs#L849-L854
+resource: src/llm/agent/service.rs#L861-L867
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/tool_profile/ToolSelection/only
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/agent/tool_profile/ToolSelection/resolve
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/tool_profile/ToolSelection/with_mcp_exposure
     resolved_by: tree-sitter-receiver
     confidence: semantic
   called_by:
@@ -33,6 +36,7 @@ relationships:
 
 - [only](../../../../../../functions/src/llm/agent/tool_profile/ToolSelection/only.md)
 - [resolve](../../../../../../functions/src/llm/agent/tool_profile/ToolSelection/resolve.md)
+- [with_mcp_exposure](../../../../../../functions/src/llm/agent/tool_profile/ToolSelection/with_mcp_exposure.md)
 
 # Called by
 

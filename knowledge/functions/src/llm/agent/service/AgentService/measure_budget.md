@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: measure_budget
-resource: src/llm/agent/service.rs#L920-L934
+resource: src/llm/agent/service.rs#L933-L947
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/context/AgentContext/effective_system_prompt

@@ -4,7 +4,7 @@ title: top_level_name_key_matches
 resource: src/llm/provider/tool_call_recovery.rs#L110-L116
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/tool_call_recovery/name_key_immediately_precedes

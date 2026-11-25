@@ -3,7 +3,7 @@ type: Rust Function
 title: held_response_server
 resource: src/llm/provider/test_support.rs#L13-L45
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/test_support/read_request

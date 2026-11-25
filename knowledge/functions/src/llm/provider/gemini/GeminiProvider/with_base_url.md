@@ -3,7 +3,7 @@ type: Rust Method
 title: with_base_url
 resource: src/llm/provider/gemini.rs#L66-L70
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/gemini/GeminiProvider/new

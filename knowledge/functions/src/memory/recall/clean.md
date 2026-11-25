@@ -3,7 +3,7 @@ type: Rust Function
 title: clean
 resource: src/memory/recall.rs#L211-L214
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/run/AgentRun/path_memory_text
@@ -12,7 +12,7 @@ relationships:
   - target: functions/src/memory/recall/line
     resolved_by: tree-sitter
     confidence: exact
-  - target: functions/src/memory/recall/render_block
+  - target: functions/src/memory/recall/render_block_located
     resolved_by: tree-sitter
     confidence: exact
 ---
@@ -25,4 +25,4 @@ relationships:
 
 - [path_memory_text](../../../../functions/src/llm/agent/service/run/AgentRun/path_memory_text.md)
 - [line](../../../../functions/src/memory/recall/line.md)
-- [render_block](../../../../functions/src/memory/recall/render_block.md)
+- [render_block_located](../../../../functions/src/memory/recall/render_block_located.md)

@@ -3,7 +3,7 @@ type: Rust Method
 title: update_session_usage
 resource: src/services/session.rs#L101-L119
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/session/SessionService/get_session_required

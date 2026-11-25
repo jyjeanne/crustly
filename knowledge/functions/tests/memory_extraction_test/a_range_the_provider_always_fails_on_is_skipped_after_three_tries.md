@@ -6,12 +6,9 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
-  - target: functions/tests/memory_extraction_test/Scripted/new
-    resolved_by: tree-sitter-receiver
-    confidence: semantic
   - target: functions/src/memory/MemoryStore/new
     resolved_by: tree-sitter-receiver
     confidence: semantic
@@ -47,7 +44,6 @@ relationships:
 
 # Calls
 
-- [new](../../../functions/tests/memory_extraction_test/Scripted/new.md)
 - [new](../../../functions/src/memory/MemoryStore/new.md)
 - [pool](../../../functions/src/db/Database/pool.md)
 - [enabled_config](../../../functions/tests/memory_extraction_test/enabled_config.md)

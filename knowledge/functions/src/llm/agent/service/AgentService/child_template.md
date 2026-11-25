@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: child_template
-resource: src/llm/agent/service.rs#L1258-L1276
+resource: src/llm/agent/service.rs#L1271-L1290
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner

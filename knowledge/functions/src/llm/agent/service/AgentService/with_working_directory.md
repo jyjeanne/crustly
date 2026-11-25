@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_working_directory
-resource: src/llm/agent/service.rs#L756-L759
+resource: src/llm/agent/service.rs#L768-L771
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_chat

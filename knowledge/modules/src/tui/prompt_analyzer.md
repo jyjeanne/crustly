@@ -3,7 +3,7 @@ type: Rust Module
 title: prompt_analyzer
 resource: src/tui/prompt_analyzer.rs#L1-L392
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/regex-regex

@@ -3,7 +3,7 @@ type: Rust Method
 title: with_base_url
 resource: src/llm/provider/openai.rs#L108-L124
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/ChildTemplate/build

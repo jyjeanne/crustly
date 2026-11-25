@@ -3,7 +3,7 @@ type: Rust Method
 title: with_default_model
 resource: src/llm/provider/ollama.rs#L245-L248
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/streamed_ollama_tool_call_survives_drain

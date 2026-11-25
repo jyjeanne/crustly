@@ -4,7 +4,7 @@ title: report
 resource: tests/memory_benchmark_test.rs#L249-L254
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_benchmark_test/the_harness_runs_and_meets_the_ci_floor

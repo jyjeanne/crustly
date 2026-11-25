@@ -3,7 +3,7 @@ type: Rust Function
 title: retry
 resource: src/utils/retry.rs#L120-L174
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/utils/retry/RetryableError/retry_after

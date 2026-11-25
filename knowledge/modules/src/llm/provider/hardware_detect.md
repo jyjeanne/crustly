@@ -3,7 +3,7 @@ type: Rust Module
 title: hardware_detect
 resource: src/llm/provider/hardware_detect.rs#L1-L750
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/std-process-command-output-stdio

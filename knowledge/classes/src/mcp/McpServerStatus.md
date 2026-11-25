@@ -3,7 +3,7 @@ type: Rust Struct
 title: McpServerStatus
 resource: src/mcp/mod.rs#L21-L27
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

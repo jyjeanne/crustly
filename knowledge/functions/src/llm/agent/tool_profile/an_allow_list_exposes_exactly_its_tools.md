@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: an_allow_list_exposes_exactly_its_tools
-resource: src/llm/agent/tool_profile.rs#L136-L146
+resource: src/llm/agent/tool_profile.rs#L169-L179
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/tool_profile/ToolSelection/only

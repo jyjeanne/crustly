@@ -4,7 +4,7 @@ title: configure_agent
 resource: src/cli/mod.rs#L159-L195
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/configure_agent_loop

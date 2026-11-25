@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: write_answer
-resource: src/llm/agent/service/subagents.rs#L399-L409
+resource: src/llm/agent/service/subagents.rs#L401-L411
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/agents_dir

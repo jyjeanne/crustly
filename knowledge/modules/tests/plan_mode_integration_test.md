@@ -3,7 +3,7 @@ type: Rust Module
 title: plan_mode_integration_test
 resource: tests/plan_mode_integration_test.rs#L1-L467
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crustly-db-models-session

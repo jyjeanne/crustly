@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: system_prompt_with_env_is_none_when_no_prompt_is_set
-resource: src/llm/agent/service.rs#L2109-L2112
+resource: src/llm/agent/service.rs#L2123-L2126
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/system_prompt_with_env

@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: events
-resource: src/db/repository/memory.rs#L476-L493
+resource: src/db/repository/memory.rs#L549-L566
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/timestamp

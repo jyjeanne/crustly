@@ -3,7 +3,7 @@ type: Rust Method
 title: count_archived_sessions
 resource: src/services/session.rs#L172-L177
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/session/SessionRepository/new

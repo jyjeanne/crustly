@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/llm/provider/gemini.rs#L47-L62
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/ChildTemplate/build

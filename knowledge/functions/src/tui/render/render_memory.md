@@ -4,7 +4,7 @@ title: render_memory
 resource: src/tui/render.rs#L880-L1030
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/visible_memories

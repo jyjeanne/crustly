@@ -3,7 +3,7 @@ type: Rust Function
 title: walking_lines
 resource: src/tui/components/ferris.rs#L80-L97
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/components/ferris/lane_offset

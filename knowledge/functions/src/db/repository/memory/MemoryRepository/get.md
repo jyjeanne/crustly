@@ -1,11 +1,20 @@
 ---
 type: Rust Method
 title: get
-resource: src/db/repository/memory.rs#L398-L406
+resource: src/db/repository/memory.rs#L471-L479
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
+  - target: functions/src/memory/anchors/MemoryStore/anchor_automatically
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/memory/anchors/MemoryStore/set_anchors
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/memory/anchors/MemoryStore/drifted
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/src/memory/extraction/MemoryStore/approve
     resolved_by: tree-sitter-receiver
     confidence: semantic
@@ -47,6 +56,9 @@ relationships:
 
 # Called by
 
+- [anchor_automatically](../../../../../../functions/src/memory/anchors/MemoryStore/anchor_automatically.md)
+- [set_anchors](../../../../../../functions/src/memory/anchors/MemoryStore/set_anchors.md)
+- [drifted](../../../../../../functions/src/memory/anchors/MemoryStore/drifted.md)
 - [approve](../../../../../../functions/src/memory/extraction/MemoryStore/approve.md)
 - [save_with](../../../../../../functions/src/memory/MemoryStore/save_with.md)
 - [get](../../../../../../functions/src/memory/MemoryStore/get.md)

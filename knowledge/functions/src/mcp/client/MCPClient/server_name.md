@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: server_name
-resource: src/mcp/client.rs#L180-L182
+resource: src/mcp/client.rs#L183-L185
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

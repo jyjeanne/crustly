@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: a_background_sub_agent_is_collected_with_its_report
-resource: src/llm/agent/service.rs#L3739-L3765
+resource: src/llm/agent/service.rs#L3753-L3779
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

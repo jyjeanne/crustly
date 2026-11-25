@@ -4,7 +4,7 @@ title: try_create_ollama
 resource: src/llm/provider/factory.rs#L288-L303
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/factory/ollama_provider_from_config

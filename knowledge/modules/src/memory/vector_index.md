@@ -3,7 +3,7 @@ type: Rust Module
 title: vector_index
 resource: src/memory/vector_index.rs#L1-L171
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-vector-similarity-vectorerror

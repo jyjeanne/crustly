@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: RouterConfig
-resource: src/config/mod.rs#L481-L493
+resource: src/config/mod.rs#L547-L559
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

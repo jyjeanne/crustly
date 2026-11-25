@@ -4,7 +4,7 @@ title: create_test_db
 resource: tests/integration_test.rs#L107-L111
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect_in_memory

@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_ollama_provider_config_default
-resource: src/config/mod.rs#L2207-L2214
+resource: src/config/mod.rs#L2317-L2324
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/OllamaProviderConfig/default/default

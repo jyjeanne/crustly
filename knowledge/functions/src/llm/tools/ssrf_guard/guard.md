@@ -3,7 +3,7 @@ type: Rust Function
 title: guard
 resource: src/llm/tools/ssrf_guard.rs#L147-L149
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/http/HttpClientTool/tool/execute

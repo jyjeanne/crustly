@@ -4,7 +4,7 @@ title: model_id
 resource: tests/memory_benchmark_test.rs#L69-L71
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

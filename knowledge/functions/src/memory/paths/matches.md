@@ -3,7 +3,7 @@ type: Rust Function
 title: matches
 resource: src/memory/paths.rs#L142-L154
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/try_recall

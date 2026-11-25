@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: service
-resource: src/llm/agent/service.rs#L1-L4301
+resource: src/llm/agent/service.rs#L1-L4315
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-budget-calibration-from-tool-schema-tokens-contextbudget-contextusage-default-context-window
@@ -154,6 +154,7 @@ relationships:
 - [with_project_notes](../../../../functions/src/llm/agent/service/AgentService/with_project_notes.md)
 - [with_progress_file](../../../../functions/src/llm/agent/service/AgentService/with_progress_file.md)
 - [with_tool_profile](../../../../functions/src/llm/agent/service/AgentService/with_tool_profile.md)
+- [with_mcp_exposure](../../../../functions/src/llm/agent/service/AgentService/with_mcp_exposure.md)
 - [with_core_system_prompt](../../../../functions/src/llm/agent/service/AgentService/with_core_system_prompt.md)
 - [with_model_router](../../../../functions/src/llm/agent/service/AgentService/with_model_router.md)
 - [with_pool](../../../../functions/src/llm/agent/service/AgentService/with_pool.md)

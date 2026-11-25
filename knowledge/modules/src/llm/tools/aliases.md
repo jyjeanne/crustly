@@ -3,7 +3,7 @@ type: Rust Module
 title: aliases
 resource: src/llm/tools/aliases.rs#L1-L142
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super

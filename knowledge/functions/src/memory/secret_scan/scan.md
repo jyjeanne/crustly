@@ -3,7 +3,7 @@ type: Rust Function
 title: scan
 resource: src/memory/secret_scan.rs#L58-L71
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/secret_scan/shannon_entropy

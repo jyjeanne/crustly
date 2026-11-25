@@ -3,7 +3,7 @@ type: Rust Function
 title: elide_tool_results
 resource: src/llm/agent/compaction.rs#L142-L175
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/compaction/message_has_tool_result

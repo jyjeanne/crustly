@@ -3,7 +3,7 @@ type: Rust Function
 title: backfill
 resource: src/memory/semantic.rs#L129-L154
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/missing_embeddings

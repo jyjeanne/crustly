@@ -3,7 +3,7 @@ type: Rust Module
 title: factory
 resource: src/llm/provider/factory.rs#L1-L1260
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-anthropic-anthropicprovider-azure-azureopenaiprovider-error-providererror-gemini-geminiprovider-openai-openaiprovider-qwen-qwenprovider-toolcallparser-provider

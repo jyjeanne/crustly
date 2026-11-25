@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: calibration_learns_from_the_provider_and_resets_on_switch
-resource: src/llm/agent/service.rs#L3063-L3085
+resource: src/llm/agent/service.rs#L3077-L3099
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

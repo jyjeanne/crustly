@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: final_text_prefers_visible_text_and_keeps_thinking_separate
-resource: src/llm/agent/service.rs#L1994-L2010
+resource: src/llm/agent/service.rs#L2008-L2024
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/response_with

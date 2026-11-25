@@ -4,7 +4,7 @@ title: help_plan_mode
 resource: src/tui/render.rs#L1283-L1303
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/render/help_section_header

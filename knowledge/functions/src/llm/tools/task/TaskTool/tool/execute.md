@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/task.rs#L388-L713
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/task/FileLock/acquire
@@ -34,9 +34,6 @@ relationships:
   - target: functions/src/memory/vector_index/VectorIndex/contains
     resolved_by: tree-sitter
     confidence: exact
-  - target: functions/src/memory/vector_index/VectorIndex/remove
-    resolved_by: tree-sitter
-    confidence: exact
   - target: functions/src/tui/render/MessageLineCache/retain
     resolved_by: tree-sitter
     confidence: exact
@@ -57,5 +54,4 @@ relationships:
 - [push](../../../../../../../functions/src/llm/agent/service/tool_round/ToolRound/push.md)
 - [with_lock](../../../../../../../functions/src/llm/tools/task/TaskStore/with_lock.md)
 - [contains](../../../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
-- [remove](../../../../../../../functions/src/memory/vector_index/VectorIndex/remove.md)
 - [retain](../../../../../../../functions/src/tui/render/MessageLineCache/retain.md)

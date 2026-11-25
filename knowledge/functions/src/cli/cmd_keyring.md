@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_keyring
-resource: src/cli/mod.rs#L2187-L2282
+resource: src/cli/mod.rs#L2360-L2455
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/secrets/SecretString/from_str
@@ -25,9 +25,6 @@ relationships:
   - target: functions/src/config/secrets/SecretString/expose_secret
     resolved_by: tree-sitter
     confidence: exact
-  - target: functions/src/config/secrets/SecretString/len
-    resolved_by: tree-sitter-receiver
-    confidence: semantic
   called_by:
   - target: functions/src/cli/run
     resolved_by: tree-sitter
@@ -46,7 +43,6 @@ relationships:
 - [from_keyring_optional](../../../functions/src/config/secrets/SecretString/from_keyring_optional.md)
 - [delete_from_keyring](../../../functions/src/config/secrets/SecretString/delete_from_keyring.md)
 - [expose_secret](../../../functions/src/config/secrets/SecretString/expose_secret.md)
-- [len](../../../functions/src/config/secrets/SecretString/len.md)
 
 # Called by
 

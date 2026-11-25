@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: system_prompt_tells_the_model_the_working_directory
-resource: src/llm/agent/service.rs#L2084-L2104
+resource: src/llm/agent/service.rs#L2098-L2118
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/system_prompt_with_env

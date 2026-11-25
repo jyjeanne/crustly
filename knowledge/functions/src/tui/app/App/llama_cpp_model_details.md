@@ -3,7 +3,7 @@ type: Rust Method
 title: llama_cpp_model_details
 resource: src/tui/app.rs#L931-L950
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/provider_name

@@ -3,7 +3,7 @@ type: Rust Function
 title: spawn_download
 resource: src/tui/llama_cpp_download.rs#L307-L353
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_models/resolve_download_source

@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: AgentServiceLauncher
-resource: src/llm/agent/service/subagents.rs#L413-L416
+resource: src/llm/agent/service/subagents.rs#L415-L418
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: other_line_endings
 resource: src/db/mod.rs#L228-L234
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/reconcile_line_endings

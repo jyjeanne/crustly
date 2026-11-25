@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_run
-resource: src/cli/mod.rs#L2021-L2184
+resource: src/cli/mod.rs#L2194-L2357
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect

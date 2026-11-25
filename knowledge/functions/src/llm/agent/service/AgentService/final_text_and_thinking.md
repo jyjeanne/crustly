@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: final_text_and_thinking
-resource: src/llm/agent/service.rs#L1657-L1676
+resource: src/llm/agent/service.rs#L1671-L1690
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/extract_text_from_response

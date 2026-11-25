@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: events
-resource: src/memory/mod.rs#L661-L663
+resource: src/memory/mod.rs#L689-L691
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/events

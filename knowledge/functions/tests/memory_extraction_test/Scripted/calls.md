@@ -4,7 +4,7 @@ title: calls
 resource: tests/memory_extraction_test.rs#L36-L38
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_extraction_test/the_background_trigger_runs_once_per_session_at_a_time

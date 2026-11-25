@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: session_for
-resource: src/llm/agent/service.rs#L2644-L2650
+resource: src/llm/agent/service.rs#L2658-L2664
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/session/SessionService/new

@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: register_project
-resource: src/memory/mod.rs#L211-L213
+resource: src/memory/mod.rs#L219-L221
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/upsert_project
@@ -58,7 +58,13 @@ relationships:
   - target: functions/tests/memory_acceptance_test/a_secret_never_reaches_the_database_file_or_its_wal
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/tests/memory_anchors_test/setup
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/setup
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/tests/memory_consolidate_test/setup
@@ -203,7 +209,9 @@ relationships:
 - [a_project_fact_is_never_recalled_in_another_repository](../../../../functions/tests/memory_acceptance_test/a_project_fact_is_never_recalled_in_another_repository.md)
 - [an_updated_decision_supersedes_the_old_one_and_keeps_its_history](../../../../functions/tests/memory_acceptance_test/an_updated_decision_supersedes_the_old_one_and_keeps_its_history.md)
 - [a_secret_never_reaches_the_database_file_or_its_wal](../../../../functions/tests/memory_acceptance_test/a_secret_never_reaches_the_database_file_or_its_wal.md)
+- [setup](../../../../functions/tests/memory_anchors_test/setup.md)
 - [run](../../../../functions/tests/memory_benchmark_test/run.md)
+- [setup](../../../../functions/tests/memory_code_knowledge_test/setup.md)
 - [setup](../../../../functions/tests/memory_consolidate_test/setup.md)
 - [extraction_is_off_by_default_and_calls_nothing](../../../../functions/tests/memory_extraction_test/extraction_is_off_by_default_and_calls_nothing.md)
 - [a_run_saves_what_the_model_proposes_and_moves_the_watermark](../../../../functions/tests/memory_extraction_test/a_run_saves_what_the_model_proposes_and_moves_the_watermark.md)

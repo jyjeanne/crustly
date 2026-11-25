@@ -3,7 +3,7 @@ type: Rust Function
 title: ollama_provider_from_config
 resource: src/llm/provider/factory.rs#L317-L368
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/ollama/OllamaProvider/new

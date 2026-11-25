@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: sub_agent_tool_calls_are_approved_through_the_parent_s_prompt
-resource: src/llm/agent/service.rs#L3678-L3722
+resource: src/llm/agent/service.rs#L3692-L3736
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

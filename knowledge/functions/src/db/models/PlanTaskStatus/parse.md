@@ -3,7 +3,7 @@ type: Rust Method
 title: parse
 resource: src/db/models.rs#L136-L151
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/Config/apply_env_overrides
@@ -37,6 +37,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/provider/hardware_detect/parse_nvidia_smi_csv
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/hardware_detect/parse_size_string
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/provider/llama_cpp_models/parse_split_gguf_filename
@@ -106,6 +109,7 @@ relationships:
 - [headers](../../../../../functions/src/llm/provider/anthropic/AnthropicProvider/headers.md)
 - [headers](../../../../../functions/src/llm/provider/gemini/GeminiProvider/headers.md)
 - [parse_nvidia_smi_csv](../../../../../functions/src/llm/provider/hardware_detect/parse_nvidia_smi_csv.md)
+- [parse_size_string](../../../../../functions/src/llm/provider/hardware_detect/parse_size_string.md)
 - [parse_split_gguf_filename](../../../../../functions/src/llm/provider/llama_cpp_models/parse_split_gguf_filename.md)
 - [mock_resumable_http_server](../../../../../functions/src/llm/provider/llama_cpp_models/mock_resumable_http_server.md)
 - [headers](../../../../../functions/src/llm/provider/openai/OpenAIProvider/headers.md)

@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: complete
-resource: src/llm/agent/service.rs#L2132-L2180
+resource: src/llm/agent/service.rs#L2146-L2194
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

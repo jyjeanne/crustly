@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: set_provider
-resource: src/llm/agent/service.rs#L823-L830
+resource: src/llm/agent/service.rs#L835-L842
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/calibration_learns_from_the_provider_and_resets_on_switch

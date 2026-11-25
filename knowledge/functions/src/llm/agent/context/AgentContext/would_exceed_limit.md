@@ -3,7 +3,7 @@ type: Rust Method
 title: would_exceed_limit
 resource: src/llm/agent/context.rs#L161-L163
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/context/AgentContext/trim_to_fit

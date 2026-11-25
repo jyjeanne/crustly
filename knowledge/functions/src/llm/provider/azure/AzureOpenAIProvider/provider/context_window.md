@@ -4,7 +4,7 @@ title: context_window
 resource: src/llm/provider/azure.rs#L113-L119
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/azure/test_azure_context_window

@@ -3,7 +3,7 @@ type: Rust Method
 title: detect_command
 resource: src/llm/agent/middleware.rs#L493-L506
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/middleware/verification_detects_the_check_command_from_build_files

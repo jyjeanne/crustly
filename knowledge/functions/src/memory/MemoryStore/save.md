@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: save
-resource: src/memory/mod.rs#L219-L221
+resource: src/memory/mod.rs#L227-L229
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/save_with
@@ -55,7 +55,13 @@ relationships:
   - target: functions/tests/memory_acceptance_test/save
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/tests/memory_anchors_test/save
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/save
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/tests/memory_extraction_test/an_extracted_memory_cannot_replace_a_user_memory_without_user_evidence
@@ -106,7 +112,9 @@ relationships:
 - [import_from_notes](../../../../functions/src/memory/transfer/import_from_notes.md)
 - [memory_screen_app](../../../../functions/src/tui/app/memory_screen_app.md)
 - [save](../../../../functions/tests/memory_acceptance_test/save.md)
+- [save](../../../../functions/tests/memory_anchors_test/save.md)
 - [run](../../../../functions/tests/memory_benchmark_test/run.md)
+- [save](../../../../functions/tests/memory_code_knowledge_test/save.md)
 - [an_extracted_memory_cannot_replace_a_user_memory_without_user_evidence](../../../../functions/tests/memory_extraction_test/an_extracted_memory_cannot_replace_a_user_memory_without_user_evidence.md)
 - [an_approved_correction_supersedes_the_memory_it_corrects](../../../../functions/tests/memory_extraction_test/an_approved_correction_supersedes_the_memory_it_corrects.md)
 - [the_user_saying_a_pending_memory_approves_it](../../../../functions/tests/memory_extraction_test/the_user_saying_a_pending_memory_approves_it.md)

@@ -3,7 +3,7 @@ type: Rust Function
 title: is_provider_switch
 resource: src/tui/events.rs#L489-L491
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/key_matches

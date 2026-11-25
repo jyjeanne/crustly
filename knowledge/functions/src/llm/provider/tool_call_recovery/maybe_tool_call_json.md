@@ -3,7 +3,7 @@ type: Rust Function
 title: maybe_tool_call_json
 resource: src/llm/provider/tool_call_recovery.rs#L25-L28
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/llama_cpp/run_stream

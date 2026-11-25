@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: a_refused_forget_deletes_nothing_and_the_prompt_shows_the_memory
-resource: src/llm/agent/service.rs#L4193-L4261
+resource: src/llm/agent/service.rs#L4207-L4275
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

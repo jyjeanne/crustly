@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: SubAgentsConfig
-resource: src/config/mod.rs#L428-L439
+resource: src/config/mod.rs#L494-L505
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

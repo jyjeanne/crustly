@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_max_concurrent_subagents
-resource: src/config/mod.rs#L450-L452
+resource: src/config/mod.rs#L516-L518
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/SubAgentsConfig/default/default

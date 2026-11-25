@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: ThinkSetting
-resource: src/config/mod.rs#L1077-L1080
+resource: src/config/mod.rs#L1162-L1165
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

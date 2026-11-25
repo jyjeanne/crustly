@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_extraction_min_importance
-resource: src/config/mod.rs#L261-L263
+resource: src/config/mod.rs#L308-L310
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryExtractionConfig/default/default

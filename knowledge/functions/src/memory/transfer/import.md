@@ -3,7 +3,7 @@ type: Rust Function
 title: import
 resource: src/memory/transfer.rs#L116-L172
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/id_for_root

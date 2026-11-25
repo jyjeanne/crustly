@@ -4,7 +4,7 @@ title: save
 resource: src/llm/tools/task.rs#L177-L194
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/write

@@ -4,7 +4,7 @@ title: shannon_entropy
 resource: src/memory/secret_scan.rs#L74-L93
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/secret_scan/scan

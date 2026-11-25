@@ -3,7 +3,7 @@ type: Rust Function
 title: render
 resource: src/tui/render.rs#L23-L91
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/render/input_box_height

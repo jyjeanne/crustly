@@ -4,7 +4,7 @@ title: parse_fallback_tool_calls
 resource: src/llm/provider/qwen.rs#L439-L478
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/qwen/QwenProvider/find_json_objects

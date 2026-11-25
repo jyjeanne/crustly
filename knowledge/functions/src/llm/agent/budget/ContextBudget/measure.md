@@ -3,7 +3,7 @@ type: Rust Method
 title: measure
 resource: src/llm/agent/budget.rs#L51-L66
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/budget/ContextBudget/from_counts

@@ -4,7 +4,7 @@ title: default_sampling
 resource: src/llm/provider/qwen.rs#L928-L946
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

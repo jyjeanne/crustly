@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: build_tool_registry_registers_every_built_in_tool
-resource: src/cli/mod.rs#L3678-L3710
+resource: src/cli/mod.rs#L3851-L3883
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/build_tool_registry

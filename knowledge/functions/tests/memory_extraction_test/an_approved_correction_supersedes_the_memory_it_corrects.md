@@ -6,7 +6,7 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/new
@@ -27,9 +27,6 @@ relationships:
   - target: functions/src/memory/extraction/MemoryStore/with_extraction
     resolved_by: tree-sitter
     confidence: exact
-  - target: functions/tests/memory_extraction_test/Scripted/new
-    resolved_by: tree-sitter-receiver
-    confidence: semantic
   - target: functions/tests/memory_extraction_test/session_with
     resolved_by: tree-sitter
     confidence: exact
@@ -62,7 +59,6 @@ relationships:
 - [register_project](../../../functions/src/memory/MemoryStore/register_project.md)
 - [save](../../../functions/src/memory/MemoryStore/save.md)
 - [with_extraction](../../../functions/src/memory/extraction/MemoryStore/with_extraction.md)
-- [new](../../../functions/tests/memory_extraction_test/Scripted/new.md)
 - [session_with](../../../functions/tests/memory_extraction_test/session_with.md)
 - [chat](../../../functions/tests/memory_extraction_test/chat.md)
 - [extract](../../../functions/src/memory/extraction/MemoryStore/extract.md)

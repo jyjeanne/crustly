@@ -3,7 +3,7 @@ type: Rust Method
 title: start_auto_update_loop
 resource: src/config/update.rs#L156-L181
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/update/ProviderUpdater/should_update

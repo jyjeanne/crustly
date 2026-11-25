@@ -3,7 +3,7 @@ type: Rust Function
 title: tool_call_from_content
 resource: src/llm/provider/tool_call_recovery.rs#L167-L203
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/tool_call_recovery/parse_tool_call_object

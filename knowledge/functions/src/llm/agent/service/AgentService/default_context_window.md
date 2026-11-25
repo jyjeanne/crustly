@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: default_context_window
-resource: src/llm/agent/service.rs#L865-L868
+resource: src/llm/agent/service.rs#L878-L881
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/provider_context_window

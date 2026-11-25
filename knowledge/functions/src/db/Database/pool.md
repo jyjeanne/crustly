@@ -3,7 +3,7 @@ type: Rust Method
 title: pool
 resource: src/db/mod.rs#L121-L123
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/benches/memory_recall/bench_keyword_recall
@@ -144,7 +144,16 @@ relationships:
   - target: functions/tests/memory_acceptance_test/open
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/tests/memory_anchors_test/setup
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/setup
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/tests/memory_consolidate_test/setup
@@ -369,7 +378,10 @@ relationships:
 - [test_end_to_end_system_prompt](../../../../functions/tests/integration_test/test_end_to_end_system_prompt.md)
 - [test_database_persistence](../../../../functions/tests/integration_test/test_database_persistence.md)
 - [open](../../../../functions/tests/memory_acceptance_test/open.md)
+- [setup](../../../../functions/tests/memory_anchors_test/setup.md)
 - [run](../../../../functions/tests/memory_benchmark_test/run.md)
+- [setup](../../../../functions/tests/memory_code_knowledge_test/setup.md)
+- [without_code_knowledge_nothing_changes](../../../../functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes.md)
 - [setup](../../../../functions/tests/memory_consolidate_test/setup.md)
 - [insert_at](../../../../functions/tests/memory_consolidate_test/insert_at.md)
 - [merge_band_vectors](../../../../functions/tests/memory_consolidate_test/merge_band_vectors.md)

@@ -3,7 +3,7 @@ type: Rust Method
 title: model
 resource: src/memory/vector_index.rs#L43-L45
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/semantic/current_index

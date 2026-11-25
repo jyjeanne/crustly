@@ -3,7 +3,7 @@ type: Rust Function
 title: is_page_down
 resource: src/tui/events.rs#L566-L568
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/app/App/handle_key_event

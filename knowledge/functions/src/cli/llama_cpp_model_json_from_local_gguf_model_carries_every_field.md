@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: llama_cpp_model_json_from_local_gguf_model_carries_every_field
-resource: src/cli/mod.rs#L3461-L3490
+resource: src/cli/mod.rs#L3634-L3663
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/LlamaCppModelJson/from-crate-llm-provider-llama-cpp-models-localggufmodel/from

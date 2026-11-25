@@ -3,7 +3,7 @@ type: Rust Function
 title: resolve_profiles
 resource: src/llm/agent/profiles.rs#L103-L129
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/profiles/builtin_profiles
