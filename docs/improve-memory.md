@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Phases 0 to 4 built on `feat/memory-v2-finish`, with fake-model tests. Phase 5: the upgrade test, docs, minor review fixes, the TUI notice test and the TUI memory screen (P5.1: `/memories` browses, filters, searches, approves, rejects and forgets; editing stays with `crustly memory edit`) are done; the reranker experiment (P5.4) is not. Phase 6 deferred (§21). Real-model runs (embedding benchmark, extraction with a local model) are pending. |
+| Status | Phases 0 to 4 built on `feat/memory-v2-finish`, with fake-model tests. Phase 5: the upgrade test, docs, minor review fixes, the TUI notice test and the TUI memory screen (P5.1: `/memories` browses, filters, searches, approves, rejects and forgets; editing stays with `crustly memory edit`) are done; the reranker experiment (P5.4) is not. Phase 6 (okf-rs code knowledge, P6.0-P6.7) built on `feat/memory-code-knowledge`, with its okf-rs side (P6.0) on okf-rs branch `feat/mcp-structured-results`, not yet merged there; what differs from §23 is in §23.9. Real-model runs (embedding benchmark, extraction with a local model) are pending. |
 | Revised | 2026-11-21, with ideas from `docs/harness-memory-study.md` (what was adopted and why: Appendix C), and an optional integration with [okf-rs](https://github.com/jyjeanne/okf-rs) for code knowledge (§23) |
 | Date | 2026-11-21 |
 | Target | Next minor release after 0.5.x (new migrations, new config keys) |
@@ -1088,7 +1088,7 @@ All decided on 2026-11-21:
 Decided on 2026-11-23:
 
 7. **Extraction is configured as `[memory.extraction] enabled = false`**, with the table's other keys beside it. This replaces the `extraction = "off" | "auto"` key in §16, which cannot coexist with that table in TOML. D6 and §16 are read with this name.
-8. **Phase 6 (okf-rs integration) is deferred.** It needs changes in the okf-rs repository first (§23.5).
+8. **Phase 6 (okf-rs integration) was deferred** until the okf-rs changes of §23.5 existed. They were made on 2026-11-25 (okf-rs branch `feat/mcp-structured-results`), and Phase 6 was built the same day (§23.9).
 9. **Verification is with fake models.** Real-model runs (the Ollama benchmark, and an extraction run with a small local model) are listed as pending, not claimed as done.
 
 ## 22. Rules for the implementing agent
@@ -1216,6 +1216,19 @@ Integration tests use a fixture bundle and a scripted MCP server, so CI needs no
 | `expose_tools = true` on an 8k-token window | okf tools not offered; internal use still works |
 
 The benchmark (§18.4) gains a "code-anchored" case: queries that name a function, where the expected memory shares no words with the query.
+
+### 23.9 As built (2026-11-25)
+
+Where the build differs from §23.1 to §23.8, and why:
+
+- **okf-rs side (P6.0).** `search_ranked`, `explore` and `graph` (relations `callers`, `callees`, `file`) take `format: "json"` and answer with versioned documents (`okf-search-ranked/1`, `okf-explore/1`, `okf-concepts/1`); `graph` gained the `file` relation. okf-mcp also caches its full-text index with the session's concepts: a warm `search_ranked` went from about 400 ms to about 13 ms on Crustly's 4,336-concept bundle, which the 300 ms query timeout needs.
+- **Handshake by capability, not version.** Crustly reads `tools/list` and needs the `format` property and the `file` relation. No okf-rs version bump is required, and a server that has them works whatever its version says.
+- **Started at chat start, not first use.** Starting okf-mcp and loading a large bundle takes about a second, more than the query timeout, so a chat or `crustly run` starts it in the background and warms it up; requests before it is ready go without code knowledge. CLI commands that need it (`status`, `add`, `anchors`, `consolidate`) wait for it, up to 30 s.
+- **Stricter anchors.** A plain lower-case word (`open`) is anchored only with its type (`File::open`): on Crustly's own bundle, a memory about "what `open` returns" was otherwise anchored to a test helper. Test code (a `tests` path segment, `test_*` or `*_test` names) is never an anchor target. File paths in backticks are left to path-scoped memories. At most 6 names are looked up per text. When every one of the 25 search hits carries the name, it counts as ambiguous.
+- **Recall cost.** Recall queries okf-mcp only when the project has anchored memories. Callers and callees come from `explore` (at most 20 of each), for at most 3 named concepts.
+- **Drift.** The bundle time is the newest modification time of its files; it is compared with the anchor time in whole seconds, the precision anchors are stored with.
+- **`expose_tools`.** Registers okf-mcp as a second process, the MCP server `okf`, with `expose = "full_profile"`; the per-server `expose` setting is general (`[[mcp.servers]]`). The MCP client also read tool schemas from the wrong field (`input_schema` instead of `inputSchema`), so every MCP tool had reached the model with an empty schema; fixed.
+- **Not built.** The model-side `anchors` field on `save_memory`, the OKF document export (§23.6), and the "code-anchored" benchmark case.
 
 ## 24. Implementation tasks
 

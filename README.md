@@ -460,9 +460,29 @@ review = false                # true: extracted memories wait for `crustly memor
 
 [memory.lifecycle]
 episode_retention_days = 180  # episodes older than this are archived by consolidation
+
+[memory.code_knowledge]       # memories anchored to code, from an okf-rs bundle
+enabled = "auto"              # auto: on when okf-mcp is on PATH and the project has a bundle; "on" | "off"
+command = "okf-mcp"
+query_timeout_ms = 300        # past it, recall carries on without code knowledge
+expose_tools = false          # also offer okf-mcp's tools to the model (full tool profile only)
 ```
 
 The keys `episodic_budget_tokens`, `enable_codebase_index` and `compaction_threshold` are still accepted, but they have no effect.
+
+### Code knowledge (okf-rs)
+
+When the project has an [okf-rs](https://github.com/jyjeanne/okf-rs) bundle (`okf-rs generate`) and `okf-mcp` is on `PATH`, memory knows the project's functions and types:
+
+- A project memory that names one (`` `connect_pool` ``, `Database::run_migrations`) is anchored to it: exact, unambiguous matches only, never test code, at most three.
+- Naming that function in a request recalls the memory even with no word in common, and so does naming a function that calls it or that it calls. Reading the file that defines it brings the memory along with the tool result.
+- A recalled anchored memory shows where its code is now (`src/db/mod.rs#L154-L184`).
+- When a newer bundle no longer has the function, `crustly memory consolidate` lists the memory for review, with the closest match; nothing is changed by itself.
+- `crustly memory anchors <id> [--set ID... | --clear | --auto]` and `crustly memory add --anchor ID` manage anchors; `crustly memory status` says whether okf-mcp is ready and when the bundle is older than the source.
+
+It needs an okf-mcp that answers in JSON and has the `file` relation; an older one, a missing bundle, or a slow answer leaves memory working as without it. Crustly never regenerates the bundle itself, since that writes into the working tree.
+
+MCP servers in `[[mcp.servers]]` also take `expose = "always" | "full_profile" | "never"`: every tool schema is sent with every request, so a server with several tools can be kept for the full tool profile (windows of 32k tokens or more).
 
 ## 🔒 Interactive Approval System
 
