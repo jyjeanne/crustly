@@ -17,7 +17,7 @@ Crustly remembers facts and preferences across sessions and repositories. Design
 - **Extraction (off by default).** With `[memory.extraction] enabled = true`, memories are learned from conversations. Extracted memories can wait for review, and session ends write an episode that starts the next session's "recent work".
 - **Path-scoped memories.** A memory can name files (`src/tui/**`). It is recalled when a request or a tool call mentions them.
 - **Consolidation.** Expired memories are archived, old episodes expire after 180 days, near-duplicates are merged, and a year-unused fact is listed for review, never archived.
-- **Code knowledge (okf-rs).** With an okf-rs bundle and `okf-mcp` on `PATH`, a memory naming a function or type is anchored to it. Naming that function, a caller or a callee recalls the memory; reading its file brings it with the tool result; the recalled memory shows where the code is now. A memory whose function disappears from a newer bundle is listed for review. `crustly memory anchors`, `crustly memory add --anchor`.
+- **Code knowledge (okf-rs).** With an okf-rs bundle and `okf-mcp` from okf-rs 0.8.0 or newer on `PATH`, a memory naming a function or type is anchored to it. Naming that function, a caller or a callee recalls the memory; reading its file brings it with the tool result; the recalled memory shows where the code is now. A memory whose function disappears from a newer bundle is listed for review. `crustly memory anchors`, `crustly memory add --anchor`.
 - **MCP tool exposure.** `[[mcp.servers]] expose = "always" | "full_profile" | "never"` keeps a server's tool schemas off small windows.
 
 #### Commands
@@ -46,7 +46,7 @@ Every key is optional; defaults are in the README's Long-Term Memory section.
 - Editing a memory from the `/memories` screen (`crustly memory edit` does it).
 - Extraction with a provider other than the active one (`provider = "inherit"` only).
 - Global memories are not checked for near-duplicates on save.
-- Code knowledge needs okf-rs with JSON results and the `file` relation (okf-rs branch `feat/mcp-structured-results`, not yet released). The model cannot anchor memories itself (no `anchors` field on `save_memory`).
+- The model cannot anchor memories itself (no `anchors` field on `save_memory`).
 - Real-model results: the embedding benchmark and extraction runs against a local model are pending. The shipped checks use fake models.
 
 ---

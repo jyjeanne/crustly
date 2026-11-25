@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Phases 0 to 4 built on `feat/memory-v2-finish`, with fake-model tests. Phase 5: the upgrade test, docs, minor review fixes, the TUI notice test and the TUI memory screen (P5.1: `/memories` browses, filters, searches, approves, rejects and forgets; editing stays with `crustly memory edit`) are done; the reranker experiment (P5.4) is not. Phase 6 (okf-rs code knowledge, P6.0-P6.7) built on `feat/memory-code-knowledge`, with its okf-rs side (P6.0) on okf-rs branch `feat/mcp-structured-results`, not yet merged there; what differs from §23 is in §23.9. Real-model runs (embedding benchmark, extraction with a local model) are pending. |
+| Status | Phases 0 to 4 on master (the last of them through PR #130), with fake-model tests. Phase 5: the upgrade test, docs, minor review fixes, the TUI notice test and the TUI memory screen (P5.1: `/memories` browses, filters, searches, approves, rejects and forgets; editing stays with `crustly memory edit`) are done; the reranker experiment (P5.4) is not. Phase 6 (okf-rs code knowledge, P6.0-P6.7) built on `feat/memory-code-knowledge`; its okf-rs side (P6.0) is released in okf-rs 0.8.0, which code knowledge requires. What differs from §23 is in §23.9. Real-model runs (embedding benchmark, extraction with a local model) are pending. |
 | Revised | 2026-11-21, with ideas from `docs/harness-memory-study.md` (what was adopted and why: Appendix C), and an optional integration with [okf-rs](https://github.com/jyjeanne/okf-rs) for code knowledge (§23) |
 | Date | 2026-11-21 |
 | Target | Next minor release after 0.5.x (new migrations, new config keys) |
@@ -38,7 +38,7 @@ The first draft asked the implementer to audit the code before designing anythin
 | `[memory]` config | `episodic_budget_tokens`, `enable_codebase_index`, `compaction_threshold`, `project_notes`, `progress_file`. | `src/config/mod.rs` (`MemoryConfig`) | Only `project_notes` and `progress_file` are read. The other three are parsed and ignored. |
 | Embeddings | `crustly ollama embed` calls `ollama_models::generate_embeddings` (ollama-rs, batched `/api/embed`). | `src/cli/mod.rs`, `src/llm/provider/ollama_models.rs` | Behind the optional `ollama` feature, which is not in `default`. The memory embedder cannot depend on it. |
 | Codebase index | The empty `codebase_index` table (2026-05-03 migration). | `migrations/` | **Removed on 2026-11-21 (D13).** `CodebaseIndex`, `start_file_watcher`, their test file and the `notify` dependency were dead code: the watcher was never started and nothing read the index. The table stays. okf-rs does this job better (§23). |
-| okf-rs bundle | `knowledge/` holds an OKF bundle of Crustly's own code (4,336 concepts: 172 modules, 376 structs, 78 enums, 9 traits, 2,291 functions, 1,409 methods), and `AGENTS.md` tells coding agents to query it with `okf-rs`. | `knowledge/`, `AGENTS.md` | Used by agents working on Crustly; from Phase 6 also by Crustly's memory, through okf-mcp (§23). Regenerated on 2026-11-25 with okf-rs 0.7.0 (P6.1), which replaced the 0.3.0 bundle and its wrong call edges. |
+| okf-rs bundle | `knowledge/` holds an OKF bundle of Crustly's own code (4,446 concepts: 176 modules, 384 structs, 81 enums, 10 traits, 2,335 functions, 1,459 methods), and `AGENTS.md` tells coding agents to query it with `okf-rs`. | `knowledge/`, `AGENTS.md` | Used by agents working on Crustly; from Phase 6 also by Crustly's memory, through okf-mcp (§23). Regenerated on 2026-11-25 with okf-rs 0.7.0 (P6.1), which replaced the 0.3.0 bundle and its wrong call edges, then with okf-rs 0.8.0 once Phase 6 was built. |
 | SQLite | sqlx 0.8 with bundled `libsqlite3-sys` 0.30.1: SQLite 3.46.0, compiled with FTS5 and JSON1. WAL mode, `foreign_keys = ON` in `after_connect`, migrations through `sqlx::migrate!("./migrations")`. Conventions: `TEXT` UUID ids and `INTEGER` Unix timestamps. | `src/db/mod.rs`, `migrations/` | FTS5 (including its `secure-delete` option, SQLite 3.44+) is available with no new dependency. No vector extension is needed (D7). |
 | Project identity | None. `sessions` has no working-directory column. | `migrations/` | v2 must define one (§7). |
 | `crustly db clear` | Deletes `messages`, `files` and `sessions`. | `src/cli/mod.rs` | Memories must survive it (D10). |
@@ -1088,7 +1088,7 @@ All decided on 2026-11-21:
 Decided on 2026-11-23:
 
 7. **Extraction is configured as `[memory.extraction] enabled = false`**, with the table's other keys beside it. This replaces the `extraction = "off" | "auto"` key in §16, which cannot coexist with that table in TOML. D6 and §16 are read with this name.
-8. **Phase 6 (okf-rs integration) was deferred** until the okf-rs changes of §23.5 existed. They were made on 2026-11-25 (okf-rs branch `feat/mcp-structured-results`), and Phase 6 was built the same day (§23.9).
+8. **Phase 6 (okf-rs integration) was deferred** until the okf-rs changes of §23.5 existed. They were made on 2026-11-25 and released in okf-rs 0.8.0; Phase 6 was built the same day (§23.9).
 9. **Verification is with fake models.** Real-model runs (the Ollama benchmark, and an extraction run with a small local model) are listed as pending, not claimed as done.
 
 ## 22. Rules for the implementing agent
@@ -1221,8 +1221,8 @@ The benchmark (§18.4) gains a "code-anchored" case: queries that name a functio
 
 Where the build differs from §23.1 to §23.8, and why:
 
-- **okf-rs side (P6.0).** `search_ranked`, `explore` and `graph` (relations `callers`, `callees`, `file`) take `format: "json"` and answer with versioned documents (`okf-search-ranked/1`, `okf-explore/1`, `okf-concepts/1`); `graph` gained the `file` relation. okf-mcp also caches its full-text index with the session's concepts: a warm `search_ranked` went from about 400 ms to about 13 ms on Crustly's 4,336-concept bundle, which the 300 ms query timeout needs.
-- **Handshake by capability, not version.** Crustly reads `tools/list` and needs the `format` property and the `file` relation. No okf-rs version bump is required, and a server that has them works whatever its version says.
+- **okf-rs side (P6.0).** `search_ranked`, `explore` and `graph` (relations `callers`, `callees`, `file`) take `format: "json"` and answer with versioned documents (`okf-search-ranked/1`, `okf-explore/1`, `okf-concepts/1`); `graph` gained the `file` relation. okf-mcp also caches its full-text index with the session's concepts: a warm `search_ranked` went from about 400 ms to about 13 ms on Crustly's 4,336-concept bundle, which the 300 ms query timeout needs. Released in okf-rs 0.8.0.
+- **Handshake by capability, not version.** Crustly reads `tools/list` and needs the `format` property and the `file` relation, which okf-rs 0.8.0 is the first to have. The version itself is not checked: a server that has them works whatever its version says, and messages point to 0.8.0 or newer.
 - **Started at chat start, not first use.** Starting okf-mcp and loading a large bundle takes about a second, more than the query timeout, so a chat or `crustly run` starts it in the background and warms it up; requests before it is ready go without code knowledge. CLI commands that need it (`status`, `add`, `anchors`, `consolidate`) wait for it, up to 30 s.
 - **Stricter anchors.** A plain lower-case word (`open`) is anchored only with its type (`File::open`): on Crustly's own bundle, a memory about "what `open` returns" was otherwise anchored to a test helper. Test code (a `tests` path segment, `test_*` or `*_test` names) is never an anchor target. File paths in backticks are left to path-scoped memories. At most 6 names are looked up per text. When every one of the 25 search hits carries the name, it counts as ambiguous.
 - **Recall cost.** Recall queries okf-mcp only when the project has anchored memories. Callers and callees come from `explore` (at most 20 of each), for at most 3 named concepts.
@@ -1563,7 +1563,7 @@ At the end of a phase, run the full `cargo test --features openai,aws-bedrock,ol
 | Task | Tag | Needs | Files | Do | Test |
 | --- | --- | --- | --- | --- | --- |
 | P6.0 okf-rs prerequisites | S | none | okf-rs repository | JSON output for `search_ranked`, `explore`, `graph`; a `file` relation (§23.5) | okf-rs tests |
-| P6.1 Regenerate Crustly's bundle | H | none | `knowledge/` | `okf-rs generate` with okf-rs 0.7 or newer; commit the result | `okf-rs validate` passes |
+| P6.1 Regenerate Crustly's bundle | H | none | `knowledge/` | `okf-rs generate` with okf-rs 0.7 or newer (done with 0.8.0); commit the result | `okf-rs validate` passes |
 | P6.2 Migration 6 | H | P1.1 | `migrations/…_memory_anchors.sql` | SQL of §23.3 | Cascade |
 | P6.3 Per-server tool exposure | H | none | `src/config/mod.rs`, `src/llm/agent/tool_profile.rs` | `expose` on `McpServerConfig`; `ToolSelection::exposes` honours it (§23.2) | Hidden on an 8k window with `full_profile` |
 | P6.4 okf-mcp connection | S | P6.0, P6.3 | `src/memory/code_knowledge.rs` | Detection, lazy start through `src/mcp/`, version check, timeouts (§23.2) | Scripted MCP server; missing binary turns the feature off |

@@ -480,7 +480,7 @@ When the project has an [okf-rs](https://github.com/jyjeanne/okf-rs) bundle (`ok
 - When a newer bundle no longer has the function, `crustly memory consolidate` lists the memory for review, with the closest match; nothing is changed by itself.
 - `crustly memory anchors <id> [--set ID... | --clear | --auto]` and `crustly memory add --anchor ID` manage anchors; `crustly memory status` says whether okf-mcp is ready and when the bundle is older than the source.
 
-It needs an okf-mcp that answers in JSON and has the `file` relation; an older one, a missing bundle, or a slow answer leaves memory working as without it. Crustly never regenerates the bundle itself, since that writes into the working tree.
+It needs okf-rs 0.8.0 or newer ([releases](https://github.com/jyjeanne/okf-rs/releases)); an older okf-mcp answers only in text and is not used. With an older okf-mcp, no bundle, or a slow answer, memory works as without code knowledge. Crustly never regenerates the bundle itself, since that writes into the working tree.
 
 MCP servers in `[[mcp.servers]]` also take `expose = "always" | "full_profile" | "never"`: every tool schema is sent with every request, so a server with several tools can be kept for the full tool profile (windows of 32k tokens or more).
 

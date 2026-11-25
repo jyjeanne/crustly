@@ -254,7 +254,7 @@ impl CodeKnowledge {
         };
         let Ok(command) = which::which(&config.command) else {
             return off(format!(
-                "`{}` was not found (install okf-rs, or set [memory.code_knowledge] command)",
+                "`{}` was not found (install okf-rs 0.8.0 or newer, or set [memory.code_knowledge] command)",
                 config.command
             ));
         };
@@ -652,8 +652,9 @@ fn newest_mtime(dir: &Path) -> Option<std::time::SystemTime> {
 }
 
 /// Whether okf-mcp has what this module needs: JSON results (`format` on
-/// `search_ranked`, `explore` and `graph`) and the `file` relation. Older
-/// servers answer only in text, which is not parsed (§23.5).
+/// `search_ranked`, `explore` and `graph`) and the `file` relation, both in
+/// okf-rs 0.8.0 and newer. Older servers answer only in text, which is not
+/// parsed (§23.5).
 fn check_capabilities(tools: &[McpToolDef]) -> Result<()> {
     let schema = |name: &str| {
         tools
@@ -681,7 +682,7 @@ fn check_capabilities(tools: &[McpToolDef]) -> Result<()> {
         Ok(())
     } else {
         Err(anyhow!(
-            "this okf-mcp answers only in text; okf-rs with JSON results and the `file` relation is needed"
+            "this okf-mcp answers only in text; okf-rs 0.8.0 or newer is needed"
         ))
     }
 }
