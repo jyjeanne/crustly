@@ -1,16 +1,22 @@
 ---
 type: Rust Method
 title: call_provider_streaming
-resource: src/llm/agent/service.rs#L1579-L1591
+resource: src/llm/agent/service.rs#L1518-L1530
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/types/LLMRequest/with_streaming
-  - functions/src/llm/agent/service/drain_stream_to_response
+  - target: functions/src/llm/provider/types/LLMRequest/with_streaming
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/drain_stream_to_response
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+  - target: functions/src/llm/agent/service/run/AgentRun/call_model
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -24,4 +30,4 @@ relationships:
 
 # Called by
 
-- [send_message_with_tools_inner](../../../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.md)
+- [call_model](../../../../../../functions/src/llm/agent/service/run/AgentRun/call_model.md)

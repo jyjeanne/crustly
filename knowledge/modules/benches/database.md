@@ -3,14 +3,22 @@ type: Rust Module
 title: database
 resource: benches/database.rs#L1-L326
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/criterion-black-box-criterion-group-criterion-main-benchmarkid-criterion
-  - external/crustly-db-models-session-database
-  - external/tempfile-tempdir
+  - target: external/criterion-black-box-criterion-group-criterion-main-benchmarkid-criterion
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-db-models-session-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

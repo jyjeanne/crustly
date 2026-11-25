@@ -1,16 +1,22 @@
 ---
 type: Rust Function
 title: skill_lookup_roots
-resource: src/llm/tools/skill.rs#L177-L203
+resource: src/llm/tools/skill.rs#L252-L278
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/skill/push_if_dir
+  - target: functions/src/llm/tools/skill/push_if_dir
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/skill/resolve_skill_path
-  - functions/src/llm/tools/skill/list_skills
+  - target: functions/src/llm/tools/skill/resolve_skill_path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/list_skills
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

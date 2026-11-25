@@ -3,10 +3,19 @@ type: Rust Function
 title: retry_db_sqlx
 resource: src/db/retry.rs#L175-L233
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/retry/is_database_locked
+  - target: functions/src/db/retry/is_database_locked
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/retry/DbRetryConfig/calculate_delay
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  called_by:
+  - target: functions/src/db/repository/memory/MemoryRepository/insert
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,3 +25,8 @@ relationships:
 # Calls
 
 - [is_database_locked](../../../../functions/src/db/retry/is_database_locked.md)
+- [calculate_delay](../../../../functions/src/db/retry/DbRetryConfig/calculate_delay.md)
+
+# Called by
+
+- [insert](../../../../functions/src/db/repository/memory/MemoryRepository/insert.md)

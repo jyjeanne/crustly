@@ -2,9 +2,11 @@
 type: Rust Function
 title: validate_rejects_zero_timeout
 resource: src/llm/tools/powershell.rs#L456-L461
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

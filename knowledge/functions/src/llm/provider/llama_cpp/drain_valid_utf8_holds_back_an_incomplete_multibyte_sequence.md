@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: drain_valid_utf8_holds_back_an_incomplete_multibyte_sequence
-resource: src/llm/provider/llama_cpp.rs#L1554-L1568
+resource: src/llm/provider/llama_cpp.rs#L1655-L1669
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
+  - target: functions/src/llm/provider/llama_cpp/drain_valid_utf8
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +20,4 @@ relationships:
 
 # Calls
 
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
+- [drain_valid_utf8](../../../../../functions/src/llm/provider/llama_cpp/drain_valid_utf8.md)

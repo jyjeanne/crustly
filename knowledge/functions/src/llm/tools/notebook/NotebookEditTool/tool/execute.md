@@ -4,12 +4,34 @@ title: execute
 resource: src/llm/tools/notebook.rs#L161-L335
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/sandbox/check_path
-  - functions/src/config/secrets/SecretString/from_str
-  - functions/src/config/secrets/SecretString/len
+  - target: functions/src/llm/tools/trait/ToolResult/error
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/sandbox/check_path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/project/write
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/trait/ToolResult/success
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
+  called_by:
+  - target: functions/src/llm/tools/notebook/test_add_cell_within_working_directory_succeeds
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/notebook/test_path_outside_working_directory_is_denied
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -18,6 +40,14 @@ relationships:
 
 # Calls
 
+- [error](../../../../../../../functions/src/llm/tools/trait/ToolResult/error.md)
 - [check_path](../../../../../../../functions/src/llm/tools/sandbox/check_path.md)
-- [from_str](../../../../../../../functions/src/config/secrets/SecretString/from_str.md)
-- [len](../../../../../../../functions/src/config/secrets/SecretString/len.md)
+- [write](../../../../../../../functions/src/memory/project/write.md)
+- [contains](../../../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
+- [success](../../../../../../../functions/src/llm/tools/trait/ToolResult/success.md)
+- [display](../../../../../../../functions/src/llm/tools/skill/SkillSource/display.md)
+
+# Called by
+
+- [test_add_cell_within_working_directory_succeeds](../../../../../../../functions/src/llm/tools/notebook/test_add_cell_within_working_directory_succeeds.md)
+- [test_path_outside_working_directory_is_denied](../../../../../../../functions/src/llm/tools/notebook/test_path_outside_working_directory_is_denied.md)

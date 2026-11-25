@@ -3,13 +3,19 @@ type: Rust Module
 title: cli_test
 resource: tests/cli_test.rs#L1-L273
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/clap-parser
-  - external/crustly-cli-cli-commands-dbcommands-outputformat
+  - target: external/clap-parser
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-cli-cli-commands-dbcommands-outputformat
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

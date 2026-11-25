@@ -4,11 +4,15 @@ title: resolve_shell
 resource: src/llm/tools/bash.rs#L37-L77
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/bash/BashTool/tool/execute
-  - functions/src/llm/tools/bash/windows_resolves_a_posix_shell_not_cmd
+  - target: functions/src/llm/tools/bash/BashTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/bash/windows_resolves_a_posix_shell_not_cmd
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

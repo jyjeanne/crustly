@@ -1,16 +1,19 @@
 ---
 type: Rust Method
 title: start_model_pull
-resource: src/tui/app.rs#L2525-L2538
+resource: src/tui/app.rs#L3373-L3386
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/tui/app/App/event_sender
+  - target: functions/src/tui/app/App/event_sender
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_model_download_key
+  - target: functions/src/tui/app/App/handle_model_download_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +22,6 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 - [event_sender](../../../../../functions/src/tui/app/App/event_sender.md)
 
 # Called by

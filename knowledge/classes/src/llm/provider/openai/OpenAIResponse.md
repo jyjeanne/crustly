@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: OpenAIResponse
-resource: src/llm/provider/openai.rs#L1055-L1062
+resource: src/llm/provider/openai.rs#L859-L866
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

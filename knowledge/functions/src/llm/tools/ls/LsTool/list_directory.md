@@ -4,21 +4,17 @@ title: list_directory
 resource: src/llm/tools/ls.rs#L138-L213
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/len
   called_by:
-  - functions/src/llm/tools/ls/LsTool/tool/execute
+  - target: functions/src/llm/tools/ls/LsTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `async fn list_directory( &self, path: &Path, input: &LsInput, output: &mut String, ) -> Result<()>`
-
-# Calls
-
-- [len](../../../../../../functions/src/config/secrets/SecretString/len.md)
 
 # Called by
 

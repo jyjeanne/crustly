@@ -1,9 +1,9 @@
 ---
 type: Rust Trait
 title: SubAgentLauncher
-resource: src/llm/tools/trait.rs#L17-L26
+resource: src/llm/tools/trait.rs#L68-L91
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

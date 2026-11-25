@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_toggle_auto_mode_key
-resource: src/tui/events.rs#L561-L567
+resource: src/tui/events.rs#L705-L711
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/logging/LoggerGuard/empty
+  - target: functions/src/tui/events/is_toggle_auto_mode
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +20,4 @@ relationships:
 
 # Calls
 
-- [empty](../../../../functions/src/logging/LoggerGuard/empty.md)
+- [is_toggle_auto_mode](../../../../functions/src/tui/events/is_toggle_auto_mode.md)

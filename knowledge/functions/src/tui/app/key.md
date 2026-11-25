@@ -1,68 +1,181 @@
 ---
 type: Rust Function
 title: key
-resource: src/tui/app.rs#L3003-L3005
+resource: src/tui/app.rs#L3927-L3929
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/logging/LoggerGuard/empty
   called_by:
-  - functions/src/tui/app/model_download_typing_filters_suggestions
-  - functions/src/tui/app/model_download_backspace_removes_last_char
-  - functions/src/tui/app/model_download_tab_adopts_highlighted_suggestion
-  - functions/src/tui/app/model_download_esc_closes_dialog_without_running_pull
-  - functions/src/tui/app/model_download_enter_starts_pull_then_esc_aborts_it
-  - functions/src/tui/app/delete_key_ignored_for_uninstalled_suggestion
-  - functions/src/tui/app/delete_key_on_installed_model_asks_for_confirmation
-  - functions/src/tui/app/confirm_delete_n_cancels_back_to_list
-  - functions/src/tui/app/confirm_delete_esc_cancels_back_to_list_without_closing_dialog
-  - functions/src/tui/app/confirm_delete_y_starts_delete
-  - functions/src/tui/app/up_recalls_previous_messages_without_sending_them
-  - functions/src/tui/app/recalled_message_can_be_edited_before_resending
-  - functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft
-  - functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history
-  - functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once
-  - functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting
-  - functions/src/tui/app/chat_alt_enter_inserts_newline_as_non_kitty_fallback
-  - functions/src/tui/app/chat_left_arrow_moves_cursor_for_mid_buffer_insert
-  - functions/src/tui/app/chat_backspace_deletes_at_cursor_not_always_the_last_char
-  - functions/src/tui/app/chat_home_and_end_move_cursor_to_line_boundaries
-  - functions/src/tui/app/chat_ctrl_left_right_jump_by_word
-  - functions/src/tui/app/chat_ctrl_backspace_deletes_whole_word
-  - functions/src/tui/app/altgr_backslash_reaches_the_input
-  - functions/src/tui/app/plain_at_sign_still_opens_the_file_picker
-  - functions/src/tui/app/typed_backslashes_reach_the_input
-  - functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end
-  - functions/src/tui/app/shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps
-  - functions/src/tui/app/shift_tab_works_from_any_mode_not_just_chat
-  - functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone
-  - functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end
-  - functions/src/tui/app/skills_view_up_down_navigation_clamps_at_bounds
-  - functions/src/tui/app/skills_view_esc_returns_to_chat
-  - functions/src/tui/app/mcp_view_up_down_navigation_clamps_at_bounds
-  - functions/src/tui/app/mcp_view_esc_returns_to_chat
-  - functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer
-  - functions/src/tui/app/chat_plain_enter_on_empty_buffer_does_nothing
-  - functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it
-  - functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias
-  - functions/src/tui/app/provider_switch_up_down_navigation_clamps_at_bounds
-  - functions/src/tui/app/provider_switch_esc_returns_to_chat
-  - functions/src/tui/app/llama_cpp_up_down_navigation_clamps_at_bounds
-  - functions/src/tui/app/llama_cpp_esc_returns_to_chat
-  - functions/src/tui/app/llama_cpp_typing_fills_the_download_input
-  - functions/src/tui/app/llama_cpp_delete_key_asks_for_confirmation_before_deleting
-  - functions/src/tui/app/llama_cpp_switch_is_a_noop_while_a_delete_is_already_running
+  - target: functions/src/tui/app/model_download_typing_filters_suggestions
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/model_download_backspace_removes_last_char
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/model_download_tab_adopts_highlighted_suggestion
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/model_download_esc_closes_dialog_without_running_pull
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/model_download_enter_starts_pull_then_esc_aborts_it
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/delete_key_ignored_for_uninstalled_suggestion
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/delete_key_on_installed_model_asks_for_confirmation
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/confirm_delete_n_cancels_back_to_list
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/confirm_delete_esc_cancels_back_to_list_without_closing_dialog
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/confirm_delete_y_starts_delete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_recalls_previous_messages_without_sending_them
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/recalled_message_can_be_edited_before_resending
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_alt_enter_inserts_newline_as_non_kitty_fallback
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_left_arrow_moves_cursor_for_mid_buffer_insert
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_backspace_deletes_at_cursor_not_always_the_last_char
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_home_and_end_move_cursor_to_line_boundaries
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_ctrl_left_right_jump_by_word
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_ctrl_backspace_deletes_whole_word
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/altgr_backslash_reaches_the_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/plain_at_sign_still_opens_the_file_picker
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/typed_backslashes_reach_the_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/page_up_stops_at_the_top_of_the_transcript
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/help_scrolls_within_its_height
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/shift_tab_works_from_any_mode_not_just_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/skills_view_up_down_navigation_clamps_at_bounds
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/skills_view_esc_returns_to_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/mcp_view_up_down_navigation_clamps_at_bounds
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/mcp_view_esc_returns_to_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_plain_enter_on_empty_buffer_does_nothing
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/ctrl_o_opens_model_info_panel_and_esc_closes_it
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/provider_switch_up_down_navigation_clamps_at_bounds
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/provider_switch_esc_returns_to_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/llama_cpp_up_down_navigation_clamps_at_bounds
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/llama_cpp_esc_returns_to_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/llama_cpp_typing_fills_the_download_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/llama_cpp_delete_key_asks_for_confirmation_before_deleting
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/llama_cpp_switch_is_a_noop_while_a_delete_is_already_running
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/scope_and_category_filters_narrow_the_list
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/search_filters_by_words_in_the_content
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/approve_makes_a_pending_memory_active
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/reject_deletes_a_pending_memory
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/forget_asks_first_and_deletes_only_on_y
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/enter_shows_details_with_the_history
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn key(code: KeyCode) -> crossterm::event::KeyEvent`
-
-# Calls
-
-- [empty](../../../../functions/src/logging/LoggerGuard/empty.md)
 
 # Called by
 
@@ -92,6 +205,9 @@ relationships:
 - [plain_at_sign_still_opens_the_file_picker](../../../../functions/src/tui/app/plain_at_sign_still_opens_the_file_picker.md)
 - [typed_backslashes_reach_the_input](../../../../functions/src/tui/app/typed_backslashes_reach_the_input.md)
 - [paste_inserts_at_cursor_not_always_appended_at_the_end](../../../../functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end.md)
+- [ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it](../../../../functions/src/tui/app/ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it.md)
+- [page_up_stops_at_the_top_of_the_transcript](../../../../functions/src/tui/app/page_up_stops_at_the_top_of_the_transcript.md)
+- [help_scrolls_within_its_height](../../../../functions/src/tui/app/help_scrolls_within_its_height.md)
 - [shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps](../../../../functions/src/tui/app/shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps.md)
 - [shift_tab_works_from_any_mode_not_just_chat](../../../../functions/src/tui/app/shift_tab_works_from_any_mode_not_just_chat.md)
 - [setting_auto_mode_state_shares_the_same_cell_as_a_clone](../../../../functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone.md)
@@ -111,3 +227,9 @@ relationships:
 - [llama_cpp_typing_fills_the_download_input](../../../../functions/src/tui/app/llama_cpp_typing_fills_the_download_input.md)
 - [llama_cpp_delete_key_asks_for_confirmation_before_deleting](../../../../functions/src/tui/app/llama_cpp_delete_key_asks_for_confirmation_before_deleting.md)
 - [llama_cpp_switch_is_a_noop_while_a_delete_is_already_running](../../../../functions/src/tui/app/llama_cpp_switch_is_a_noop_while_a_delete_is_already_running.md)
+- [scope_and_category_filters_narrow_the_list](../../../../functions/src/tui/app/scope_and_category_filters_narrow_the_list.md)
+- [search_filters_by_words_in_the_content](../../../../functions/src/tui/app/search_filters_by_words_in_the_content.md)
+- [approve_makes_a_pending_memory_active](../../../../functions/src/tui/app/approve_makes_a_pending_memory_active.md)
+- [reject_deletes_a_pending_memory](../../../../functions/src/tui/app/reject_deletes_a_pending_memory.md)
+- [forget_asks_first_and_deletes_only_on_y](../../../../functions/src/tui/app/forget_asks_first_and_deletes_only_on_y.md)
+- [enter_shows_details_with_the_history](../../../../functions/src/tui/app/enter_shows_details_with_the_history.md)

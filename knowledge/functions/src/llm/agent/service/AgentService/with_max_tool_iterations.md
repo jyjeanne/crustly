@@ -1,14 +1,20 @@
 ---
 type: Rust Method
 title: with_max_tool_iterations
-resource: src/llm/agent/service.rs#L573-L576
+resource: src/llm/agent/service.rs#L732-L735
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/cli/cmd_run
-  - functions/src/llm/agent/service/AgentServiceLauncher/crate-llm-tools-subagentlauncher/launch
+  - target: functions/src/cli/configure_agent_loop
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/round_limit_ends_with_an_answer_instead_of_an_error
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/subagents/ChildTemplate/build
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,6 +23,6 @@ relationships:
 
 # Called by
 
-- [cmd_chat](../../../../../../functions/src/cli/cmd_chat.md)
-- [cmd_run](../../../../../../functions/src/cli/cmd_run.md)
-- [launch](../../../../../../functions/src/llm/agent/service/AgentServiceLauncher/crate-llm-tools-subagentlauncher/launch.md)
+- [configure_agent_loop](../../../../../../functions/src/cli/configure_agent_loop.md)
+- [round_limit_ends_with_an_answer_instead_of_an_error](../../../../../../functions/src/llm/agent/service/round_limit_ends_with_an_answer_instead_of_an_error.md)
+- [build](../../../../../../functions/src/llm/agent/service/subagents/ChildTemplate/build.md)

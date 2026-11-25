@@ -1,15 +1,19 @@
 ---
 type: Rust Function
 title: render_approval_header
-resource: src/tui/render.rs#L1236-L1288
+resource: src/tui/render.rs#L1710-L1762
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/ToolApprovalRequest/time_remaining
+  - target: functions/src/tui/events/ToolApprovalRequest/time_remaining
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render_approval
+  - target: functions/src/tui/render/render_approval
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

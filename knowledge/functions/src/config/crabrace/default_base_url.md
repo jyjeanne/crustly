@@ -4,10 +4,12 @@ title: default_base_url
 resource: src/config/crabrace.rs#L33-L35
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/config/crabrace/CrabraceConfig/default/default
+  - target: functions/src/config/crabrace/CrabraceConfig/default/default
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

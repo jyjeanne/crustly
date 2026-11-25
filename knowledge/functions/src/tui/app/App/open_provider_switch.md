@@ -1,16 +1,22 @@
 ---
 type: Rust Method
 title: open_provider_switch
-resource: src/tui/app.rs#L2649-L2662
+resource: src/tui/app.rs#L3497-L3510
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/event_sender
-  - functions/src/tui/app/App/switch_mode
+  - target: functions/src/tui/app/App/event_sender
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/switch_mode
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

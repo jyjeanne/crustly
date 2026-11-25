@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: new
-resource: src/app/mod.rs#L17-L19
+resource: src/app/mod.rs#L12-L14
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: MockTool
-resource: src/llm/tools/registry.rs#L306-L309
+resource: src/llm/tools/registry.rs#L331-L334
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

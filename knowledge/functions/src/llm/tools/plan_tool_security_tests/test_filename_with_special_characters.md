@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_filename_with_special_characters
 resource: src/llm/tools/plan_tool_security_tests.rs#L183-L192
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/plan_tool/validate_plan_file_path
+  - target: functions/src/llm/tools/plan_tool/validate_plan_file_path
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

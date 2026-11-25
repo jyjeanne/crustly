@@ -3,10 +3,12 @@ type: Rust Function
 title: extract_pdf_text
 resource: src/llm/pdf_context.rs#L55-L60
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/pdf_context/augment_message_with_pdf
+  - target: functions/src/llm/pdf_context/augment_message_with_pdf
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

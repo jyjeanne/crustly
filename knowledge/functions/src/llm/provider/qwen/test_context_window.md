@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_context_window
-resource: src/llm/provider/qwen.rs#L2344-L2350
+resource: src/llm/provider/qwen.rs#L2370-L2376
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/QwenProvider/dashscope_intl
+  - target: functions/src/llm/provider/qwen/QwenProvider/dashscope_intl
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/QwenProvider/provider/context_window
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [dashscope_intl](../../../../../functions/src/llm/provider/qwen/QwenProvider/dashscope_intl.md)
+- [context_window](../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/context_window.md)

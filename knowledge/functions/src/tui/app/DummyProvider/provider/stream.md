@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: stream
-resource: src/tui/app.rs#L2975-L2977
+resource: src/tui/app.rs#L3899-L3901
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

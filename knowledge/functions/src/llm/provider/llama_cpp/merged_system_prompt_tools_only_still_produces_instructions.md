@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: merged_system_prompt_tools_only_still_produces_instructions
-resource: src/llm/provider/llama_cpp.rs#L1640-L1645
+resource: src/llm/provider/llama_cpp.rs#L1741-L1746
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp/merged_system_prompt
+  - target: functions/src/llm/provider/llama_cpp/merged_system_prompt
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

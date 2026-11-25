@@ -4,14 +4,19 @@ title: end_code_block
 resource: src/tui/markdown.rs#L122-L145
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/markdown/MarkdownRenderer/flush_current_line
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/tui/highlight/highlight_code
+  - target: functions/src/tui/markdown/MarkdownRenderer/flush_current_line
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/highlight/highlight_code
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/markdown/MarkdownRenderer/handle_end_tag
+  - target: functions/src/tui/markdown/MarkdownRenderer/handle_end_tag
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,7 +26,6 @@ relationships:
 # Calls
 
 - [flush_current_line](../../../../../functions/src/tui/markdown/MarkdownRenderer/flush_current_line.md)
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 - [highlight_code](../../../../../functions/src/tui/highlight/highlight_code.md)
 
 # Called by

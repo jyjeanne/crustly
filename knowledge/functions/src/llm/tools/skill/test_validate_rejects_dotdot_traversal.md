@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_validate_rejects_dotdot_traversal
-resource: src/llm/tools/skill.rs#L344-L350
+resource: src/llm/tools/skill.rs#L432-L438
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

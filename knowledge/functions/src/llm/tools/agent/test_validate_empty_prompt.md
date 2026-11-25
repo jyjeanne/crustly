@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_validate_empty_prompt
-resource: src/llm/tools/agent.rs#L242-L247
+resource: src/llm/tools/agent.rs#L299-L304
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

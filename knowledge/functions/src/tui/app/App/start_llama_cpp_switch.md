@@ -1,16 +1,22 @@
 ---
 type: Rust Method
 title: start_llama_cpp_switch
-resource: src/tui/app.rs#L2826-L2841
+resource: src/tui/app.rs#L3696-L3711
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/event_sender
-  - functions/src/tui/llama_cpp_download/spawn_switch
+  - target: functions/src/tui/app/App/event_sender
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/llama_cpp_download/spawn_switch
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_llama_cpp_models_key
+  - target: functions/src/tui/app/App/handle_llama_cpp_models_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

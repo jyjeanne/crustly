@@ -1,18 +1,34 @@
 ---
 type: Rust Method
 title: save_plan
-resource: src/tui/app.rs#L2137-L2174
+resource: src/tui/app.rs#L2981-L3018
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/plan/PlanService/export_to_json
+  - target: functions/src/services/plan/PlanService/update
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/plan/PlanService/create
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/plan/PlanService/export_to_json
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_plan_key
-  - functions/src/tui/app/App/check_task_completion
-  - functions/src/tui/app/App/execute_next_plan_task
-  - functions/src/tui/app/App/fail_current_plan_task
+  - target: functions/src/tui/app/App/handle_plan_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/check_task_completion
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/execute_next_plan_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/fail_current_plan_task
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,6 +37,8 @@ relationships:
 
 # Calls
 
+- [update](../../../../../functions/src/services/plan/PlanService/update.md)
+- [create](../../../../../functions/src/services/plan/PlanService/create.md)
 - [export_to_json](../../../../../functions/src/services/plan/PlanService/export_to_json.md)
 
 # Called by

@@ -1,0 +1,31 @@
+---
+type: Rust Function
+title: search_returns_the_most_similar_first_and_respects_k
+resource: src/memory/vector_index.rs#L114-L130
+tags:
+- test
+visibility: private
+generated:
+  by: okf-rs/0.7.0
+relationships:
+  calls:
+  - target: functions/src/memory/vector_index/VectorIndex/from_entries
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/search
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/memory/vector_index/unit
+    resolved_by: tree-sitter
+    confidence: exact
+---
+
+# Signature
+
+`fn search_returns_the_most_similar_first_and_respects_k()`
+
+# Calls
+
+- [from_entries](../../../../functions/src/memory/vector_index/VectorIndex/from_entries.md)
+- [search](../../../../functions/src/memory/vector_index/VectorIndex/search.md)
+- [unit](../../../../functions/src/memory/vector_index/unit.md)

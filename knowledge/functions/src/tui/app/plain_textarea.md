@@ -1,15 +1,21 @@
 ---
 type: Rust Function
 title: plain_textarea
-resource: src/tui/app.rs#L231-L235
+resource: src/tui/app.rs#L357-L361
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/app/App/new
-  - functions/src/tui/app/App/clear_input
-  - functions/src/tui/app/App/set_input_text
+  - target: functions/src/tui/app/App/new
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/clear_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/set_input_text
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

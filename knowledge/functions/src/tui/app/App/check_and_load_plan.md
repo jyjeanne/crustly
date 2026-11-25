@@ -1,16 +1,25 @@
 ---
 type: Rust Method
 title: check_and_load_plan
-resource: src/tui/app.rs#L1903-L2053
+resource: src/tui/app.rs#L2747-L2897
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/plan/PlanService/get_most_recent_plan
-  - functions/src/config/secrets/SecretString/len
+  - target: functions/src/services/plan/PlanService/get_most_recent_plan
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/plan/PlanService/create
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/complete_response
+  - target: functions/src/tui/app/App/complete_response
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,7 +29,8 @@ relationships:
 # Calls
 
 - [get_most_recent_plan](../../../../../functions/src/services/plan/PlanService/get_most_recent_plan.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
+- [create](../../../../../functions/src/services/plan/PlanService/create.md)
+- [display](../../../../../functions/src/llm/tools/skill/SkillSource/display.md)
 
 # Called by
 

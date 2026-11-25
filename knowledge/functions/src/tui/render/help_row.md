@@ -1,16 +1,24 @@
 ---
 type: Rust Function
 title: help_row
-resource: src/tui/render.rs#L704-L713
+resource: src/tui/render.rs#L1109-L1118
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/help_global_commands
-  - functions/src/tui/render/help_chat_mode
-  - functions/src/tui/render/help_session_list
-  - functions/src/tui/render/help_plan_mode
+  - target: functions/src/tui/render/help_global_commands
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_chat_mode
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_session_list
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_plan_mode
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

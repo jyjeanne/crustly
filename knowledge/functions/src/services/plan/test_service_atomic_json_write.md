@@ -2,13 +2,19 @@
 type: Rust Function
 title: test_service_atomic_json_write
 resource: src/services/plan.rs#L618-L636
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/plan/setup_test_service
-  - functions/src/services/plan/PlanService/export_to_json
+  - target: functions/src/services/plan/setup_test_service
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/plan/PlanService/export_to_json
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

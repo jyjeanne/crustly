@@ -4,10 +4,15 @@ title: setup_test_db
 resource: benches/database.rs#L16-L24
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/Database/run_migrations
+  - target: functions/src/db/Database/connect
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/db/Database/run_migrations
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +21,5 @@ relationships:
 
 # Calls
 
+- [connect](../../../functions/src/db/Database/connect.md)
 - [run_migrations](../../../functions/src/db/Database/run_migrations.md)

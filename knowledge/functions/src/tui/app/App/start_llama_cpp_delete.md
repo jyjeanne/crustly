@@ -1,15 +1,19 @@
 ---
 type: Rust Method
 title: start_llama_cpp_delete
-resource: src/tui/app.rs#L2807-L2820
+resource: src/tui/app.rs#L3677-L3690
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/event_sender
+  - target: functions/src/tui/app/App/event_sender
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_llama_cpp_models_key
+  - target: functions/src/tui/app/App/handle_llama_cpp_models_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

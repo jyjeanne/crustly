@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: non_slash_message_is_never_treated_as_a_command
-resource: src/tui/app.rs#L3883-L3890
+resource: src/tui/app.rs#L5025-L5032
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/try_handle_slash_command
+  - target: functions/src/tui/app/App/try_handle_slash_command
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,17 +1,25 @@
 ---
 type: Rust Method
 title: clear_session
-resource: src/tui/app.rs#L1513-L1544
+resource: src/tui/app.rs#L2342-L2373
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/message/MessageService/delete_messages_for_session
+  - target: functions/src/services/message/MessageService/delete_messages_for_session
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
-  - functions/src/tui/app/clear_session_is_refused_while_the_current_session_is_processing
-  - functions/src/tui/app/clear_session_proceeds_when_only_another_session_is_processing
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/clear_session_is_refused_while_the_current_session_is_processing
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/clear_session_proceeds_when_only_another_session_is_processing
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: QwenUsage
-resource: src/llm/provider/qwen.rs#L1781-L1784
+resource: src/llm/provider/qwen.rs#L1807-L1810
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

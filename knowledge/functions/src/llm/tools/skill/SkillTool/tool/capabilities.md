@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: capabilities
-resource: src/llm/tools/skill.rs#L69-L71
+resource: src/llm/tools/skill.rs#L94-L96
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

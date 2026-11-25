@@ -1,15 +1,32 @@
 ---
 type: Rust Function
 title: plan_task_error_marks_task_failed_and_stops_auto_execution
-resource: src/tui/app.rs#L4467-L4509
+resource: src/tui/app.rs#L5724-L5766
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/create_new_session
-  - functions/src/plan/PlanDocument/add_task
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/create_new_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/plan/PlanTask/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/plan/PlanDocument/add_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,5 +36,8 @@ relationships:
 # Calls
 
 - [create_new_session](../../../../functions/src/tui/app/App/create_new_session.md)
+- [new](../../../../functions/src/plan/PlanDocument/new.md)
+- [new](../../../../functions/src/plan/PlanTask/new.md)
 - [add_task](../../../../functions/src/plan/PlanDocument/add_task.md)
 - [handle_event](../../../../functions/src/tui/app/App/handle_event.md)
+- [contains](../../../../functions/src/memory/vector_index/VectorIndex/contains.md)

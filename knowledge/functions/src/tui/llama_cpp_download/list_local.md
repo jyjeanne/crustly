@@ -1,18 +1,20 @@
 ---
 type: Rust Function
 title: list_local
-resource: src/tui/llama_cpp_download.rs#L75-L87
+resource: src/tui/llama_cpp_download.rs#L169-L227
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp_models/list_local_models
+  - target: functions/src/llm/provider/llama_cpp_models/list_all_local_models
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
-`pub async fn list_local(models_dir: PathBuf) -> Vec<LlamaCppModelSummary>`
+`pub async fn list_local( models_dir: PathBuf, extra_model_paths: Vec<PathBuf>, ollama_models_dir: Option<PathBuf>, ) -> Vec<LlamaCppModelSummary>`
 
 # Calls
 
-- [list_local_models](../../../../functions/src/llm/provider/llama_cpp_models/list_local_models.md)
+- [list_all_local_models](../../../../functions/src/llm/provider/llama_cpp_models/list_all_local_models.md)

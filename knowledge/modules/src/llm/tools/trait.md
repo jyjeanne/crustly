@@ -1,28 +1,57 @@
 ---
 type: Rust Module
 title: trait
-resource: src/llm/tools/trait.rs#L1-L254
+resource: src/llm/tools/trait.rs#L1-L344
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-result
-  - external/super-file-read-cache-filereadcache
-  - external/async-trait-async-trait
-  - external/serde-json-value
-  - external/std-collections-hashmap
-  - external/std-sync-arc
-  - external/uuid-uuid
-  - external/super
+  - target: external/super-error-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-file-read-cache-filereadcache
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-collections-hashmap
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-util-sync-cancellationtoken
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
 
+- [SubAgentTask](../../../../classes/src/llm/tools/trait/SubAgentTask.md)
+- [SubAgentStatus](../../../../classes/src/llm/tools/trait/SubAgentStatus.md)
+- [is_finished](../../../../functions/src/llm/tools/trait/SubAgentStatus/is_finished.md)
+- [SubAgentReport](../../../../classes/src/llm/tools/trait/SubAgentReport.md)
 - [SubAgentLauncher](../../../../interfaces/src/llm/tools/trait/SubAgentLauncher.md)
 - [ToolExecutionContext](../../../../classes/src/llm/tools/trait/ToolExecutionContext.md)
 - [new](../../../../functions/src/llm/tools/trait/ToolExecutionContext/new.md)
+- [with_cancel](../../../../functions/src/llm/tools/trait/ToolExecutionContext/with_cancel.md)
 - [with_working_directory](../../../../functions/src/llm/tools/trait/ToolExecutionContext/with_working_directory.md)
 - [with_auto_approve](../../../../functions/src/llm/tools/trait/ToolExecutionContext/with_auto_approve.md)
 - [with_timeout](../../../../functions/src/llm/tools/trait/ToolExecutionContext/with_timeout.md)
@@ -36,6 +65,8 @@ relationships:
 - [ToolCapability](../../../../classes/src/llm/tools/trait/ToolCapability.md)
 - [Tool](../../../../interfaces/src/llm/tools/trait/Tool.md)
 - [requires_approval](../../../../functions/src/llm/tools/trait/Tool/requires_approval.md)
+- [requires_approval_for](../../../../functions/src/llm/tools/trait/Tool/requires_approval_for.md)
+- [approval_preview](../../../../functions/src/llm/tools/trait/Tool/approval_preview.md)
 - [validate_input](../../../../functions/src/llm/tools/trait/Tool/validate_input.md)
 - [test_execution_context](../../../../functions/src/llm/tools/trait/test_execution_context.md)
 - [test_tool_result_success](../../../../functions/src/llm/tools/trait/test_tool_result_success.md)
@@ -46,9 +77,11 @@ relationships:
 - `super::error::Result`
 - `super::file_read_cache::FileReadCache`
 - `async_trait::async_trait`
+- `serde::Serialize`
 - `serde_json::Value`
 - `std::collections::HashMap`
 - `std::sync::Arc`
+- `tokio_util::sync::CancellationToken`
 - `uuid::Uuid`
 - `super::*`
 

@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_validate_empty_skill_name
-resource: src/llm/tools/skill.rs#L330-L334
+resource: src/llm/tools/skill.rs#L418-L422
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

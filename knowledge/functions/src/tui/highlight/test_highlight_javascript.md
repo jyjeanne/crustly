@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_highlight_javascript
 resource: src/tui/highlight.rs#L169-L173
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/highlight/highlight_code
+  - target: functions/src/tui/highlight/highlight_code
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

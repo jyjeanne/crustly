@@ -1,22 +1,34 @@
 ---
 type: Rust Function
 title: drain_stream_to_response
-resource: src/llm/agent/service.rs#L406-L532
+resource: src/llm/agent/service.rs#L413-L539
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/EventHandler/next
-  - functions/src/llm/agent/service/apply_streamed_tool_input
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/llm/agent/service/route_text_delta
-  - functions/src/llm/provider/types/extract_think_tags
+  - target: functions/src/llm/agent/service/apply_streamed_tool_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/route_text_delta
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/types/extract_think_tags
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/agent/service/AgentService/call_provider_streaming
-  - functions/src/llm/agent/service/streamed_ollama_tool_call_survives_drain
-  - functions/src/llm/agent/service/drain_stream_to_response_carries_perf_metrics_through
-  - functions/src/llm/agent/service/drain_stream_assembles_anthropic_tool_input_from_json_deltas
+  - target: functions/src/llm/agent/service/AgentService/call_provider_streaming
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/streamed_ollama_tool_call_survives_drain
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/drain_stream_to_response_carries_perf_metrics_through
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/drain_stream_assembles_anthropic_tool_input_from_json_deltas
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -25,9 +37,7 @@ relationships:
 
 # Calls
 
-- [next](../../../../../functions/src/tui/events/EventHandler/next.md)
 - [apply_streamed_tool_input](../../../../../functions/src/llm/agent/service/apply_streamed_tool_input.md)
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 - [route_text_delta](../../../../../functions/src/llm/agent/service/route_text_delta.md)
 - [extract_think_tags](../../../../../functions/src/llm/provider/types/extract_think_tags.md)
 

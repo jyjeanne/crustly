@@ -1,17 +1,25 @@
 ---
 type: Rust Function
 title: connect_configured_mcp_servers
-resource: src/cli/mod.rs#L671-L709
+resource: src/cli/mod.rs#L1739-L1777
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/registry/ToolRegistry/register_mcp_server
+  - target: functions/src/llm/tools/registry/ToolRegistry/register_mcp_server
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/cli/connect_configured_mcp_servers_returns_empty_status_with_no_servers
-  - functions/src/cli/connect_configured_mcp_servers_records_failure_for_unreachable_server
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/connect_configured_mcp_servers_returns_empty_status_with_no_servers
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/connect_configured_mcp_servers_records_failure_for_unreachable_server
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

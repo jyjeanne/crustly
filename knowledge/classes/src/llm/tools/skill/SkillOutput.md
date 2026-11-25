@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: SkillOutput
-resource: src/llm/tools/skill.rs#L32-L38
+resource: src/llm/tools/skill.rs#L57-L63
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

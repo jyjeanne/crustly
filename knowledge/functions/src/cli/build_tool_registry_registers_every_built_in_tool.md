@@ -1,13 +1,23 @@
 ---
 type: Rust Function
 title: build_tool_registry_registers_every_built_in_tool
-resource: src/cli/mod.rs#L1734-L1766
+resource: src/cli/mod.rs#L3678-L3710
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/cli/build_tool_registry
+  - target: functions/src/cli/build_tool_registry
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/registry/ToolRegistry/count
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/registry/ToolRegistry/has_tool
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +27,5 @@ relationships:
 # Calls
 
 - [build_tool_registry](../../../functions/src/cli/build_tool_registry.md)
+- [count](../../../functions/src/llm/tools/registry/ToolRegistry/count.md)
+- [has_tool](../../../functions/src/llm/tools/registry/ToolRegistry/has_tool.md)

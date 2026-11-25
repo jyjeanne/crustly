@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_ollama_command_parses
-resource: src/cli/mod.rs#L1674-L1682
+resource: src/cli/mod.rs#L3319-L3327
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

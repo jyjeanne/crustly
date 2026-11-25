@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: ProviderConfig
-resource: src/config/mod.rs#L370-L386
+resource: src/config/mod.rs#L883-L899
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

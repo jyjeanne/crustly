@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supports_tools
-resource: src/llm/provider/qwen.rs#L1508-L1510
+resource: src/llm/provider/qwen.rs#L1529-L1531
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

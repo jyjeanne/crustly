@@ -1,9 +1,9 @@
 ---
 type: Rust Trait
 title: PoolExt
-resource: src/db/mod.rs#L186-L199
+resource: src/db/mod.rs#L196-L209
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

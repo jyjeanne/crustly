@@ -1,18 +1,22 @@
 ---
 type: Rust Method
 title: history_prev
-resource: src/tui/app.rs#L420-L439
+resource: src/tui/app.rs#L614-L633
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/tui/app/App/input_text
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/tui/app/App/load_history_entry
+  - target: functions/src/tui/app/App/input_text
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/load_history_entry
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,9 +25,7 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 - [input_text](../../../../../functions/src/tui/app/App/input_text.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 - [load_history_entry](../../../../../functions/src/tui/app/App/load_history_entry.md)
 
 # Called by

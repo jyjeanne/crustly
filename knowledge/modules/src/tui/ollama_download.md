@@ -3,16 +3,28 @@ type: Rust Module
 title: ollama_download
 resource: src/tui/ollama_download.rs#L1-L304
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-events-tuievent
-  - external/tokio-sync-mpsc-unboundedsender
-  - external/tokio-task-joinhandle
-  - external/crate-llm-provider-ollama-models
-  - external/super
+  - target: external/super-events-tuievent
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-sync-mpsc-unboundedsender
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-task-joinhandle
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-ollama-models
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

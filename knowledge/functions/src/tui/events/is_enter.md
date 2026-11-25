@@ -1,27 +1,31 @@
 ---
 type: Rust Function
 title: is_enter
-resource: src/tui/events.rs#L402-L404
+resource: src/tui/events.rs#L546-L548
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/is_empty
   called_by:
-  - functions/src/tui/app/App/handle_sessions_key
-  - functions/src/tui/app/App/handle_file_picker_key
-  - functions/src/tui/app/App/handle_model_download_key
-  - functions/src/tui/app/App/handle_provider_switch_key
-  - functions/src/tui/app/App/handle_llama_cpp_models_key
+  - target: functions/src/tui/app/App/handle_sessions_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_file_picker_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_model_download_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_provider_switch_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_llama_cpp_models_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `pub fn is_enter(event: &KeyEvent) -> bool`
-
-# Calls
-
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
 
 # Called by
 

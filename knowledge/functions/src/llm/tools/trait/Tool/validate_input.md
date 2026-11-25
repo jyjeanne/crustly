@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: validate_input
-resource: src/llm/tools/trait.rs#L214-L217
+resource: src/llm/tools/trait.rs#L304-L307
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

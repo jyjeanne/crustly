@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: total_tokens
-resource: src/tui/app.rs#L2341-L2343
+resource: src/tui/app.rs#L3185-L3187
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/render_header
+  - target: functions/src/tui/render/render_header
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

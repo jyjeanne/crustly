@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_config_env_overrides
-resource: src/config/mod.rs#L1447-L1467
+resource: src/config/mod.rs#L2115-L2135
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/Config/apply_env_overrides
+  - target: functions/src/config/Config/default/default
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/config/Config/apply_env_overrides
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [default](../../../functions/src/config/Config/default/default.md)
 - [apply_env_overrides](../../../functions/src/config/Config/apply_env_overrides.md)

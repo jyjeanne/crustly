@@ -4,12 +4,18 @@ title: generate_call_id
 resource: src/llm/provider/qwen.rs#L232-L237
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/parse_hermes_tool_calls
-  - functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls
-  - functions/src/llm/provider/qwen/QwenProvider/parse_native_qwen_tool_calls
+  - target: functions/src/llm/provider/qwen/QwenProvider/parse_hermes_tool_calls
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/QwenProvider/parse_native_qwen_tool_calls
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,16 +1,31 @@
 ---
 type: Rust Method
 title: copy_last_response_to_clipboard
-resource: src/tui/app.rs#L468-L479
+resource: src/tui/app.rs#L662-L681
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/last_assistant_message
-  - functions/src/tui/markdown/last_code_block
+  - target: functions/src/tui/app/App/last_assistant_message
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/markdown/last_code_block
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/clipboard
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/notify
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/app/plural
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,6 +36,9 @@ relationships:
 
 - [last_assistant_message](../../../../../functions/src/tui/app/App/last_assistant_message.md)
 - [last_code_block](../../../../../functions/src/tui/markdown/last_code_block.md)
+- [clipboard](../../../../../functions/src/tui/app/App/clipboard.md)
+- [notify](../../../../../functions/src/tui/app/App/notify.md)
+- [plural](../../../../../functions/src/tui/app/plural.md)
 
 # Called by
 

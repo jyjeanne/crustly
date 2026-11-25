@@ -2,13 +2,25 @@
 type: Rust Function
 title: matching_fingerprint_after_record_is_ok
 resource: src/llm/tools/file_read_cache.rs#L113-L117
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/file_read_cache/FileReadCache/record
-  - functions/src/llm/tools/file_read_cache/fp
+  - target: functions/src/llm/tools/file_read_cache/FileReadCache/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/file_read_cache/FileReadCache/record
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/file_read_cache/fp
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/file_read_cache/FileReadCache/check
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,5 +29,7 @@ relationships:
 
 # Calls
 
+- [new](../../../../../functions/src/llm/tools/file_read_cache/FileReadCache/new.md)
 - [record](../../../../../functions/src/llm/tools/file_read_cache/FileReadCache/record.md)
 - [fp](../../../../../functions/src/llm/tools/file_read_cache/fp.md)
+- [check](../../../../../functions/src/llm/tools/file_read_cache/FileReadCache/check.md)

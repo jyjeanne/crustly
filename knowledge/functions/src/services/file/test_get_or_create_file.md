@@ -2,12 +2,19 @@
 type: Rust Function
 title: test_get_or_create_file
 resource: src/services/file.rs#L398-L420
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/file/FileService/get_or_create_file
+  - target: functions/src/services/session/SessionService/create_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/file/FileService/get_or_create_file
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [create_session](../../../../functions/src/services/session/SessionService/create_session.md)
 - [get_or_create_file](../../../../functions/src/services/file/FileService/get_or_create_file.md)

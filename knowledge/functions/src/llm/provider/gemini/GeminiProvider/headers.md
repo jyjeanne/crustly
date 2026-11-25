@@ -4,10 +4,19 @@ title: headers
 resource: src/llm/provider/gemini.rs#L83-L99
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTaskStatus/parse
+  - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter
+    confidence: exact
+  called_by:
+  - target: functions/src/llm/provider/gemini/GeminiProvider/provider/complete
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/gemini/GeminiProvider/provider/stream
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,3 +26,8 @@ relationships:
 # Calls
 
 - [parse](../../../../../../functions/src/db/models/PlanTaskStatus/parse.md)
+
+# Called by
+
+- [complete](../../../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/complete.md)
+- [stream](../../../../../../functions/src/llm/provider/gemini/GeminiProvider/provider/stream.md)

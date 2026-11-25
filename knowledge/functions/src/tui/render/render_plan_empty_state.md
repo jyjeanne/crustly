@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: render_plan_empty_state
-resource: src/tui/render.rs#L1144-L1159
+resource: src/tui/render.rs#L1618-L1633
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/render_plan
+  - target: functions/src/tui/render/render_plan
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

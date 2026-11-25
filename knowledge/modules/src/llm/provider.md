@@ -1,25 +1,51 @@
 ---
 type: Rust Module
 title: provider
-resource: src/llm/provider/mod.rs#L1-L48
+resource: src/llm/provider/mod.rs#L1-L55
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/pub-use-error-providererror-result
-  - external/pub-use-r-trait-provider-providercapabilities-providerstream
-  - external/pub-use-types
-  - external/pub-use-anthropic-anthropicprovider
-  - external/pub-use-azure-azureopenaiprovider
-  - external/pub-use-factory-create-provider
-  - external/pub-use-factory-ollama-provider-from-config
-  - external/pub-use-gemini-geminiprovider
-  - external/pub-use-llama-cpp-llamacppprovider
-  - external/pub-use-ollama-ollamaprovider
-  - external/pub-use-openai-openaiprovider
-  - external/pub-use-qwen-qwenprovider-thinkingconfig-toolcallparser
+  - target: external/pub-use-error-providererror-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-r-trait-provider-providercapabilities-providerstream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-types
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-anthropic-anthropicprovider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-azure-azureopenaiprovider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-factory-ollama-provider-from-config
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-factory-create-named-provider-create-provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-gemini-geminiprovider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-llama-cpp-llamacppprovider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-ollama-ollamaprovider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-openai-openaiprovider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-qwen-qwenprovider-thinkingconfig-toolcallparser
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Imports
@@ -29,8 +55,8 @@ relationships:
 - `pub use types::*`
 - `pub use anthropic::AnthropicProvider`
 - `pub use azure::AzureOpenAIProvider`
-- `pub use factory::create_provider`
 - `pub use factory::ollama_provider_from_config`
+- `pub use factory::{create_named_provider, create_provider}`
 - `pub use gemini::GeminiProvider`
 - `pub use llama_cpp::LlamaCppProvider`
 - `pub use ollama::OllamaProvider`

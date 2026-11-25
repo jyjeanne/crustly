@@ -3,20 +3,40 @@ type: Rust Module
 title: file
 resource: src/services/file.rs#L1-L455
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-db-models-file-repository-filerepository
-  - external/crate-services-servicecontext
-  - external/anyhow-context-result
-  - external/chrono-utc
-  - external/std-path-path-pathbuf
-  - external/uuid-uuid
-  - external/super
-  - external/crate-services-sessionservice
-  - external/crate-db-database
+  - target: external/crate-db-models-file-repository-filerepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-services-servicecontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/chrono-utc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-services-sessionservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

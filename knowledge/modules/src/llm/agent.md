@@ -1,24 +1,36 @@
 ---
 type: Rust Module
 title: agent
-resource: src/llm/agent/mod.rs#L1-L17
+resource: src/llm/agent/mod.rs#L1-L22
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/pub-use-context-agentcontext
-  - external/pub-use-error-agenterror-result
-  - external/pub-use-service-agentresponse-agentservice-agentstreamresponse-approvalcallback-toolapprovalinfo
+  - target: external/pub-use-budget-contextbudget-contextusage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-context-agentcontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-error-agenterror-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-service-agentresponse-agentservice-agentstreamresponse-approvalcallback-fallback-toolapprovalinfo
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Imports
 
+- `pub use budget::{ContextBudget, ContextUsage}`
 - `pub use context::AgentContext`
 - `pub use error::{AgentError, Result}`
 - `pub use service::{
-    AgentResponse, AgentService, AgentStreamResponse, ApprovalCallback, ToolApprovalInfo,
+    AgentResponse, AgentService, AgentStreamResponse, ApprovalCallback, Fallback, ToolApprovalInfo,
 }`
 
 # Member of

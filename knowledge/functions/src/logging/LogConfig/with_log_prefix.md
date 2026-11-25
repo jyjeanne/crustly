@@ -3,10 +3,12 @@ type: Rust Method
 title: with_log_prefix
 resource: src/logging.rs#L80-L83
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/logging/test_log_config_builder
+  - target: functions/src/logging/test_log_config_builder
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

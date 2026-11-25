@@ -1,13 +1,15 @@
 ---
 type: Rust Method
 title: default
-resource: src/config/mod.rs#L650-L667
+resource: src/config/mod.rs#L1180-L1199
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/default_llama_cpp_n_ctx
+  - target: functions/src/config/default_llama_cpp_n_ctx
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

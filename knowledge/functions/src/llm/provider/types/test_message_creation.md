@@ -2,13 +2,19 @@
 type: Rust Function
 title: test_message_creation
 resource: src/llm/provider/types.rs#L479-L486
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/types/Message/user
-  - functions/src/llm/provider/types/Message/assistant
+  - target: functions/src/llm/provider/types/Message/user
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/types/Message/assistant
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

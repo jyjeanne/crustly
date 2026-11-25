@@ -1,16 +1,25 @@
 ---
 type: Rust Method
 title: clear_input
-resource: src/tui/app.rs#L371-L373
+resource: src/tui/app.rs#L565-L567
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/plain_textarea
+  - target: functions/src/tui/app/plain_textarea
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
-  - functions/src/tui/app/chat_input_text_is_not_underlined
+  - target: functions/src/tui/app/App/handle_ctrl_c
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_input_text_is_not_underlined
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -23,5 +32,6 @@ relationships:
 
 # Called by
 
+- [handle_ctrl_c](../../../../../functions/src/tui/app/App/handle_ctrl_c.md)
 - [handle_chat_key](../../../../../functions/src/tui/app/App/handle_chat_key.md)
 - [chat_input_text_is_not_underlined](../../../../../functions/src/tui/app/chat_input_text_is_not_underlined.md)

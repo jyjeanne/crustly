@@ -1,18 +1,40 @@
 ---
 type: Rust Function
 title: cmd_init
-resource: src/cli/mod.rs#L430-L459
+resource: src/cli/mod.rs#L933-L962
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
+  calls:
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/Config/default/default
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/config/Config/save
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/run
+  - target: functions/src/cli/run
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `async fn cmd_init(_config: &crate::config::Config, force: bool) -> Result<()>`
+
+# Calls
+
+- [context](../../../functions/src/services/ServiceManager/context.md)
+- [default](../../../functions/src/config/Config/default/default.md)
+- [save](../../../functions/src/config/Config/save.md)
+- [display](../../../functions/src/llm/tools/skill/SkillSource/display.md)
 
 # Called by
 

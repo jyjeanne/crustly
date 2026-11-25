@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: input_schema
-resource: src/llm/tools/save_memory.rs#L81-L92
+resource: src/llm/tools/save_memory.rs#L223-L259
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

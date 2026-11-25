@@ -1,17 +1,30 @@
 ---
 type: Rust Function
 title: help_section_header
-resource: src/tui/render.rs#L730-L736
+resource: src/tui/render.rs#L1135-L1141
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/help_global_commands
-  - functions/src/tui/render/help_chat_mode
-  - functions/src/tui/render/help_session_list
-  - functions/src/tui/render/help_plan_mode
-  - functions/src/tui/render/help_features
+  - target: functions/src/tui/render/help_global_commands
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_chat_mode
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_session_list
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_plan_mode
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_features
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_about
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -25,3 +38,4 @@ relationships:
 - [help_session_list](../../../../functions/src/tui/render/help_session_list.md)
 - [help_plan_mode](../../../../functions/src/tui/render/help_plan_mode.md)
 - [help_features](../../../../functions/src/tui/render/help_features.md)
+- [help_about](../../../../functions/src/tui/render/help_about.md)

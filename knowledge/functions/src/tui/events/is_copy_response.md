@@ -1,14 +1,21 @@
 ---
 type: Rust Function
 title: is_copy_response
-resource: src/tui/events.rs#L356-L358
+resource: src/tui/events.rs#L500-L502
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/key_matches
+  - target: functions/src/tui/events/key_matches
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/test_copy_response_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -22,3 +29,4 @@ relationships:
 # Called by
 
 - [handle_chat_key](../../../../functions/src/tui/app/App/handle_chat_key.md)
+- [test_copy_response_key](../../../../functions/src/tui/events/test_copy_response_key.md)

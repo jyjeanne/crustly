@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: with_allow_sub_agents
-resource: src/llm/agent/service.rs#L627-L630
+resource: src/llm/agent/service.rs#L813-L816
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/agent/service/AgentServiceLauncher/crate-llm-tools-subagentlauncher/launch
+  - target: functions/src/llm/agent/service/subagents/ChildTemplate/build
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -15,4 +17,4 @@ relationships:
 
 # Called by
 
-- [launch](../../../../../../functions/src/llm/agent/service/AgentServiceLauncher/crate-llm-tools-subagentlauncher/launch.md)
+- [build](../../../../../../functions/src/llm/agent/service/subagents/ChildTemplate/build.md)

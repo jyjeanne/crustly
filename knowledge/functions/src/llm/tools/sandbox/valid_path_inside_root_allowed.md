@@ -2,12 +2,22 @@
 type: Rust Function
 title: valid_path_inside_root_allowed
 resource: src/llm/tools/sandbox.rs#L598-L608
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/sandbox/make_root
+  - target: functions/src/llm/tools/sandbox/make_root
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/project/write
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/sandbox/PathBoundaryRule/permissionpolicy/evaluate
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,3 +27,5 @@ relationships:
 # Calls
 
 - [make_root](../../../../../functions/src/llm/tools/sandbox/make_root.md)
+- [write](../../../../../functions/src/memory/project/write.md)
+- [evaluate](../../../../../functions/src/llm/tools/sandbox/PathBoundaryRule/permissionpolicy/evaluate.md)

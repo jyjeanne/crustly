@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: run
-resource: src/app/mod.rs#L21-L24
+resource: src/app/mod.rs#L16-L19
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: supported_models
-resource: src/tui/runner.rs#L176-L178
+resource: src/tui/runner.rs#L181-L183
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

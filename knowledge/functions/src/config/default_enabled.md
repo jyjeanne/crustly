@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_enabled
-resource: src/config/mod.rs#L695-L697
+resource: src/config/mod.rs#L1227-L1229
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

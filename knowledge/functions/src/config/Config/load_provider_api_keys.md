@@ -1,15 +1,19 @@
 ---
 type: Rust Method
 title: load_provider_api_keys
-resource: src/config/mod.rs#L933-L1075
+resource: src/config/mod.rs#L1497-L1639
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTaskStatus/parse
+  - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/config/Config/apply_env_overrides
+  - target: functions/src/config/Config/apply_env_overrides
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

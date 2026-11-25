@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_find_json_objects_recovers_nested_object_after_failed_outer_parse
-resource: src/llm/provider/qwen.rs#L2669-L2680
+resource: src/llm/provider/qwen.rs#L2725-L2736
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/QwenProvider/find_json_objects
+  - target: functions/src/llm/provider/qwen/QwenProvider/find_json_objects
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

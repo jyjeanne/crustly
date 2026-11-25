@@ -1,24 +1,48 @@
 ---
 type: Rust Module
 title: qwen
-resource: src/llm/provider/qwen.rs#L1-L2831
+resource: src/llm/provider/qwen.rs#L1-L2887
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-providererror-result
-  - external/super-r-trait-provider-providerstream
-  - external/super-types
-  - external/async-trait-async-trait
-  - external/futures-stream-streamext
-  - external/reqwest-client
-  - external/serde-deserialize-serialize
-  - external/std-time-duration
-  - external/super-retry-retry-with-backoff-retryconfig
-  - external/super
-  - external/tokio-io-asyncreadext-asyncwriteext
+  - target: external/super-error-providererror-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-provider-providerstream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-types
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/futures-stream-streamext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/reqwest-client
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-retry-retry-with-backoff-retryconfig
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-io-asyncreadext-asyncwriteext
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -116,6 +140,7 @@ relationships:
 - [test_tool_call_index_in_bounds](../../../../functions/src/llm/provider/qwen/test_tool_call_index_in_bounds.md)
 - [test_custom_default_model](../../../../functions/src/llm/provider/qwen/test_custom_default_model.md)
 - [test_sampling_defaults_qwen25_coder_local](../../../../functions/src/llm/provider/qwen/test_sampling_defaults_qwen25_coder_local.md)
+- [test_text_sent_with_tool_results_follows_them](../../../../functions/src/llm/provider/qwen/test_text_sent_with_tool_results_follows_them.md)
 - [test_sampling_defaults_qwen3_non_thinking](../../../../functions/src/llm/provider/qwen/test_sampling_defaults_qwen3_non_thinking.md)
 - [test_sampling_defaults_qwen3_thinking](../../../../functions/src/llm/provider/qwen/test_sampling_defaults_qwen3_thinking.md)
 - [test_sampling_defaults_dashscope_omits_vendor_extensions](../../../../functions/src/llm/provider/qwen/test_sampling_defaults_dashscope_omits_vendor_extensions.md)

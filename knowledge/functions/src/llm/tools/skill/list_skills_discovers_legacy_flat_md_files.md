@@ -1,13 +1,23 @@
 ---
 type: Rust Function
 title: list_skills_discovers_legacy_flat_md_files
-resource: src/llm/tools/skill.rs#L402-L418
+resource: src/llm/tools/skill.rs#L490-L506
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/skill/list_skills
+  - target: functions/src/memory/project/write
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/list_skills
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/MemoryStore/find
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +26,6 @@ relationships:
 
 # Calls
 
+- [write](../../../../../functions/src/memory/project/write.md)
 - [list_skills](../../../../../functions/src/llm/tools/skill/list_skills.md)
+- [find](../../../../../functions/src/memory/MemoryStore/find.md)

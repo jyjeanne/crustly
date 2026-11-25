@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_tool_result_success
-resource: src/llm/tools/trait.rs#L237-L245
+resource: src/llm/tools/trait.rs#L327-L335
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/trait/ToolResult/with_metadata
+  - target: functions/src/llm/tools/trait/ToolResult/success
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/trait/ToolResult/with_metadata
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [success](../../../../../functions/src/llm/tools/trait/ToolResult/success.md)
 - [with_metadata](../../../../../functions/src/llm/tools/trait/ToolResult/with_metadata.md)

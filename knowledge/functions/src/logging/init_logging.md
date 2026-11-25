@@ -3,13 +3,19 @@ type: Rust Function
 title: init_logging
 resource: src/logging.rs#L117-L125
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/logging/init_debug_logging
-  - functions/src/logging/init_minimal_logging
+  - target: functions/src/logging/init_debug_logging
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/logging/init_minimal_logging
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/logging/setup_from_cli
+  - target: functions/src/logging/setup_from_cli
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

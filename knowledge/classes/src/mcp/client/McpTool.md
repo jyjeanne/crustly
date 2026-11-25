@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: McpTool
-resource: src/mcp/client.rs#L292-L296
+resource: src/mcp/client.rs#L291-L295
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

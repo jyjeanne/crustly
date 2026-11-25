@@ -1,14 +1,18 @@
 ---
 type: Rust Module
 title: src
-resource: src/lib.rs#L1-L61
+resource: src/lib.rs#L1-L62
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/pub-use-error-crustlyerror-errorcode
+  - target: external/pub-use-error-crustlyerror-errorcode
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Imports

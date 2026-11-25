@@ -2,9 +2,11 @@
 type: Rust Function
 title: not_policy_inverts_allow
 resource: src/llm/tools/sandbox.rs#L826-L832
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

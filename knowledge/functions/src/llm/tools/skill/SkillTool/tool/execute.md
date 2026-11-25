@@ -1,16 +1,30 @@
 ---
 type: Rust Method
 title: execute
-resource: src/llm/tools/skill.rs#L95-L133
+resource: src/llm/tools/skill.rs#L120-L162
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/llm/tools/skill/resolve_skill_path
-  - functions/src/llm/tools/skill/parse_skill_frontmatter_value
-  - functions/src/llm/tools/trait/ToolResult/with_metadata
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/resolve_skill
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/parse_skill_frontmatter_value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/trait/ToolResult/success
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/trait/ToolResult/with_metadata
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +33,9 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
-- [resolve_skill_path](../../../../../../../functions/src/llm/tools/skill/resolve_skill_path.md)
+- [contains](../../../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
+- [resolve_skill](../../../../../../../functions/src/llm/tools/skill/resolve_skill.md)
+- [display](../../../../../../../functions/src/llm/tools/skill/SkillSource/display.md)
 - [parse_skill_frontmatter_value](../../../../../../../functions/src/llm/tools/skill/parse_skill_frontmatter_value.md)
+- [success](../../../../../../../functions/src/llm/tools/trait/ToolResult/success.md)
 - [with_metadata](../../../../../../../functions/src/llm/tools/trait/ToolResult/with_metadata.md)

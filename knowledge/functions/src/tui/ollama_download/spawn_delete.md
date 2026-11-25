@@ -3,7 +3,7 @@ type: Rust Function
 title: spawn_delete
 resource: src/tui/ollama_download.rs#L196-L210
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

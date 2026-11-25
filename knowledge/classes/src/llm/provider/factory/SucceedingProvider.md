@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: SucceedingProvider
-resource: src/llm/provider/factory.rs#L593-L595
+resource: src/llm/provider/factory.rs#L616-L618
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: default_model
-resource: src/llm/provider/factory.rs#L624-L626
+resource: src/llm/provider/factory.rs#L647-L649
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

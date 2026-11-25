@@ -2,12 +2,19 @@
 type: Rust Function
 title: test_streaming_request_builder
 resource: tests/streaming_test.rs#L330-L335
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/types/LLMRequest/with_streaming
+  - target: functions/src/llm/provider/types/LLMRequest/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/types/LLMRequest/with_streaming
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [new](../../../functions/src/llm/provider/types/LLMRequest/new.md)
 - [with_streaming](../../../functions/src/llm/provider/types/LLMRequest/with_streaming.md)

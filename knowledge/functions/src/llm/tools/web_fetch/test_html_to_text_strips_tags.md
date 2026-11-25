@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_html_to_text_strips_tags
 resource: src/llm/tools/web_fetch.rs#L250-L256
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/web_fetch/html_to_text
+  - target: functions/src/llm/tools/web_fetch/html_to_text
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

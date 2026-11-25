@@ -1,15 +1,21 @@
 ---
 type: Rust Method
 title: call_tool
-resource: src/mcp/client.rs#L139-L175
+resource: src/mcp/client.rs#L139-L174
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/mcp/client/MCPClient/send_request
+  - target: functions/src/mcp/client/MCPClient/send_request
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/mcp/client/McpTool/tool/execute
-  - functions/tests/mcp_contract_test/unhealthy_client_returns_graceful_error
+  - target: functions/src/mcp/client/McpTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/mcp_contract_test/unhealthy_client_returns_graceful_error
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,15 +1,32 @@
 ---
 type: Rust Function
 title: test_to_gemini_request_maps_system_and_tools
-resource: src/llm/provider/gemini.rs#L951-L968
+resource: src/llm/provider/gemini.rs#L957-L974
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/types/LLMRequest/with_system
-  - functions/src/llm/provider/types/LLMRequest/with_tools
-  - functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request
+  - target: functions/src/llm/provider/gemini/GeminiProvider/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/types/LLMRequest/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/types/LLMRequest/with_system
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/types/LLMRequest/with_tools
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/types/Message/user
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,6 +35,9 @@ relationships:
 
 # Calls
 
+- [new](../../../../../functions/src/llm/provider/gemini/GeminiProvider/new.md)
+- [new](../../../../../functions/src/llm/provider/types/LLMRequest/new.md)
 - [with_system](../../../../../functions/src/llm/provider/types/LLMRequest/with_system.md)
 - [with_tools](../../../../../functions/src/llm/provider/types/LLMRequest/with_tools.md)
 - [to_gemini_request](../../../../../functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request.md)
+- [user](../../../../../functions/src/llm/provider/types/Message/user.md)

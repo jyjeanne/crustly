@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: context_window
-resource: src/llm/provider/llama_cpp.rs#L1454-L1456
+resource: src/llm/provider/llama_cpp.rs#L1555-L1557
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

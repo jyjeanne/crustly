@@ -1,15 +1,25 @@
 ---
 type: Rust Method
 title: load_plan_for_viewing
-resource: src/tui/app.rs#L1830-L1898
+resource: src/tui/app.rs#L2674-L2742
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/plan/PlanService/get_most_recent_plan
+  - target: functions/src/services/plan/PlanService/get_most_recent_plan
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/plan/PlanService/create
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,6 +29,8 @@ relationships:
 # Calls
 
 - [get_most_recent_plan](../../../../../functions/src/services/plan/PlanService/get_most_recent_plan.md)
+- [create](../../../../../functions/src/services/plan/PlanService/create.md)
+- [display](../../../../../functions/src/llm/tools/skill/SkillSource/display.md)
 
 # Called by
 

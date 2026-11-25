@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supported_models
-resource: src/llm/provider/factory.rs#L102-L107
+resource: src/llm/provider/factory.rs#L122-L127
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

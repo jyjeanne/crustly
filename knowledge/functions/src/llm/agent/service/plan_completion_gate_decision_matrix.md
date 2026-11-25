@@ -1,13 +1,29 @@
 ---
 type: Rust Function
 title: plan_completion_gate_decision_matrix
-resource: src/llm/agent/service.rs#L1991-L2056
+resource: src/llm/agent/service.rs#L1865-L1930
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/service/plan_completion_rejection
+  - target: functions/src/llm/agent/service/plan_completion_rejection
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/project/write
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/plan/PlanTask/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +33,7 @@ relationships:
 # Calls
 
 - [plan_completion_rejection](../../../../../functions/src/llm/agent/service/plan_completion_rejection.md)
+- [write](../../../../../functions/src/memory/project/write.md)
+- [new](../../../../../functions/src/plan/PlanDocument/new.md)
+- [new](../../../../../functions/src/plan/PlanTask/new.md)
+- [contains](../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)

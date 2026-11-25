@@ -1,13 +1,26 @@
 ---
 type: Rust Function
 title: test_execute_requires_approval
-resource: src/llm/tools/registry.rs#L425-L444
+resource: src/llm/tools/registry.rs#L450-L469
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/registry/ToolRegistry/register
+  - target: functions/src/llm/tools/registry/ToolRegistry/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/registry/ToolRegistry/register
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/trait/ToolExecutionContext/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/registry/ToolRegistry/execute
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -16,4 +29,7 @@ relationships:
 
 # Calls
 
+- [new](../../../../../functions/src/llm/tools/registry/ToolRegistry/new.md)
 - [register](../../../../../functions/src/llm/tools/registry/ToolRegistry/register.md)
+- [new](../../../../../functions/src/llm/tools/trait/ToolExecutionContext/new.md)
+- [execute](../../../../../functions/src/llm/tools/registry/ToolRegistry/execute.md)

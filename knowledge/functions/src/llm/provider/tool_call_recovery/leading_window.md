@@ -4,22 +4,20 @@ title: leading_window
 resource: src/llm/provider/tool_call_recovery.rs#L98-L104
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/len
   called_by:
-  - functions/src/llm/provider/tool_call_recovery/commits_to_an_offered_tool_call
-  - functions/src/llm/provider/tool_call_recovery/leading_window_never_panics_and_stays_within_a_char_boundary
+  - target: functions/src/llm/provider/tool_call_recovery/commits_to_an_offered_tool_call
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/tool_call_recovery/leading_window_never_panics_and_stays_within_a_char_boundary
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn leading_window(text: &str, max_bytes: usize) -> &str`
-
-# Calls
-
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 
 # Called by
 

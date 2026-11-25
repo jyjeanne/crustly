@@ -1,13 +1,15 @@
 ---
 type: Rust Method
 title: handle_approval_requested
-resource: src/tui/app.rs#L2351-L2355
+resource: src/tui/app.rs#L3199-L3203
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

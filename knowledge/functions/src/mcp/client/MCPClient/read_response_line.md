@@ -1,16 +1,19 @@
 ---
 type: Rust Method
 title: read_response_line
-resource: src/mcp/client.rs#L254-L281
+resource: src/mcp/client.rs#L253-L280
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/tui/error/ErrorInfo/with_context
+  - target: functions/src/tui/error/ErrorInfo/with_context
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/mcp/client/MCPClient/send_request
+  - target: functions/src/mcp/client/MCPClient/send_request
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +22,6 @@ relationships:
 
 # Calls
 
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 - [with_context](../../../../../functions/src/tui/error/ErrorInfo/with_context.md)
 
 # Called by

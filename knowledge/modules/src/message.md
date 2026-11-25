@@ -3,10 +3,12 @@ type: Rust Module
 title: message
 resource: src/message/mod.rs#L1-L15
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Member of

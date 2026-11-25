@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: project_config_path
-resource: src/config/mod.rs#L842-L853
+resource: src/config/mod.rs#L1400-L1411
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/config/Config/load
+  - target: functions/src/config/Config/load
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

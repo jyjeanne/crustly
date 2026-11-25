@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_cli_parse_config_path
 resource: tests/cli_test.rs#L202-L205
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

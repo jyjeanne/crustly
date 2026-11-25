@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: fraction
-resource: src/llm/provider/llama_cpp_models.rs#L44-L47
+resource: src/llm/provider/llama_cpp_models.rs#L146-L149
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

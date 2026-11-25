@@ -3,14 +3,22 @@ type: Rust Module
 title: model_routing_test
 resource: tests/model_routing_test.rs#L1-L102
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crustly-llm-provider-router-modelrouter-modeltier
-  - external/crustly-llm-provider-types-llmrequest
-  - external/crustly-tui-prompt-analyzer-promptanalyzer
+  - target: external/crustly-llm-provider-router-modelrouter-modeltier
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-llm-provider-types-llmrequest
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-tui-prompt-analyzer-promptanalyzer
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

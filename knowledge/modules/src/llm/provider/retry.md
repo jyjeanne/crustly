@@ -3,20 +3,40 @@ type: Rust Module
 title: retry
 resource: src/llm/provider/retry.rs#L1-L421
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-providererror-result
-  - external/std-future-future
-  - external/std-time-duration
-  - external/tokio-time-sleep
-  - external/rand-rng
-  - external/regex-regex
-  - external/super
-  - external/std-sync-atomic-atomicu32-ordering
-  - external/std-sync-arc
+  - target: external/super-error-providererror-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-future-future
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-time-sleep
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/rand-rng
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/regex-regex
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-atomic-atomicu32-ordering
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

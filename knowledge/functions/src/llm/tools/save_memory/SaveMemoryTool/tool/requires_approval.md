@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: requires_approval
-resource: src/llm/tools/save_memory.rs#L98-L100
+resource: src/llm/tools/save_memory.rs#L265-L267
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_plan_update_task_status
 resource: src/db/repository/plan.rs#L1168-L1204
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/plan/PlanDocument/get_task_mut
+  - target: functions/src/plan/PlanDocument/get_task_mut
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

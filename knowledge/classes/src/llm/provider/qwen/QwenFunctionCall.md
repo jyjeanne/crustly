@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: QwenFunctionCall
-resource: src/llm/provider/qwen.rs#L1746-L1749
+resource: src/llm/provider/qwen.rs#L1772-L1775
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

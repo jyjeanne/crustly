@@ -1,29 +1,35 @@
 ---
 type: Rust Function
 title: prepare_generation
-resource: src/llm/provider/llama_cpp.rs#L530-L574
+resource: src/llm/provider/llama_cpp.rs#L550-L597
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp/build_prompt
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/llm/provider/llama_cpp/build_sampler
+  - target: functions/src/llm/provider/llama_cpp/build_sampler
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp/prefill
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/llama_cpp/run_complete
-  - functions/src/llm/provider/llama_cpp/run_stream
+  - target: functions/src/llm/provider/llama_cpp/run_complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp/run_stream
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
-`fn prepare_generation( model: &LlamaModel, context: &mut LlamaContext<'_>, chat_template: &Option<LlamaChatTemplate>, sampling_defaults: &SamplingDefaults, default_seed: Option<u32>, request: &LLMRequest, ) -> Result<PreparedGeneration>`
+`fn prepare_generation( model: &LlamaModel, context: &mut LlamaContext<'_>, kv_tokens: &mut Vec<LlamaToken>, chat_template: &Option<LlamaChatTemplate>, sampling_defaults: &SamplingDefaults, default_seed: Option<u32>, request: &LLMRequest, ) -> Result<PreparedGeneration>`
 
 # Calls
 
-- [build_prompt](../../../../../functions/src/llm/provider/llama_cpp/build_prompt.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 - [build_sampler](../../../../../functions/src/llm/provider/llama_cpp/build_sampler.md)
+- [prefill](../../../../../functions/src/llm/provider/llama_cpp/prefill.md)
 
 # Called by
 

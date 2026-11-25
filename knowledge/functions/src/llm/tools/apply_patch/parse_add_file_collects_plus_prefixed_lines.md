@@ -2,12 +2,16 @@
 type: Rust Function
 title: parse_add_file_collects_plus_prefixed_lines
 resource: src/llm/tools/apply_patch.rs#L559-L569
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/apply_patch/parse_patch
+  - target: functions/src/llm/tools/apply_patch/parse_patch
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

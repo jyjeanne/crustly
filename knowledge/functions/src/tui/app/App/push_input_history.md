@@ -1,18 +1,30 @@
 ---
 type: Rust Method
 title: push_input_history
-resource: src/tui/app.rs#L387-L394
+resource: src/tui/app.rs#L581-L588
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
-  - functions/src/tui/app/up_recalls_previous_messages_without_sending_them
-  - functions/src/tui/app/key_release_events_are_ignored
-  - functions/src/tui/app/recalled_message_can_be_edited_before_resending
-  - functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft
-  - functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_recalls_previous_messages_without_sending_them
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/key_release_events_are_ignored
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/recalled_message_can_be_edited_before_resending
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,20 +1,33 @@
 ---
 type: Rust Module
 title: context
-resource: src/llm/agent/context.rs#L1-L357
+resource: src/llm/agent/context.rs#L1-L396
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-db-models-message-as-dbmessage
-  - external/crate-llm-provider-types-cachemetrics
-  - external/crate-llm-provider-contentblock-message-role
-  - external/std-path-pathbuf
-  - external/uuid-uuid
-  - external/crate-db-repository-episodicmemoryrepository
-  - external/super
+  - target: external/crate-db-models-message-as-dbmessage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-types-cachemetrics
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-contentblock-message-role
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -22,6 +35,8 @@ relationships:
 - [AgentContext](../../../../classes/src/llm/agent/context/AgentContext.md)
 - [TrackedFile](../../../../classes/src/llm/agent/context/TrackedFile.md)
 - [new](../../../../functions/src/llm/agent/context/AgentContext/new.md)
+- [effective_system_prompt](../../../../functions/src/llm/agent/context/AgentContext/effective_system_prompt.md)
+- [recount_tokens](../../../../functions/src/llm/agent/context/AgentContext/recount_tokens.md)
 - [with_system_prompt](../../../../functions/src/llm/agent/context/AgentContext/with_system_prompt.md)
 - [add_message](../../../../functions/src/llm/agent/context/AgentContext/add_message.md)
 - [from_db_messages](../../../../functions/src/llm/agent/context/AgentContext/from_db_messages.md)
@@ -32,7 +47,6 @@ relationships:
 - [usage_percentage](../../../../functions/src/llm/agent/context/AgentContext/usage_percentage.md)
 - [should_compact](../../../../functions/src/llm/agent/context/AgentContext/should_compact.md)
 - [trim_to_fit](../../../../functions/src/llm/agent/context/AgentContext/trim_to_fit.md)
-- [inject_episodic_memories](../../../../functions/src/llm/agent/context/AgentContext/inject_episodic_memories.md)
 - [token_count](../../../../functions/src/llm/agent/context/token_count.md)
 - [test_context_creation](../../../../functions/src/llm/agent/context/test_context_creation.md)
 - [test_add_message](../../../../functions/src/llm/agent/context/test_add_message.md)
@@ -52,7 +66,6 @@ relationships:
 - `crate::llm::provider::{ContentBlock, Message, Role}`
 - `std::path::PathBuf`
 - `uuid::Uuid`
-- `crate::db::repository::EpisodicMemoryRepository`
 - `super::*`
 
 # Member of

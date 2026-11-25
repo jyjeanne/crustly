@@ -4,14 +4,22 @@ title: task_from_db
 resource: src/db/repository/plan.rs#L292-L320
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/from_str
-  - functions/src/db/repository/plan/PlanRepository/parse_task_type
-  - functions/src/db/repository/plan/PlanRepository/parse_task_status
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/plan/PlanRepository/parse_task_type
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/plan/PlanRepository/parse_task_status
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/db/repository/plan/PlanRepository/plan_from_db
+  - target: functions/src/db/repository/plan/PlanRepository/plan_from_db
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,7 +28,7 @@ relationships:
 
 # Calls
 
-- [from_str](../../../../../../functions/src/config/secrets/SecretString/from_str.md)
+- [context](../../../../../../functions/src/services/ServiceManager/context.md)
 - [parse_task_type](../../../../../../functions/src/db/repository/plan/PlanRepository/parse_task_type.md)
 - [parse_task_status](../../../../../../functions/src/db/repository/plan/PlanRepository/parse_task_status.md)
 

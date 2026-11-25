@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: AnthropicError
-resource: src/llm/provider/anthropic.rs#L473-L475
+resource: src/llm/provider/anthropic.rs#L484-L486
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

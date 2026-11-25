@@ -3,14 +3,22 @@ type: Rust Module
 title: llama_cpp_grammar
 resource: src/llm/provider/llama_cpp_grammar.rs#L1-L231
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-types-tool
-  - external/llama-cpp-2-sampling-llamasampler
-  - external/super
+  - target: external/super-types-tool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-sampling-llamasampler
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

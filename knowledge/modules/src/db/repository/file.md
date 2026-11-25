@@ -3,21 +3,43 @@ type: Rust Module
 title: file
 resource: src/db/repository/file.rs#L1-L239
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-db-models-file
-  - external/anyhow-context-result
-  - external/sqlx-sqlitepool
-  - external/std-path-path
-  - external/uuid-uuid
-  - external/super
-  - external/crate-db-models-session
-  - external/crate-db-repository-sessionrepository
-  - external/crate-db-database
-  - external/std-path-pathbuf
+  - target: external/crate-db-models-file
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/sqlx-sqlitepool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-models-session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-repository-sessionrepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

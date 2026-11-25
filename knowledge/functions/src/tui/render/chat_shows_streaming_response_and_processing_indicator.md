@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: chat_shows_streaming_response_and_processing_indicator
-resource: src/tui/render.rs#L2930-L2944
+resource: src/tui/render.rs#L3882-L3896
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_to_string
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

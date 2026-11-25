@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: set_kitty_keyboard_protocol_active
-resource: src/tui/app.rs#L586-L588
+resource: src/tui/app.rs#L954-L956
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/runner/run
+  - target: functions/src/tui/runner/run
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

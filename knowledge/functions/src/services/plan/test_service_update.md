@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_service_update
 resource: src/services/plan.rs#L418-L438
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/plan/setup_test_service
+  - target: functions/src/services/plan/setup_test_service
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

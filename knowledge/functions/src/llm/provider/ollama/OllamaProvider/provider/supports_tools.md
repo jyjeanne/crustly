@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supports_tools
-resource: src/llm/provider/ollama.rs#L720-L722
+resource: src/llm/provider/ollama.rs#L619-L621
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

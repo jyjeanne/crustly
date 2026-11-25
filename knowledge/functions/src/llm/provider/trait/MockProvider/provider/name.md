@@ -2,9 +2,11 @@
 type: Rust Method
 title: name
 resource: src/llm/provider/trait.rs#L105-L107
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

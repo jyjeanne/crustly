@@ -1,18 +1,30 @@
 ---
 type: Rust Module
 title: compaction_test
-resource: tests/compaction_test.rs#L1-L171
+resource: tests/compaction_test.rs#L1-L174
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crustly-db-database
-  - external/crustly-llm-agent-compaction-compact
-  - external/crustly-llm-agent-context-agentcontext
-  - external/crustly-llm-provider-types-contentblock-message-role
-  - external/uuid-uuid
+  - target: external/crustly-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-llm-agent-compaction-compact
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-llm-agent-context-agentcontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-llm-provider-types-contentblock-message-role
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

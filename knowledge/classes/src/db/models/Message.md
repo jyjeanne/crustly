@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: Message
-resource: src/db/models.rs#L28-L42
+resource: src/db/models.rs#L28-L45
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

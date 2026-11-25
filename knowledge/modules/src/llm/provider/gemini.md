@@ -1,24 +1,48 @@
 ---
 type: Rust Module
 title: gemini
-resource: src/llm/provider/gemini.rs#L1-L1363
+resource: src/llm/provider/gemini.rs#L1-L1397
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-providererror-result
-  - external/super-r-trait-provider-providerstream
-  - external/super-types
-  - external/async-trait-async-trait
-  - external/reqwest-client
-  - external/serde-deserialize-serialize
-  - external/std-collections-hashmap
-  - external/std-time-duration
-  - external/super-retry-retry-with-backoff-retryconfig
-  - external/futures-streamext-as
-  - external/super
+  - target: external/super-error-providererror-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-provider-providerstream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-types
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/reqwest-client
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-collections-hashmap
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-retry-retry-with-backoff-retryconfig
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/futures-streamext-as
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -74,6 +98,7 @@ relationships:
 - [test_role_mapping](../../../../functions/src/llm/provider/gemini/test_role_mapping.md)
 - [test_to_gemini_request_maps_system_and_tools](../../../../functions/src/llm/provider/gemini/test_to_gemini_request_maps_system_and_tools.md)
 - [test_to_gemini_request_tool_result_uses_function_name](../../../../functions/src/llm/provider/gemini/test_to_gemini_request_tool_result_uses_function_name.md)
+- [test_to_gemini_request_keeps_text_sent_with_tool_results](../../../../functions/src/llm/provider/gemini/test_to_gemini_request_keeps_text_sent_with_tool_results.md)
 - [test_from_gemini_response_maps_tool_use](../../../../functions/src/llm/provider/gemini/test_from_gemini_response_maps_tool_use.md)
 - [test_from_gemini_response_maps_thinking](../../../../functions/src/llm/provider/gemini/test_from_gemini_response_maps_thinking.md)
 - [test_thinking_config_forwarded](../../../../functions/src/llm/provider/gemini/test_thinking_config_forwarded.md)

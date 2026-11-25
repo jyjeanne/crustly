@@ -4,10 +4,12 @@ title: name_key_immediately_precedes
 resource: src/llm/provider/tool_call_recovery.rs#L121-L124
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/tool_call_recovery/top_level_name_key_matches
+  - target: functions/src/llm/provider/tool_call_recovery/top_level_name_key_matches
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

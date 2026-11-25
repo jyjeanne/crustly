@@ -1,14 +1,24 @@
 ---
 type: Rust Function
 title: ollama_host
-resource: src/cli/mod.rs#L1126-L1133
+resource: src/cli/mod.rs#L2287-L2294
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/cli/cmd_ollama
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/cmd_ollama
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/test_ollama_host_defaults_when_unconfigured
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/test_ollama_host_uses_configured_value
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,3 +29,5 @@ relationships:
 
 - [cmd_chat](../../../functions/src/cli/cmd_chat.md)
 - [cmd_ollama](../../../functions/src/cli/cmd_ollama.md)
+- [test_ollama_host_defaults_when_unconfigured](../../../functions/src/cli/test_ollama_host_defaults_when_unconfigured.md)
+- [test_ollama_host_uses_configured_value](../../../functions/src/cli/test_ollama_host_uses_configured_value.md)

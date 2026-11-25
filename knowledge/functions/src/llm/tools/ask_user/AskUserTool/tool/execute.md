@@ -4,11 +4,22 @@ title: execute
 resource: src/llm/tools/ask_user.rs#L77-L130
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/llm/tools/trait/ToolResult/with_metadata
+  - target: functions/src/llm/tools/trait/ToolResult/success
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/trait/ToolResult/error
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/trait/ToolResult/with_metadata
+    resolved_by: tree-sitter
+    confidence: exact
+  called_by:
+  - target: functions/src/llm/tools/ask_user/test_auto_approve_returns_placeholder
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,5 +28,10 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [success](../../../../../../../functions/src/llm/tools/trait/ToolResult/success.md)
+- [error](../../../../../../../functions/src/llm/tools/trait/ToolResult/error.md)
 - [with_metadata](../../../../../../../functions/src/llm/tools/trait/ToolResult/with_metadata.md)
+
+# Called by
+
+- [test_auto_approve_returns_placeholder](../../../../../../../functions/src/llm/tools/ask_user/test_auto_approve_returns_placeholder.md)

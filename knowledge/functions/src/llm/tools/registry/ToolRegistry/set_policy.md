@@ -3,13 +3,24 @@ type: Rust Method
 title: set_policy
 resource: src/llm/tools/registry.rs#L50-L52
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/cli/cmd_run
-  - functions/src/llm/tools/registry/execute_evaluates_policy_against_the_canonical_name_not_the_alias
-  - functions/src/llm/tools/registry/is_trusted_evaluates_policy_against_the_canonical_name_not_the_alias
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/cmd_run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/registry/is_denied_follows_the_policy_through_aliases
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/registry/execute_evaluates_policy_against_the_canonical_name_not_the_alias
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/registry/is_trusted_evaluates_policy_against_the_canonical_name_not_the_alias
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,5 +31,6 @@ relationships:
 
 - [cmd_chat](../../../../../../functions/src/cli/cmd_chat.md)
 - [cmd_run](../../../../../../functions/src/cli/cmd_run.md)
+- [is_denied_follows_the_policy_through_aliases](../../../../../../functions/src/llm/tools/registry/is_denied_follows_the_policy_through_aliases.md)
 - [execute_evaluates_policy_against_the_canonical_name_not_the_alias](../../../../../../functions/src/llm/tools/registry/execute_evaluates_policy_against_the_canonical_name_not_the_alias.md)
 - [is_trusted_evaluates_policy_against_the_canonical_name_not_the_alias](../../../../../../functions/src/llm/tools/registry/is_trusted_evaluates_policy_against_the_canonical_name_not_the_alias.md)

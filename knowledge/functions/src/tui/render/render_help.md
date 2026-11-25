@@ -1,21 +1,40 @@
 ---
 type: Rust Function
 title: render_help
-resource: src/tui/render.rs#L916-L951
+resource: src/tui/render.rs#L1381-L1425
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/help_global_commands
-  - functions/src/tui/render/help_chat_mode
-  - functions/src/tui/render/help_session_list
-  - functions/src/tui/render/help_plan_mode
-  - functions/src/tui/render/help_features
-  - functions/src/tui/render/help_footer
-  - functions/src/plan/PlanTask/block
+  - target: functions/src/tui/render/help_global_commands
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_chat_mode
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_session_list
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_plan_mode
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_features
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_about
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_footer
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanTask/block
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render
+  - target: functions/src/tui/render/render
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -29,6 +48,7 @@ relationships:
 - [help_session_list](../../../../functions/src/tui/render/help_session_list.md)
 - [help_plan_mode](../../../../functions/src/tui/render/help_plan_mode.md)
 - [help_features](../../../../functions/src/tui/render/help_features.md)
+- [help_about](../../../../functions/src/tui/render/help_about.md)
 - [help_footer](../../../../functions/src/tui/render/help_footer.md)
 - [block](../../../../functions/src/plan/PlanTask/block.md)
 

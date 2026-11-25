@@ -1,27 +1,29 @@
 ---
 type: Rust Function
 title: summarise_turns
-resource: src/llm/agent/compaction.rs#L133-L157
+resource: src/llm/agent/compaction.rs#L214-L247
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/is_empty
   called_by:
-  - functions/src/llm/agent/compaction/compact
-  - functions/src/llm/agent/compaction/summarise_turns_truncates_multibyte_text_without_panicking
+  - target: functions/src/llm/agent/compaction/compact_keeping
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/compaction/summarise_turns_truncates_multibyte_text_without_panicking
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/compaction/summarise_turns_records_tool_calls_and_results
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
-`fn summarise_turns(messages: &[crate::llm::provider::types::Message]) -> String`
-
-# Calls
-
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+`fn summarise_turns(messages: &[(usize, &Message)]) -> String`
 
 # Called by
 
-- [compact](../../../../../functions/src/llm/agent/compaction/compact.md)
+- [compact_keeping](../../../../../functions/src/llm/agent/compaction/compact_keeping.md)
 - [summarise_turns_truncates_multibyte_text_without_panicking](../../../../../functions/src/llm/agent/compaction/summarise_turns_truncates_multibyte_text_without_panicking.md)
+- [summarise_turns_records_tool_calls_and_results](../../../../../functions/src/llm/agent/compaction/summarise_turns_records_tool_calls_and_results.md)

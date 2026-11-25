@@ -1,20 +1,26 @@
 ---
 type: Rust Function
 title: build_sampler
-resource: src/llm/provider/llama_cpp.rs#L1071-L1118
+resource: src/llm/provider/llama_cpp.rs#L1163-L1212
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/llama_cpp/prepare_generation
-  - functions/src/llm/provider/llama_cpp/try_build_constrained_sampler
-  - functions/src/llm/provider/llama_cpp/build_sampler_seed_offset_changes_the_resolved_seed
+  - target: functions/src/llm/provider/llama_cpp/prepare_generation
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp/try_build_constrained_sampler
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp/build_sampler_seed_offset_changes_the_resolved_seed
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
-`fn build_sampler( defaults: &SamplingDefaults, request: &LLMRequest, default_seed: Option<u32>, seed_offset: u32, grammar: Option<LlamaSampler>, ) -> LlamaSampler`
+`fn build_sampler( n_vocab: i32, defaults: &SamplingDefaults, request: &LLMRequest, default_seed: Option<u32>, seed_offset: u32, grammar: Option<LlamaSampler>, ) -> LlamaSampler`
 
 # Called by
 

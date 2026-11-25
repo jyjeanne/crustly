@@ -1,15 +1,22 @@
 ---
 type: Rust Function
 title: worker_loop
-resource: src/llm/provider/llama_cpp.rs#L266-L437
+resource: src/llm/provider/llama_cpp.rs#L265-L442
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp/dispatch_job
+  - target: functions/src/llm/provider/llama_cpp/dispatch_job
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/llama_cpp/LlamaCppProvider/new
+  - target: functions/src/llm/provider/llama_cpp/LlamaCppProvider/new
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,6 +26,7 @@ relationships:
 # Calls
 
 - [dispatch_job](../../../../../functions/src/llm/provider/llama_cpp/dispatch_job.md)
+- [display](../../../../../functions/src/llm/tools/skill/SkillSource/display.md)
 
 # Called by
 

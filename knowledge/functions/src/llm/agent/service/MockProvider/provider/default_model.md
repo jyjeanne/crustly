@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: default_model
-resource: src/llm/agent/service.rs#L1921-L1923
+resource: src/llm/agent/service.rs#L1795-L1797
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

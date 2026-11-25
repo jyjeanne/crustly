@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_from_gemini_response_maps_tool_use
-resource: src/llm/provider/gemini.rs#L1003-L1034
+resource: src/llm/provider/gemini.rs#L1037-L1068
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response
+  - target: functions/src/llm/provider/gemini/GeminiProvider/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [new](../../../../../functions/src/llm/provider/gemini/GeminiProvider/new.md)
 - [from_gemini_response](../../../../../functions/src/llm/provider/gemini/GeminiProvider/from_gemini_response.md)

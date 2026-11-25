@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: llama_cpp_models_listed_clears_loading_state
-resource: src/tui/app.rs#L4209-L4231
+resource: src/tui/app.rs#L5396-L5438
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

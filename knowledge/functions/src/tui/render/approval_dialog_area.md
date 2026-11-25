@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: approval_dialog_area
-resource: src/tui/render.rs#L1213-L1233
+resource: src/tui/render.rs#L1687-L1707
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/render_approval
+  - target: functions/src/tui/render/render_approval
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

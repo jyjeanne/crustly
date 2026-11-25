@@ -1,18 +1,42 @@
 ---
 type: Rust Method
 title: update_message_usage
-resource: src/services/message.rs#L95-L112
+resource: src/services/message.rs#L96-L113
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/message/MessageService/get_message_required
+  - target: functions/src/services/message/MessageService/get_message_required
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/message/MessageRepository/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/ServiceContext/pool
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/db/repository/message/MessageRepository/update
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
-  - functions/src/services/message/create_then_update_survives_a_file_backed_wal_pool
-  - functions/src/services/message/test_update_message_usage
-  - functions/src/services/message/test_calculate_totals
+  - target: functions/src/llm/agent/service/AgentService/send_message
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/create_then_update_survives_a_file_backed_wal_pool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/test_update_message_usage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/test_calculate_totals
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -22,6 +46,10 @@ relationships:
 # Calls
 
 - [get_message_required](../../../../../functions/src/services/message/MessageService/get_message_required.md)
+- [new](../../../../../functions/src/db/repository/message/MessageRepository/new.md)
+- [pool](../../../../../functions/src/services/ServiceContext/pool.md)
+- [update](../../../../../functions/src/db/repository/message/MessageRepository/update.md)
+- [context](../../../../../functions/src/services/ServiceManager/context.md)
 
 # Called by
 

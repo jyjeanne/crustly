@@ -1,17 +1,39 @@
 ---
 type: Rust Method
 title: delete_message
-resource: src/services/message.rs#L145-L151
+resource: src/services/message.rs#L160-L166
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
+  calls:
+  - target: functions/src/db/repository/message/MessageRepository/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/ServiceContext/pool
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/db/repository/message/MessageRepository/delete
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/message/test_delete_message
+  - target: functions/src/services/message/test_delete_message
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `pub async fn delete_message(&self, id: Uuid) -> Result<()>`
+
+# Calls
+
+- [new](../../../../../functions/src/db/repository/message/MessageRepository/new.md)
+- [pool](../../../../../functions/src/services/ServiceContext/pool.md)
+- [delete](../../../../../functions/src/db/repository/message/MessageRepository/delete.md)
+- [context](../../../../../functions/src/services/ServiceManager/context.md)
 
 # Called by
 

@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: default_model
-resource: src/tui/app.rs#L2981-L2983
+resource: src/tui/app.rs#L3905-L3907
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

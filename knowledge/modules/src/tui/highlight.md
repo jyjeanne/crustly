@@ -3,15 +3,25 @@ type: Rust Module
 title: highlight
 resource: src/tui/highlight.rs#L1-L214
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/once-cell-sync-lazy
-  - external/ratatui-style-color-style-text-line-span
-  - external/syntect-easy-highlightlines-highlighting-fontstyle-theme-themeset-parsing-syntaxreference-syntaxset-util-lineswithendings
-  - external/super
+  - target: external/once-cell-sync-lazy
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ratatui-style-color-style-text-line-span
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/syntect-easy-highlightlines-highlighting-fontstyle-theme-themeset-parsing-syntaxreference-syntaxset-util-lineswithendings
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

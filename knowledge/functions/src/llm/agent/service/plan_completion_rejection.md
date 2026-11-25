@@ -1,16 +1,22 @@
 ---
 type: Rust Function
 title: plan_completion_rejection
-resource: src/llm/agent/service.rs#L157-L224
+resource: src/llm/agent/service.rs#L96-L163
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/memory/MemoryStore/find
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
-  - functions/src/llm/agent/service/plan_completion_gate_decision_matrix
+  - target: functions/src/llm/agent/service/plan_completion_gate_decision_matrix
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/tool_round/AgentService/execute_tool_round
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,9 +25,9 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [find](../../../../../functions/src/memory/MemoryStore/find.md)
 
 # Called by
 
-- [send_message_with_tools_inner](../../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.md)
 - [plan_completion_gate_decision_matrix](../../../../../functions/src/llm/agent/service/plan_completion_gate_decision_matrix.md)
+- [execute_tool_round](../../../../../functions/src/llm/agent/service/tool_round/AgentService/execute_tool_round.md)

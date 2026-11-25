@@ -1,24 +1,20 @@
 ---
 type: Rust Method
 title: cursor_on_last_line
-resource: src/tui/app.rs#L404-L406
+resource: src/tui/app.rs#L598-L600
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/len
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn cursor_on_last_line(&self) -> bool`
-
-# Calls
-
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 
 # Called by
 

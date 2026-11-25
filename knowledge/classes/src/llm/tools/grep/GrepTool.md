@@ -3,7 +3,7 @@ type: Rust Struct
 title: GrepTool
 resource: src/llm/tools/grep.rs#L14
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -3,14 +3,22 @@ type: Rust Module
 title: azure
 resource: src/llm/provider/azure.rs#L1-L196
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-openai-openaiprovider-llmrequest-llmresponse-provider-result
-  - external/async-trait-async-trait
-  - external/super
+  - target: external/super-openai-openaiprovider-llmrequest-llmresponse-provider-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

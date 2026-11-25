@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_send_message_with_system_prompt
-resource: src/llm/agent/service.rs#L2190-L2202
+resource: src/llm/agent/service.rs#L2064-L2076
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

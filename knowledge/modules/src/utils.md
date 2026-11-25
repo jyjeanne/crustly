@@ -3,13 +3,19 @@ type: Rust Module
 title: utils
 resource: src/utils/mod.rs#L1-L45
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/pub-use-retry-retry-retry-with-check-retryconfig-retryableerror
-  - external/super-truncate-at-char-boundary
+  - target: external/pub-use-retry-retry-retry-with-check-retryconfig-retryableerror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-truncate-at-char-boundary
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

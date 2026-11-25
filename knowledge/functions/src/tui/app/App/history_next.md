@@ -1,16 +1,19 @@
 ---
 type: Rust Method
 title: history_next
-resource: src/tui/app.rs#L445-L461
+resource: src/tui/app.rs#L639-L655
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/tui/app/App/load_history_entry
+  - target: functions/src/tui/app/App/load_history_entry
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +22,6 @@ relationships:
 
 # Calls
 
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 - [load_history_entry](../../../../../functions/src/tui/app/App/load_history_entry.md)
 
 # Called by

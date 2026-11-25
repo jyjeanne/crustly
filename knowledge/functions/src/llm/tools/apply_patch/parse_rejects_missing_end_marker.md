@@ -2,12 +2,19 @@
 type: Rust Function
 title: parse_rejects_missing_end_marker
 resource: src/llm/tools/apply_patch.rs#L553-L556
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/apply_patch/parse_patch
+  - target: functions/src/llm/tools/apply_patch/parse_patch
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [parse_patch](../../../../../functions/src/llm/tools/apply_patch/parse_patch.md)
+- [contains](../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)

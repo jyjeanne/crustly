@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: OpenAIToolCall
-resource: src/llm/provider/openai.rs#L1029-L1033
+resource: src/llm/provider/openai.rs#L833-L837
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

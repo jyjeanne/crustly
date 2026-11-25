@@ -3,10 +3,12 @@ type: Rust Method
 title: messages
 resource: src/services/mod.rs#L69-L71
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/services/test_service_manager_creation
+  - target: functions/src/services/test_service_manager_creation
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

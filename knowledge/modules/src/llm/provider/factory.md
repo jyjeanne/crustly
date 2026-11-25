@@ -1,29 +1,52 @@
 ---
 type: Rust Module
 title: factory
-resource: src/llm/provider/factory.rs#L1-L1166
+resource: src/llm/provider/factory.rs#L1-L1260
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-anthropic-anthropicprovider-azure-azureopenaiprovider-error-providererror-gemini-geminiprovider-openai-openaiprovider-qwen-qwenprovider-toolcallparser-provider
-  - external/crate-config-config-providerconfig-qwenproviderconfig
-  - external/anyhow-context-result
-  - external/async-trait-async-trait
-  - external/std-sync-arc
-  - external/super-ollama-modeloverrides-ollamaprovider
-  - external/super-super-error-providererror-result-as-providerresult-r-trait-providerstream-types-contentblock-llmrequest-llmresponse-stopreason-tokenusage
-  - external/super
-  - external/crate-config-config-providerconfig-providerconfigs-qwenproviderconfig
-  - external/std-sync-atomic-atomicusize-ordering
+  - target: external/super-anthropic-anthropicprovider-azure-azureopenaiprovider-error-providererror-gemini-geminiprovider-openai-openaiprovider-qwen-qwenprovider-toolcallparser-provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-config-config-providerconfig-qwenproviderconfig
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-ollama-modeloverrides-ollamaprovider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-super-error-providererror-result-as-providerresult-r-trait-providerstream-types-contentblock-llmrequest-llmresponse-stopreason-tokenusage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-config-config-providerconfig-providerconfigs-qwenproviderconfig
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-atomic-atomicusize-ordering
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
 
 - [FailoverProvider](../../../../classes/src/llm/provider/factory/FailoverProvider.md)
 - [new](../../../../functions/src/llm/provider/factory/FailoverProvider/new.md)
+- [request_for](../../../../functions/src/llm/provider/factory/FailoverProvider/request_for.md)
 - [is_failover_error](../../../../functions/src/llm/provider/factory/FailoverProvider/is_failover_error.md)
 - [complete](../../../../functions/src/llm/provider/factory/FailoverProvider/provider/complete.md)
 - [stream](../../../../functions/src/llm/provider/factory/FailoverProvider/provider/stream.md)
@@ -33,6 +56,7 @@ relationships:
 - [context_window](../../../../functions/src/llm/provider/factory/FailoverProvider/provider/context_window.md)
 - [calculate_cost](../../../../functions/src/llm/provider/factory/FailoverProvider/provider/calculate_cost.md)
 - [create_provider](../../../../functions/src/llm/provider/factory/create_provider.md)
+- [create_named_provider](../../../../functions/src/llm/provider/factory/create_named_provider.md)
 - [try_create_azure](../../../../functions/src/llm/provider/factory/try_create_azure.md)
 - [try_create_gemini](../../../../functions/src/llm/provider/factory/try_create_gemini.md)
 - [try_create_ollama](../../../../functions/src/llm/provider/factory/try_create_ollama.md)
@@ -62,6 +86,16 @@ relationships:
 - [context_window](../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/context_window.md)
 - [calculate_cost](../../../../functions/src/llm/provider/factory/SucceedingProvider/provider/calculate_cost.md)
 - [test_failover_on_rate_limit_tries_next_provider](../../../../functions/src/llm/provider/factory/test_failover_on_rate_limit_tries_next_provider.md)
+- [ModelRecorder](../../../../classes/src/llm/provider/factory/ModelRecorder.md)
+- [complete](../../../../functions/src/llm/provider/factory/ModelRecorder/provider/complete.md)
+- [stream](../../../../functions/src/llm/provider/factory/ModelRecorder/provider/stream.md)
+- [name](../../../../functions/src/llm/provider/factory/ModelRecorder/provider/name.md)
+- [default_model](../../../../functions/src/llm/provider/factory/ModelRecorder/provider/default_model.md)
+- [supported_models](../../../../functions/src/llm/provider/factory/ModelRecorder/provider/supported_models.md)
+- [context_window](../../../../functions/src/llm/provider/factory/ModelRecorder/provider/context_window.md)
+- [calculate_cost](../../../../functions/src/llm/provider/factory/ModelRecorder/provider/calculate_cost.md)
+- [test_failover_sends_the_secondary_its_own_model](../../../../functions/src/llm/provider/factory/test_failover_sends_the_secondary_its_own_model.md)
+- [named_providers_must_be_known_and_configured](../../../../functions/src/llm/provider/factory/named_providers_must_be_known_and_configured.md)
 - [test_failover_all_fail_returns_last_error](../../../../functions/src/llm/provider/factory/test_failover_all_fail_returns_last_error.md)
 - [test_create_provider_with_anthropic](../../../../functions/src/llm/provider/factory/test_create_provider_with_anthropic.md)
 - [test_create_provider_with_openai](../../../../functions/src/llm/provider/factory/test_create_provider_with_openai.md)

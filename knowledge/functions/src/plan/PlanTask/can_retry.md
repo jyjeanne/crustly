@@ -3,11 +3,15 @@ type: Rust Method
 title: can_retry
 resource: src/plan/mod.rs#L668-L671
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/plan_tool/PlanTool/tool/execute
-  - functions/src/plan/PlanDocument/retriable_tasks
+  - target: functions/src/llm/tools/plan_tool/PlanTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/retriable_tasks
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

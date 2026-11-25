@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: test_approval_request
-resource: src/tui/render.rs#L2989-L3003
+resource: src/tui/render.rs#L4055-L4070
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/approval_dialog_shows_tool_name_capabilities_and_summarized_params
-  - functions/src/tui/render/approval_dialog_details_view_shows_pretty_printed_json
+  - target: functions/src/tui/render/approval_dialog_shows_tool_name_capabilities_and_summarized_params
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/approval_dialog_details_view_shows_pretty_printed_json
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

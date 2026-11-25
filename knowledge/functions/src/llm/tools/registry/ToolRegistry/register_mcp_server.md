@@ -1,16 +1,33 @@
 ---
 type: Rust Method
 title: register_mcp_server
-resource: src/llm/tools/registry.rs#L226-L253
+resource: src/llm/tools/registry.rs#L251-L278
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/mcp/client/MCPClient/discover_tools
+  - target: functions/src/mcp/client/MCPClient/connect
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/mcp/client/MCPClient/discover_tools
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/mcp/client/McpTool/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/mcp/client/McpTool/tool/name
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   called_by:
-  - functions/src/cli/connect_configured_mcp_servers
-  - functions/src/cli/cmd_run
-  - functions/src/llm/tools/registry/register_mcp_server_with_nonexistent_command_fails_gracefully
+  - target: functions/src/cli/connect_configured_mcp_servers
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/cmd_run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/registry/register_mcp_server_with_nonexistent_command_fails_gracefully
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +36,10 @@ relationships:
 
 # Calls
 
+- [connect](../../../../../../functions/src/mcp/client/MCPClient/connect.md)
 - [discover_tools](../../../../../../functions/src/mcp/client/MCPClient/discover_tools.md)
+- [new](../../../../../../functions/src/mcp/client/McpTool/new.md)
+- [name](../../../../../../functions/src/mcp/client/McpTool/tool/name.md)
 
 # Called by
 

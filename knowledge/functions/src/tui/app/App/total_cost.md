@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: total_cost
-resource: src/tui/app.rs#L2346-L2348
+resource: src/tui/app.rs#L3191-L3196
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/render_header
+  - target: functions/src/tui/render/render_header
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

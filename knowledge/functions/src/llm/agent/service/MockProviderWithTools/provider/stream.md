@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: stream
-resource: src/llm/agent/service.rs#L2331-L2336
+resource: src/llm/agent/service.rs#L2182-L2187
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,17 +1,28 @@
 ---
 type: Rust Method
 title: refresh_model_download_suggestions
-resource: src/tui/app.rs#L2515-L2521
+resource: src/tui/app.rs#L3363-L3369
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/ollama_download/filter_suggestions
+  - target: functions/src/tui/ollama_download/filter_suggestions
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_event
-  - functions/src/tui/app/App/open_model_download
-  - functions/src/tui/app/App/handle_model_download_key
+  - target: functions/src/tui/app/App/paste_text
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/open_model_download
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_model_download_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -24,6 +35,7 @@ relationships:
 
 # Called by
 
+- [paste_text](../../../../../functions/src/tui/app/App/paste_text.md)
 - [handle_event](../../../../../functions/src/tui/app/App/handle_event.md)
 - [open_model_download](../../../../../functions/src/tui/app/App/open_model_download.md)
 - [handle_model_download_key](../../../../../functions/src/tui/app/App/handle_model_download_key.md)

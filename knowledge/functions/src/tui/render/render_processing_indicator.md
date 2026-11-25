@@ -1,15 +1,28 @@
 ---
 type: Rust Function
 title: render_processing_indicator
-resource: src/tui/render.rs#L401-L424
+resource: src/tui/render.rs#L517-L552
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
+  - target: functions/src/tui/app/App/processing_elapsed
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/components/ferris/walking_lines
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/tool_round/ToolRound/push
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/format_elapsed
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render_chat
+  - target: functions/src/tui/render/render_chat
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,7 +31,10 @@ relationships:
 
 # Calls
 
-- [len](../../../../functions/src/config/secrets/SecretString/len.md)
+- [processing_elapsed](../../../../functions/src/tui/app/App/processing_elapsed.md)
+- [walking_lines](../../../../functions/src/tui/components/ferris/walking_lines.md)
+- [push](../../../../functions/src/llm/agent/service/tool_round/ToolRound/push.md)
+- [format_elapsed](../../../../functions/src/tui/render/format_elapsed.md)
 
 # Called by
 

@@ -3,18 +3,34 @@ type: Rust Module
 title: sandbox
 resource: src/llm/tools/sandbox.rs#L1-L885
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/serde-json-value
-  - external/std-path-path-pathbuf
-  - external/std-path-component-prefix
-  - external/super
-  - external/tempfile-tempdir
-  - external/std-sync-atomic-atomicbool-ordering
-  - external/std-sync-arc
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-component-prefix
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-atomic-atomicbool-ordering
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

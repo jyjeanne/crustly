@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_cli_invalid_subcommand
 resource: tests/cli_test.rs#L258-L261
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_build_gemini_error_api_error_with_body
-resource: src/llm/provider/gemini.rs#L1227-L1247
+resource: src/llm/provider/gemini.rs#L1261-L1281
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/gemini/build_gemini_error
+  - target: functions/src/llm/provider/gemini/build_gemini_error
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

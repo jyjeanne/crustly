@@ -2,12 +2,19 @@
 type: Rust Function
 title: test_secret_string_debug
 resource: src/config/secrets.rs#L324-L329
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/from_str
+  - target: functions/src/config/secrets/SecretString/from_str
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [from_str](../../../../functions/src/config/secrets/SecretString/from_str.md)
+- [contains](../../../../functions/src/memory/vector_index/VectorIndex/contains.md)

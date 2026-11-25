@@ -1,18 +1,28 @@
 ---
 type: Rust Function
 title: run_inner
-resource: src/tui/runner.rs#L84-L94
+resource: src/tui/runner.rs#L89-L99
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/initialize
-  - functions/src/tui/app/App/event_sender
-  - functions/src/tui/events/EventHandler/start_terminal_listener
-  - functions/src/tui/runner/run_loop
+  - target: functions/src/tui/app/App/initialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/event_sender
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/EventHandler/start_terminal_listener
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/runner/run_loop
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/runner/run
+  - target: functions/src/tui/runner/run
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

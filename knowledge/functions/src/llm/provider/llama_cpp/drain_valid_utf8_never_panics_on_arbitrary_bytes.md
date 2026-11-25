@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: drain_valid_utf8_never_panics_on_arbitrary_bytes
-resource: src/llm/provider/llama_cpp.rs#L1592-L1599
+resource: src/llm/provider/llama_cpp.rs#L1693-L1700
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp/drain_valid_utf8
+  - target: functions/src/llm/provider/llama_cpp/drain_valid_utf8
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

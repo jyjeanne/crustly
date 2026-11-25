@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_plan_risks_serialization
 resource: src/db/repository/plan.rs#L1121-L1139
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

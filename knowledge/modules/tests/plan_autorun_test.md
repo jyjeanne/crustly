@@ -1,15 +1,21 @@
 ---
 type: Rust Module
 title: plan_autorun_test
-resource: tests/plan_autorun_test.rs#L1-L141
+resource: tests/plan_autorun_test.rs#L1-L143
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crustly-plan-autorunmode-planmodestate-plantask-taskstatus-tasktype
-  - external/uuid-uuid
+  - target: external/crustly-plan-autorunmode-planmodestate-plantask-taskstatus-tasktype
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

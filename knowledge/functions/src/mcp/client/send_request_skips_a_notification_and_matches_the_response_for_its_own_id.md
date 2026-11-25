@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: send_request_skips_a_notification_and_matches_the_response_for_its_own_id
-resource: src/mcp/client.rs#L437-L476
+resource: src/mcp/client.rs#L436-L475
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/mcp/client/MCPClient/send_request
+  - target: functions/src/mcp/client/MCPClient/send_request
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

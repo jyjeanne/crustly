@@ -1,25 +1,36 @@
 ---
 type: Rust Module
 title: session
-resource: src/services/session.rs#L1-L440
+resource: src/services/session.rs#L1-L384
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-db-models-session-repository-episodicmemoryrepository-sessionlistoptions-sessionrepository
-  - external/crate-llm-agent-memory-episodicmemory
-  - external/crate-llm-provider-types-message
-  - external/crate-services-servicecontext
-  - external/anyhow-context-result
-  - external/chrono-utc
-  - external/uuid-uuid
-  - external/crate-llm-agent-context-token-count
-  - external/crate-llm-provider-types-contentblock
-  - external/crate-llm-provider-types-role
-  - external/super
-  - external/crate-db-database
+  - target: external/crate-db-models-session-repository-sessionlistoptions-sessionrepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-services-servicecontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/chrono-utc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -39,7 +50,6 @@ relationships:
 - [get_most_recent_session](../../../functions/src/services/session/SessionService/get_most_recent_session.md)
 - [count_sessions](../../../functions/src/services/session/SessionService/count_sessions.md)
 - [count_archived_sessions](../../../functions/src/services/session/SessionService/count_archived_sessions.md)
-- [end_session_with_summary](../../../functions/src/services/session/SessionService/end_session_with_summary.md)
 - [create_test_service](../../../functions/src/services/session/create_test_service.md)
 - [test_create_session](../../../functions/src/services/session/test_create_session.md)
 - [test_get_session](../../../functions/src/services/session/test_get_session.md)
@@ -56,17 +66,12 @@ relationships:
 
 - `crate::db::{
     models::Session,
-    repository::{EpisodicMemoryRepository, SessionListOptions, SessionRepository},
+    repository::{SessionListOptions, SessionRepository},
 }`
-- `crate::llm::agent::memory::EpisodicMemory`
-- `crate::llm::provider::types::Message`
 - `crate::services::ServiceContext`
 - `anyhow::{Context, Result}`
 - `chrono::Utc`
 - `uuid::Uuid`
-- `crate::llm::agent::context::token_count`
-- `crate::llm::provider::types::ContentBlock`
-- `crate::llm::provider::types::Role`
 - `super::*`
 - `crate::db::Database`
 

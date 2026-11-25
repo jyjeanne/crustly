@@ -1,12 +1,23 @@
 ---
 type: Rust Function
 title: model_override_targets_gemini_when_it_is_the_selected_provider
-resource: src/config/mod.rs#L1237-L1271
+resource: src/config/mod.rs#L1801-L1835
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
+relationships:
+  calls:
+  - target: functions/src/config/ProviderConfigs/override_default_model
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn model_override_targets_gemini_when_it_is_the_selected_provider()`
+
+# Calls
+
+- [override_default_model](../../../functions/src/config/ProviderConfigs/override_default_model.md)

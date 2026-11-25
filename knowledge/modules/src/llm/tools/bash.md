@@ -3,21 +3,43 @@ type: Rust Module
 title: bash
 resource: src/llm/tools/bash.rs#L1-L735
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-result-toolerror
-  - external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
-  - external/async-trait-async-trait
-  - external/serde-deserialize-serialize
-  - external/serde-json-value
-  - external/tokio-process-command
-  - external/tokio-time-timeout-duration
-  - external/std-sync-oncelock
-  - external/super
-  - external/uuid-uuid
+  - target: external/super-error-result-toolerror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-process-command
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-time-timeout-duration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-oncelock
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

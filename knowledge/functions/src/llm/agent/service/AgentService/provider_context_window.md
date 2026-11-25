@@ -1,11 +1,24 @@
 ---
 type: Rust Method
 title: provider_context_window
-resource: src/llm/agent/service.rs#L653-L655
+resource: src/llm/agent/service.rs#L844-L846
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
+relationships:
+  called_by:
+  - target: functions/src/llm/agent/service/AgentService/default_context_window
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/app/App/provider_context_window
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
 
 `pub fn provider_context_window(&self) -> Option<u32>`
+
+# Called by
+
+- [default_context_window](../../../../../../functions/src/llm/agent/service/AgentService/default_context_window.md)
+- [provider_context_window](../../../../../../functions/src/tui/app/App/provider_context_window.md)

@@ -3,42 +3,109 @@ type: Rust Method
 title: default_local
 resource: src/llm/provider/ollama.rs#L158-L160
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
+  calls:
+  - target: functions/src/llm/provider/ollama/OllamaProvider/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   called_by:
-  - functions/src/llm/agent/service/streamed_ollama_tool_call_survives_drain
-  - functions/src/llm/provider/ollama/test_ollama_provider_creation
-  - functions/src/llm/provider/ollama/test_with_default_model
-  - functions/src/llm/provider/ollama/per_model_override_wins_over_provider_default_for_that_model
-  - functions/src/llm/provider/ollama/per_model_override_falls_back_field_by_field
-  - functions/src/llm/provider/ollama/overrides_for_returns_provider_defaults_when_no_per_model_map
-  - functions/src/llm/provider/ollama/context_window_reflects_the_per_model_num_ctx_that_is_actually_requested
-  - functions/src/llm/provider/ollama/test_validate_model_always_true
-  - functions/src/llm/provider/ollama/test_supported_models_includes_gemma4
-  - functions/src/llm/provider/ollama/test_supported_models_includes_ornith
-  - functions/src/llm/provider/ollama/test_context_window_default_and_custom
-  - functions/src/llm/provider/ollama/test_calculate_cost_is_always_zero
-  - functions/src/llm/provider/ollama/test_supports_vision_detection
-  - functions/src/llm/provider/ollama/test_to_ollama_request_maps_common_fields
-  - functions/src/llm/provider/ollama/recovered_tool_call_becomes_a_tool_use_block
-  - functions/src/llm/provider/ollama/fenced_call_in_prose_becomes_a_tool_use_block
-  - functions/src/llm/provider/ollama/from_ollama_response_plain_text_with_final_data
-  - functions/src/llm/provider/ollama/from_ollama_response_without_final_data_has_zero_usage_and_no_perf
-  - functions/src/llm/provider/ollama/from_ollama_response_extracts_tool_calls
-  - functions/src/llm/provider/ollama/streamed_tool_call_reaches_caller
-  - functions/src/llm/provider/ollama/from_ollama_response_uses_explicit_thinking_field
-  - functions/src/llm/provider/ollama/from_ollama_response_falls_back_to_think_tags
-  - functions/src/llm/provider/ollama/to_ollama_request_maps_tool_messages
-  - functions/src/llm/provider/ollama/to_ollama_request_maps_thinking_and_response_format
-  - functions/src/llm/provider/ollama/per_model_think_false_is_sent_when_request_has_no_thinking
-  - functions/src/llm/provider/ollama/request_thinking_wins_over_configured_think
-  - functions/src/llm/provider/ollama/invalid_think_value_is_ignored
-  - functions/src/llm/provider/ollama/to_ollama_request_embeds_base64_image
+  - target: functions/src/llm/agent/service/streamed_ollama_tool_call_survives_drain
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_ollama_provider_creation
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_with_default_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/per_model_override_wins_over_provider_default_for_that_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/per_model_override_falls_back_field_by_field
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/overrides_for_returns_provider_defaults_when_no_per_model_map
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/context_window_reflects_the_per_model_num_ctx_that_is_actually_requested
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_validate_model_always_true
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_supported_models_includes_gemma4
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_supported_models_includes_ornith
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_context_window_default_and_custom
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_calculate_cost_is_always_zero
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_supports_vision_detection
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/test_to_ollama_request_maps_common_fields
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/recovered_tool_call_becomes_a_tool_use_block
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/fenced_call_in_prose_becomes_a_tool_use_block
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/from_ollama_response_plain_text_with_final_data
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/from_ollama_response_without_final_data_has_zero_usage_and_no_perf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/from_ollama_response_extracts_tool_calls
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/streamed_tool_call_reaches_caller
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/from_ollama_response_uses_explicit_thinking_field
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/from_ollama_response_falls_back_to_think_tags
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/to_ollama_request_maps_tool_messages
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/to_ollama_request_keeps_text_sent_with_tool_results
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/to_ollama_request_maps_thinking_and_response_format
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/per_model_think_false_is_sent_when_request_has_no_thinking
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/request_thinking_wins_over_configured_think
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/invalid_think_value_is_ignored
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/to_ollama_request_embeds_base64_image
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `pub fn default_local() -> Self`
+
+# Calls
+
+- [new](../../../../../../functions/src/llm/provider/ollama/OllamaProvider/new.md)
 
 # Called by
 
@@ -65,6 +132,7 @@ relationships:
 - [from_ollama_response_uses_explicit_thinking_field](../../../../../../functions/src/llm/provider/ollama/from_ollama_response_uses_explicit_thinking_field.md)
 - [from_ollama_response_falls_back_to_think_tags](../../../../../../functions/src/llm/provider/ollama/from_ollama_response_falls_back_to_think_tags.md)
 - [to_ollama_request_maps_tool_messages](../../../../../../functions/src/llm/provider/ollama/to_ollama_request_maps_tool_messages.md)
+- [to_ollama_request_keeps_text_sent_with_tool_results](../../../../../../functions/src/llm/provider/ollama/to_ollama_request_keeps_text_sent_with_tool_results.md)
 - [to_ollama_request_maps_thinking_and_response_format](../../../../../../functions/src/llm/provider/ollama/to_ollama_request_maps_thinking_and_response_format.md)
 - [per_model_think_false_is_sent_when_request_has_no_thinking](../../../../../../functions/src/llm/provider/ollama/per_model_think_false_is_sent_when_request_has_no_thinking.md)
 - [request_thinking_wins_over_configured_think](../../../../../../functions/src/llm/provider/ollama/request_thinking_wins_over_configured_think.md)

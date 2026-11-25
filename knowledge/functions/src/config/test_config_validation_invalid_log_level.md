@@ -1,12 +1,27 @@
 ---
 type: Rust Function
 title: test_config_validation_invalid_log_level
-resource: src/config/mod.rs#L1389-L1393
+resource: src/config/mod.rs#L1953-L1957
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
+relationships:
+  calls:
+  - target: functions/src/config/Config/default/default
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/config/Config/validate
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn test_config_validation_invalid_log_level()`
+
+# Calls
+
+- [default](../../../functions/src/config/Config/default/default.md)
+- [validate](../../../functions/src/config/Config/validate.md)

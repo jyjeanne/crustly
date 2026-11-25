@@ -1,28 +1,60 @@
 ---
 type: Rust Module
 title: runner
-resource: src/tui/runner.rs#L1-L203
+resource: src/tui/runner.rs#L1-L208
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-app-app
-  - external/super-events-eventhandler
-  - external/super-render
-  - external/anyhow-result
-  - external/crossterm-event-disablebracketedpaste-enablebracketedpaste-keyboardenhancementflags-popkeyboardenhancementflags-pushkeyboardenhancementflags-execute-terminal-disable-raw-mode-enable-raw-mode-supports-keyboard-enhancement-enteralternatescreen-leavealternatescreen
-  - external/ratatui-backend-backend-crosstermbackend-terminal
-  - external/std-io
-  - external/super
-  - external/crate-db-database
-  - external/crate-llm-agent-agentservice
-  - external/crate-llm-provider-llmrequest-llmresponse-provider-providerstream-result-as-providerresult
-  - external/crate-services-servicecontext
-  - external/async-trait-async-trait
-  - external/ratatui-backend-testbackend
-  - external/std-sync-arc
+  - target: external/super-app-app
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-events-eventhandler
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-render
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crossterm-event-disablebracketedpaste-enablebracketedpaste-keyboardenhancementflags-popkeyboardenhancementflags-pushkeyboardenhancementflags-execute-terminal-disable-raw-mode-enable-raw-mode-supports-keyboard-enhancement-enteralternatescreen-leavealternatescreen
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ratatui-backend-backend-crosstermbackend-terminal
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-io
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-agent-agentservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-llmrequest-llmresponse-provider-providerstream-result-as-providerresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-services-servicecontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ratatui-backend-testbackend
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

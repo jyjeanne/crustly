@@ -1,15 +1,23 @@
 ---
 type: Rust Function
 title: compaction_atomicity_db_failure_leaves_context_unchanged
-resource: src/llm/agent/compaction.rs#L218-L255
+resource: src/llm/agent/compaction.rs#L517-L554
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/context/AgentContext/add_message
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/llm/agent/compaction/compact
+  - target: functions/src/llm/agent/context/AgentContext/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/context/AgentContext/add_message
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/compaction/compact
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,6 +26,6 @@ relationships:
 
 # Calls
 
+- [new](../../../../../functions/src/llm/agent/context/AgentContext/new.md)
 - [add_message](../../../../../functions/src/llm/agent/context/AgentContext/add_message.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 - [compact](../../../../../functions/src/llm/agent/compaction/compact.md)

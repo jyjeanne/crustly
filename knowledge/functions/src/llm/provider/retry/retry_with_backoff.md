@@ -3,22 +3,48 @@ type: Rust Function
 title: retry_with_backoff
 resource: src/llm/provider/retry.rs#L112-L166
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete
-  - functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream
-  - functions/src/llm/provider/gemini/GeminiProvider/provider/complete
-  - functions/src/llm/provider/gemini/GeminiProvider/provider/stream
-  - functions/src/llm/provider/openai/OpenAIProvider/provider/complete
-  - functions/src/llm/provider/openai/OpenAIProvider/provider/stream
-  - functions/src/llm/provider/qwen/QwenProvider/provider/complete
-  - functions/src/llm/provider/qwen/QwenProvider/provider/stream
-  - functions/src/llm/provider/retry/retry_with_rate_limit
-  - functions/src/llm/provider/retry/test_retry_success_immediate
-  - functions/src/llm/provider/retry/test_retry_success_after_retries
-  - functions/src/llm/provider/retry/test_retry_max_attempts_exceeded
-  - functions/src/llm/provider/retry/test_retry_non_retryable_error
+  - target: functions/src/llm/provider/anthropic/AnthropicProvider/provider/complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/anthropic/AnthropicProvider/provider/stream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/GeminiProvider/provider/complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/GeminiProvider/provider/stream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/OpenAIProvider/provider/complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/OpenAIProvider/provider/stream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/QwenProvider/provider/complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/QwenProvider/provider/stream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/retry/retry_with_rate_limit
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/retry/test_retry_success_immediate
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/retry/test_retry_success_after_retries
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/retry/test_retry_max_attempts_exceeded
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/retry/test_retry_non_retryable_error
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

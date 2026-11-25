@@ -1,14 +1,18 @@
 ---
 type: Rust Method
 title: get_messages_by_role
-resource: src/services/message.rs#L179-L182
+resource: src/services/message.rs#L194-L197
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/message/MessageService/list_messages_for_session
+  - target: functions/src/services/message/MessageService/list_messages_for_session
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/message/test_get_messages_by_role
+  - target: functions/src/services/message/test_get_messages_by_role
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: OpenAIMessage
-resource: src/llm/provider/openai.rs#L1015-L1026
+resource: src/llm/provider/openai.rs#L819-L830
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

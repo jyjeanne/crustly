@@ -4,12 +4,16 @@ title: read_with_buffer
 resource: src/llm/tools/read.rs#L161-L241
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/tests/memory_acceptance_test/open
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/read/ReadTool/tool/execute
+  - target: functions/src/llm/tools/read/ReadTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,7 +22,7 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [open](../../../../../../functions/tests/memory_acceptance_test/open.md)
 
 # Called by
 

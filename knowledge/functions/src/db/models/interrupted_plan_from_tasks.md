@@ -1,18 +1,24 @@
 ---
 type: Rust Function
 title: interrupted_plan_from_tasks
-resource: src/db/models.rs#L195-L216
+resource: src/db/models.rs#L198-L219
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTask/exec_status
-  - functions/src/db/models/PlanTaskStatus/is_incomplete
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/config/secrets/SecretString/len
+  - target: functions/src/db/models/PlanTask/exec_status
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/models/PlanTaskStatus/is_incomplete
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/tests/plan_crash_recovery_test/interrupted_plan_none_when_all_done
-  - functions/tests/plan_crash_recovery_test/interrupted_plan_resumes_at_lowest_incomplete
+  - target: functions/tests/plan_crash_recovery_test/interrupted_plan_none_when_all_done
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/plan_crash_recovery_test/interrupted_plan_resumes_at_lowest_incomplete
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -23,8 +29,6 @@ relationships:
 
 - [exec_status](../../../../functions/src/db/models/PlanTask/exec_status.md)
 - [is_incomplete](../../../../functions/src/db/models/PlanTaskStatus/is_incomplete.md)
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
-- [len](../../../../functions/src/config/secrets/SecretString/len.md)
 
 # Called by
 

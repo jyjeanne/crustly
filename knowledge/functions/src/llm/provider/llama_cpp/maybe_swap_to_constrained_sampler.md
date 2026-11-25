@@ -1,21 +1,27 @@
 ---
 type: Rust Function
 title: maybe_swap_to_constrained_sampler
-resource: src/llm/provider/llama_cpp.rs#L1249-L1281
+resource: src/llm/provider/llama_cpp.rs#L1348-L1382
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/tool_call_recovery/commits_to_an_offered_tool_call
+  - target: functions/src/llm/provider/tool_call_recovery/commits_to_an_offered_tool_call
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/llama_cpp/run_complete
-  - functions/src/llm/provider/llama_cpp/run_stream
+  - target: functions/src/llm/provider/llama_cpp/run_complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp/run_stream
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
-`fn maybe_swap_to_constrained_sampler( text: &str, swap_possible: bool, grammar_swap_attempted: &mut bool, grammar_env: &Option<ToolCallGrammarEnv>, offered_tools: &[Tool], generated_tokens: &[LlamaToken], sampling_defaults: &SamplingDefaults, request: &LLMRequest, default_seed: Option<u32>, sampler: &mut LlamaSampler, )`
+`fn maybe_swap_to_constrained_sampler( n_vocab: i32, text: &str, swap_possible: bool, grammar_swap_attempted: &mut bool, grammar_env: &Option<ToolCallGrammarEnv>, offered_tools: &[Tool], generated_tokens: &[LlamaToken], sampling_defaults: &SamplingDefaults, request: &LLMRequest, default_seed: Option<u32>, sampler: &mut LlamaSampler, )`
 
 # Calls
 

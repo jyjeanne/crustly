@@ -3,10 +3,12 @@ type: Rust Method
 title: with_retry
 resource: src/tui/error.rs#L155-L160
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/error/test_error_info_with_retry
+  - target: functions/src/tui/error/test_error_info_with_retry
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

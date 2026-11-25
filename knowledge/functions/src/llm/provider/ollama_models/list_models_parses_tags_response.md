@@ -2,13 +2,16 @@
 type: Rust Function
 title: list_models_parses_tags_response
 resource: src/llm/provider/ollama_models.rs#L276-L287
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/ollama_models/mock_server
-  - functions/src/llm/provider/ollama_models/list_models
+  - target: functions/src/llm/provider/ollama_models/list_models
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,5 +20,4 @@ relationships:
 
 # Calls
 
-- [mock_server](../../../../../functions/src/llm/provider/ollama_models/mock_server.md)
 - [list_models](../../../../../functions/src/llm/provider/ollama_models/list_models.md)

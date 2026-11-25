@@ -1,13 +1,23 @@
 ---
 type: Rust Function
 title: plan_mode_shows_full_document_with_tasks_and_criteria
-resource: src/tui/render.rs#L2947-L2978
+resource: src/tui/render.rs#L4013-L4044
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_to_string
+  - target: functions/src/plan/PlanDocument/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/plan/PlanTask/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +26,6 @@ relationships:
 
 # Calls
 
+- [new](../../../../functions/src/plan/PlanDocument/new.md)
+- [new](../../../../functions/src/plan/PlanTask/new.md)
 - [render_to_string](../../../../functions/src/tui/render/render_to_string.md)

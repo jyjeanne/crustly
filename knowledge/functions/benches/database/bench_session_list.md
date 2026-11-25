@@ -4,10 +4,12 @@ title: bench_session_list
 resource: benches/database.rs#L113-L167
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/markdown/MarkdownRenderer/finish
+  - target: functions/src/db/models/Session/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -16,4 +18,4 @@ relationships:
 
 # Calls
 
-- [finish](../../../functions/src/tui/markdown/MarkdownRenderer/finish.md)
+- [new](../../../functions/src/db/models/Session/new.md)

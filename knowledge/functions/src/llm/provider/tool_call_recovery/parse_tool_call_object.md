@@ -4,21 +4,17 @@ title: parse_tool_call_object
 resource: src/llm/provider/tool_call_recovery.rs#L232-L268
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/from_str
   called_by:
-  - functions/src/llm/provider/tool_call_recovery/tool_call_from_content
+  - target: functions/src/llm/provider/tool_call_recovery/tool_call_from_content
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn parse_tool_call_object(text: &str, offered: &[Tool]) -> Option<(String, serde_json::Value)>`
-
-# Calls
-
-- [from_str](../../../../../functions/src/config/secrets/SecretString/from_str.md)
 
 # Called by
 

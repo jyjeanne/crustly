@@ -1,30 +1,72 @@
 ---
 type: Rust Module
 title: llama_cpp
-resource: src/llm/provider/llama_cpp.rs#L1-L1753
+resource: src/llm/provider/llama_cpp.rs#L1-L1857
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-providererror-result
-  - external/super-r-trait-provider-providerstream
-  - external/super-tool-call-recovery-commits-to-an-offered-tool-call-maybe-tool-call-json-tool-call-from-content
-  - external/super-types
-  - external/async-trait-async-trait
-  - external/llama-cpp-2-context-params-llamacontextparams
-  - external/llama-cpp-2-context-llamacontext
-  - external/llama-cpp-2-llama-backend-llamabackend
-  - external/llama-cpp-2-llama-batch-llamabatch
-  - external/llama-cpp-2-model-params-llamamodelparams
-  - external/llama-cpp-2-model-addbos-llamachatmessage-llamachattemplate-llamamodel
-  - external/llama-cpp-2-sampling-llamasampler
-  - external/llama-cpp-2-token-llamatoken
-  - external/std-num-nonzerou32
-  - external/std-path-pathbuf
-  - external/tokio-sync-mpsc-oneshot
-  - external/super
+  - target: external/super-error-providererror-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-provider-providerstream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-tool-call-recovery-commits-to-an-offered-tool-call-maybe-tool-call-json-tool-call-from-content
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-types
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-context-params-llamacontextparams
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-context-llamacontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-llama-backend-llamabackend
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-llama-batch-llamabatch
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-model-params-llamamodelparams
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-model-llamachatmessage-llamachattemplate-llamamodel
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-sampling-llamasampler
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-token-llamatoken
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/llama-cpp-2-vocab-llamavocab
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-num-nonzerou32
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-sync-mpsc-oneshot
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-prompt-cache-prefill-batches-reusable-prefix
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -42,6 +84,7 @@ relationships:
 - [panic_message](../../../../functions/src/llm/provider/llama_cpp/panic_message.md)
 - [PreparedGeneration](../../../../classes/src/llm/provider/llama_cpp/PreparedGeneration.md)
 - [prepare_generation](../../../../functions/src/llm/provider/llama_cpp/prepare_generation.md)
+- [prefill](../../../../functions/src/llm/provider/llama_cpp/prefill.md)
 - [decode_one_more](../../../../functions/src/llm/provider/llama_cpp/decode_one_more.md)
 - [run_complete](../../../../functions/src/llm/provider/llama_cpp/run_complete.md)
 - [run_stream](../../../../functions/src/llm/provider/llama_cpp/run_stream.md)
@@ -104,12 +147,14 @@ relationships:
 - `llama_cpp_2::llama_backend::LlamaBackend`
 - `llama_cpp_2::llama_batch::LlamaBatch`
 - `llama_cpp_2::model::params::LlamaModelParams`
-- `llama_cpp_2::model::{AddBos, LlamaChatMessage, LlamaChatTemplate, LlamaModel}`
+- `llama_cpp_2::model::{LlamaChatMessage, LlamaChatTemplate, LlamaModel}`
 - `llama_cpp_2::sampling::LlamaSampler`
 - `llama_cpp_2::token::LlamaToken`
+- `llama_cpp_2::vocab::LlamaVocab`
 - `std::num::NonZeroU32`
 - `std::path::PathBuf`
 - `tokio::sync::{mpsc, oneshot}`
+- `super::prompt_cache::{prefill_batches, reusable_prefix}`
 - `super::*`
 
 # Member of

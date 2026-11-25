@@ -1,16 +1,19 @@
 ---
 type: Rust Method
 title: push_fallback_or_text
-resource: src/llm/provider/qwen.rs#L944-L971
+resource: src/llm/provider/qwen.rs#L954-L981
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+  - target: functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,7 +23,6 @@ relationships:
 # Calls
 
 - [parse_fallback_tool_calls](../../../../../../functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls.md)
-- [is_empty](../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 
 # Called by
 

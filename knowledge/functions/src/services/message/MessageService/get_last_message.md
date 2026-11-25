@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: get_last_message
-resource: src/services/message.rs#L173-L176
+resource: src/services/message.rs#L188-L191
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/message/MessageService/list_messages_for_session
+  - target: functions/src/services/message/MessageService/list_messages_for_session
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,21 +1,46 @@
 ---
 type: Rust Function
 title: render_chat
-resource: src/tui/render.rs#L435-L475
+resource: src/tui/render.rs#L597-L649
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_pending_plan_banner
-  - functions/src/tui/render/render_message_lines
-  - functions/src/tui/render/render_streaming_response
-  - functions/src/tui/render/render_processing_indicator
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/tui/render/compute_scroll_offset
-  - functions/src/plan/PlanTask/block
+  - target: functions/src/tui/render/render_pending_plan_banner
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_welcome
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/MessageLineCache/retain
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/MessageLineCache/lines_for
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_streaming_response
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_processing_indicator
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/extract/transcript
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/fit_scroll
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanTask/block
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/chat_block
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render
+  - target: functions/src/tui/render/render
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -25,12 +50,15 @@ relationships:
 # Calls
 
 - [render_pending_plan_banner](../../../../functions/src/tui/render/render_pending_plan_banner.md)
-- [render_message_lines](../../../../functions/src/tui/render/render_message_lines.md)
+- [render_welcome](../../../../functions/src/tui/render/render_welcome.md)
+- [retain](../../../../functions/src/tui/render/MessageLineCache/retain.md)
+- [lines_for](../../../../functions/src/tui/render/MessageLineCache/lines_for.md)
 - [render_streaming_response](../../../../functions/src/tui/render/render_streaming_response.md)
 - [render_processing_indicator](../../../../functions/src/tui/render/render_processing_indicator.md)
-- [len](../../../../functions/src/config/secrets/SecretString/len.md)
-- [compute_scroll_offset](../../../../functions/src/tui/render/compute_scroll_offset.md)
+- [transcript](../../../../functions/src/memory/extract/transcript.md)
+- [fit_scroll](../../../../functions/src/tui/render/fit_scroll.md)
 - [block](../../../../functions/src/plan/PlanTask/block.md)
+- [chat_block](../../../../functions/src/tui/render/chat_block.md)
 
 # Called by
 

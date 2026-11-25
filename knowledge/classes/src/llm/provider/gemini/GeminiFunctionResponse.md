@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: GeminiFunctionResponse
-resource: src/llm/provider/gemini.rs#L791-L794
+resource: src/llm/provider/gemini.rs#L797-L800
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

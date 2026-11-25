@@ -3,22 +3,46 @@ type: Rust Module
 title: apply_patch
 resource: src/llm/tools/apply_patch.rs#L1-L907
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-validate-file-path-validate-path-safety-result-toolerror
-  - external/super-file-read-cache-filefingerprint-readgate
-  - external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
-  - external/async-trait-async-trait
-  - external/serde-deserialize
-  - external/serde-json-value
-  - external/std-path-pathbuf
-  - external/tokio-fs
-  - external/super
-  - external/tempfile-tempdir
-  - external/uuid-uuid
+  - target: external/super-error-validate-file-path-validate-path-safety-result-toolerror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-file-read-cache-filefingerprint-readgate
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-fs
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

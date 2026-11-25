@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_build_gemini_error_rate_limit_no_body
-resource: src/llm/provider/gemini.rs#L1221-L1224
+resource: src/llm/provider/gemini.rs#L1255-L1258
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/gemini/build_gemini_error
+  - target: functions/src/llm/provider/gemini/build_gemini_error
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

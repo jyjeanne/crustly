@@ -3,15 +3,25 @@ type: Rust Module
 title: pdf_context
 resource: src/llm/pdf_context.rs#L1-L215
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/std-path-path-pathbuf
-  - external/super
-  - external/std-io-write
-  - external/tempfile-namedtempfile
+  - target: external/std-path-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-io-write
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-namedtempfile
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

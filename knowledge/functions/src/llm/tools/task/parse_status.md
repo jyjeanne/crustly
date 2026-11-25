@@ -4,10 +4,12 @@ title: parse_status
 resource: src/llm/tools/task.rs#L286-L298
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/task/TaskTool/tool/execute
+  - target: functions/src/llm/tools/task/TaskTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: GeminiUsageMetadata
-resource: src/llm/provider/gemini.rs#L869-L876
+resource: src/llm/provider/gemini.rs#L875-L882
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

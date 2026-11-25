@@ -4,12 +4,19 @@ title: syntect_style_to_ratatui
 resource: src/tui/highlight.rs#L34-L48
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/highlight/syntect_to_ratatui_color
+  - target: functions/src/tui/highlight/syntect_to_ratatui_color
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/highlight/highlight_code
+  - target: functions/src/tui/highlight/highlight_code
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,6 +26,7 @@ relationships:
 # Calls
 
 - [syntect_to_ratatui_color](../../../../functions/src/tui/highlight/syntect_to_ratatui_color.md)
+- [contains](../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 
 # Called by
 

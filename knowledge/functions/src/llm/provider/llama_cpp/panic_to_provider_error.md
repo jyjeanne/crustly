@@ -1,15 +1,19 @@
 ---
 type: Rust Function
 title: panic_to_provider_error
-resource: src/llm/provider/llama_cpp.rs#L499-L503
+resource: src/llm/provider/llama_cpp.rs#L519-L523
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp/panic_message
+  - target: functions/src/llm/provider/llama_cpp/panic_message
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/llama_cpp/dispatch_job
+  - target: functions/src/llm/provider/llama_cpp/dispatch_job
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

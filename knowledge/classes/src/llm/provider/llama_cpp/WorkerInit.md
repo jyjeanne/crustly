@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: WorkerInit
-resource: src/llm/provider/llama_cpp.rs#L222-L241
+resource: src/llm/provider/llama_cpp.rs#L221-L240
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

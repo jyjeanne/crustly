@@ -3,14 +3,22 @@ type: Rust Function
 title: build_tool_call_sampler
 resource: src/llm/provider/llama_cpp_grammar.rs#L128-L142
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp_grammar/tool_call_json_schema
+  - target: functions/src/llm/provider/llama_cpp_grammar/tool_call_json_schema
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/llama_cpp/try_build_constrained_sampler
-  - functions/src/llm/provider/llama_cpp_grammar/schema_compiles_into_a_working_sampler
-  - functions/src/llm/provider/llama_cpp_grammar/one_factory_builds_multiple_independent_grammars
+  - target: functions/src/llm/provider/llama_cpp/try_build_constrained_sampler
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp_grammar/schema_compiles_into_a_working_sampler
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp_grammar/one_factory_builds_multiple_independent_grammars
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,18 +1,25 @@
 ---
 type: Rust Method
 title: from_gemini_response
-resource: src/llm/provider/gemini.rs#L265-L337
+resource: src/llm/provider/gemini.rs#L271-L343
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/EventHandler/next
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/tui/events/EventHandler/next
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/gemini/GeminiProvider/provider/complete
-  - functions/src/llm/provider/gemini/test_from_gemini_response_maps_tool_use
-  - functions/src/llm/provider/gemini/test_from_gemini_response_maps_thinking
+  - target: functions/src/llm/provider/gemini/GeminiProvider/provider/complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/test_from_gemini_response_maps_tool_use
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/test_from_gemini_response_maps_thinking
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -22,7 +29,6 @@ relationships:
 # Calls
 
 - [next](../../../../../../functions/src/tui/events/EventHandler/next.md)
-- [is_empty](../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 
 # Called by
 

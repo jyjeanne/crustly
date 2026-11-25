@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: requires_approval
-resource: src/llm/tools/skill.rs#L73-L75
+resource: src/llm/tools/skill.rs#L98-L100
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -3,14 +3,24 @@ type: Rust Method
 title: with_per_model
 resource: src/llm/provider/ollama.rs#L193-L199
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/factory/ollama_provider_from_config
-  - functions/src/llm/provider/ollama/per_model_override_wins_over_provider_default_for_that_model
-  - functions/src/llm/provider/ollama/per_model_override_falls_back_field_by_field
-  - functions/src/llm/provider/ollama/context_window_reflects_the_per_model_num_ctx_that_is_actually_requested
-  - functions/src/llm/provider/ollama/per_model_think_false_is_sent_when_request_has_no_thinking
+  - target: functions/src/llm/provider/factory/ollama_provider_from_config
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/per_model_override_wins_over_provider_default_for_that_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/per_model_override_falls_back_field_by_field
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/context_window_reflects_the_per_model_num_ctx_that_is_actually_requested
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/per_model_think_false_is_sent_when_request_has_no_thinking
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

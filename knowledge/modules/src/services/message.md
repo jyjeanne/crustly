@@ -1,22 +1,42 @@
 ---
 type: Rust Module
 title: message
-resource: src/services/message.rs#L1-L581
+resource: src/services/message.rs#L1-L596
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-db-models-message-repository-messagerepository
-  - external/crate-services-servicecontext
-  - external/anyhow-context-result
-  - external/chrono-utc
-  - external/uuid-uuid
-  - external/super
-  - external/crate-services-sessionservice
-  - external/crate-db-database
-  - external/crate-llm-provider-perfmetrics
+  - target: external/crate-db-models-message-repository-messagerepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-services-servicecontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/chrono-utc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-services-sessionservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-perfmetrics
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -29,6 +49,7 @@ relationships:
 - [list_messages_for_session](../../../functions/src/services/message/MessageService/list_messages_for_session.md)
 - [update_message](../../../functions/src/services/message/MessageService/update_message.md)
 - [update_message_usage](../../../functions/src/services/message/MessageService/update_message_usage.md)
+- [update_message_tool_log](../../../functions/src/services/message/MessageService/update_message_tool_log.md)
 - [update_message_metrics](../../../functions/src/services/message/MessageService/update_message_metrics.md)
 - [delete_message](../../../functions/src/services/message/MessageService/delete_message.md)
 - [delete_messages_for_session](../../../functions/src/services/message/MessageService/delete_messages_for_session.md)

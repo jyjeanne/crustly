@@ -3,12 +3,16 @@ type: Rust Function
 title: extract_retry_after
 resource: src/llm/provider/retry.rs#L196-L216
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/retry/parse_retry_seconds
+  - target: functions/src/llm/provider/retry/parse_retry_seconds
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/retry/test_extract_retry_after
+  - target: functions/src/llm/provider/retry/test_extract_retry_after
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

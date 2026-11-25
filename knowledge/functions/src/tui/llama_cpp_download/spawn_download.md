@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: spawn_download
-resource: src/tui/llama_cpp_download.rs#L163-L209
+resource: src/tui/llama_cpp_download.rs#L307-L353
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp_models/resolve_download_source
-  - functions/src/llm/provider/llama_cpp_models/download_model
+  - target: functions/src/llm/provider/llama_cpp_models/resolve_download_source
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp_models/download_model
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

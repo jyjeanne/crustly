@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: llama_cpp_typing_fills_the_download_input
-resource: src/tui/app.rs#L4279-L4292
+resource: src/tui/app.rs#L5506-L5519
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/handle_llama_cpp_models_key
-  - functions/src/tui/app/key
+  - target: functions/src/tui/app/App/handle_llama_cpp_models_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: SessionService
-resource: src/services/session.rs#L18-L20
+resource: src/services/session.rs#L16-L18
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

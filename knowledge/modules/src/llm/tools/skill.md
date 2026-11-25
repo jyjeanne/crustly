@@ -1,24 +1,42 @@
 ---
 type: Rust Module
 title: skill
-resource: src/llm/tools/skill.rs#L1-L459
+resource: src/llm/tools/skill.rs#L1-L623
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-result-toolerror
-  - external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
-  - external/async-trait-async-trait
-  - external/serde-deserialize-serialize
-  - external/serde-json-value
-  - external/std-path-path-pathbuf
-  - external/super
+  - target: external/super-error-result-toolerror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
 
+- [lookup](../../../../functions/src/llm/tools/skill/lookup.md)
+- [names](../../../../functions/src/llm/tools/skill/names.md)
 - [SkillTool](../../../../classes/src/llm/tools/skill/SkillTool.md)
 - [SkillInput](../../../../classes/src/llm/tools/skill/SkillInput.md)
 - [SkillOutput](../../../../classes/src/llm/tools/skill/SkillOutput.md)
@@ -29,6 +47,10 @@ relationships:
 - [requires_approval](../../../../functions/src/llm/tools/skill/SkillTool/tool/requires_approval.md)
 - [validate_input](../../../../functions/src/llm/tools/skill/SkillTool/tool/validate_input.md)
 - [execute](../../../../functions/src/llm/tools/skill/SkillTool/tool/execute.md)
+- [SkillSource](../../../../classes/src/llm/tools/skill/SkillSource.md)
+- [display](../../../../functions/src/llm/tools/skill/SkillSource/display.md)
+- [resolve_skill](../../../../functions/src/llm/tools/skill/resolve_skill.md)
+- [resolve_skill_content](../../../../functions/src/llm/tools/skill/resolve_skill_content.md)
 - [resolve_skill_path](../../../../functions/src/llm/tools/skill/resolve_skill_path.md)
 - [skill_lookup_roots](../../../../functions/src/llm/tools/skill/skill_lookup_roots.md)
 - [push_if_dir](../../../../functions/src/llm/tools/skill/push_if_dir.md)
@@ -50,6 +72,13 @@ relationships:
 - [list_skills_is_sorted_alphabetically_case_insensitive](../../../../functions/src/llm/tools/skill/list_skills_is_sorted_alphabetically_case_insensitive.md)
 - [list_skills_deduplicates_same_name_across_roots](../../../../functions/src/llm/tools/skill/list_skills_deduplicates_same_name_across_roots.md)
 - [list_skills_does_not_panic_on_a_directory_with_no_skills_dir](../../../../functions/src/llm/tools/skill/list_skills_does_not_panic_on_a_directory_with_no_skills_dir.md)
+- [resolve_skill_content_falls_back_to_builtin_review_skill](../../../../functions/src/llm/tools/skill/resolve_skill_content_falls_back_to_builtin_review_skill.md)
+- [resolve_skill_content_prefers_project_file_over_builtin](../../../../functions/src/llm/tools/skill/resolve_skill_content_prefers_project_file_over_builtin.md)
+- [resolve_skill_content_returns_none_for_unknown_skill](../../../../functions/src/llm/tools/skill/resolve_skill_content_returns_none_for_unknown_skill.md)
+- [list_skills_includes_builtin_review_skill](../../../../functions/src/llm/tools/skill/list_skills_includes_builtin_review_skill.md)
+- [resolve_skill_content_falls_back_to_builtin_spec_skill](../../../../functions/src/llm/tools/skill/resolve_skill_content_falls_back_to_builtin_spec_skill.md)
+- [list_skills_includes_builtin_spec_skill](../../../../functions/src/llm/tools/skill/list_skills_includes_builtin_spec_skill.md)
+- [list_skills_lets_project_skill_shadow_builtin_of_same_name](../../../../functions/src/llm/tools/skill/list_skills_lets_project_skill_shadow_builtin_of_same_name.md)
 
 # Imports
 

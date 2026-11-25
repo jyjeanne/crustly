@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: Attachment
-resource: src/db/models.rs#L57-L66
+resource: src/db/models.rs#L60-L69
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

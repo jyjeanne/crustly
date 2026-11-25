@@ -4,10 +4,12 @@ title: with_error
 resource: tests/streaming_test.rs#L76-L82
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/tests/streaming_test/test_streaming_error_handling
+  - target: functions/tests/streaming_test/test_streaming_error_handling
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

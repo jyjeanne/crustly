@@ -1,16 +1,30 @@
 ---
 type: Rust Method
 title: get_most_recent_session
-resource: src/services/session.rs#L155-L165
+resource: src/services/session.rs#L153-L163
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/repository/session/SessionRepository/list
-  - functions/src/tui/events/EventHandler/next
+  - target: functions/src/db/repository/session/SessionRepository/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/ServiceContext/pool
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/db/repository/session/SessionRepository/list
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/events/EventHandler/next
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/session/test_get_most_recent_session
-  - functions/src/tui/app/App/initialize
+  - target: functions/src/services/session/test_get_most_recent_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/initialize
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,6 +33,8 @@ relationships:
 
 # Calls
 
+- [new](../../../../../functions/src/db/repository/session/SessionRepository/new.md)
+- [pool](../../../../../functions/src/services/ServiceContext/pool.md)
 - [list](../../../../../functions/src/db/repository/session/SessionRepository/list.md)
 - [next](../../../../../functions/src/tui/events/EventHandler/next.md)
 

@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: with_file_read_cache
-resource: src/llm/tools/trait.rs#L114-L117
+resource: src/llm/tools/trait.rs#L190-L193
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+  - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

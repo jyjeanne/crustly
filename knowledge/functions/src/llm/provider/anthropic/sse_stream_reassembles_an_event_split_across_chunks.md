@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: sse_stream_reassembles_an_event_split_across_chunks
-resource: src/llm/provider/anthropic.rs#L591-L611
+resource: src/llm/provider/anthropic.rs#L604-L624
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/anthropic/parse_anthropic_sse_stream
+  - target: functions/src/memory/MemoryStore/find
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/anthropic/parse_anthropic_sse_stream
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [find](../../../../../functions/src/memory/MemoryStore/find.md)
 - [parse_anthropic_sse_stream](../../../../../functions/src/llm/provider/anthropic/parse_anthropic_sse_stream.md)

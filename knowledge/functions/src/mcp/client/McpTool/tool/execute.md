@@ -1,13 +1,21 @@
 ---
 type: Rust Method
 title: execute
-resource: src/mcp/client.rs#L361-L371
+resource: src/mcp/client.rs#L360-L370
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/mcp/client/MCPClient/call_tool
+  - target: functions/src/mcp/client/MCPClient/call_tool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/trait/ToolResult/success
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/trait/ToolResult/error
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,3 +25,5 @@ relationships:
 # Calls
 
 - [call_tool](../../../../../../functions/src/mcp/client/MCPClient/call_tool.md)
+- [success](../../../../../../functions/src/llm/tools/trait/ToolResult/success.md)
+- [error](../../../../../../functions/src/llm/tools/trait/ToolResult/error.md)

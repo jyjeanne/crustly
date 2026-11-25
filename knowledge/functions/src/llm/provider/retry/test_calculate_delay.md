@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_calculate_delay
 resource: src/llm/provider/retry.rs#L265-L289
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -4,11 +4,15 @@ title: release
 resource: src/llm/tools/task.rs#L145-L149
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/task/TaskStore/with_lock
-  - functions/src/llm/tools/task/TaskTool/tool/execute
+  - target: functions/src/llm/tools/task/TaskStore/with_lock
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/task/TaskTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

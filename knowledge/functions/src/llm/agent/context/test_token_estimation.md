@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_token_estimation
-resource: src/llm/agent/context.rs#L249-L253
+resource: src/llm/agent/context.rs#L288-L292
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/context/AgentContext/estimate_tokens
+  - target: functions/src/llm/agent/context/AgentContext/estimate_tokens
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,16 +1,24 @@
 ---
 type: Rust Function
 title: test_grammar_env
-resource: src/llm/provider/llama_cpp.rs#L1681-L1685
+resource: src/llm/provider/llama_cpp.rs#L1782-L1786
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp_grammar/build_parser_factory
+  - target: functions/src/llm/provider/llama_cpp_grammar/build_parser_factory
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/llama_cpp/try_build_constrained_sampler_succeeds_for_a_valid_tool_schema
-  - functions/src/llm/provider/llama_cpp/try_build_constrained_sampler_does_not_panic_on_an_arbitrary_token_replay
+  - target: functions/src/llm/provider/llama_cpp/try_build_constrained_sampler_succeeds_for_a_valid_tool_schema
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp/try_build_constrained_sampler_does_not_panic_on_an_arbitrary_token_replay
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

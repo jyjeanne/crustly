@@ -4,21 +4,17 @@ title: end_heading
 resource: src/tui/markdown.rs#L93-L120
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/is_empty
   called_by:
-  - functions/src/tui/markdown/MarkdownRenderer/handle_end_tag
+  - target: functions/src/tui/markdown/MarkdownRenderer/handle_end_tag
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn end_heading(&mut self)`
-
-# Calls
-
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 
 # Called by
 

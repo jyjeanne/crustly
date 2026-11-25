@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: final_text_falls_back_to_thinking_when_there_is_no_visible_text
-resource: src/llm/agent/service.rs#L2085-L2115
+resource: src/llm/agent/service.rs#L1959-L1989
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/service/response_with
-  - functions/src/llm/agent/service/AgentService/final_text_and_thinking
+  - target: functions/src/llm/agent/service/response_with
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/AgentService/final_text_and_thinking
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

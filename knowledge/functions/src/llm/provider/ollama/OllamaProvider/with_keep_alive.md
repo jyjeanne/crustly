@@ -3,12 +3,16 @@ type: Rust Method
 title: with_keep_alive
 resource: src/llm/provider/ollama.rs#L254-L260
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/ollama/parse_keep_alive
+  - target: functions/src/llm/provider/ollama/parse_keep_alive
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/factory/ollama_provider_from_config
+  - target: functions/src/llm/provider/factory/ollama_provider_from_config
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_create_provider_with_anthropic
-resource: src/llm/provider/factory.rs#L675-L693
+resource: src/llm/provider/factory.rs#L769-L787
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/factory/create_provider
+  - target: functions/src/llm/provider/factory/create_provider
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

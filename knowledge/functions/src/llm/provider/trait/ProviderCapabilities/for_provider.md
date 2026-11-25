@@ -3,10 +3,12 @@ type: Rust Method
 title: for_provider
 resource: src/llm/provider/trait.rs#L78-L85
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/trait/test_provider_capabilities
+  - target: functions/src/llm/provider/trait/test_provider_capabilities
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

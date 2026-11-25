@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: FailoverProvider
-resource: src/llm/provider/factory.rs#L25-L27
+resource: src/llm/provider/factory.rs#L30-L32
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

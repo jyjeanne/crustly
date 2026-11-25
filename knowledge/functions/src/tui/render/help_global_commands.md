@@ -1,16 +1,22 @@
 ---
 type: Rust Function
 title: help_global_commands
-resource: src/tui/render.rs#L738-L778
+resource: src/tui/render.rs#L1143-L1187
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/help_section_header
-  - functions/src/tui/render/help_row
+  - target: functions/src/tui/render/help_section_header
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_row
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render_help
+  - target: functions/src/tui/render/render_help
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

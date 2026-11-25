@@ -4,26 +4,32 @@ title: client_for
 resource: src/llm/provider/ollama_models.rs#L63-L65
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/tui/error/ErrorInfo/with_context
   called_by:
-  - functions/src/llm/provider/ollama_models/list_models
-  - functions/src/llm/provider/ollama_models/show_model
-  - functions/src/llm/provider/ollama_models/delete_model
-  - functions/src/llm/provider/ollama_models/pull_model
-  - functions/src/llm/provider/ollama_models/generate_embeddings
-  - functions/src/llm/provider/ollama_models/invalid_host_returns_error
+  - target: functions/src/llm/provider/ollama_models/list_models
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/show_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/delete_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/pull_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/generate_embeddings
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/invalid_host_returns_error
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn client_for(host: &str) -> Result<Ollama>`
-
-# Calls
-
-- [with_context](../../../../../functions/src/tui/error/ErrorInfo/with_context.md)
 
 # Called by
 

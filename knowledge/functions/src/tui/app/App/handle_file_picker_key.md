@@ -1,21 +1,34 @@
 ---
 type: Rust Method
 title: handle_file_picker_key
-resource: src/tui/app.rs#L2438-L2489
+resource: src/tui/app.rs#L3286-L3337
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/is_cancel
-  - functions/src/tui/app/App/switch_mode
-  - functions/src/tui/events/is_up
-  - functions/src/tui/events/is_down
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/tui/events/is_enter
-  - functions/src/tui/app/App/open_file_picker
+  - target: functions/src/tui/events/is_cancel
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/switch_mode
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_up
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_down
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_enter
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/open_file_picker
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -28,7 +41,6 @@ relationships:
 - [switch_mode](../../../../../functions/src/tui/app/App/switch_mode.md)
 - [is_up](../../../../../functions/src/tui/events/is_up.md)
 - [is_down](../../../../../functions/src/tui/events/is_down.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 - [is_enter](../../../../../functions/src/tui/events/is_enter.md)
 - [open_file_picker](../../../../../functions/src/tui/app/App/open_file_picker.md)
 

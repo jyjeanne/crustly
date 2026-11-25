@@ -3,11 +3,15 @@ type: Rust Method
 title: with_presence_penalty
 resource: src/llm/provider/types.rs#L234-L237
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/openai/test_llm_request_new_fields
-  - functions/src/llm/provider/openai/test_new_fields_forwarded_to_openai_request
+  - target: functions/src/llm/provider/openai/test_llm_request_new_fields
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/test_new_fields_forwarded_to_openai_request
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

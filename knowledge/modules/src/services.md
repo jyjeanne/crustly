@@ -3,20 +3,40 @@ type: Rust Module
 title: services
 resource: src/services/mod.rs#L1-L120
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/pub-use-file-fileservice
-  - external/pub-use-message-messageservice
-  - external/pub-use-plan-planservice
-  - external/pub-use-session-sessionservice
-  - external/crate-db-pool
-  - external/std-sync-arc
-  - external/super
-  - external/crate-db-pool-poolext
-  - external/crate-db-database
+  - target: external/pub-use-file-fileservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-message-messageservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-plan-planservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-session-sessionservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-pool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-pool-poolext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

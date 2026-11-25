@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_end_to_end_error_handling
 resource: tests/integration_test.rs#L326-L342
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/tests/integration_test/create_test_agent
+  - target: functions/tests/integration_test/create_test_agent
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

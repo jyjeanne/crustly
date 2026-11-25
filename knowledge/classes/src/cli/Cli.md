@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: Cli
-resource: src/cli/mod.rs#L136-L156
+resource: src/cli/mod.rs#L260-L280
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

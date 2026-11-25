@@ -1,13 +1,15 @@
 ---
 type: Rust Method
 title: extract_text_from_response
-resource: src/llm/agent/service.rs#L1661-L1678
+resource: src/llm/agent/service.rs#L1620-L1637
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/agent/service/AgentService/final_text_and_thinking
+  - target: functions/src/llm/agent/service/AgentService/final_text_and_thinking
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

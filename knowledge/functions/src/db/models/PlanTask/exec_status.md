@@ -1,14 +1,24 @@
 ---
 type: Rust Method
 title: exec_status
-resource: src/db/models.rs#L183-L185
+resource: src/db/models.rs#L186-L188
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTaskStatus/parse
+  - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   called_by:
-  - functions/src/db/models/interrupted_plan_from_tasks
+  - target: functions/src/db/models/interrupted_plan_from_tasks
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/plan_crash_recovery_test/task_state_transitions_correct_order
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/plan_crash_recovery_test/failed_task_stores_error_without_completion_timestamp
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -22,3 +32,5 @@ relationships:
 # Called by
 
 - [interrupted_plan_from_tasks](../../../../../functions/src/db/models/interrupted_plan_from_tasks.md)
+- [task_state_transitions_correct_order](../../../../../functions/tests/plan_crash_recovery_test/task_state_transitions_correct_order.md)
+- [failed_task_stores_error_without_completion_timestamp](../../../../../functions/tests/plan_crash_recovery_test/failed_task_stores_error_without_completion_timestamp.md)

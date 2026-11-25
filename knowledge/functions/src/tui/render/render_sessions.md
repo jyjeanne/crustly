@@ -1,24 +1,20 @@
 ---
 type: Rust Function
 title: render_sessions
-resource: src/tui/render.rs#L528-L578
+resource: src/tui/render.rs#L767-L817
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/plan/PlanTask/block
   called_by:
-  - functions/src/tui/render/render
+  - target: functions/src/tui/render/render
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn render_sessions(f: &mut Frame, app: &App, area: Rect)`
-
-# Calls
-
-- [block](../../../../functions/src/plan/PlanTask/block.md)
 
 # Called by
 

@@ -1,13 +1,17 @@
 ---
 type: Rust Method
 title: llama_cpp_models_dir
-resource: src/config/mod.rs#L355-L365
+resource: src/config/mod.rs#L835-L845
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/cli/cmd_llama_cpp
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/cmd_llama_cpp
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

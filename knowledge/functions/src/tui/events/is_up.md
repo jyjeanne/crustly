@@ -1,32 +1,44 @@
 ---
 type: Rust Function
 title: is_up
-resource: src/tui/events.rs#L407-L409
+resource: src/tui/events.rs#L551-L553
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/is_empty
   called_by:
-  - functions/src/tui/app/App/handle_sessions_key
-  - functions/src/tui/app/App/handle_skills_key
-  - functions/src/tui/app/App/handle_mcp_key
-  - functions/src/tui/app/App/handle_file_picker_key
-  - functions/src/tui/app/App/handle_model_download_key
-  - functions/src/tui/app/App/handle_provider_switch_key
-  - functions/src/tui/app/App/handle_llama_cpp_models_key
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_sessions_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_skills_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_mcp_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_file_picker_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_model_download_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_provider_switch_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_llama_cpp_models_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `pub fn is_up(event: &KeyEvent) -> bool`
 
-# Calls
-
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
-
 # Called by
 
+- [handle_key_event](../../../../functions/src/tui/app/App/handle_key_event.md)
 - [handle_sessions_key](../../../../functions/src/tui/app/App/handle_sessions_key.md)
 - [handle_skills_key](../../../../functions/src/tui/app/App/handle_skills_key.md)
 - [handle_mcp_key](../../../../functions/src/tui/app/App/handle_mcp_key.md)

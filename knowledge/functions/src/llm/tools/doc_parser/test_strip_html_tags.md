@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_strip_html_tags
-resource: src/llm/tools/doc_parser.rs#L765-L771
+resource: src/llm/tools/doc_parser.rs#L824-L830
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

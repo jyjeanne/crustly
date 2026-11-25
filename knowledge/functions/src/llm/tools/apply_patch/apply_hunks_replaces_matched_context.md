@@ -2,12 +2,16 @@
 type: Rust Function
 title: apply_hunks_replaces_matched_context
 resource: src/llm/tools/apply_patch.rs#L600-L612
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/apply_patch/apply_hunks
+  - target: functions/src/llm/tools/apply_patch/apply_hunks
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

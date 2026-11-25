@@ -1,14 +1,20 @@
 ---
 type: Rust Method
 title: set_auto_mode_state
-resource: src/tui/app.rs#L594-L596
+resource: src/tui/app.rs#L962-L964
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone
-  - functions/src/tui/render/status_bar_shows_full_auto_when_active
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/setting_auto_mode_state_shares_the_same_cell_as_a_clone
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/status_bar_shows_full_auto_when_active
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

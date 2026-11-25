@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: mcp_view_shows_connection_error
-resource: src/tui/render.rs#L2620-L2635
+resource: src/tui/render.rs#L3371-L3386
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_to_string
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

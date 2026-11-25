@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: push_if_dir
-resource: src/llm/tools/skill.rs#L205-L209
+resource: src/llm/tools/skill.rs#L280-L284
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/skill/skill_lookup_roots
+  - target: functions/src/llm/tools/skill/skill_lookup_roots
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

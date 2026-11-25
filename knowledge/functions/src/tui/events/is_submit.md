@@ -1,14 +1,21 @@
 ---
 type: Rust Function
 title: is_submit
-resource: src/tui/events.rs#L378-L381
+resource: src/tui/events.rs#L522-L525
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/test_submit_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,8 +24,9 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [contains](../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 
 # Called by
 
 - [handle_chat_key](../../../../functions/src/tui/app/App/handle_chat_key.md)
+- [test_submit_key](../../../../functions/src/tui/events/test_submit_key.md)

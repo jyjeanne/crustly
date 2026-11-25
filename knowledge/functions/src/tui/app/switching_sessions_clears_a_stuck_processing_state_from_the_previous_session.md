@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: switching_sessions_clears_a_stuck_processing_state_from_the_previous_session
-resource: src/tui/app.rs#L4571-L4595
+resource: src/tui/app.rs#L5830-L5854
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/create_new_session
+  - target: functions/src/tui/app/App/create_new_session
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

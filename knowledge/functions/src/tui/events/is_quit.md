@@ -1,14 +1,21 @@
 ---
 type: Rust Function
 title: is_quit
-resource: src/tui/events.rs#L305-L307
+resource: src/tui/events.rs#L449-L451
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/key_matches
+  - target: functions/src/tui/events/key_matches
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/test_quit_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -22,3 +29,4 @@ relationships:
 # Called by
 
 - [handle_key_event](../../../../functions/src/tui/app/App/handle_key_event.md)
+- [test_quit_key](../../../../functions/src/tui/events/test_quit_key.md)

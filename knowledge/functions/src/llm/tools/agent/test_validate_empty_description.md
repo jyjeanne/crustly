@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_validate_empty_description
-resource: src/llm/tools/agent.rs#L234-L239
+resource: src/llm/tools/agent.rs#L291-L296
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

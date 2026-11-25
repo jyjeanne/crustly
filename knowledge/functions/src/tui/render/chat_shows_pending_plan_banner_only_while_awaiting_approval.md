@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: chat_shows_pending_plan_banner_only_while_awaiting_approval
-resource: src/tui/render.rs#L2849-L2866
+resource: src/tui/render.rs#L3801-L3818
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_to_string
+  - target: functions/src/plan/PlanDocument/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [new](../../../../functions/src/plan/PlanDocument/new.md)
 - [render_to_string](../../../../functions/src/tui/render/render_to_string.md)

@@ -1,16 +1,22 @@
 ---
 type: Rust Function
 title: resolve_skill_path
-resource: src/llm/tools/skill.rs#L137-L174
+resource: src/llm/tools/skill.rs#L212-L249
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/skill/skill_lookup_roots
-  - functions/src/llm/tools/skill/frontmatter_name_matches
+  - target: functions/src/llm/tools/skill/skill_lookup_roots
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/frontmatter_name_matches
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/skill/SkillTool/tool/execute
+  - target: functions/src/llm/tools/skill/resolve_skill
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -24,4 +30,4 @@ relationships:
 
 # Called by
 
-- [execute](../../../../../functions/src/llm/tools/skill/SkillTool/tool/execute.md)
+- [resolve_skill](../../../../../functions/src/llm/tools/skill/resolve_skill.md)

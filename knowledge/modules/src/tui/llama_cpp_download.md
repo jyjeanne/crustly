@@ -1,20 +1,39 @@
 ---
 type: Rust Module
 title: llama_cpp_download
-resource: src/tui/llama_cpp_download.rs#L1-L357
+resource: src/tui/llama_cpp_download.rs#L1-L539
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-events-tuievent
-  - external/std-path-pathbuf
-  - external/std-sync-arc-mutex
-  - external/tokio-sync-mpsc-unboundedsender
-  - external/tokio-task-joinhandle
-  - external/crate-llm-provider-llama-cpp-models
-  - external/super
+  - target: external/super-events-tuievent
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc-mutex
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-sync-mpsc-unboundedsender
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-task-joinhandle
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-llama-cpp-models-self-localggufmodel
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-llama-cpp-models
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -23,6 +42,10 @@ relationships:
 - [LlamaCppDownloadProgress](../../../classes/src/tui/llama_cpp_download/LlamaCppDownloadProgress.md)
 - [fraction](../../../functions/src/tui/llama_cpp_download/LlamaCppDownloadProgress/fraction.md)
 - [LlamaCppModelDetails](../../../classes/src/tui/llama_cpp_download/LlamaCppModelDetails.md)
+- [HardwareSummary](../../../classes/src/tui/llama_cpp_download/HardwareSummary.md)
+- [budget_bytes](../../../functions/src/tui/llama_cpp_download/HardwareSummary/budget_bytes.md)
+- [detect_hardware_summary](../../../functions/src/tui/llama_cpp_download/detect_hardware_summary.md)
+- [detect_hardware_summary](../../../functions/src/tui/llama_cpp_download/detect_hardware_summary-2.md)
 - [list_local](../../../functions/src/tui/llama_cpp_download/list_local.md)
 - [list_local](../../../functions/src/tui/llama_cpp_download/list_local-2.md)
 - [build_llama_cpp_provider](../../../functions/src/tui/llama_cpp_download/build_llama_cpp_provider.md)
@@ -39,6 +62,7 @@ relationships:
 - [filter_local_empty_query_returns_all](../../../functions/src/tui/llama_cpp_download/filter_local_empty_query_returns_all.md)
 - [filter_local_matches_substring_case_insensitive](../../../functions/src/tui/llama_cpp_download/filter_local_matches_substring_case_insensitive.md)
 - [filter_local_no_match_returns_empty](../../../functions/src/tui/llama_cpp_download/filter_local_no_match_returns_empty.md)
+- [filter_local_matches_display_name_even_when_filename_does_not](../../../functions/src/tui/llama_cpp_download/filter_local_matches_display_name_even_when_filename_does_not.md)
 - [list_local_without_feature_is_empty](../../../functions/src/tui/llama_cpp_download/list_local_without_feature_is_empty.md)
 - [build_provider_without_feature_reports_a_clear_error](../../../functions/src/tui/llama_cpp_download/build_provider_without_feature_reports_a_clear_error.md)
 
@@ -49,6 +73,7 @@ relationships:
 - `std::sync::{Arc, Mutex}`
 - `tokio::sync::mpsc::UnboundedSender`
 - `tokio::task::JoinHandle`
+- `crate::llm::provider::llama_cpp_models::{self, LocalGgufModel}`
 - `crate::llm::provider::llama_cpp_models`
 - `super::*`
 

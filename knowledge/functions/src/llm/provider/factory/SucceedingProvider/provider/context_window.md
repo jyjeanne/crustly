@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: context_window
-resource: src/llm/provider/factory.rs#L630-L632
+resource: src/llm/provider/factory.rs#L653-L655
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

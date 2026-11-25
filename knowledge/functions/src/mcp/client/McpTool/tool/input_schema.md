@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: input_schema
-resource: src/mcp/client.rs#L330-L335
+resource: src/mcp/client.rs#L329-L334
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

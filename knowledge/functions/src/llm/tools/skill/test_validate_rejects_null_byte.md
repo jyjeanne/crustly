@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_validate_rejects_null_byte
-resource: src/llm/tools/skill.rs#L360-L364
+resource: src/llm/tools/skill.rs#L448-L452
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

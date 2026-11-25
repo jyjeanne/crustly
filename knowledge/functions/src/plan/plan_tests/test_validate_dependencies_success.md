@@ -2,14 +2,25 @@
 type: Rust Function
 title: test_validate_dependencies_success
 resource: src/plan/plan_tests.rs#L280-L294
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/plan/plan_tests/create_test_task
-  - functions/src/plan/PlanDocument/add_task
-  - functions/src/plan/PlanDocument/validate_dependencies
+  - target: functions/src/plan/plan_tests/create_test_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/tool_round/ToolRound/push
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/add_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/validate_dependencies
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,5 +30,6 @@ relationships:
 # Calls
 
 - [create_test_task](../../../../functions/src/plan/plan_tests/create_test_task.md)
+- [push](../../../../functions/src/llm/agent/service/tool_round/ToolRound/push.md)
 - [add_task](../../../../functions/src/plan/PlanDocument/add_task.md)
 - [validate_dependencies](../../../../functions/src/plan/PlanDocument/validate_dependencies.md)

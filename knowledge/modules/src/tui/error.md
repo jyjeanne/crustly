@@ -3,14 +3,22 @@ type: Rust Module
 title: error
 resource: src/tui/error.rs#L1-L297
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/chrono-datetime-utc
-  - external/ratatui-style-color
-  - external/super
+  - target: external/chrono-datetime-utc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ratatui-style-color
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: build_llama_cpp_provider
-resource: src/tui/llama_cpp_download.rs#L114-L123
+resource: src/tui/llama_cpp_download.rs#L258-L267
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

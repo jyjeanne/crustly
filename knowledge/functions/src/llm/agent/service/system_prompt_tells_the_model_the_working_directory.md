@@ -1,13 +1,23 @@
 ---
 type: Rust Function
 title: system_prompt_tells_the_model_the_working_directory
-resource: src/llm/agent/service.rs#L2210-L2230
+resource: src/llm/agent/service.rs#L2084-L2104
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/service/AgentService/system_prompt_with_env
+  - target: functions/src/llm/agent/service/AgentService/system_prompt_with_env
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +27,5 @@ relationships:
 # Calls
 
 - [system_prompt_with_env](../../../../../functions/src/llm/agent/service/AgentService/system_prompt_with_env.md)
+- [contains](../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
+- [display](../../../../../functions/src/llm/tools/skill/SkillSource/display.md)

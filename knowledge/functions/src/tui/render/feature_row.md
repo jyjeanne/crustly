@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: feature_row
-resource: src/tui/render.rs#L716-L727
+resource: src/tui/render.rs#L1121-L1132
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/help_features
+  - target: functions/src/tui/render/help_features
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

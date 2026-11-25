@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supports_tools
-resource: src/llm/provider/llama_cpp.rs#L1417-L1423
+resource: src/llm/provider/llama_cpp.rs#L1518-L1524
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

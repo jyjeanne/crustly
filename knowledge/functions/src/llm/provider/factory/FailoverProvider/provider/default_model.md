@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: default_model
-resource: src/llm/provider/factory.rs#L98-L100
+resource: src/llm/provider/factory.rs#L118-L120
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

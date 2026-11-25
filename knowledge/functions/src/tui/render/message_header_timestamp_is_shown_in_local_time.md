@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: message_header_timestamp_is_shown_in_local_time
-resource: src/tui/render.rs#L2458-L2501
+resource: src/tui/render.rs#L3209-L3252
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/line_text
-  - functions/src/tui/render/render_message_lines
+  - target: functions/src/tui/render/line_text
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_message_lines
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

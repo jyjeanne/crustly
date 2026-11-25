@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: SkillTool
-resource: src/llm/tools/skill.rs#L21
+resource: src/llm/tools/skill.rs#L46
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

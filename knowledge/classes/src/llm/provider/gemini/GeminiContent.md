@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: GeminiContent
-resource: src/llm/provider/gemini.rs#L736-L740
+resource: src/llm/provider/gemini.rs#L742-L746
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

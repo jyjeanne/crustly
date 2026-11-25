@@ -3,13 +3,19 @@ type: Rust Module
 title: dialogs
 resource: src/tui/components/dialogs/mod.rs#L1-L171
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-plan-autorunmode-planmodestate-plantask-taskstatus
-  - external/ratatui-layout-alignment-constraint-direction-layout-rect-style-color-modifier-style-text-line-span-widgets-block-borders-clear-paragraph-wrap-frame
+  - target: external/crate-plan-autorunmode-planmodestate-plantask-taskstatus
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ratatui-layout-alignment-constraint-direction-layout-rect-style-color-modifier-style-text-line-span-widgets-block-borders-clear-paragraph-wrap-frame
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

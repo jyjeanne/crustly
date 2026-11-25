@@ -4,13 +4,19 @@ title: strip_verbatim_prefix
 resource: src/llm/tools/sandbox.rs#L196-L224
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/EventHandler/next
-  - functions/src/plan/PlanTask/skip
+  - target: functions/src/tui/events/EventHandler/next
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanTask/skip
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/sandbox/PathBoundaryRule/check
+  - target: functions/src/llm/tools/sandbox/PathBoundaryRule/check
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

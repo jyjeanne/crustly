@@ -3,12 +3,16 @@ type: Rust Module
 title: mcp_contract_test
 resource: tests/mcp_contract_test.rs#L1-L80
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crustly-mcp-client-mcpclient
+  - target: external/crustly-mcp-client-mcpclient
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

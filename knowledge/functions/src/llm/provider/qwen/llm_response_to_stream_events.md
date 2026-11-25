@@ -1,16 +1,22 @@
 ---
 type: Rust Function
 title: llm_response_to_stream_events
-resource: src/llm/provider/qwen.rs#L1624-L1697
+resource: src/llm/provider/qwen.rs#L1650-L1723
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/llm/agent/service/tool_round/ToolRound/push
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/provider/stream
-  - functions/src/llm/provider/qwen/stream_events_from_buffered_content
+  - target: functions/src/llm/provider/qwen/QwenProvider/provider/stream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/stream_events_from_buffered_content
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +25,7 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [push](../../../../../functions/src/llm/agent/service/tool_round/ToolRound/push.md)
 
 # Called by
 

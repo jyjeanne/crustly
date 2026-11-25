@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_calculate_delay_capped
 resource: src/utils/retry.rs#L394-L408
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

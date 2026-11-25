@@ -3,9 +3,34 @@ type: Rust Method
 title: insert
 resource: src/llm/tools/cache.rs#L100-L111
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
+relationships:
+  called_by:
+  - target: functions/src/llm/tools/cache/ToolResultCache/insert_for_tool
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/cache/cache_hit_returns_same_result
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/cache/cache_expires_after_ttl
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/cache/invalidate_matching_drops_selected_tools_and_keeps_others
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/cache/zero_ttl_insert_is_noop
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
 
 `pub fn insert(&self, key: CacheKey, result: String, ttl: Duration)`
+
+# Called by
+
+- [insert_for_tool](../../../../../../functions/src/llm/tools/cache/ToolResultCache/insert_for_tool.md)
+- [cache_hit_returns_same_result](../../../../../../functions/src/llm/tools/cache/cache_hit_returns_same_result.md)
+- [cache_expires_after_ttl](../../../../../../functions/src/llm/tools/cache/cache_expires_after_ttl.md)
+- [invalidate_matching_drops_selected_tools_and_keeps_others](../../../../../../functions/src/llm/tools/cache/invalidate_matching_drops_selected_tools_and_keeps_others.md)
+- [zero_ttl_insert_is_noop](../../../../../../functions/src/llm/tools/cache/zero_ttl_insert_is_noop.md)

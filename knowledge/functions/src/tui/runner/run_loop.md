@@ -1,19 +1,31 @@
 ---
 type: Rust Function
 title: run_loop
-resource: src/tui/runner.rs#L97-L145
+resource: src/tui/runner.rs#L102-L150
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render
-  - functions/src/tui/app/App/next_event
-  - functions/src/tui/app/App/handle_event
-  - functions/src/tui/app/App/try_next_event
+  - target: functions/src/tui/render/render
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/next_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/try_next_event
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/runner/run_inner
-  - functions/src/tui/runner/run_loop_exits_immediately_when_should_quit_is_set
+  - target: functions/src/tui/runner/run_inner
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/runner/run_loop_exits_immediately_when_should_quit_is_set
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

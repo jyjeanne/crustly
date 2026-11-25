@@ -2,13 +2,19 @@
 type: Rust Function
 title: test_service_get_most_recent_plan
 resource: src/services/plan.rs#L485-L527
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/plan/setup_test_service
-  - functions/src/services/plan/PlanService/get_most_recent_plan
+  - target: functions/src/services/plan/setup_test_service
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/plan/PlanService/get_most_recent_plan
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

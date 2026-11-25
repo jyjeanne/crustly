@@ -1,13 +1,15 @@
 ---
 type: Rust Method
 title: cursor_on_first_line
-resource: src/tui/app.rs#L400-L402
+resource: src/tui/app.rs#L594-L596
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/app/App/handle_chat_key
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

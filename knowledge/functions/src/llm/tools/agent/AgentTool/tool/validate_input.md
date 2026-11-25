@@ -1,13 +1,21 @@
 ---
 type: Rust Method
 title: validate_input
-resource: src/llm/tools/agent.rs#L98-L113
+resource: src/llm/tools/agent.rs#L106-L130
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/llm/tools/agent/action_of
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/agent/is_blank
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/agent/parse_id
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +24,6 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [action_of](../../../../../../../functions/src/llm/tools/agent/action_of.md)
+- [is_blank](../../../../../../../functions/src/llm/tools/agent/is_blank.md)
+- [parse_id](../../../../../../../functions/src/llm/tools/agent/parse_id.md)

@@ -4,10 +4,12 @@ title: stream_url
 resource: src/llm/provider/gemini.rs#L105-L110
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/gemini/GeminiProvider/provider/stream
+  - target: functions/src/llm/provider/gemini/GeminiProvider/provider/stream
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

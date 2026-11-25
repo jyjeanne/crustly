@@ -1,13 +1,15 @@
 ---
 type: Rust Method
 title: parse_text
-resource: src/llm/tools/doc_parser.rs#L411-L423
+resource: src/llm/tools/doc_parser.rs#L451-L463
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/doc_parser/DocParserTool/tool/execute
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

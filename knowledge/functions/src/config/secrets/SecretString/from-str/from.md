@@ -4,10 +4,12 @@ title: from
 resource: src/config/secrets.rs#L195-L197
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/from_str
+  - target: functions/src/config/secrets/SecretString/from_str
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature

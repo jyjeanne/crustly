@@ -1,12 +1,18 @@
 ---
 type: Rust Method
 title: with_system_prompt
-resource: src/llm/agent/context.rs#L61-L65
+resource: src/llm/agent/context.rs#L100-L104
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/context/AgentContext/estimate_tokens
+  - target: functions/src/llm/agent/context/AgentContext/estimate_tokens
+    resolved_by: tree-sitter
+    confidence: exact
+  called_by:
+  - target: functions/src/llm/agent/context/test_system_prompt
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -16,3 +22,7 @@ relationships:
 # Calls
 
 - [estimate_tokens](../../../../../../functions/src/llm/agent/context/AgentContext/estimate_tokens.md)
+
+# Called by
+
+- [test_system_prompt](../../../../../../functions/src/llm/agent/context/test_system_prompt.md)

@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: App
-resource: src/app/mod.rs#L12-L14
+resource: src/app/mod.rs#L7-L9
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

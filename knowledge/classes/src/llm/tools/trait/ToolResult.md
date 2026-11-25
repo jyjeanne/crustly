@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: ToolResult
-resource: src/llm/tools/trait.rs#L122-L134
+resource: src/llm/tools/trait.rs#L198-L210
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_disabled_azure_falls_through_to_anthropic
-resource: src/llm/provider/factory.rs#L760-L783
+resource: src/llm/provider/factory.rs#L854-L877
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/factory/create_provider
+  - target: functions/src/llm/provider/factory/create_provider
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
