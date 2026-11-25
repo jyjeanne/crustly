@@ -3,7 +3,7 @@ type: Rust Method
 title: start_execution
 resource: src/plan/mod.rs#L195-L198
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/plan/plan_tests/test_plan_state_transitions

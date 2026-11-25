@@ -3,7 +3,7 @@ type: Rust Function
 title: best_fitting_model
 resource: src/llm/provider/llama_cpp_models.rs#L827-L840
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_models/hardware_fit

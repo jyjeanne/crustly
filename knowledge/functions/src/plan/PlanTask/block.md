@@ -3,7 +3,7 @@ type: Rust Method
 title: block
 resource: src/plan/mod.rs#L692-L694
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/plan/plan_tests/test_task_blocking

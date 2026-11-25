@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: a_memory_cannot_close_the_block_early
-resource: src/memory/recall.rs#L573-L583
+resource: src/memory/recall.rs#L586-L596
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/render_block

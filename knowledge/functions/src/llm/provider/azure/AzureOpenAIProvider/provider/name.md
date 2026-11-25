@@ -4,7 +4,7 @@ title: name
 resource: src/llm/provider/azure.rs#L87-L89
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/azure/test_azure_provider_creation

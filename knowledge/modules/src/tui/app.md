@@ -3,7 +3,7 @@ type: Rust Module
 title: app
 resource: src/tui/app.rs#L1-L6462
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-events-appmode-eventhandler-toolapprovalrequest-toolapprovalresponse-tuievent

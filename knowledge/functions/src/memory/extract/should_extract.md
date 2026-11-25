@@ -3,7 +3,7 @@ type: Rust Function
 title: should_extract
 resource: src/memory/extract.rs#L88-L93
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/extract/extraction_runs_after_enough_messages_or_at_session_end

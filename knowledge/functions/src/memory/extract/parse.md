@@ -3,7 +3,7 @@ type: Rust Function
 title: parse
 resource: src/memory/extract.rs#L187-L226
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/extract/check

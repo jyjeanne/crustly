@@ -4,7 +4,7 @@ title: prepare_generation
 resource: src/llm/provider/llama_cpp.rs#L550-L597
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp/build_sampler

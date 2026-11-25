@@ -3,7 +3,7 @@ type: Rust Method
 title: get_tool_definitions
 resource: src/llm/tools/registry.rs#L144-L153
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/core_profile_fixed_overhead_fits_a_small_window

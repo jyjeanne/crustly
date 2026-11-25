@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_db
-resource: src/cli/mod.rs#L1573-L1674
+resource: src/cli/mod.rs#L1718-L1819
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect

@@ -3,7 +3,7 @@ type: Rust Method
 title: with_client
 resource: src/llm/provider/anthropic.rs#L48-L50
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

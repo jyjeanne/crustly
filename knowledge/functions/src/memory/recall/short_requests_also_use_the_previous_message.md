@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: short_requests_also_use_the_previous_message
-resource: src/memory/recall.rs#L336-L345
+resource: src/memory/recall.rs#L349-L358
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/fts_match_expr

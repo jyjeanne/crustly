@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: take_notices
-resource: src/memory/mod.rs#L828-L833
+resource: src/memory/mod.rs#L860-L865
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_run

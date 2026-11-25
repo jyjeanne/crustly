@@ -4,7 +4,7 @@ title: lesson_from_episodes
 resource: src/memory/consolidate.rs#L180-L256
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/folded_sources

@@ -4,7 +4,7 @@ title: first_line
 resource: src/tui/app.rs#L347-L349
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/EventHandler/next

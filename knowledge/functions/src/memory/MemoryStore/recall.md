@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: recall
-resource: src/memory/mod.rs#L348-L356
+resource: src/memory/mod.rs#L363-L371
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/try_recall
@@ -20,6 +20,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/recall
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/tests/memory_extraction_test/recall
@@ -68,6 +71,7 @@ relationships:
 - [memory_block](../../../../functions/src/llm/agent/service/AgentService/memory_block.md)
 - [recall](../../../../functions/tests/memory_acceptance_test/recall.md)
 - [run](../../../../functions/tests/memory_benchmark_test/run.md)
+- [recall](../../../../functions/tests/memory_code_knowledge_test/recall.md)
 - [recall](../../../../functions/tests/memory_extraction_test/recall.md)
 - [a_session_end_run_writes_an_episode_that_starts_the_next_session](../../../../functions/tests/memory_extraction_test/a_session_end_run_writes_an_episode_that_starts_the_next_session.md)
 - [first_request_block](../../../../functions/tests/memory_extraction_test/first_request_block.md)

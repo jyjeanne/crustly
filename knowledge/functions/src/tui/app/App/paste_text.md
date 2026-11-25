@@ -4,7 +4,7 @@ title: paste_text
 resource: src/tui/app.rs#L706-L733
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/notify

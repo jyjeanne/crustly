@@ -4,7 +4,7 @@ title: resolve_skill
 resource: src/llm/tools/skill.rs#L185-L190
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/skill/resolve_skill_path

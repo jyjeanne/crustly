@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: build_request
-resource: src/llm/agent/service.rs#L1067-L1082
+resource: src/llm/agent/service.rs#L1080-L1095
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/types/LLMRequest/new

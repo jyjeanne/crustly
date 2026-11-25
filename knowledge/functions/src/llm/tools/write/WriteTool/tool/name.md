@@ -4,7 +4,7 @@ title: name
 resource: src/llm/tools/write.rs#L34-L36
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/write/test_write_tool_schema

@@ -3,7 +3,7 @@ type: Rust Function
 title: truncate_at_char_boundary
 resource: src/utils/mod.rs#L10-L19
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/compaction/elide_tool_results

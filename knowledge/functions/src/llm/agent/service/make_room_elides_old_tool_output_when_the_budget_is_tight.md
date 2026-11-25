@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: make_room_elides_old_tool_output_when_the_budget_is_tight
-resource: src/llm/agent/service.rs#L3026-L3058
+resource: src/llm/agent/service.rs#L3040-L3072
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

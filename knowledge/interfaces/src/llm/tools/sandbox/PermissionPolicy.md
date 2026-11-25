@@ -3,7 +3,7 @@ type: Rust Trait
 title: PermissionPolicy
 resource: src/llm/tools/sandbox.rs#L38-L40
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

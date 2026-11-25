@@ -4,9 +4,12 @@ title: init_debug_logging
 resource: src/logging.rs#L128-L203
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/project/write
     resolved_by: tree-sitter
     confidence: exact
@@ -34,6 +37,7 @@ relationships:
 
 # Calls
 
+- [exists](../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [write](../../../functions/src/memory/project/write.md)
 - [build](../../../functions/src/llm/agent/service/subagents/ChildTemplate/build.md)
 - [parse](../../../functions/src/db/models/PlanTaskStatus/parse.md)

@@ -3,7 +3,7 @@ type: Rust Method
 title: has_tool
 resource: src/llm/tools/registry.rs#L134-L136
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/registry/ToolRegistry/canonical_name

@@ -3,7 +3,7 @@ type: Rust Method
 title: extraction_state
 resource: src/db/repository/memory.rs#L160-L175
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/extraction/MemoryStore/has_unread_turns

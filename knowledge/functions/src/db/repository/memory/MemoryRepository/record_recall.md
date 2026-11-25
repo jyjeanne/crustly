@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: record_recall
-resource: src/db/repository/memory.rs#L517-L531
+resource: src/db/repository/memory.rs#L590-L604
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/try_recall

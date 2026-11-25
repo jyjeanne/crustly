@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: list
-resource: src/memory/mod.rs#L645-L653
+resource: src/memory/mod.rs#L673-L681
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/list_for_project

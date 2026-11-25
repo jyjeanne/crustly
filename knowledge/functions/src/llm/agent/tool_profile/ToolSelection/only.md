@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: only
-resource: src/llm/agent/tool_profile.rs#L46-L52
+resource: src/llm/agent/tool_profile.rs#L50-L57
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/tool_selection

@@ -4,7 +4,7 @@ title: search_file
 resource: src/llm/tools/grep.rs#L238-L312
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/plan/PlanTask/skip

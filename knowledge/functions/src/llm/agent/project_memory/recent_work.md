@@ -3,7 +3,7 @@ type: Rust Function
 title: recent_work
 resource: src/llm/agent/project_memory.rs#L221-L261
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/context/token_count

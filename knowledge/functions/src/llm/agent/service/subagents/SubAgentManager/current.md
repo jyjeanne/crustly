@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: current
-resource: src/llm/agent/service/subagents.rs#L173-L175
+resource: src/llm/agent/service/subagents.rs#L175-L177
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/SubAgentManager/agents

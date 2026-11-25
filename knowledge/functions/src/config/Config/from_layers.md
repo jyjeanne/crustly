@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: from_layers
-resource: src/config/mod.rs#L1428-L1449
+resource: src/config/mod.rs#L1513-L1534
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

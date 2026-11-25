@@ -3,7 +3,7 @@ type: Rust Method
 title: on_tool_calls
 resource: src/llm/agent/middleware.rs#L126-L128
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/middleware/Pipeline/first_decision

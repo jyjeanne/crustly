@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: DebugConfig
-resource: src/config/mod.rs#L726-L734
+resource: src/config/mod.rs#L811-L819
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

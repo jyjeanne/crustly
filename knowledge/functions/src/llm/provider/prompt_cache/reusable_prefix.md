@@ -3,7 +3,7 @@ type: Rust Function
 title: reusable_prefix
 resource: src/llm/provider/prompt_cache.rs#L20-L27
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/llama_cpp/prefill

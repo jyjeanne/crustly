@@ -4,7 +4,7 @@ title: parse_native_qwen_tool_calls
 resource: src/llm/provider/qwen.rs#L537-L593
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/plan/PlanTask/skip

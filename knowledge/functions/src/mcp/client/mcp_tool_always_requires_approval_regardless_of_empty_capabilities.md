@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: mcp_tool_always_requires_approval_regardless_of_empty_capabilities
-resource: src/mcp/client.rs#L522-L562
+resource: src/mcp/client.rs#L541-L581
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/mcp/client/McpTool/new

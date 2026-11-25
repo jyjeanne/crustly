@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: errors_that_a_retry_cannot_fix_do_not_fall_back
-resource: src/llm/agent/service.rs#L4021-L4040
+resource: src/llm/agent/service.rs#L4035-L4054
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

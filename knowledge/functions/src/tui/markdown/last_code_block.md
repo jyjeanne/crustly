@@ -3,7 +3,7 @@ type: Rust Function
 title: last_code_block
 resource: src/tui/markdown.rs#L238-L262
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/app/App/copy_last_response_to_clipboard

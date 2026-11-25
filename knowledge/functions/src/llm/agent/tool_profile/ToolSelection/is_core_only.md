@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: is_core_only
-resource: src/llm/agent/tool_profile.rs#L73-L75
+resource: src/llm/agent/tool_profile.rs#L106-L108
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/system_prompt_for

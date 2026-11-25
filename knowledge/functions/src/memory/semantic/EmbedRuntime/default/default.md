@@ -4,7 +4,7 @@ title: default
 resource: src/memory/semantic.rs#L43-L54
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/embedder_from_config

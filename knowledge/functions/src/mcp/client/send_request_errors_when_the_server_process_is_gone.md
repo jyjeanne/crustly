@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: send_request_errors_when_the_server_process_is_gone
-resource: src/mcp/client.rs#L481-L507
+resource: src/mcp/client.rs#L500-L526
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/mcp/client/MCPClient/send_request

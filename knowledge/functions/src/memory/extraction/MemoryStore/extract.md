@@ -3,7 +3,7 @@ type: Rust Method
 title: extract
 resource: src/memory/extraction.rs#L120-L269
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/extraction_state

@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/services/mod.rs#L51-L61
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceContext/new

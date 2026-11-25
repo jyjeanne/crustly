@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/llm/provider/llama_cpp.rs#L131-L218
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp/gpu_backend_compiled_in

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: system_config_path
-resource: src/config/mod.rs#L1395-L1397
+resource: src/config/mod.rs#L1480-L1482
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/Config/load

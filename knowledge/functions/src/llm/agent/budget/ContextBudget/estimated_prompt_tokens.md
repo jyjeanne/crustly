@@ -3,7 +3,7 @@ type: Rust Method
 title: estimated_prompt_tokens
 resource: src/llm/agent/budget.rs#L102-L105
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/budget/ContextBudget/calibrated

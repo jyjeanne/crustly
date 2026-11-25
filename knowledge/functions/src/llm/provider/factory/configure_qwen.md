@@ -4,7 +4,7 @@ title: configure_qwen
 resource: src/llm/provider/factory.rs#L459-L508
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/qwen/QwenProvider/with_tool_parser

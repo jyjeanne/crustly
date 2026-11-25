@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: agents_dir
-resource: src/llm/agent/service/subagents.rs#L370-L372
+resource: src/llm/agent/service/subagents.rs#L372-L374
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/subagents/write_report

@@ -4,7 +4,7 @@ title: handle_ctrl_c
 resource: src/tui/app.rs#L759-L778
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/cancel_request

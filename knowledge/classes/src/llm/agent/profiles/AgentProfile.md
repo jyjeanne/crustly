@@ -3,7 +3,7 @@ type: Rust Struct
 title: AgentProfile
 resource: src/llm/agent/profiles.rs#L16-L27
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

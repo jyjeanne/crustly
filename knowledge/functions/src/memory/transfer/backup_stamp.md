@@ -3,7 +3,7 @@ type: Rust Function
 title: backup_stamp
 resource: src/memory/transfer.rs#L332-L334
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_memory

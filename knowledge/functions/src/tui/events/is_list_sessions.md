@@ -3,7 +3,7 @@ type: Rust Function
 title: is_list_sessions
 resource: src/tui/events.rs#L459-L461
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/key_matches

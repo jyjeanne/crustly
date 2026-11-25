@@ -4,7 +4,7 @@ title: handle_error
 resource: src/llm/provider/qwen.rs#L1229-L1290
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/qwen/QwenProvider/provider/complete

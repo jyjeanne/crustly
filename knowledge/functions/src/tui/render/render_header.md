@@ -4,7 +4,7 @@ title: render_header
 resource: src/tui/render.rs#L201-L307
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/total_tokens

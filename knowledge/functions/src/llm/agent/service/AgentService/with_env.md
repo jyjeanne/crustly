@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: with_env
-resource: src/llm/agent/service.rs#L800-L809
+resource: src/llm/agent/service.rs#L812-L821
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/system_prompt_with_env

@@ -4,7 +4,7 @@ title: handle_start_tag
 resource: src/tui/markdown.rs#L83-L91
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/markdown/MarkdownRenderer/start_code_block

@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: wait_for_status
-resource: src/llm/agent/service.rs#L3824-L3837
+resource: src/llm/agent/service.rs#L3838-L3851
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/AgentServiceLauncher/subagentlauncher/report

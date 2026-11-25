@@ -3,7 +3,7 @@ type: Rust Method
 title: tasks_in_order
 resource: src/plan/mod.rs#L86-L145
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/tool_round/ToolRound/push

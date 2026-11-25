@@ -3,7 +3,7 @@ type: Rust Function
 title: build_tool_call_sampler
 resource: src/llm/provider/llama_cpp_grammar.rs#L128-L142
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_grammar/tool_call_json_schema

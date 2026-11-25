@@ -3,7 +3,7 @@ type: Rust Module
 title: extract
 resource: src/memory/extract.rs#L1-L406
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-model-validate-memorycategory-max-content-chars

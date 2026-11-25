@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: llama_cpp_doctor_findings
-resource: src/cli/mod.rs#L2684-L2898
+resource: src/cli/mod.rs#L2857-L3071
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/tool_round/ToolRound/push
@@ -17,6 +17,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/config/ProviderConfigs/llama_cpp_extra_model_paths
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/config/ProviderConfigs/llama_cpp_ollama_models_dir
@@ -77,6 +80,7 @@ relationships:
 - [write](../../../functions/src/memory/project/write.md)
 - [available_space_at](../../../functions/src/llm/provider/llama_cpp_models/available_space_at.md)
 - [llama_cpp_extra_model_paths](../../../functions/src/config/ProviderConfigs/llama_cpp_extra_model_paths.md)
+- [exists](../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [llama_cpp_ollama_models_dir](../../../functions/src/config/ProviderConfigs/llama_cpp_ollama_models_dir.md)
 - [detect_hardware](../../../functions/src/llm/provider/hardware_detect/detect_hardware.md)
 - [vram_available_bytes](../../../functions/src/llm/provider/hardware_detect/GpuInfo/vram_available_bytes.md)

@@ -4,7 +4,7 @@ title: complete_response
 resource: src/tui/app.rs#L2531-L2624
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/check_task_completion

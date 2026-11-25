@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: memory_status_lines
-resource: src/cli/mod.rs#L1029-L1098
+resource: src/cli/mod.rs#L1073-L1142
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/tool_round/ToolRound/push

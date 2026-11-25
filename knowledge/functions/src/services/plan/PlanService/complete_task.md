@@ -3,7 +3,7 @@ type: Rust Method
 title: complete_task
 resource: src/services/plan.rs#L69-L73
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/plan/PlanTaskRepository/update_task_status

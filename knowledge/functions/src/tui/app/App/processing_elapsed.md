@@ -3,7 +3,7 @@ type: Rust Method
 title: processing_elapsed
 resource: src/tui/app.rs#L749-L753
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/render/render_processing_indicator

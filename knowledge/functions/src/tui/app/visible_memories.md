@@ -3,7 +3,7 @@ type: Rust Function
 title: visible_memories
 resource: src/tui/app.rs#L69-L82
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

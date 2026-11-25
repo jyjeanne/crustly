@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: fmt
-resource: src/llm/agent/service/subagents.rs#L425-L429
+resource: src/llm/agent/service/subagents.rs#L427-L431
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

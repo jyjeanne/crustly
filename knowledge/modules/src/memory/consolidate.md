@@ -3,7 +3,7 @@ type: Rust Module
 title: consolidate
 resource: src/memory/consolidate.rs#L1-L339
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-model-memory-memorycategory-memoryscope-memorysource-newmemory-saveoutcome

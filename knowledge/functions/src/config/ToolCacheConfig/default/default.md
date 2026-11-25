@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: default
-resource: src/config/mod.rs#L596-L603
+resource: src/config/mod.rs#L681-L688
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/default_read_file_ttl

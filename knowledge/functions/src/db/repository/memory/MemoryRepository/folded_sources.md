@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: folded_sources
-resource: src/db/repository/memory.rs#L343-L355
+resource: src/db/repository/memory.rs#L416-L428
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/models/PlanTaskStatus/parse

@@ -4,7 +4,7 @@ title: session_with
 resource: tests/memory_extraction_test.rs#L143-L164
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/pool

@@ -3,7 +3,7 @@ type: Rust Function
 title: create_provider
 resource: src/llm/provider/factory.rs#L161-L194
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/factory/try_create_qwen

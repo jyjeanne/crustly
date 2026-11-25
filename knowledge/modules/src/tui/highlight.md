@@ -3,7 +3,7 @@ type: Rust Module
 title: highlight
 resource: src/tui/highlight.rs#L1-L214
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/once-cell-sync-lazy

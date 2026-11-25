@@ -4,7 +4,7 @@ title: QwenErrorResponse
 resource: src/llm/provider/qwen.rs#L1864-L1866
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

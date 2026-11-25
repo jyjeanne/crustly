@@ -3,7 +3,7 @@ type: Rust Function
 title: near_duplicate_to_archive
 resource: src/memory/semantic.rs#L285-L300
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/consolidate/MemoryStore/consolidate

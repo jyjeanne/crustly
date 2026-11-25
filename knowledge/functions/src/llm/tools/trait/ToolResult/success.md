@@ -3,7 +3,7 @@ type: Rust Method
 title: success
 resource: src/llm/tools/trait.rs#L214-L221
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/MockTool/crate-llm-tools-tool/execute

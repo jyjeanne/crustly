@@ -4,7 +4,7 @@ title: try_create_openai
 resource: src/llm/provider/factory.rs#L511-L534
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/factory/configure_openai

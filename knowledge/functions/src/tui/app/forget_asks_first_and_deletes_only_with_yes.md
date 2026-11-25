@@ -6,7 +6,7 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/memory_test_app
@@ -16,9 +16,6 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/memory/project/identify
-    resolved_by: tree-sitter
-    confidence: exact
-  - target: functions/src/memory/vector_index/VectorIndex/remove
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/tui/app/last_note
@@ -35,5 +32,4 @@ relationships:
 - [memory_test_app](../../../../functions/src/tui/app/memory_test_app.md)
 - [try_handle_slash_command](../../../../functions/src/tui/app/App/try_handle_slash_command.md)
 - [identify](../../../../functions/src/memory/project/identify.md)
-- [remove](../../../../functions/src/memory/vector_index/VectorIndex/remove.md)
 - [last_note](../../../../functions/src/tui/app/last_note.md)

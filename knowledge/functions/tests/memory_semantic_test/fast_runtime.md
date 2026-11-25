@@ -4,7 +4,7 @@ title: fast_runtime
 resource: tests/memory_semantic_test.rs#L75-L82
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_semantic_test/a_memory_is_recalled_by_meaning_without_a_shared_word

@@ -4,7 +4,7 @@ title: event_belongs_to_current_session
 resource: src/tui/app.rs#L2486-L2490
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/app/App/handle_event

@@ -3,7 +3,7 @@ type: Rust Method
 title: set_agent_service
 resource: src/tui/app.rs#L812-L815
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/refresh_context_usage

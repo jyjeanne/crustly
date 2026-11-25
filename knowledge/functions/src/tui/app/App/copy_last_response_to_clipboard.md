@@ -4,7 +4,7 @@ title: copy_last_response_to_clipboard
 resource: src/tui/app.rs#L662-L681
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/last_assistant_message

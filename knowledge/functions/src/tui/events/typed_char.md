@@ -4,7 +4,7 @@ title: typed_char
 resource: src/tui/events.rs#L420-L431
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

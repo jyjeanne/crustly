@@ -3,7 +3,7 @@ type: Rust Function
 title: check_arguments
 resource: src/llm/tools/schema_check.rs#L21-L50
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/schema_check/kind_fits

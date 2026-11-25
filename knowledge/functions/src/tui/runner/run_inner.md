@@ -4,7 +4,7 @@ title: run_inner
 resource: src/tui/runner.rs#L89-L99
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/initialize

@@ -3,7 +3,7 @@ type: Rust Module
 title: model_routing_test
 resource: tests/model_routing_test.rs#L1-L102
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crustly-llm-provider-router-modelrouter-modeltier

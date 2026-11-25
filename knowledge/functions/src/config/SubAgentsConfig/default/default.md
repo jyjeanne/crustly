@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: default
-resource: src/config/mod.rs#L442-L447
+resource: src/config/mod.rs#L508-L513
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/default_max_concurrent_subagents

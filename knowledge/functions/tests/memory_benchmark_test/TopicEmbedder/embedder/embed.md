@@ -4,7 +4,7 @@ title: embed
 resource: tests/memory_benchmark_test.rs#L73-L111
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

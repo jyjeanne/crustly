@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: MemoryStore
-resource: src/memory/mod.rs#L76-L95
+resource: src/memory/mod.rs#L78-L101
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

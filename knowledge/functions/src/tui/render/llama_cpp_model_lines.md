@@ -4,7 +4,7 @@ title: llama_cpp_model_lines
 resource: src/tui/render.rs#L2632-L2726
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/tool_round/ToolRound/push

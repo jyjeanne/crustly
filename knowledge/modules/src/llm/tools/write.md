@@ -3,7 +3,7 @@ type: Rust Module
 title: write
 resource: src/llm/tools/write.rs#L1-L478
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-error-validate-path-safety-result-toolerror

@@ -3,7 +3,7 @@ type: Rust Function
 title: detect_hardware
 resource: src/llm/provider/hardware_detect.rs#L135-L137
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_llama_cpp

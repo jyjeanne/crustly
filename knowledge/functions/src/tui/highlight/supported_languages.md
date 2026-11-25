@@ -3,7 +3,7 @@ type: Rust Function
 title: supported_languages
 resource: src/tui/highlight.rs#L136-L142
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/highlight/test_supported_languages

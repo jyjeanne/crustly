@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: fts_search
-resource: src/db/repository/memory.rs#L538-L564
+resource: src/db/repository/memory.rs#L611-L637
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/row_to_memory

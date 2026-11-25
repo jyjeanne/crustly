@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: find
-resource: src/memory/mod.rs#L823-L825
+resource: src/memory/mod.rs#L855-L857
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/find_by_prefix
@@ -56,6 +56,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/agent/service/without_memory_the_user_turn_is_unchanged
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/tool_profile/ToolSelection/exposes_mcp
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/provider/anthropic/sse_stream_reassembles_an_event_split_across_chunks
@@ -130,6 +133,12 @@ relationships:
   - target: functions/src/llm/tools/skill/list_skills_discovers_legacy_flat_md_files
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/anchors/MemoryStore/anchor_locations
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/check_capabilities
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/MemoryStore/try_recall
     resolved_by: tree-sitter
     confidence: exact
@@ -184,6 +193,9 @@ relationships:
   - target: functions/tests/integration_test/test_end_to_end_token_usage
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/Scripted/okfserver/call
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/tests/memory_migration_test/a_checksum_recorded_with_other_line_endings_is_accepted_and_updated
     resolved_by: tree-sitter
     confidence: exact
@@ -215,6 +227,7 @@ relationships:
 - [a_sub_agent_s_answer_comes_back_to_the_parent](../../../../functions/src/llm/agent/service/a_sub_agent_s_answer_comes_back_to_the_parent.md)
 - [recall_block_reaches_the_model_but_not_the_database](../../../../functions/src/llm/agent/service/recall_block_reaches_the_model_but_not_the_database.md)
 - [without_memory_the_user_turn_is_unchanged](../../../../functions/src/llm/agent/service/without_memory_the_user_turn_is_unchanged.md)
+- [exposes_mcp](../../../../functions/src/llm/agent/tool_profile/ToolSelection/exposes_mcp.md)
 - [sse_stream_reassembles_an_event_split_across_chunks](../../../../functions/src/llm/provider/anthropic/sse_stream_reassembles_an_event_split_across_chunks.md)
 - [parse_nvidia_smi_csv](../../../../functions/src/llm/provider/hardware_detect/parse_nvidia_smi_csv.md)
 - [parse_system_profiler_json](../../../../functions/src/llm/provider/hardware_detect/parse_system_profiler_json.md)
@@ -239,6 +252,8 @@ relationships:
 - [lookup](../../../../functions/src/llm/tools/skill/lookup.md)
 - [list_skills_discovers_project_local_skills_with_frontmatter](../../../../functions/src/llm/tools/skill/list_skills_discovers_project_local_skills_with_frontmatter.md)
 - [list_skills_discovers_legacy_flat_md_files](../../../../functions/src/llm/tools/skill/list_skills_discovers_legacy_flat_md_files.md)
+- [anchor_locations](../../../../functions/src/memory/anchors/MemoryStore/anchor_locations.md)
+- [check_capabilities](../../../../functions/src/memory/code_knowledge/check_capabilities.md)
 - [try_recall](../../../../functions/src/memory/MemoryStore/try_recall.md)
 - [archive_near_duplicates](../../../../functions/src/memory/semantic/archive_near_duplicates.md)
 - [get_task](../../../../functions/src/plan/PlanDocument/get_task.md)
@@ -257,4 +272,5 @@ relationships:
 - [forget_asks_first_and_deletes_only_on_y](../../../../functions/src/tui/app/forget_asks_first_and_deletes_only_on_y.md)
 - [find_syntax](../../../../functions/src/tui/highlight/find_syntax.md)
 - [test_end_to_end_token_usage](../../../../functions/tests/integration_test/test_end_to_end_token_usage.md)
+- [call](../../../../functions/tests/memory_code_knowledge_test/Scripted/okfserver/call.md)
 - [a_checksum_recorded_with_other_line_endings_is_accepted_and_updated](../../../../functions/tests/memory_migration_test/a_checksum_recorded_with_other_line_endings_is_accepted_and_updated.md)

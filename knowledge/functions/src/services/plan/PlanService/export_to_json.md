@@ -3,7 +3,7 @@ type: Rust Method
 title: export_to_json
 resource: src/services/plan.rs#L124-L137
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/write

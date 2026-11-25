@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: cancelling_during_an_approval_prompt_ends_the_request
-resource: src/llm/agent/service.rs#L3249-L3286
+resource: src/llm/agent/service.rs#L3263-L3300
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

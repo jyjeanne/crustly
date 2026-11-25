@@ -4,7 +4,7 @@ title: complete
 resource: tests/streaming_test.rs#L87-L90
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

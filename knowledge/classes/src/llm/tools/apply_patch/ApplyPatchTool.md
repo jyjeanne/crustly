@@ -3,7 +3,7 @@ type: Rust Struct
 title: ApplyPatchTool
 resource: src/llm/tools/apply_patch.rs#L47
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

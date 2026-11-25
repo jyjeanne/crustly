@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: response_with
-resource: src/llm/agent/service.rs#L1932-L1945
+resource: src/llm/agent/service.rs#L1946-L1959
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/final_text_falls_back_to_thinking_when_there_is_no_visible_text

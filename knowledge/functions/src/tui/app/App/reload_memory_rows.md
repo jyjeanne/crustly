@@ -4,7 +4,7 @@ title: reload_memory_rows
 resource: src/tui/app.rs#L1864-L1887
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/identify

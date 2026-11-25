@@ -4,7 +4,7 @@ title: merge_summaries
 resource: src/llm/agent/compaction.rs#L251-L271
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/find

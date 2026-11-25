@@ -3,7 +3,7 @@ type: Rust Module
 title: grep
 resource: src/llm/tools/grep.rs#L1-L486
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-error-result-toolerror

@@ -4,7 +4,7 @@ title: wait_until_indexed
 resource: tests/memory_semantic_test.rs#L116-L126
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/embedding_status

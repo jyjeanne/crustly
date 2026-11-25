@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/logging.rs#L48-L50
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/logging/LogConfig/default/default

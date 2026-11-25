@@ -3,7 +3,7 @@ type: Rust Method
 title: is_context_overflow
 resource: src/llm/provider/error.rs#L82-L96
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/error/mentions_context_overflow

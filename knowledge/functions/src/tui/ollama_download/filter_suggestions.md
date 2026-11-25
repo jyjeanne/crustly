@@ -3,7 +3,7 @@ type: Rust Function
 title: filter_suggestions
 resource: src/tui/ollama_download.rs#L53-L73
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

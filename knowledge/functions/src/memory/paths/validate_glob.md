@@ -3,7 +3,7 @@ type: Rust Function
 title: validate_glob
 resource: src/memory/paths.rs#L19-L37
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

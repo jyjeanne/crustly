@@ -3,7 +3,7 @@ type: Rust Method
 title: next
 resource: src/tui/events.rs#L253-L255
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_ollama
@@ -99,6 +99,21 @@ relationships:
   - target: functions/src/llm/tools/skill/parse_skill_frontmatter_value
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/code_knowledge/parse_code_span
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/is_identifier
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/is_snake_case
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/is_camel_case
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/closest
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/embed/Prefixes/for_model
     resolved_by: tree-sitter
     confidence: exact
@@ -186,6 +201,11 @@ relationships:
 - [find_active_shell_operator](../../../../../functions/src/llm/tools/sandbox/find_active_shell_operator.md)
 - [append_fact](../../../../../functions/src/llm/tools/save_memory/append_fact.md)
 - [parse_skill_frontmatter_value](../../../../../functions/src/llm/tools/skill/parse_skill_frontmatter_value.md)
+- [parse_code_span](../../../../../functions/src/memory/code_knowledge/parse_code_span.md)
+- [is_identifier](../../../../../functions/src/memory/code_knowledge/is_identifier.md)
+- [is_snake_case](../../../../../functions/src/memory/code_knowledge/is_snake_case.md)
+- [is_camel_case](../../../../../functions/src/memory/code_knowledge/is_camel_case.md)
+- [closest](../../../../../functions/src/memory/code_knowledge/CodeKnowledge/closest.md)
 - [for_model](../../../../../functions/src/memory/embed/Prefixes/for_model.md)
 - [normalize_root](../../../../../functions/src/memory/project/normalize_root.md)
 - [get_most_recent_plan](../../../../../functions/src/services/plan/PlanService/get_most_recent_plan.md)

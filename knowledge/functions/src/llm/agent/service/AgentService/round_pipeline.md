@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: round_pipeline
-resource: src/llm/agent/service.rs#L1012-L1033
+resource: src/llm/agent/service.rs#L1025-L1046
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/middleware/Pipeline/new

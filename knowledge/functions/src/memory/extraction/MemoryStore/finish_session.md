@@ -3,13 +3,10 @@ type: Rust Method
 title: finish_session
 resource: src/memory/extraction.rs#L94-L114
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/extraction/MemoryStore/extract
-    resolved_by: tree-sitter
-    confidence: exact
-  - target: functions/src/memory/vector_index/VectorIndex/remove
     resolved_by: tree-sitter
     confidence: exact
   called_by:
@@ -25,7 +22,6 @@ relationships:
 # Calls
 
 - [extract](../../../../../functions/src/memory/extraction/MemoryStore/extract.md)
-- [remove](../../../../../functions/src/memory/vector_index/VectorIndex/remove.md)
 
 # Called by
 

@@ -3,7 +3,7 @@ type: Rust Function
 title: highlight_code
 resource: src/tui/highlight.rs#L70-L133
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/highlight/find_syntax

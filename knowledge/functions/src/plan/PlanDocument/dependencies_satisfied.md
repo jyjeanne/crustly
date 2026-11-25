@@ -3,7 +3,7 @@ type: Rust Method
 title: dependencies_satisfied
 resource: src/plan/mod.rs#L300-L306
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/all

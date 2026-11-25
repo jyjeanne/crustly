@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: projects
-resource: src/db/repository/memory.rs#L496-L514
+resource: src/db/repository/memory.rs#L569-L587
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/projects

@@ -3,7 +3,7 @@ type: Rust Method
 title: list_by_session
 resource: src/db/repository/file.rs#L121-L123
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/file/FileRepository/find_by_session

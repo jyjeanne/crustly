@@ -3,7 +3,7 @@ type: Rust Method
 title: with_streaming
 resource: src/llm/provider/types.rs#L253-L256
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/send_message_streaming

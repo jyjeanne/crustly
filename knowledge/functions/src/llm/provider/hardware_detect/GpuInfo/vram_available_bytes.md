@@ -3,7 +3,7 @@ type: Rust Method
 title: vram_available_bytes
 resource: src/llm/provider/hardware_detect.rs#L90-L96
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/llama_cpp_doctor_findings

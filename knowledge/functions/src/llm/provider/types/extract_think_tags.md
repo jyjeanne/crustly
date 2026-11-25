@@ -3,7 +3,7 @@ type: Rust Function
 title: extract_think_tags
 resource: src/llm/provider/types.rs#L439-L472
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/drain_stream_to_response

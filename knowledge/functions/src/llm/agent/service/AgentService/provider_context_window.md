@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: provider_context_window
-resource: src/llm/agent/service.rs#L844-L846
+resource: src/llm/agent/service.rs#L856-L858
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/default_context_window

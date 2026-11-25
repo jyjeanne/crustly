@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: reindex
-resource: src/memory/mod.rs#L168-L191
+resource: src/memory/mod.rs#L176-L199
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/semantic/backfill

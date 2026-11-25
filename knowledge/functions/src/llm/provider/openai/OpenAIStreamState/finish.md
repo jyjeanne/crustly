@@ -4,7 +4,7 @@ title: finish
 resource: src/llm/provider/openai.rs#L1120-L1213
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/openai/OpenAIStreamState/on_line

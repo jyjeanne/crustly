@@ -4,7 +4,7 @@ title: mmproj_core_name
 resource: src/llm/provider/llama_cpp_models.rs#L679-L690
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/llama_cpp_models/pair_mmproj_files

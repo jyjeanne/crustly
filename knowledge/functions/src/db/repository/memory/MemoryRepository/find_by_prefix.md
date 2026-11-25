@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: find_by_prefix
-resource: src/db/repository/memory.rs#L409-L418
+resource: src/db/repository/memory.rs#L482-L491
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/find

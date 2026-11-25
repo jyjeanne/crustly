@@ -3,7 +3,7 @@ type: Rust Method
 title: tool_parser
 resource: src/llm/provider/qwen.rs#L177-L179
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/factory/configure_qwen_auto_selects_openai_parser_for_coder_next

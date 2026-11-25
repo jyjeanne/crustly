@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir
-resource: src/cli/mod.rs#L3665-L3675
+resource: src/cli/mod.rs#L3838-L3848
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/resolve_llama_cpp_model_path

@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: full_exposes_everything
-resource: src/llm/agent/tool_profile.rs#L149-L154
+resource: src/llm/agent/tool_profile.rs#L212-L217
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/tool_profile/ToolSelection/full

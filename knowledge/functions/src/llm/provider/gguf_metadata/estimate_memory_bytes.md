@@ -3,7 +3,7 @@ type: Rust Function
 title: estimate_memory_bytes
 resource: src/llm/provider/gguf_metadata.rs#L495-L531
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/gguf_metadata/bits_per_weight

@@ -3,7 +3,7 @@ type: Rust Function
 title: render_crash_recovery_dialog
 resource: src/tui/components/dialogs/mod.rs#L76-L122
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/components/dialogs/centered_rect

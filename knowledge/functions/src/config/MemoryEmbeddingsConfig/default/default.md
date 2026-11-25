@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: default
-resource: src/config/mod.rs#L177-L189
+resource: src/config/mod.rs#L224-L236
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/default_embed_provider

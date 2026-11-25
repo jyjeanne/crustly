@@ -3,7 +3,7 @@ type: Rust Function
 title: archive_near_duplicates
 resource: src/memory/semantic.rs#L305-L353
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/vectors_for

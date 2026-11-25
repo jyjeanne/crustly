@@ -3,7 +3,7 @@ type: Rust Method
 title: create
 resource: src/services/plan.rs#L108-L110
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/plan/PlanRepository/create

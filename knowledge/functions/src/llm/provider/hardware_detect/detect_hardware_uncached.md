@@ -4,7 +4,7 @@ title: detect_hardware_uncached
 resource: src/llm/provider/hardware_detect.rs#L139-L150
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/hardware_detect/detect_nvidia

@@ -3,7 +3,7 @@ type: Rust Method
 title: create_task
 resource: src/db/repository/plan.rs#L492-L514
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

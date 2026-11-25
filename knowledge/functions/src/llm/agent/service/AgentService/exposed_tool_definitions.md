@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: exposed_tool_definitions
-resource: src/llm/agent/service.rs#L857-L863
+resource: src/llm/agent/service.rs#L870-L876
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/registry/ToolRegistry/get_tool_definitions

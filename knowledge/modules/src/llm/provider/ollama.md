@@ -3,7 +3,7 @@ type: Rust Module
 title: ollama
 resource: src/llm/provider/ollama.rs#L1-L1967
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-error-providererror-result

@@ -3,7 +3,7 @@ type: Rust Module
 title: test_support
 resource: src/llm/provider/test_support.rs#L1-L76
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/tokio-io-asyncreadext-asyncwriteext

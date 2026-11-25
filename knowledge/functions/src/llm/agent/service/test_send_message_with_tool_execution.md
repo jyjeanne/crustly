@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_send_message_with_tool_execution
-resource: src/llm/agent/service.rs#L2252-L2287
+resource: src/llm/agent/service.rs#L2266-L2301
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect_in_memory

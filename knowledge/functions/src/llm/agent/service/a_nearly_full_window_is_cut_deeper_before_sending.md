@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: a_nearly_full_window_is_cut_deeper_before_sending
-resource: src/llm/agent/service.rs#L2991-L3022
+resource: src/llm/agent/service.rs#L3005-L3036
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

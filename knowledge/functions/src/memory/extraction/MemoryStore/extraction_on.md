@@ -3,7 +3,7 @@ type: Rust Method
 title: extraction_on
 resource: src/memory/extraction.rs#L78-L80
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/app/App/finish_memory

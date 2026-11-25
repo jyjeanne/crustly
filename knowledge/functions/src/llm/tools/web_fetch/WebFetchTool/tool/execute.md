@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/web_fetch.rs#L157-L242
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/ssrf_guard/check_url_not_blocked
@@ -17,6 +17,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/tools/ssrf_guard/checked_redirect_policy
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/status
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/provider/ollama_models/PullProgress/is_success
@@ -53,6 +56,7 @@ relationships:
 - [error](../../../../../../../functions/src/llm/tools/trait/ToolResult/error.md)
 - [guard](../../../../../../../functions/src/llm/tools/ssrf_guard/guard.md)
 - [checked_redirect_policy](../../../../../../../functions/src/llm/tools/ssrf_guard/checked_redirect_policy.md)
+- [status](../../../../../../../functions/src/memory/code_knowledge/CodeKnowledge/status.md)
 - [is_success](../../../../../../../functions/src/llm/provider/ollama_models/PullProgress/is_success.md)
 - [contains](../../../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 - [html_to_text](../../../../../../../functions/src/llm/tools/web_fetch/html_to_text.md)

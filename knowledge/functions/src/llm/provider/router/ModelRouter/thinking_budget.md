@@ -3,7 +3,7 @@ type: Rust Method
 title: thinking_budget
 resource: src/llm/provider/router.rs#L68-L74
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/router/thinking_budget_by_tier

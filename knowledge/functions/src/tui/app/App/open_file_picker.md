@@ -4,7 +4,7 @@ title: open_file_picker
 resource: src/tui/app.rs#L3250-L3283
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/switch_mode

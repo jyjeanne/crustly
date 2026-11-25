@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: discover_tools
-resource: src/mcp/client.rs#L129-L136
+resource: src/mcp/client.rs#L132-L139
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/mcp/client/MCPClient/send_request
@@ -11,6 +11,9 @@ relationships:
     confidence: exact
   called_by:
   - target: functions/src/llm/tools/registry/ToolRegistry/register_mcp_server
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/MCPClient/okfserver/tools
     resolved_by: tree-sitter
     confidence: exact
 ---
@@ -26,3 +29,4 @@ relationships:
 # Called by
 
 - [register_mcp_server](../../../../../functions/src/llm/tools/registry/ToolRegistry/register_mcp_server.md)
+- [tools](../../../../../functions/src/memory/code_knowledge/MCPClient/okfserver/tools.md)

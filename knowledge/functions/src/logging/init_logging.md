@@ -3,7 +3,7 @@ type: Rust Function
 title: init_logging
 resource: src/logging.rs#L117-L125
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/logging/init_debug_logging

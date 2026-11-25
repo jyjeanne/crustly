@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: input_schema
-resource: src/llm/agent/service.rs#L2927-L2929
+resource: src/llm/agent/service.rs#L2941-L2943
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

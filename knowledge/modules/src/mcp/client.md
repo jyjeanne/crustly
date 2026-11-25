@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: client
-resource: src/mcp/client.rs#L1-L601
+resource: src/mcp/client.rs#L1-L620
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/anyhow-context-result
@@ -69,6 +69,7 @@ relationships:
 - [capabilities](../../../functions/src/mcp/client/McpTool/tool/capabilities.md)
 - [requires_approval](../../../functions/src/mcp/client/McpTool/tool/requires_approval.md)
 - [execute](../../../functions/src/mcp/client/McpTool/tool/execute.md)
+- [a_tool_definition_keeps_its_input_schema](../../../functions/src/mcp/client/a_tool_definition_keeps_its_input_schema.md)
 - [matches_a_response_with_the_expected_id](../../../functions/src/mcp/client/matches_a_response_with_the_expected_id.md)
 - [skips_a_response_for_a_different_request_id](../../../functions/src/mcp/client/skips_a_response_for_a_different_request_id.md)
 - [skips_an_id_less_notification](../../../functions/src/mcp/client/skips_an_id_less_notification.md)

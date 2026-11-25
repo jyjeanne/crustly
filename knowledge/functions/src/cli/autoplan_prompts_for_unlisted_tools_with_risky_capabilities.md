@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: autoplan_prompts_for_unlisted_tools_with_risky_capabilities
-resource: src/cli/mod.rs#L3274-L3292
+resource: src/cli/mod.rs#L3447-L3465
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/auto_mode_bypasses_approval

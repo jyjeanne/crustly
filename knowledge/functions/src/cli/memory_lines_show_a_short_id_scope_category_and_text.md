@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: memory_lines_show_a_short_id_scope_category_and_text
-resource: src/cli/mod.rs#L3766-L3788
+resource: src/cli/mod.rs#L3940-L3962
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/cli/memory_line

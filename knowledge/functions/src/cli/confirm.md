@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: confirm
-resource: src/cli/mod.rs#L1150-L1157
+resource: src/cli/mod.rs#L1194-L1201
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_memory

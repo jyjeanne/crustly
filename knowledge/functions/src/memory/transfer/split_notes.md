@@ -3,7 +3,7 @@ type: Rust Function
 title: split_notes
 resource: src/memory/transfer.rs#L197-L218
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/transfer/import_from_notes

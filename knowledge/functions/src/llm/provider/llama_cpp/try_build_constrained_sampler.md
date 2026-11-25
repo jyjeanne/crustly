@@ -4,7 +4,7 @@ title: try_build_constrained_sampler
 resource: src/llm/provider/llama_cpp.rs#L1284-L1320
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_grammar/build_tool_call_sampler

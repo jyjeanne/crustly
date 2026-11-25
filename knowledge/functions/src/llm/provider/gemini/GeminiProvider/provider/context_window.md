@@ -4,7 +4,7 @@ title: context_window
 resource: src/llm/provider/gemini.rs#L689-L702
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/gemini/test_context_window

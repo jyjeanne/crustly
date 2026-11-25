@@ -4,7 +4,7 @@ title: store_and_real_project
 resource: tests/memory_paths_test.rs#L170-L192
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect

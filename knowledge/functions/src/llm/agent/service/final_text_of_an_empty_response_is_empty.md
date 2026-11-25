@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: final_text_of_an_empty_response_is_empty
-resource: src/llm/agent/service.rs#L2015-L2021
+resource: src/llm/agent/service.rs#L2029-L2035
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/response_with

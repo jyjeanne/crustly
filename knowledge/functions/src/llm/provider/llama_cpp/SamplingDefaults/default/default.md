@@ -4,7 +4,7 @@ title: default
 resource: src/llm/provider/llama_cpp.rs#L71-L78
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/llama_cpp/sampling_defaults_match_documented_values

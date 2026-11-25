@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: drain_stream_to_response
-resource: src/llm/agent/service.rs#L413-L539
+resource: src/llm/agent/service.rs#L417-L543
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/apply_streamed_tool_input

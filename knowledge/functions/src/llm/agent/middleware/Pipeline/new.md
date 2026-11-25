@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/llm/agent/middleware.rs#L99-L101
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/middleware/pipeline_consults_everyone_and_the_first_decision_wins

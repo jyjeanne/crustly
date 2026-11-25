@@ -3,7 +3,7 @@ type: Rust Method
 title: provider_context_window
 resource: src/tui/app.rs#L514-L516
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/provider_context_window

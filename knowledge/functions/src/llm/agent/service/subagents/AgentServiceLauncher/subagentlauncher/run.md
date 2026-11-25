@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: run
-resource: src/llm/agent/service/subagents.rs#L434-L436
+resource: src/llm/agent/service/subagents.rs#L436-L438
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/SubAgentManager/run

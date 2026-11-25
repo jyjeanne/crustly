@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_request_limits
-resource: src/llm/agent/service.rs#L619-L627
+resource: src/llm/agent/service.rs#L624-L632
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/configure_agent_loop

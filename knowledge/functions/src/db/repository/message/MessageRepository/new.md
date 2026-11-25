@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/db/repository/message.rs#L18-L20
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/repository/message/test_message_crud

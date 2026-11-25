@@ -6,7 +6,7 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/new
@@ -19,8 +19,8 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/memory/vector_index/VectorIndex/remove
-    resolved_by: tree-sitter
-    confidence: exact
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/src/memory/vector_index/VectorIndex/len
     resolved_by: tree-sitter-receiver
     confidence: semantic

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: calibration
-resource: src/llm/agent/service.rs#L895-L900
+resource: src/llm/agent/service.rs#L908-L913
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/AgentService/context_usage_preview

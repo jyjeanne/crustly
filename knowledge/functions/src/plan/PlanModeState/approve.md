@@ -3,7 +3,7 @@ type: Rust Method
 title: approve
 resource: src/plan/mod.rs#L879-L895
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/plan/plan_tests/auto_run_no_dialogs

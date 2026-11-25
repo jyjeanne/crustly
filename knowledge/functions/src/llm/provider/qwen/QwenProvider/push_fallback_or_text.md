@@ -4,7 +4,7 @@ title: push_fallback_or_text
 resource: src/llm/provider/qwen.rs#L954-L981
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls

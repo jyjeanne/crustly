@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: touch
-resource: src/db/repository/memory.rs#L372-L379
+resource: src/db/repository/memory.rs#L445-L452
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/save_with

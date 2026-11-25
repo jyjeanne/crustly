@@ -4,7 +4,7 @@ title: forget_command
 resource: src/tui/app.rs#L1763-L1807
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/EventHandler/next

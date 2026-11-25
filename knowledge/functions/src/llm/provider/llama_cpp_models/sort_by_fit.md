@@ -3,7 +3,7 @@ type: Rust Function
 title: sort_by_fit
 resource: src/llm/provider/llama_cpp_models.rs#L802-L820
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_models/hardware_fit

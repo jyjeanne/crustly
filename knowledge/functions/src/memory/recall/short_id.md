@@ -3,7 +3,7 @@ type: Rust Function
 title: short_id
 resource: src/memory/recall.rs#L205-L207
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: record_event
-resource: src/db/repository/memory.rs#L804-L824
+resource: src/db/repository/memory.rs#L877-L897
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/repository/memory/MemoryRepository/insert

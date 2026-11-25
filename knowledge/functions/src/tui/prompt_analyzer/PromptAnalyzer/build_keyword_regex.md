@@ -4,7 +4,7 @@ title: build_keyword_regex
 resource: src/tui/prompt_analyzer.rs#L117-L124
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/prompt_analyzer/PromptAnalyzer/new

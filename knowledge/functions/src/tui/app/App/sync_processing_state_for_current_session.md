@@ -4,7 +4,7 @@ title: sync_processing_state_for_current_session
 resource: src/tui/app.rs#L2511-L2517
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/app/App/create_new_session

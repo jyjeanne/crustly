@@ -4,7 +4,7 @@ title: TodoItemInput
 resource: src/llm/tools/todo_write.rs#L106-L112
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

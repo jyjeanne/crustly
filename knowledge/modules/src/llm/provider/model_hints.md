@@ -3,7 +3,7 @@ type: Rust Module
 title: model_hints
 resource: src/llm/provider/model_hints.rs#L1-L47
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super

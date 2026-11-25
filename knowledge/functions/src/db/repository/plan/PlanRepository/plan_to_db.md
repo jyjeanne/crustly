@@ -4,7 +4,7 @@ title: plan_to_db
 resource: src/db/repository/plan.rs#L323-L349
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

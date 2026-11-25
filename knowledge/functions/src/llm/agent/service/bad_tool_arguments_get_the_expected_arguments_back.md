@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: bad_tool_arguments_get_the_expected_arguments_back
-resource: src/llm/agent/service.rs#L3516-L3554
+resource: src/llm/agent/service.rs#L3530-L3568
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

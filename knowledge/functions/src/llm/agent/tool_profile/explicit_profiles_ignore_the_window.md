@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: explicit_profiles_ignore_the_window
-resource: src/llm/agent/tool_profile.rs#L114-L117
+resource: src/llm/agent/tool_profile.rs#L147-L150
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/tool_profile/ToolSelection/resolve

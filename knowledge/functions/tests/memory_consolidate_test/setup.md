@@ -4,7 +4,7 @@ title: setup
 resource: tests/memory_consolidate_test.rs#L38-L45
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect_in_memory

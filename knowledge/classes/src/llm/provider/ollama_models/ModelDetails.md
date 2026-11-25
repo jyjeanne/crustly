@@ -3,7 +3,7 @@ type: Rust Struct
 title: ModelDetails
 resource: src/llm/provider/ollama_models.rs#L56-L61
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

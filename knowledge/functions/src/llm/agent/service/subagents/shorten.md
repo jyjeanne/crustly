@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: shorten
-resource: src/llm/agent/service/subagents.rs#L362-L368
+resource: src/llm/agent/service/subagents.rs#L364-L370
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/subagents/execute

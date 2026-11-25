@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: llama_cpp_extra_model_paths
-resource: src/config/mod.rs#L850-L855
+resource: src/config/mod.rs#L935-L940
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_chat

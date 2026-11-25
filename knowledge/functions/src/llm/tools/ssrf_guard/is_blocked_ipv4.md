@@ -4,7 +4,7 @@ title: is_blocked_ipv4
 resource: src/llm/tools/ssrf_guard.rs#L36-L51
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

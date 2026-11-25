@@ -4,7 +4,7 @@ title: collect_searchable_files
 resource: src/llm/tools/grep.rs#L324-L340
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/ChildTemplate/build

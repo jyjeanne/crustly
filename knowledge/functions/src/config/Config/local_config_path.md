@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: local_config_path
-resource: src/config/mod.rs#L1414-L1416
+resource: src/config/mod.rs#L1499-L1501
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/Config/load

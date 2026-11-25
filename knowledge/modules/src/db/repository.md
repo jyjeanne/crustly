@@ -3,7 +3,7 @@ type: Rust Module
 title: repository
 resource: src/db/repository/mod.rs#L1-L38
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/pub-use-compaction-compactionrecordrepository

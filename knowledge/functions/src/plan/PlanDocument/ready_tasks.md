@@ -3,7 +3,7 @@ type: Rust Method
 title: ready_tasks
 resource: src/plan/mod.rs#L340-L347
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/plan/PlanDocument/dependencies_satisfied

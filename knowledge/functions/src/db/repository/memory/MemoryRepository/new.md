@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/db/repository/memory.rs#L42-L44
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/reject_refuses_a_memory_that_is_not_pending
@@ -16,6 +16,12 @@ relationships:
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/src/tui/app/memory_screen_app
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_anchors_test/anchors_are_replaced_listed_and_deleted_with_their_memory
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_anchors_test/anchors_of_archived_memories_are_not_listed_for_the_project
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/tests/memory_consolidate_test/insert_at
@@ -60,6 +66,8 @@ relationships:
 - [new](../../../../../../functions/src/memory/MemoryStore/new.md)
 - [attach_embedder](../../../../../../functions/src/memory/MemoryStore/attach_embedder.md)
 - [memory_screen_app](../../../../../../functions/src/tui/app/memory_screen_app.md)
+- [anchors_are_replaced_listed_and_deleted_with_their_memory](../../../../../../functions/tests/memory_anchors_test/anchors_are_replaced_listed_and_deleted_with_their_memory.md)
+- [anchors_of_archived_memories_are_not_listed_for_the_project](../../../../../../functions/tests/memory_anchors_test/anchors_of_archived_memories_are_not_listed_for_the_project.md)
 - [insert_at](../../../../../../functions/tests/memory_consolidate_test/insert_at.md)
 - [near_duplicates_in_the_merge_band_are_merged_on_apply](../../../../../../functions/tests/memory_consolidate_test/near_duplicates_in_the_merge_band_are_merged_on_apply.md)
 - [merge_band_vectors](../../../../../../functions/tests/memory_consolidate_test/merge_band_vectors.md)

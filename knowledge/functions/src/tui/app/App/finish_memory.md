@@ -3,7 +3,7 @@ type: Rust Method
 title: finish_memory
 resource: src/tui/app.rs#L845-L871
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/extraction/MemoryStore/extraction_on

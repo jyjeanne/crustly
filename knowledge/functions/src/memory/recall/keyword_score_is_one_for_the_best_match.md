@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: keyword_score_is_one_for_the_best_match
-resource: src/memory/recall.rs#L488-L492
+resource: src/memory/recall.rs#L501-L505
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/keyword_score

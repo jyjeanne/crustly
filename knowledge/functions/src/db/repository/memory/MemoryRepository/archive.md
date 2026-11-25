@@ -3,7 +3,7 @@ type: Rust Method
 title: archive
 resource: src/db/repository/memory.rs#L145-L155
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/record_event
@@ -14,6 +14,9 @@ relationships:
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/src/memory/semantic/archive_near_duplicates
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_anchors_test/anchors_of_archived_memories_are_not_listed_for_the_project
     resolved_by: tree-sitter-receiver
     confidence: semantic
 ---
@@ -30,3 +33,4 @@ relationships:
 
 - [consolidate](../../../../../../functions/src/memory/consolidate/MemoryStore/consolidate.md)
 - [archive_near_duplicates](../../../../../../functions/src/memory/semantic/archive_near_duplicates.md)
+- [anchors_of_archived_memories_are_not_listed_for_the_project](../../../../../../functions/tests/memory_anchors_test/anchors_of_archived_memories_are_not_listed_for_the_project.md)

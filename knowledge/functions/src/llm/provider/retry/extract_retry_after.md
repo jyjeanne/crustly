@@ -3,7 +3,7 @@ type: Rust Function
 title: extract_retry_after
 resource: src/llm/provider/retry.rs#L196-L216
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/retry/parse_retry_seconds

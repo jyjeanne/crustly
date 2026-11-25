@@ -3,7 +3,7 @@ type: Rust Function
 title: load_project_notes
 resource: src/llm/agent/project_memory.rs#L42-L82
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/project_memory/take_tokens

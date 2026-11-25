@@ -3,7 +3,7 @@ type: Rust Module
 title: session
 resource: src/db/repository/session.rs#L1-L334
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crate-db-models-session

@@ -4,7 +4,7 @@ title: flush_run
 resource: src/tui/events.rs#L379-L386
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/pasted_text

@@ -4,7 +4,7 @@ title: insert_at
 resource: tests/memory_consolidate_test.rs#L48-L77
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/new

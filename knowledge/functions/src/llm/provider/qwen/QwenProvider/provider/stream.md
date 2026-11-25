@@ -4,7 +4,7 @@ title: stream
 resource: src/llm/provider/qwen.rs#L1346-L1523
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/qwen/QwenProvider/to_qwen_request
@@ -16,6 +16,9 @@ relationships:
   - target: functions/src/llm/provider/qwen/QwenProvider/headers
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/status
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/llm/provider/ollama_models/PullProgress/is_success
     resolved_by: tree-sitter
     confidence: exact
@@ -49,6 +52,7 @@ relationships:
 - [to_qwen_request](../../../../../../../functions/src/llm/provider/qwen/QwenProvider/to_qwen_request.md)
 - [retry_with_backoff](../../../../../../../functions/src/llm/provider/retry/retry_with_backoff.md)
 - [headers](../../../../../../../functions/src/llm/provider/qwen/QwenProvider/headers.md)
+- [status](../../../../../../../functions/src/memory/code_knowledge/CodeKnowledge/status.md)
 - [is_success](../../../../../../../functions/src/llm/provider/ollama_models/PullProgress/is_success.md)
 - [handle_error](../../../../../../../functions/src/llm/provider/qwen/QwenProvider/handle_error.md)
 - [next](../../../../../../../functions/src/tui/events/EventHandler/next.md)

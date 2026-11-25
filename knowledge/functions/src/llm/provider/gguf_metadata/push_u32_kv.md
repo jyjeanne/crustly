@@ -6,7 +6,7 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/gguf_metadata/parses_architecture_name_context_length_and_chat_template

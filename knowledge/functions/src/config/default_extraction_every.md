@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_extraction_every
-resource: src/config/mod.rs#L255-L257
+resource: src/config/mod.rs#L302-L304
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryExtractionConfig/default/default

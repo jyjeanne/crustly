@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: llama_cpp_exit_code
-resource: src/cli/mod.rs#L619-L641
+resource: src/cli/mod.rs#L646-L668
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/run

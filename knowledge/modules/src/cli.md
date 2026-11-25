@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: cli
-resource: src/cli/mod.rs#L1-L3923
+resource: src/cli/mod.rs#L1-L4097
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/anyhow-context-result
@@ -147,6 +147,7 @@ relationships:
 - [cmd_memory](../../functions/src/cli/cmd_memory.md)
 - [cmd_db](../../functions/src/cli/cmd_db.md)
 - [build_tool_registry](../../functions/src/cli/build_tool_registry.md)
+- [okf_tools_exposed](../../functions/src/cli/okf_tools_exposed.md)
 - [connect_configured_mcp_servers](../../functions/src/cli/connect_configured_mcp_servers.md)
 - [build_approval_callback](../../functions/src/cli/build_approval_callback.md)
 - [cmd_chat](../../functions/src/cli/cmd_chat.md)

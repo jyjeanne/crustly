@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: estimated_context_overflow_is_rejected_without_tools
-resource: src/llm/agent/service.rs#L2893-L2912
+resource: src/llm/agent/service.rs#L2907-L2926
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

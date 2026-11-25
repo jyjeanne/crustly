@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_config_validation
-resource: src/config/mod.rs#L1947-L1950
+resource: src/config/mod.rs#L2032-L2035
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

@@ -3,7 +3,7 @@ type: Rust Method
 title: get_file_required
 resource: src/services/file.rs#L55-L59
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/file/FileService/get_file

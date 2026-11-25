@@ -4,7 +4,7 @@ title: validate_input
 resource: src/llm/tools/agent.rs#L106-L130
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/agent/action_of

@@ -3,7 +3,7 @@ type: Rust Method
 title: contains
 resource: src/memory/vector_index.rs#L59-L61
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_memory
@@ -336,6 +336,27 @@ relationships:
   - target: functions/src/logging/debug_filter_is_scoped_to_crustly
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/code_knowledge/identifiers
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/parse_code_span
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/bundle_dir
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/bundle_is_older_than_sources
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/check_capabilities
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/detection_is_off_without_a_command_or_a_bundle
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/consolidate/MemoryStore/consolidate
     resolved_by: tree-sitter
     confidence: exact
@@ -352,6 +373,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/memory/MemoryStore/try_recall
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/MemoryStore/memories_for_path
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/memory/model/validate
@@ -493,6 +517,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/Scripted/okfserver/call
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/tests/memory_extraction_test/recent_work_from_episodes_keeps_to_its_cap_and_keeps_the_newest
@@ -637,12 +664,20 @@ relationships:
 - [execute](../../../../../functions/src/llm/tools/write/WriteTool/tool/execute.md)
 - [test_log_dir_in_crustly_folder](../../../../../functions/src/logging/test_log_dir_in_crustly_folder.md)
 - [debug_filter_is_scoped_to_crustly](../../../../../functions/src/logging/debug_filter_is_scoped_to_crustly.md)
+- [identifiers](../../../../../functions/src/memory/code_knowledge/identifiers.md)
+- [parse_code_span](../../../../../functions/src/memory/code_knowledge/parse_code_span.md)
+- [bundle_dir](../../../../../functions/src/memory/code_knowledge/bundle_dir.md)
+- [exists](../../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
+- [bundle_is_older_than_sources](../../../../../functions/src/memory/code_knowledge/CodeKnowledge/bundle_is_older_than_sources.md)
+- [check_capabilities](../../../../../functions/src/memory/code_knowledge/check_capabilities.md)
+- [detection_is_off_without_a_command_or_a_bundle](../../../../../functions/src/memory/code_knowledge/detection_is_off_without_a_command_or_a_bundle.md)
 - [consolidate](../../../../../functions/src/memory/consolidate/MemoryStore/consolidate.md)
 - [ollama_sends_prefixed_input_and_returns_unit_vectors](../../../../../functions/src/memory/embed/ollama_sends_prefixed_input_and_returns_unit_vectors.md)
 - [openai_orders_by_index_and_sends_the_key](../../../../../functions/src/memory/embed/openai_orders_by_index_and_sends_the_key.md)
 - [check](../../../../../functions/src/memory/extract/check.md)
 - [save_with](../../../../../functions/src/memory/MemoryStore/save_with.md)
 - [try_recall](../../../../../functions/src/memory/MemoryStore/try_recall.md)
+- [memories_for_path](../../../../../functions/src/memory/MemoryStore/memories_for_path.md)
 - [validate](../../../../../functions/src/memory/model/validate.md)
 - [strings_match_the_migration_check_lists](../../../../../functions/src/memory/model/strings_match_the_migration_check_lists.md)
 - [reject_messages_are_actionable](../../../../../functions/src/memory/model/reject_messages_are_actionable.md)
@@ -690,6 +725,7 @@ relationships:
 - [test_error_authentication](../../../../../functions/tests/error_scenarios_test/test_error_authentication.md)
 - [embed](../../../../../functions/tests/memory_benchmark_test/TopicEmbedder/embedder/embed.md)
 - [run](../../../../../functions/tests/memory_benchmark_test/run.md)
+- [call](../../../../../functions/tests/memory_code_knowledge_test/Scripted/okfserver/call.md)
 - [recent_work_from_episodes_keeps_to_its_cap_and_keeps_the_newest](../../../../../functions/tests/memory_extraction_test/recent_work_from_episodes_keeps_to_its_cap_and_keeps_the_newest.md)
 - [a_checksum_recorded_with_other_line_endings_is_accepted_and_updated](../../../../../functions/tests/memory_migration_test/a_checksum_recorded_with_other_line_endings_is_accepted_and_updated.md)
 - [an_absolute_path_in_the_message_brings_its_memory_in](../../../../../functions/tests/memory_paths_test/an_absolute_path_in_the_message_brings_its_memory_in.md)

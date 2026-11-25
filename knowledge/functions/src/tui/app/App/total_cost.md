@@ -3,7 +3,7 @@ type: Rust Method
 title: total_cost
 resource: src/tui/app.rs#L3191-L3196
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/render/render_header

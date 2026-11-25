@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: edit
-resource: src/memory/mod.rs#L672-L703
+resource: src/memory/mod.rs#L700-L731
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/get

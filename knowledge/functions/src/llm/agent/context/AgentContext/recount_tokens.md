@@ -3,7 +3,7 @@ type: Rust Method
 title: recount_tokens
 resource: src/llm/agent/context.rs#L91-L97
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/context/AgentContext/estimate_message_tokens

@@ -4,7 +4,7 @@ title: from_str
 resource: src/memory/model.rs#L46-L56
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/model/ParseEnumError/new

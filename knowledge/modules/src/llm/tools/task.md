@@ -3,7 +3,7 @@ type: Rust Module
 title: task
 resource: src/llm/tools/task.rs#L1-L714
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-error-result-toolerror

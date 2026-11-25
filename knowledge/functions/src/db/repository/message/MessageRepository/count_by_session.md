@@ -3,7 +3,7 @@ type: Rust Method
 title: count_by_session
 resource: src/db/repository/message.rs#L169-L177
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

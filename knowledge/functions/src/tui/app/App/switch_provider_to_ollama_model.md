@@ -4,7 +4,7 @@ title: switch_provider_to_ollama_model
 resource: src/tui/app.rs#L3560-L3611
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/set_provider

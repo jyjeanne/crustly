@@ -3,7 +3,7 @@ type: Rust Method
 title: summary
 resource: src/tui/error.rs#L163-L170
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/error/ErrorSeverity/prefix

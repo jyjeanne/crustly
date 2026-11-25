@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: sanitized
-resource: src/config/mod.rs#L287-L372
+resource: src/config/mod.rs#L335-L438
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains
@@ -13,6 +13,15 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/config/default_recall_max_tokens
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/default_code_knowledge_enabled
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/default_code_knowledge_timeout_ms
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/default_code_knowledge_command
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/config/default_extraction_every
@@ -63,6 +72,9 @@ relationships:
 - [contains](../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 - [default_pinned_min_importance](../../../../functions/src/config/default_pinned_min_importance.md)
 - [default_recall_max_tokens](../../../../functions/src/config/default_recall_max_tokens.md)
+- [default_code_knowledge_enabled](../../../../functions/src/config/default_code_knowledge_enabled.md)
+- [default_code_knowledge_timeout_ms](../../../../functions/src/config/default_code_knowledge_timeout_ms.md)
+- [default_code_knowledge_command](../../../../functions/src/config/default_code_knowledge_command.md)
 - [default_extraction_every](../../../../functions/src/config/default_extraction_every.md)
 - [default_extraction_max](../../../../functions/src/config/default_extraction_max.md)
 - [default_extraction_min_importance](../../../../functions/src/config/default_extraction_min_importance.md)

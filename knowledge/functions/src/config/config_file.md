@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: config_file
-resource: src/config/mod.rs#L2011-L2015
+resource: src/config/mod.rs#L2121-L2125
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/write

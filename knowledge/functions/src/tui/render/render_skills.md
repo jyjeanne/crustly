@@ -4,7 +4,7 @@ title: render_skills
 resource: src/tui/render.rs#L820-L876
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/render/render

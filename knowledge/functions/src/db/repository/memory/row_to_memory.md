@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: row_to_memory
-resource: src/db/repository/memory.rs#L830-L853
+resource: src/db/repository/memory.rs#L903-L926
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/models/PlanTaskStatus/parse

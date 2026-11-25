@@ -3,7 +3,7 @@ type: Rust Method
 title: context_usage
 resource: src/tui/app.rs#L519-L521
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/render/render_header

@@ -4,7 +4,7 @@ title: before_round
 resource: src/llm/agent/middleware.rs#L411-L426
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/middleware/finish_at_limit

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: warn_query_once
-resource: src/memory/mod.rs#L417-L424
+resource: src/memory/mod.rs#L432-L439
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/semantic_scores

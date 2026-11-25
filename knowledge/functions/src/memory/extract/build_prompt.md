@@ -3,7 +3,7 @@ type: Rust Function
 title: build_prompt
 resource: src/memory/extract.rs#L97-L146
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

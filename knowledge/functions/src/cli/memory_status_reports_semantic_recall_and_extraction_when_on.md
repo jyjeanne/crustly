@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: memory_status_reports_semantic_recall_and_extraction_when_on
-resource: src/cli/mod.rs#L3870-L3922
+resource: src/cli/mod.rs#L4044-L4096
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

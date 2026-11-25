@@ -4,7 +4,7 @@ title: start_model_pull
 resource: src/tui/app.rs#L3373-L3386
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/event_sender

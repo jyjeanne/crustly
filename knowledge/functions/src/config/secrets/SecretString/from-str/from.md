@@ -4,7 +4,7 @@ title: from
 resource: src/config/secrets.rs#L195-L197
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/secrets/SecretString/from_str

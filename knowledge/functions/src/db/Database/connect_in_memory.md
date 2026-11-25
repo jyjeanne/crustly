@@ -3,7 +3,7 @@ type: Rust Method
 title: connect_in_memory
 resource: src/db/mod.rs#L96-L118
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context
@@ -121,6 +121,9 @@ relationships:
   - target: functions/tests/integration_test/create_test_db
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/tests/memory_anchors_test/setup
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/tests/memory_consolidate_test/setup
     resolved_by: tree-sitter-receiver
     confidence: semantic
@@ -206,6 +209,7 @@ relationships:
 - [compaction_writes_one_record_to_db](../../../../functions/tests/compaction_test/compaction_writes_one_record_to_db.md)
 - [create_test_db](../../../../functions/tests/error_scenarios_test/create_test_db.md)
 - [create_test_db](../../../../functions/tests/integration_test/create_test_db.md)
+- [setup](../../../../functions/tests/memory_anchors_test/setup.md)
 - [setup](../../../../functions/tests/memory_consolidate_test/setup.md)
 - [repo_with_projects](../../../../functions/tests/memory_repository_test/repo_with_projects.md)
 - [repo](../../../../functions/tests/memory_review_fixes_test/repo.md)

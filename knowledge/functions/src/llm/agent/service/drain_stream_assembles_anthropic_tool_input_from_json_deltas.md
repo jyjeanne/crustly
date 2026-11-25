@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: drain_stream_assembles_anthropic_tool_input_from_json_deltas
-resource: src/llm/agent/service.rs#L2412-L2475
+resource: src/llm/agent/service.rs#L2426-L2489
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/drain_stream_to_response

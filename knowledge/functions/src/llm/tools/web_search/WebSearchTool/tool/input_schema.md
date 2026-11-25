@@ -4,7 +4,7 @@ title: input_schema
 resource: src/llm/tools/web_search.rs#L84-L102
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: empty_security_config_trusts_nothing
-resource: src/config/mod.rs#L1926-L1935
+resource: src/config/mod.rs#L2011-L2020
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/SecurityConfig/to_policy

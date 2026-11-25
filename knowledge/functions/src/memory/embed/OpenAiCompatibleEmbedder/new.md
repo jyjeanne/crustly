@@ -3,7 +3,7 @@ type: Rust Method
 title: new
 resource: src/memory/embed.rs#L255-L264
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/embed/check_settings

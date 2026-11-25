@@ -3,7 +3,7 @@ type: Rust Module
 title: provider
 resource: src/llm/provider/mod.rs#L1-L55
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/pub-use-error-providererror-result

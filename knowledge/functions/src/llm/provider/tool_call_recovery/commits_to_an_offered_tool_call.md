@@ -3,7 +3,7 @@ type: Rust Function
 title: commits_to_an_offered_tool_call
 resource: src/llm/provider/tool_call_recovery.rs#L71-L80
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/tool_call_recovery/leading_window

@@ -3,7 +3,7 @@ type: Rust Module
 title: plan_crash_recovery_test
 resource: tests/plan_crash_recovery_test.rs#L1-L236
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crustly-db-models-interrupted-plan-from-tasks-plantaskstatus

@@ -3,7 +3,7 @@ type: Rust Function
 title: embed_with_retries
 resource: src/memory/semantic.rs#L72-L92
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/semantic/embed_and_store

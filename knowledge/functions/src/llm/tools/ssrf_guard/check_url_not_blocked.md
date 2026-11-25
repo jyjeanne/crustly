@@ -3,7 +3,7 @@ type: Rust Function
 title: check_url_not_blocked
 resource: src/llm/tools/ssrf_guard.rs#L129-L144
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/ssrf_guard/is_blocked_ip

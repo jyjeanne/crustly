@@ -3,7 +3,7 @@ type: Rust Method
 title: add_message
 resource: src/llm/agent/context.rs#L107-L112
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/context/AgentContext/estimate_message_tokens

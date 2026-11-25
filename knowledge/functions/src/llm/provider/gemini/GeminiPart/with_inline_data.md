@@ -4,7 +4,7 @@ title: with_inline_data
 resource: src/llm/provider/gemini.rs#L772-L778
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request

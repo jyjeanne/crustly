@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: supersede
-resource: src/db/repository/memory.rs#L596-L615
+resource: src/db/repository/memory.rs#L669-L688
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/record_event

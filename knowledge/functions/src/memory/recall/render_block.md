@@ -1,21 +1,15 @@
 ---
 type: Rust Function
 title: render_block
-resource: src/memory/recall.rs#L235-L275
+resource: src/memory/recall.rs#L238-L240
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
-  - target: functions/src/memory/recall/line
-    resolved_by: tree-sitter
-    confidence: exact
-  - target: functions/src/memory/recall/clean
+  - target: functions/src/memory/recall/render_block_located
     resolved_by: tree-sitter
     confidence: exact
   called_by:
-  - target: functions/src/memory/MemoryStore/try_recall
-    resolved_by: tree-sitter
-    confidence: exact
   - target: functions/src/memory/recall/block_has_sections_in_order_and_skips_empty_ones
     resolved_by: tree-sitter
     confidence: exact
@@ -39,12 +33,10 @@ relationships:
 
 # Calls
 
-- [line](../../../../functions/src/memory/recall/line.md)
-- [clean](../../../../functions/src/memory/recall/clean.md)
+- [render_block_located](../../../../functions/src/memory/recall/render_block_located.md)
 
 # Called by
 
-- [try_recall](../../../../functions/src/memory/MemoryStore/try_recall.md)
 - [block_has_sections_in_order_and_skips_empty_ones](../../../../functions/src/memory/recall/block_has_sections_in_order_and_skips_empty_ones.md)
 - [empty_sections_are_left_out](../../../../functions/src/memory/recall/empty_sections_are_left_out.md)
 - [a_memory_cannot_close_the_block_early](../../../../functions/src/memory/recall/a_memory_cannot_close_the_block_early.md)

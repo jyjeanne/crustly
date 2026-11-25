@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: signature_accepts_file_path_alias
-resource: src/llm/agent/service.rs#L1833-L1840
+resource: src/llm/agent/service.rs#L1847-L1854
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/middleware/tool_call_signature

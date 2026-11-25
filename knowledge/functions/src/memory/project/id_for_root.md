@@ -3,7 +3,7 @@ type: Rust Function
 title: id_for_root
 resource: src/memory/project.rs#L28-L30
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/sha256_hex
@@ -19,7 +19,13 @@ relationships:
   - target: functions/tests/memory_acceptance_test/repo
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/tests/memory_anchors_test/setup
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/setup
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/tests/memory_consolidate_test/project
@@ -55,7 +61,9 @@ relationships:
 
 - [import](../../../../functions/src/memory/transfer/import.md)
 - [repo](../../../../functions/tests/memory_acceptance_test/repo.md)
+- [setup](../../../../functions/tests/memory_anchors_test/setup.md)
 - [run](../../../../functions/tests/memory_benchmark_test/run.md)
+- [setup](../../../../functions/tests/memory_code_knowledge_test/setup.md)
 - [project](../../../../functions/tests/memory_consolidate_test/project.md)
 - [project](../../../../functions/tests/memory_extraction_test/project.md)
 - [store_and_project](../../../../functions/tests/memory_paths_test/store_and_project.md)

@@ -4,7 +4,7 @@ title: name
 resource: src/llm/tools/edit.rs#L109-L111
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: tool_work_is_remembered_across_requests
-resource: src/llm/agent/service.rs#L3359-L3423
+resource: src/llm/agent/service.rs#L3373-L3437
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

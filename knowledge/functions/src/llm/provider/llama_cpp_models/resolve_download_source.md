@@ -3,7 +3,7 @@ type: Rust Function
 title: resolve_download_source
 resource: src/llm/provider/llama_cpp_models.rs#L877-L886
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_models/parse_hf_shorthand

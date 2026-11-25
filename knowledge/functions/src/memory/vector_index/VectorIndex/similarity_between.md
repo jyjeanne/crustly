@@ -3,7 +3,7 @@ type: Rust Method
 title: similarity_between
 resource: src/memory/vector_index.rs#L80-L83
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector/similarity

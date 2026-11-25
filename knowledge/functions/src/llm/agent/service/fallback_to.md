@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: fallback_to
-resource: src/llm/agent/service.rs#L3909-L3915
+resource: src/llm/agent/service.rs#L3923-L3929
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/a_failing_provider_falls_back_and_says_so

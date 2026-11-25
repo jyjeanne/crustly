@@ -4,7 +4,7 @@ title: enabled_config
 resource: tests/memory_extraction_test.rs#L115-L125
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/MemoryExtractionConfig/default/default

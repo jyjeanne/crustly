@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: default
-resource: src/config/mod.rs#L266-L281
+resource: src/config/mod.rs#L313-L329
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/default_episodic_budget
@@ -26,6 +26,9 @@ relationships:
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/src/config/MemoryLifecycleConfig/default/default
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/config/MemoryCodeKnowledgeConfig/default/default
     resolved_by: tree-sitter-receiver
     confidence: semantic
   called_by:
@@ -71,7 +74,16 @@ relationships:
   - target: functions/tests/memory_acceptance_test/open
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/tests/memory_anchors_test/setup
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/setup
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes
     resolved_by: tree-sitter-receiver
     confidence: semantic
   - target: functions/tests/memory_consolidate_test/setup
@@ -164,6 +176,7 @@ relationships:
 - [default](../../../../../functions/src/config/MemoryEmbeddingsConfig/default/default.md)
 - [default](../../../../../functions/src/config/MemoryExtractionConfig/default/default.md)
 - [default](../../../../../functions/src/config/MemoryLifecycleConfig/default/default.md)
+- [default](../../../../../functions/src/config/MemoryCodeKnowledgeConfig/default/default.md)
 
 # Called by
 
@@ -181,7 +194,10 @@ relationships:
 - [memory_test_app](../../../../../functions/src/tui/app/memory_test_app.md)
 - [memory_screen_app](../../../../../functions/src/tui/app/memory_screen_app.md)
 - [open](../../../../../functions/tests/memory_acceptance_test/open.md)
+- [setup](../../../../../functions/tests/memory_anchors_test/setup.md)
 - [run](../../../../../functions/tests/memory_benchmark_test/run.md)
+- [setup](../../../../../functions/tests/memory_code_knowledge_test/setup.md)
+- [without_code_knowledge_nothing_changes](../../../../../functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes.md)
 - [setup](../../../../../functions/tests/memory_consolidate_test/setup.md)
 - [three_episodes_become_one_lesson_with_its_sources](../../../../../functions/tests/memory_consolidate_test/three_episodes_become_one_lesson_with_its_sources.md)
 - [extraction_on](../../../../../functions/tests/memory_consolidate_test/extraction_on.md)

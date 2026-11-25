@@ -4,7 +4,7 @@ title: handle_provider_switch_key
 resource: src/tui/app.rs#L3513-L3548
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/is_cancel

@@ -3,7 +3,7 @@ type: Rust Module
 title: secrets
 resource: src/config/secrets.rs#L1-L393
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/anyhow-context-result

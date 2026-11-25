@@ -3,7 +3,7 @@ type: Rust Method
 title: from_env
 resource: src/config/secrets.rs#L40-L44
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/error/ErrorInfo/with_context

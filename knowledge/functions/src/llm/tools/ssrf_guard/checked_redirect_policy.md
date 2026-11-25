@@ -3,7 +3,7 @@ type: Rust Function
 title: checked_redirect_policy
 resource: src/llm/tools/ssrf_guard.rs#L162-L176
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/ssrf_guard/check_url_not_blocked

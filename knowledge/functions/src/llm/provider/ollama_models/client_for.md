@@ -4,7 +4,7 @@ title: client_for
 resource: src/llm/provider/ollama_models.rs#L63-L65
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/ollama_models/list_models

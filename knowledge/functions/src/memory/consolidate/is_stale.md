@@ -3,7 +3,7 @@ type: Rust Function
 title: is_stale
 resource: src/memory/consolidate.rs#L54-L61
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/consolidate/MemoryStore/consolidate

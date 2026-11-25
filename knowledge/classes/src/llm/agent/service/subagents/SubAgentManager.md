@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: SubAgentManager
-resource: src/llm/agent/service/subagents.rs#L123-L128
+resource: src/llm/agent/service/subagents.rs#L125-L130
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

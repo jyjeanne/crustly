@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: merge_toml_tables
-resource: src/config/mod.rs#L1307-L1323
+resource: src/config/mod.rs#L1392-L1408
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/merge_toml_tables

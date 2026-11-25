@@ -3,7 +3,7 @@ type: Rust Method
 title: last_assistant_message
 resource: src/tui/app.rs#L545-L547
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/find

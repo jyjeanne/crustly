@@ -6,7 +6,7 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/benches/parallel_tool_dispatch/make_temp_files
@@ -273,6 +273,12 @@ relationships:
   - target: functions/src/logging/init_debug_logging
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/memory/code_knowledge/a_bundle_is_found_through_okf_toml_or_knowledge
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/detection_is_off_without_a_command_or_a_bundle
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/memory/project/a_linked_worktree_belongs_to_the_main_repository
     resolved_by: tree-sitter
     confidence: exact
@@ -304,6 +310,15 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/tui/app/llama_cpp_model_header_summary_for_path_reads_a_real_header_once
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/setup
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/a_concept_gone_from_a_newer_bundle_is_flagged_and_not_from_an_older_one
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/real_okf_mcp_answers_in_json
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/tests/memory_minor_fixes_test/a_submodule_is_its_own_project_not_its_superprojects
@@ -411,6 +426,8 @@ relationships:
 - [test_overwrite_rejects_a_file_never_read_this_session](../../../../functions/src/llm/tools/write/test_overwrite_rejects_a_file_never_read_this_session.md)
 - [test_overwrite_rejects_a_file_changed_since_it_was_read](../../../../functions/src/llm/tools/write/test_overwrite_rejects_a_file_changed_since_it_was_read.md)
 - [init_debug_logging](../../../../functions/src/logging/init_debug_logging.md)
+- [a_bundle_is_found_through_okf_toml_or_knowledge](../../../../functions/src/memory/code_knowledge/a_bundle_is_found_through_okf_toml_or_knowledge.md)
+- [detection_is_off_without_a_command_or_a_bundle](../../../../functions/src/memory/code_knowledge/detection_is_off_without_a_command_or_a_bundle.md)
 - [a_linked_worktree_belongs_to_the_main_repository](../../../../functions/src/memory/project/a_linked_worktree_belongs_to_the_main_repository.md)
 - [a_worktree_is_found_through_its_commondir_file](../../../../functions/src/memory/project/a_worktree_is_found_through_its_commondir_file.md)
 - [a_submodule_under_a_worktrees_directory_is_its_own_project](../../../../functions/src/memory/project/a_submodule_under_a_worktrees_directory_is_its_own_project.md)
@@ -422,6 +439,9 @@ relationships:
 - [test_service_json_import_invalid_json](../../../../functions/src/services/plan/test_service_json_import_invalid_json.md)
 - [export_plan_to_markdown](../../../../functions/src/tui/app/App/export_plan_to_markdown.md)
 - [llama_cpp_model_header_summary_for_path_reads_a_real_header_once](../../../../functions/src/tui/app/llama_cpp_model_header_summary_for_path_reads_a_real_header_once.md)
+- [setup](../../../../functions/tests/memory_code_knowledge_test/setup.md)
+- [a_concept_gone_from_a_newer_bundle_is_flagged_and_not_from_an_older_one](../../../../functions/tests/memory_code_knowledge_test/a_concept_gone_from_a_newer_bundle_is_flagged_and_not_from_an_older_one.md)
+- [real_okf_mcp_answers_in_json](../../../../functions/tests/memory_code_knowledge_test/real_okf_mcp_answers_in_json.md)
 - [a_submodule_is_its_own_project_not_its_superprojects](../../../../functions/tests/memory_minor_fixes_test/a_submodule_is_its_own_project_not_its_superprojects.md)
 - [store_and_real_project](../../../../functions/tests/memory_paths_test/store_and_real_project.md)
 - [from_notes_moves_bullets_keeps_rejected_ones_and_backs_up_first](../../../../functions/tests/memory_transfer_test/from_notes_moves_bullets_keeps_rejected_ones_and_backs_up_first.md)

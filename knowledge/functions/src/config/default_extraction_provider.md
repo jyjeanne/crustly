@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_extraction_provider
-resource: src/config/mod.rs#L252-L254
+resource: src/config/mod.rs#L299-L301
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryExtractionConfig/default/default

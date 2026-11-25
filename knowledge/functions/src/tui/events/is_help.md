@@ -3,7 +3,7 @@ type: Rust Function
 title: is_help
 resource: src/tui/events.rs#L464-L466
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/key_matches

@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/http.rs#L171-L327
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/http/parse_method
@@ -23,6 +23,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/status
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/provider/ollama_models/PullProgress/is_success
@@ -61,6 +64,7 @@ relationships:
 - [guard](../../../../../../../functions/src/llm/tools/ssrf_guard/guard.md)
 - [checked_redirect_policy](../../../../../../../functions/src/llm/tools/ssrf_guard/checked_redirect_policy.md)
 - [parse](../../../../../../../functions/src/db/models/PlanTaskStatus/parse.md)
+- [status](../../../../../../../functions/src/memory/code_knowledge/CodeKnowledge/status.md)
 - [is_success](../../../../../../../functions/src/llm/provider/ollama_models/PullProgress/is_success.md)
 - [text](../../../../../../../functions/src/llm/provider/gemini/GeminiPart/text.md)
 - [push](../../../../../../../functions/src/llm/agent/service/tool_round/ToolRound/push.md)

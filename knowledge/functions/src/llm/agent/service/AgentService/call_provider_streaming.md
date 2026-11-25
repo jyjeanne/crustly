@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: call_provider_streaming
-resource: src/llm/agent/service.rs#L1518-L1530
+resource: src/llm/agent/service.rs#L1532-L1544
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/types/LLMRequest/with_streaming

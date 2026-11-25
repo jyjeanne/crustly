@@ -3,7 +3,7 @@ type: Rust Method
 title: default_local
 resource: src/llm/provider/ollama.rs#L158-L160
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/ollama/OllamaProvider/new

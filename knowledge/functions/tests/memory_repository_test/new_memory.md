@@ -4,7 +4,7 @@ title: new_memory
 resource: tests/memory_repository_test.rs#L26-L40
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/tests/memory_repository_test/fixed_now

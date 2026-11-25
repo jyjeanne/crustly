@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: send_message
-resource: src/llm/agent/service.rs#L1092-L1166
+resource: src/llm/agent/service.rs#L1105-L1179
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/prepare_message_context

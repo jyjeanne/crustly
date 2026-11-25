@@ -4,7 +4,7 @@ title: DuckDuckGoResponse
 resource: src/llm/tools/web_search.rs#L30-L46
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: find_after
 resource: src/llm/provider/qwen.rs#L105-L107
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/find

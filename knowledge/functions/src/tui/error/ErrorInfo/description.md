@@ -3,7 +3,7 @@ type: Rust Method
 title: description
 resource: src/tui/error.rs#L173-L215
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/tool_round/ToolRound/push

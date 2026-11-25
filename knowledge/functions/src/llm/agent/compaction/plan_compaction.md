@@ -4,7 +4,7 @@ title: plan_compaction
 resource: src/llm/agent/compaction.rs#L184-L200
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/compaction/message_has_tool_result

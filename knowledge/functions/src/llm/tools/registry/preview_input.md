@@ -4,7 +4,7 @@ title: preview_input
 resource: src/llm/tools/registry.rs#L25-L32
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/registry/preview_input_truncates_a_large_payload

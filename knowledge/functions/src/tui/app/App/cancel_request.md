@@ -4,7 +4,7 @@ title: cancel_request
 resource: src/tui/app.rs#L526-L535
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/app/App/handle_ctrl_c

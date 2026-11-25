@@ -4,7 +4,7 @@ title: is_read_only_powershell
 resource: src/llm/tools/powershell.rs#L128-L134
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

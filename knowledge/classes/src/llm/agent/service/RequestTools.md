@@ -4,7 +4,7 @@ title: RequestTools
 resource: src/llm/agent/service.rs#L69-L72
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

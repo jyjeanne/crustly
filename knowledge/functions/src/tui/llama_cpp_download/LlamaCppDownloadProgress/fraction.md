@@ -3,7 +3,7 @@ type: Rust Method
 title: fraction
 resource: src/tui/llama_cpp_download.rs#L73-L76
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/llama_cpp_download/download_progress_fraction

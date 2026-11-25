@@ -4,7 +4,7 @@ title: request_for
 resource: src/llm/provider/factory.rs#L44-L54
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/factory/FailoverProvider/provider/complete

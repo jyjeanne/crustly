@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_chat
-resource: src/cli/mod.rs#L1848-L1956
+resource: src/cli/mod.rs#L2021-L2129
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect

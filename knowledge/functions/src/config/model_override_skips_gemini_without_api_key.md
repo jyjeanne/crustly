@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: model_override_skips_gemini_without_api_key
-resource: src/config/mod.rs#L1840-L1862
+resource: src/config/mod.rs#L1925-L1947
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/ProviderConfigs/override_default_model

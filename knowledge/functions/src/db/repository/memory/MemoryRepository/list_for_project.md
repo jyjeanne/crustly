@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: list_for_project
-resource: src/db/repository/memory.rs#L444-L463
+resource: src/db/repository/memory.rs#L517-L536
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/consolidate/MemoryStore/consolidate

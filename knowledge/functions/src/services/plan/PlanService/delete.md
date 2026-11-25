@@ -3,7 +3,7 @@ type: Rust Method
 title: delete
 resource: src/services/plan.rs#L118-L120
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/plan/PlanRepository/delete

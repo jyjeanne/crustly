@@ -4,7 +4,7 @@ title: embed
 resource: tests/memory_semantic_test.rs#L390-L396
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

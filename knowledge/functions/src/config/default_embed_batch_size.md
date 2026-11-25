@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_embed_batch_size
-resource: src/config/mod.rs#L204-L206
+resource: src/config/mod.rs#L251-L253
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryEmbeddingsConfig/default/default

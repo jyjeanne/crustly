@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_allow_sub_agents
-resource: src/llm/agent/service.rs#L813-L816
+resource: src/llm/agent/service.rs#L825-L828
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/subagents/ChildTemplate/build

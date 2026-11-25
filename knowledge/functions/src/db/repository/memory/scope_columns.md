@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: scope_columns
-resource: src/db/repository/memory.rs#L797-L802
+resource: src/db/repository/memory.rs#L870-L875
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/repository/memory/MemoryRepository/insert

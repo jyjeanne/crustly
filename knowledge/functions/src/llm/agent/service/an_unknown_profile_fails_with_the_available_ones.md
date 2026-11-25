@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: an_unknown_profile_fails_with_the_available_ones
-resource: src/llm/agent/service.rs#L3768-L3785
+resource: src/llm/agent/service.rs#L3782-L3799
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

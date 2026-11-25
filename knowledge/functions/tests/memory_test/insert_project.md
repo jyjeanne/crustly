@@ -4,7 +4,7 @@ title: insert_project
 resource: tests/memory_test.rs#L15-L24
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_test/global_memory_must_not_have_a_project

@@ -3,7 +3,7 @@ type: Rust Struct
 title: PlanTool
 resource: src/llm/tools/plan_tool.rs#L15
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: handle_inline_code
 resource: src/tui/markdown.rs#L183-L191
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/markdown/parse_markdown

@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: add_sources
-resource: src/db/repository/memory.rs#L358-L369
+resource: src/db/repository/memory.rs#L431-L442
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/consolidate/MemoryStore/lesson_from_episodes

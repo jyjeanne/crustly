@@ -4,7 +4,7 @@ title: init_minimal_logging
 resource: src/logging.rs#L206-L233
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/models/PlanTaskStatus/parse

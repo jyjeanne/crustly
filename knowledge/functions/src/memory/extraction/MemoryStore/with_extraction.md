@@ -3,7 +3,7 @@ type: Rust Method
 title: with_extraction
 resource: src/memory/extraction.rs#L42-L47
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/build_memory_store

@@ -3,7 +3,7 @@ type: Rust Method
 title: set_pending_replaces
 resource: src/db/repository/memory.rs#L243-L251
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

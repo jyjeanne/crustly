@@ -4,7 +4,7 @@ title: filename_suggests_mmproj
 resource: src/llm/provider/llama_cpp_models.rs#L182-L185
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

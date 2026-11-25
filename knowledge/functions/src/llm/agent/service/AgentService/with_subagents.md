@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_subagents
-resource: src/llm/agent/service.rs#L607-L615
+resource: src/llm/agent/service.rs#L612-L620
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/SubAgentManager/new

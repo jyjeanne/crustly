@@ -3,7 +3,7 @@ type: Rust Module
 title: memory_recall
 resource: benches/memory_recall.rs#L1-L97
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/criterion-criterion-group-criterion-main-benchmarkid-criterion

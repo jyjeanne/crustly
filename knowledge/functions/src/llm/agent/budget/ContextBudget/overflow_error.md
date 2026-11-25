@@ -3,7 +3,7 @@ type: Rust Method
 title: overflow_error
 resource: src/llm/agent/budget.rs#L136-L141
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/budget/ContextBudget/estimated_prompt_tokens

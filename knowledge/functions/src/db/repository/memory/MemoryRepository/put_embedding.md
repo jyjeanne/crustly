@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: put_embedding
-resource: src/db/repository/memory.rs#L689-L711
+resource: src/db/repository/memory.rs#L762-L784
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector/encode

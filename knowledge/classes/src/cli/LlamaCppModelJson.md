@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: LlamaCppModelJson
-resource: src/cli/mod.rs#L471-L495
+resource: src/cli/mod.rs#L498-L522
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

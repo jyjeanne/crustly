@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: MemoryExtractionConfig
-resource: src/config/mod.rs#L214-L236
+resource: src/config/mod.rs#L261-L283
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

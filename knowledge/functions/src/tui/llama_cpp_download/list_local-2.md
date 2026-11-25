@@ -3,7 +3,7 @@ type: Rust Function
 title: list_local
 resource: src/tui/llama_cpp_download.rs#L230-L236
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

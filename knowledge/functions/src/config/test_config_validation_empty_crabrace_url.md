@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_config_validation_empty_crabrace_url
-resource: src/config/mod.rs#L1960-L1964
+resource: src/config/mod.rs#L2070-L2074
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

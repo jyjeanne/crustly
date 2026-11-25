@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_from_layers_reports_the_file_with_a_syntax_error
-resource: src/config/mod.rs#L2100-L2112
+resource: src/config/mod.rs#L2210-L2222
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/config_file

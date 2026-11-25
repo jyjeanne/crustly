@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_from_layers_without_files_is_default
-resource: src/config/mod.rs#L2076-L2083
+resource: src/config/mod.rs#L2186-L2193
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/from_layers

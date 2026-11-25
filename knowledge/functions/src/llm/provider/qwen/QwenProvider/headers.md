@@ -4,7 +4,7 @@ title: headers
 resource: src/llm/provider/qwen.rs#L246-L267
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/qwen/QwenProvider/is_local

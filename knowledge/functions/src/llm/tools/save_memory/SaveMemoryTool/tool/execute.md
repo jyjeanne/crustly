@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/save_memory.rs#L285-L330
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/save_memory/SaveMemoryTool/save_to_store

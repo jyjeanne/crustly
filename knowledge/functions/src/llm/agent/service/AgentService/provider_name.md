@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: provider_name
-resource: src/llm/agent/service.rs#L833-L835
+resource: src/llm/agent/service.rs#L845-L847
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/configure_agent

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_extraction_max
-resource: src/config/mod.rs#L258-L260
+resource: src/config/mod.rs#L305-L307
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryExtractionConfig/default/default

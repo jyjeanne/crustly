@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: embedding_counts
-resource: src/db/repository/memory.rs#L780-L793
+resource: src/db/repository/memory.rs#L853-L866
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/MemoryStore/embedding_status

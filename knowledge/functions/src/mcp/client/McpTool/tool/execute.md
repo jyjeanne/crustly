@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: execute
-resource: src/mcp/client.rs#L360-L370
+resource: src/mcp/client.rs#L363-L373
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/mcp/client/MCPClient/call_tool

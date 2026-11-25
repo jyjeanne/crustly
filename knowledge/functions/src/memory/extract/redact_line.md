@@ -4,7 +4,7 @@ title: redact_line
 resource: src/memory/extract.rs#L78-L84
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/secret_scan/scan

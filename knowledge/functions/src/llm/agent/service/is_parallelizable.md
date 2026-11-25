@@ -3,7 +3,7 @@ type: Rust Function
 title: is_parallelizable
 resource: src/llm/agent/service.rs#L166-L179
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/service/loop_detection_recovery_message_logic

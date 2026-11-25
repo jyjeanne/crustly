@@ -4,7 +4,7 @@ title: frontmatter_name_matches
 resource: src/llm/tools/skill.rs#L360-L365
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/skill/parse_skill_frontmatter_value

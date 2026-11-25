@@ -3,7 +3,7 @@ type: Rust Method
 title: find_file_by_path
 resource: src/services/file.rs#L70-L75
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/file/FileRepository/new

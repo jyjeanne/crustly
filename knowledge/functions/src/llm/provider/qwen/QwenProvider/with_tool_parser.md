@@ -3,7 +3,7 @@ type: Rust Method
 title: with_tool_parser
 resource: src/llm/provider/qwen.rs#L169-L172
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/factory/configure_qwen

@@ -4,7 +4,7 @@ title: llama_cpp_fit_tag
 resource: src/tui/render.rs#L2608-L2614
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

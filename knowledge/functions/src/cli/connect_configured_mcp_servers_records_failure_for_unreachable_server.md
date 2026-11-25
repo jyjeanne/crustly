@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: connect_configured_mcp_servers_records_failure_for_unreachable_server
-resource: src/cli/mod.rs#L3723-L3738
+resource: src/cli/mod.rs#L3896-L3912
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

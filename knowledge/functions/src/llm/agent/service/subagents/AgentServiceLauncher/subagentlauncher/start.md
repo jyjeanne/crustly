@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: start
-resource: src/llm/agent/service/subagents.rs#L438-L445
+resource: src/llm/agent/service/subagents.rs#L440-L447
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/SubAgentManager/start

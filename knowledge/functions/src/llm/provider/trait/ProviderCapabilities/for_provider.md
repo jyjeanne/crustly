@@ -3,7 +3,7 @@ type: Rust Method
 title: for_provider
 resource: src/llm/provider/trait.rs#L78-L85
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/trait/test_provider_capabilities

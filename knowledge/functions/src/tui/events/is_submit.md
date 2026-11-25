@@ -3,7 +3,7 @@ type: Rust Function
 title: is_submit
 resource: src/tui/events.rs#L522-L525
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

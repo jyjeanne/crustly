@@ -3,7 +3,7 @@ type: Rust Module
 title: tui
 resource: src/tui/mod.rs#L1-L28
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/pub-use-app-app-displaymessage

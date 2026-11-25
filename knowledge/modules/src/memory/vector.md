@@ -3,7 +3,7 @@ type: Rust Module
 title: vector
 resource: src/memory/vector.rs#L1-L156
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/std-fmt

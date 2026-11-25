@@ -3,7 +3,7 @@ type: Rust Method
 title: insert
 resource: src/db/repository/compaction.rs#L18-L36
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

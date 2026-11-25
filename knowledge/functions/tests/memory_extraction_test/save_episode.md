@@ -4,7 +4,7 @@ title: save_episode
 resource: tests/memory_extraction_test.rs#L669-L684
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/save

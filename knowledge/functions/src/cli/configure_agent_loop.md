@@ -1,16 +1,22 @@
 ---
 type: Rust Function
 title: configure_agent_loop
-resource: src/cli/mod.rs#L235-L254
+resource: src/cli/mod.rs#L246-L281
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/with_core_system_prompt
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/agent/service/AgentService/with_tool_profile
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/AgentService/with_mcp_exposure
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/cli/okf_tools_exposed
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/agent/service/AgentService/with_max_tool_iterations
@@ -51,6 +57,8 @@ relationships:
 
 - [with_core_system_prompt](../../../functions/src/llm/agent/service/AgentService/with_core_system_prompt.md)
 - [with_tool_profile](../../../functions/src/llm/agent/service/AgentService/with_tool_profile.md)
+- [with_mcp_exposure](../../../functions/src/llm/agent/service/AgentService/with_mcp_exposure.md)
+- [okf_tools_exposed](../../../functions/src/cli/okf_tools_exposed.md)
 - [with_max_tool_iterations](../../../functions/src/llm/agent/service/AgentService/with_max_tool_iterations.md)
 - [with_request_limits](../../../functions/src/llm/agent/service/AgentService/with_request_limits.md)
 - [max_wall_time](../../../functions/src/config/AgentConfig/max_wall_time.md)

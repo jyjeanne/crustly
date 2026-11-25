@@ -3,7 +3,7 @@ type: Rust Method
 title: has_unread_turns
 resource: src/memory/extraction.rs#L84-L88
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/extraction_state

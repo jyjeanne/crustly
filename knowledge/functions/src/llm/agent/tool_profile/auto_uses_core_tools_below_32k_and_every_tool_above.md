@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: auto_uses_core_tools_below_32k_and_every_tool_above
-resource: src/llm/agent/tool_profile.rs#L106-L111
+resource: src/llm/agent/tool_profile.rs#L139-L144
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/tool_profile/ToolSelection/resolve

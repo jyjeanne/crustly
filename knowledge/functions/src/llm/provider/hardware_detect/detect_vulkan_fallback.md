@@ -4,7 +4,7 @@ title: detect_vulkan_fallback
 resource: src/llm/provider/hardware_detect.rs#L438-L441
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/hardware_detect/run_and_capture_stdout

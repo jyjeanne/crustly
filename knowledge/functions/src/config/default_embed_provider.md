@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_embed_provider
-resource: src/config/mod.rs#L192-L194
+resource: src/config/mod.rs#L239-L241
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryEmbeddingsConfig/default/default

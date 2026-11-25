@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: estimated_overflow_tries_deeper_compaction_first
-resource: src/llm/agent/service.rs#L2954-L2985
+resource: src/llm/agent/service.rs#L2968-L2999
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

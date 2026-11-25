@@ -3,7 +3,7 @@ type: Rust Method
 title: approve
 resource: src/db/repository/memory.rs#L227-L240
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/record_event

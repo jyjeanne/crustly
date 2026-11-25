@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/read.rs#L92-L156
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/sandbox/check_path

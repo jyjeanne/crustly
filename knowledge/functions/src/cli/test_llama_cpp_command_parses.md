@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: test_llama_cpp_command_parses
-resource: src/cli/mod.rs#L3330-L3343
+resource: src/cli/mod.rs#L3503-L3516
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

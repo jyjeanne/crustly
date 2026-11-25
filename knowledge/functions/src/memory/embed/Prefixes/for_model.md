@@ -3,7 +3,7 @@ type: Rust Method
 title: for_model
 resource: src/memory/embed.rs#L81-L99
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/EventHandler/next

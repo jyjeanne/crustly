@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: default_compaction_threshold
-resource: src/config/mod.rs#L549-L551
+resource: src/config/mod.rs#L615-L617
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/config/MemoryConfig/default/default

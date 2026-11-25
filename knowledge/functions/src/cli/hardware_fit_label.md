@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: hardware_fit_label
-resource: src/cli/mod.rs#L556-L564
+resource: src/cli/mod.rs#L583-L591
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_llama_cpp

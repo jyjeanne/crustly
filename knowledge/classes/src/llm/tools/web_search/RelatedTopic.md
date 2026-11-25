@@ -4,7 +4,7 @@ title: RelatedTopic
 resource: src/llm/tools/web_search.rs#L50-L64
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

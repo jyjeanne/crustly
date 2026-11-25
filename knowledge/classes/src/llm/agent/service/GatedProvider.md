@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: GatedProvider
-resource: src/llm/agent/service.rs#L3788-L3790
+resource: src/llm/agent/service.rs#L3802-L3804
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

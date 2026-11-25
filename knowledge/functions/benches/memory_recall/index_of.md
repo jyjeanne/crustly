@@ -4,7 +4,7 @@ title: index_of
 resource: benches/memory_recall.rs#L26-L30
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/benches/memory_recall/vector

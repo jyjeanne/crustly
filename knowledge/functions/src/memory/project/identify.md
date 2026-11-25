@@ -3,7 +3,7 @@ type: Rust Function
 title: identify
 resource: src/memory/project.rs#L33-L46
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/project/find_root
@@ -19,7 +19,13 @@ relationships:
   - target: functions/benches/memory_recall/bench_keyword_recall
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/src/cli/build_memory_store
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/cli/cmd_memory
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/connect_configured_mcp_servers
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/cli/cmd_run
@@ -139,7 +145,9 @@ relationships:
 # Called by
 
 - [bench_keyword_recall](../../../../functions/benches/memory_recall/bench_keyword_recall.md)
+- [build_memory_store](../../../../functions/src/cli/build_memory_store.md)
 - [cmd_memory](../../../../functions/src/cli/cmd_memory.md)
+- [connect_configured_mcp_servers](../../../../functions/src/cli/connect_configured_mcp_servers.md)
 - [cmd_run](../../../../functions/src/cli/cmd_run.md)
 - [memory_block](../../../../functions/src/llm/agent/service/AgentService/memory_block.md)
 - [path_memory_text](../../../../functions/src/llm/agent/service/run/AgentRun/path_memory_text.md)

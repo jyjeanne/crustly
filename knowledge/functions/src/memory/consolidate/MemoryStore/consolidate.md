@@ -3,7 +3,7 @@ type: Rust Method
 title: consolidate
 resource: src/memory/consolidate.rs#L72-L168
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/list_for_project

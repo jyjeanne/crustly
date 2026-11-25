@@ -3,7 +3,7 @@ type: Rust Function
 title: spawn_pull
 resource: src/tui/ollama_download.rs#L174-L189
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

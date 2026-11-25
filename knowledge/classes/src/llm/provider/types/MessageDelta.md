@@ -3,7 +3,7 @@ type: Rust Struct
 title: MessageDelta
 resource: src/llm/provider/types.rs#L426-L429
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

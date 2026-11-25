@@ -3,7 +3,7 @@ type: Rust Function
 title: import_from_notes
 resource: src/memory/transfer.rs#L277-L329
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

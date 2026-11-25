@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: execute
-resource: src/llm/agent/service.rs#L3485-L3498
+resource: src/llm/agent/service.rs#L3499-L3512
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/trait/ToolResult/success

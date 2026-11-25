@@ -1,10 +1,10 @@
 ---
 type: Rust Enum
 title: DoctorStatus
-resource: src/cli/mod.rs#L2653-L2657
+resource: src/cli/mod.rs#L2826-L2830
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

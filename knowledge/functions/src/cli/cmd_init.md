@@ -1,13 +1,16 @@
 ---
 type: Rust Function
 title: cmd_init
-resource: src/cli/mod.rs#L933-L962
+resource: src/cli/mod.rs#L977-L1006
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/config/Config/default/default
@@ -32,6 +35,7 @@ relationships:
 # Calls
 
 - [context](../../../functions/src/services/ServiceManager/context.md)
+- [exists](../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [default](../../../functions/src/config/Config/default/default.md)
 - [save](../../../functions/src/config/Config/save.md)
 - [display](../../../functions/src/llm/tools/skill/SkillSource/display.md)

@@ -4,7 +4,7 @@ title: refresh_context_usage
 resource: src/tui/app.rs#L539-L541
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/context_usage_preview

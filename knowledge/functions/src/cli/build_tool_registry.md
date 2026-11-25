@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: build_tool_registry
-resource: src/cli/mod.rs#L1680-L1731
+resource: src/cli/mod.rs#L1825-L1876
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/registry/ToolRegistry/new

@@ -3,7 +3,7 @@ type: Rust Method
 title: list_tools
 resource: src/llm/tools/registry.rs#L139-L141
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/registry/test_list_tools

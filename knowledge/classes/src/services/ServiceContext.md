@@ -3,7 +3,7 @@ type: Rust Struct
 title: ServiceContext
 resource: src/services/mod.rs#L21-L24
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

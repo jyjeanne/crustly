@@ -3,7 +3,7 @@ type: Rust Struct
 title: EmbedRuntime
 resource: src/memory/semantic.rs#L31-L40
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

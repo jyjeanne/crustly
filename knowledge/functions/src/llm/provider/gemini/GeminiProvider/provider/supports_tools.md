@@ -4,7 +4,7 @@ title: supports_tools
 resource: src/llm/provider/gemini.rs#L653-L655
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

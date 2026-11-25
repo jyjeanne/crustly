@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: create_test_service
-resource: src/llm/agent/service.rs#L2023-L2041
+resource: src/llm/agent/service.rs#L2037-L2055
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/Database/connect_in_memory

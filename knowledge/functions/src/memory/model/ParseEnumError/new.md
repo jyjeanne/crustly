@@ -4,7 +4,7 @@ title: new
 resource: src/memory/model.rs#L143-L148
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/model/MemoryCategory/fromstr/from_str

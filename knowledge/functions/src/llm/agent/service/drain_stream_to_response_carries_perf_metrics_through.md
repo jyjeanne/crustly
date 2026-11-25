@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: drain_stream_to_response_carries_perf_metrics_through
-resource: src/llm/agent/service.rs#L2357-L2409
+resource: src/llm/agent/service.rs#L2371-L2423
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/drain_stream_to_response

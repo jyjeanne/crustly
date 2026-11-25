@@ -3,7 +3,7 @@ type: Rust Function
 title: is_language_supported
 resource: src/tui/highlight.rs#L145-L147
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/highlight/find_syntax

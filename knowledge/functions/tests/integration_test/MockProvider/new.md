@@ -4,7 +4,7 @@ title: new
 resource: tests/integration_test.rs#L30-L35
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/integration_test/MockProvider/single_response

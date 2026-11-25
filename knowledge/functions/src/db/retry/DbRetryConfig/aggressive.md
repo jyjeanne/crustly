@@ -3,7 +3,7 @@ type: Rust Method
 title: aggressive
 resource: src/db/retry.rs#L51-L58
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/db/retry/test_retry_config_aggressive

@@ -3,7 +3,7 @@ type: Rust Method
 title: with_sampling
 resource: src/llm/provider/qwen.rs#L187-L199
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/factory/configure_qwen

@@ -3,7 +3,7 @@ type: Rust Module
 title: embed
 resource: src/memory/embed.rs#L1-L470
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-vector-normalize

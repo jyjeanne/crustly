@@ -3,7 +3,7 @@ type: Rust Function
 title: retry_with_check
 resource: src/utils/retry.rs#L179-L226
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

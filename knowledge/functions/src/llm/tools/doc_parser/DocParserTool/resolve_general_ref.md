@@ -4,7 +4,7 @@ title: resolve_general_ref
 resource: src/llm/tools/doc_parser.rs#L345-L351
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/doc_parser/DocParserTool/extract_text_from_docx_xml

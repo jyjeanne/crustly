@@ -3,7 +3,7 @@ type: Rust Module
 title: integration_test
 resource: tests/integration_test.rs#L1-L463
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/anyhow-result

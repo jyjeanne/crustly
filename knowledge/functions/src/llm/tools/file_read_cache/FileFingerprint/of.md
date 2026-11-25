@@ -3,7 +3,7 @@ type: Rust Method
 title: of
 resource: src/llm/tools/file_read_cache.rs#L35-L40
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/execute

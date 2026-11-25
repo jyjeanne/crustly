@@ -3,7 +3,7 @@ type: Rust Method
 title: budget_bytes
 resource: src/llm/provider/hardware_detect.rs#L119-L125
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_llama_cpp

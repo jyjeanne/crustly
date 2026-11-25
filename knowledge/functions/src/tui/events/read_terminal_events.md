@@ -4,7 +4,7 @@ title: read_terminal_events
 resource: src/tui/events.rs#L286-L337
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/is_text_press

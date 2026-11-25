@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: llama_cpp_doctor_findings_skips_the_best_fit_finding_when_no_models_present
-resource: src/cli/mod.rs#L3639-L3651
+resource: src/cli/mod.rs#L3812-L3824
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

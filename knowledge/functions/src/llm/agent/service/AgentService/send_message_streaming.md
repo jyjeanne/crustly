@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: send_message_streaming
-resource: src/llm/agent/service.rs#L1171-L1198
+resource: src/llm/agent/service.rs#L1184-L1211
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/prepare_message_context

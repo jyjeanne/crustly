@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: complete
-resource: src/llm/agent/service.rs#L3794-L3800
+resource: src/llm/agent/service.rs#L3808-L3814
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/forget

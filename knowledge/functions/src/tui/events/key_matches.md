@@ -3,7 +3,7 @@ type: Rust Function
 title: key_matches
 resource: src/tui/events.rs#L440-L442
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/events/is_quit

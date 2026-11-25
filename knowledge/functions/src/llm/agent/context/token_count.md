@@ -3,7 +3,7 @@ type: Rust Function
 title: token_count
 resource: src/llm/agent/context.rs#L232-L248
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/budget/tool_schema_tokens

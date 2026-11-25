@@ -3,7 +3,7 @@ type: Rust Method
 title: usage_percentage
 resource: src/llm/agent/context.rs#L201-L203
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/agent/compaction/compaction_fires_at_threshold

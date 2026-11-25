@@ -4,7 +4,7 @@ title: kind_of
 resource: src/llm/tools/schema_check.rs#L131-L140
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/tools/schema_check/check_arguments

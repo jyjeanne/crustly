@@ -3,7 +3,7 @@ type: Rust Method
 title: hit_rate
 resource: src/llm/provider/types.rs#L281-L288
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/types/cache_metrics_hit_rate

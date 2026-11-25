@@ -4,7 +4,7 @@ title: now
 resource: tests/memory_review_fixes_test.rs#L20-L22
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

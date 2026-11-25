@@ -4,7 +4,7 @@ title: TaskOperation
 resource: src/llm/tools/task.rs#L222-L265
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

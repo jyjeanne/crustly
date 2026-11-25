@@ -3,7 +3,7 @@ type: Rust Function
 title: pull_model
 resource: src/llm/provider/ollama_models.rs#L116-L140
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/ollama_models/client_for

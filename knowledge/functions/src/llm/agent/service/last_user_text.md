@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: last_user_text
-resource: src/llm/agent/service.rs#L3089-L3102
+resource: src/llm/agent/service.rs#L3103-L3116
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/MemoryStore/find

@@ -3,7 +3,7 @@ type: Rust Method
 title: event_sender
 resource: src/tui/app.rs#L807-L809
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/EventHandler/sender

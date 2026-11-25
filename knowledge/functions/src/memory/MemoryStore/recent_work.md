@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: recent_work
-resource: src/memory/mod.rs#L555-L598
+resource: src/memory/mod.rs#L583-L626
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/episodes_for

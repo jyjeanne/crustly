@@ -3,7 +3,7 @@ type: Rust Module
 title: file
 resource: src/db/repository/file.rs#L1-L239
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crate-db-models-file

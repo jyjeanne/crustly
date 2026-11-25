@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: with_pool
-resource: src/llm/agent/service.rs#L720-L723
+resource: src/llm/agent/service.rs#L732-L735
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

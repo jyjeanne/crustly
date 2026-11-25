@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: relevance_floor_needs_a_match
-resource: src/memory/recall.rs#L503-L508
+resource: src/memory/recall.rs#L516-L521
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/passes_floor

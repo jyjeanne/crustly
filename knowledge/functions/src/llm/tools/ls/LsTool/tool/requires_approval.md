@@ -4,7 +4,7 @@ title: requires_approval
 resource: src/llm/tools/ls.rs#L76-L78
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: merge_by_canonical_path
 resource: src/llm/provider/llama_cpp_models.rs#L557-L592
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/llama_cpp_models/is_richer

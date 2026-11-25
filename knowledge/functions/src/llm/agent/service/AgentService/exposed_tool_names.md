@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: exposed_tool_names
-resource: src/llm/agent/service.rs#L872-L881
+resource: src/llm/agent/service.rs#L885-L894
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/tool_selection

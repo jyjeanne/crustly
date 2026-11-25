@@ -4,7 +4,7 @@ title: is_plain_user_message
 resource: src/llm/agent/compaction.rs#L208-L210
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/compaction/message_has_tool_result

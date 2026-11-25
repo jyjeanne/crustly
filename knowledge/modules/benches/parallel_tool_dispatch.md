@@ -3,7 +3,7 @@ type: Rust Module
 title: parallel_tool_dispatch
 resource: benches/parallel_tool_dispatch.rs#L1-L64
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/criterion-criterion-group-criterion-main-criterion

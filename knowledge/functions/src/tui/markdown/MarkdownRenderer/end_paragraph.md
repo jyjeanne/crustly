@@ -4,7 +4,7 @@ title: end_paragraph
 resource: src/tui/markdown.rs#L154-L157
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/markdown/MarkdownRenderer/flush_current_line

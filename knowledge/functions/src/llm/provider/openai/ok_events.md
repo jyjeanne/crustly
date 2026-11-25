@@ -4,7 +4,7 @@ title: ok_events
 resource: src/llm/provider/openai.rs#L938-L940
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

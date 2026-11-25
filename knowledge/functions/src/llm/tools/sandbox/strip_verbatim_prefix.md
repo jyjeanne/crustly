@@ -4,7 +4,7 @@ title: strip_verbatim_prefix
 resource: src/llm/tools/sandbox.rs#L196-L224
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/EventHandler/next

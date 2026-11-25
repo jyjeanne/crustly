@@ -3,7 +3,7 @@ type: Rust Struct
 title: SearchMemoryTool
 resource: src/llm/tools/search_memory.rs#L22-L24
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: load_config
-resource: src/cli/mod.rs#L915-L930
+resource: src/cli/mod.rs#L959-L974
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/load_from_path

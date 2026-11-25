@@ -4,7 +4,7 @@ title: check_settings
 resource: src/memory/embed.rs#L120-L131
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/embed/OllamaEmbedder/new

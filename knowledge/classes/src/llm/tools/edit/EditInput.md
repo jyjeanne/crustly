@@ -4,7 +4,7 @@ title: EditInput
 resource: src/llm/tools/edit.rs#L63-L76
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/apply_patch.rs#L343-L518
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/trait/ToolResult/error
@@ -17,6 +17,9 @@ relationships:
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/tools/error/validate_path_safety
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/src/llm/tools/error/validate_file_path
@@ -86,6 +89,7 @@ relationships:
 - [parse_patch](../../../../../../../functions/src/llm/tools/apply_patch/parse_patch.md)
 - [check_path](../../../../../../../functions/src/llm/tools/sandbox/check_path.md)
 - [validate_path_safety](../../../../../../../functions/src/llm/tools/error/validate_path_safety.md)
+- [exists](../../../../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [validate_file_path](../../../../../../../functions/src/llm/tools/error/validate_file_path.md)
 - [check](../../../../../../../functions/src/llm/tools/file_read_cache/FileReadCache/check.md)
 - [of](../../../../../../../functions/src/llm/tools/file_read_cache/FileFingerprint/of.md)

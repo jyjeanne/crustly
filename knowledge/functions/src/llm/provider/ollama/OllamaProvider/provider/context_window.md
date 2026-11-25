@@ -4,7 +4,7 @@ title: context_window
 resource: src/llm/provider/ollama.rs#L656-L672
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/ollama/OllamaProvider/overrides_for

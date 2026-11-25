@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: llama_cpp_doctor_findings_reports_build_features
-resource: src/cli/mod.rs#L3600-L3610
+resource: src/cli/mod.rs#L3773-L3783
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/config/Config/default/default

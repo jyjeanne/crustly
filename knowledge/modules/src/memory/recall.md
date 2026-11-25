@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: recall
-resource: src/memory/recall.rs#L1-L591
+resource: src/memory/recall.rs#L1-L604
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/super-model-memory-memorycategory-memoryscope
@@ -51,6 +51,7 @@ relationships:
 - [clean](../../../functions/src/memory/recall/clean.md)
 - [line](../../../functions/src/memory/recall/line.md)
 - [render_block](../../../functions/src/memory/recall/render_block.md)
+- [render_block_located](../../../functions/src/memory/recall/render_block_located.md)
 - [now](../../../functions/src/memory/recall/now.md)
 - [memory](../../../functions/src/memory/recall/memory.md)
 - [ranked](../../../functions/src/memory/recall/ranked.md)

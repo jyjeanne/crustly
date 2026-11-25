@@ -3,7 +3,7 @@ type: Rust Function
 title: fts_match_expr
 resource: src/memory/recall.rs#L42-L62
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/recall/query_words

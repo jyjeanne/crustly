@@ -4,7 +4,7 @@ title: wait_for_vector
 resource: tests/memory_semantic_test.rs#L445-L466
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/memory/MemoryRepository/new

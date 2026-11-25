@@ -3,7 +3,7 @@ type: Rust Method
 title: progress_percentage
 resource: src/plan/mod.rs#L164-L170
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/plan/PlanDocument/count_by_status

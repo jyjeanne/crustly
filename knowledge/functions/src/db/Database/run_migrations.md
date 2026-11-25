@@ -3,7 +3,7 @@ type: Rust Method
 title: run_migrations
 resource: src/db/mod.rs#L154-L184
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/task/FileLock/acquire
@@ -148,7 +148,16 @@ relationships:
   - target: functions/tests/memory_acceptance_test/open
     resolved_by: tree-sitter
     confidence: exact
+  - target: functions/tests/memory_anchors_test/setup
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/tests/memory_benchmark_test/run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/setup
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes
     resolved_by: tree-sitter
     confidence: exact
   - target: functions/tests/memory_consolidate_test/setup
@@ -269,7 +278,10 @@ relationships:
 - [create_test_db](../../../../functions/tests/integration_test/create_test_db.md)
 - [test_database_persistence](../../../../functions/tests/integration_test/test_database_persistence.md)
 - [open](../../../../functions/tests/memory_acceptance_test/open.md)
+- [setup](../../../../functions/tests/memory_anchors_test/setup.md)
 - [run](../../../../functions/tests/memory_benchmark_test/run.md)
+- [setup](../../../../functions/tests/memory_code_knowledge_test/setup.md)
+- [without_code_knowledge_nothing_changes](../../../../functions/tests/memory_code_knowledge_test/without_code_knowledge_nothing_changes.md)
 - [setup](../../../../functions/tests/memory_consolidate_test/setup.md)
 - [database](../../../../functions/tests/memory_extraction_test/database.md)
 - [a_database_from_before_memory_upgrades_and_keeps_its_sessions](../../../../functions/tests/memory_migration_test/a_database_from_before_memory_upgrades_and_keeps_its_sessions.md)

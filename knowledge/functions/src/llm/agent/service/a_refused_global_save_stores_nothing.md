@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: a_refused_global_save_stores_nothing
-resource: src/llm/agent/service.rs#L4265-L4300
+resource: src/llm/agent/service.rs#L4279-L4314
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

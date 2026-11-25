@@ -3,7 +3,7 @@ type: Rust Struct
 title: CompactionRecordRepository
 resource: src/db/repository/compaction.rs#L9-L11
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

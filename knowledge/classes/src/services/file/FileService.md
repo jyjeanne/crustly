@@ -3,7 +3,7 @@ type: Rust Struct
 title: FileService
 resource: src/services/file.rs#L14-L16
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

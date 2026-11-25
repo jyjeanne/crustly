@@ -3,7 +3,7 @@ type: Rust Method
 title: get_incomplete_tasks
 resource: src/services/plan.rs#L83-L88
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/plan/PlanTaskRepository/get_incomplete_tasks

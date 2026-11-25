@@ -3,7 +3,7 @@ type: Rust Function
 title: is_quit
 resource: src/tui/events.rs#L449-L451
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/key_matches

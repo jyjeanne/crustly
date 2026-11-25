@@ -4,7 +4,7 @@ title: render_message_lines
 resource: src/tui/render.rs#L429-L484
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/render/render_thinking_block

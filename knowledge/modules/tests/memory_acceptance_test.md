@@ -3,7 +3,7 @@ type: Rust Module
 title: memory_acceptance_test
 resource: tests/memory_acceptance_test.rs#L1-L291
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/crustly-config-memoryconfig

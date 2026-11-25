@@ -1,9 +1,9 @@
 ---
 type: Rust Module
 title: config
-resource: src/config/mod.rs#L1-L2316
+resource: src/config/mod.rs#L1-L2426
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/pub-use-crabrace-crabraceconfig-crabraceintegration
@@ -54,6 +54,11 @@ relationships:
 - [SecurityConfig](../../classes/src/config/SecurityConfig.md)
 - [to_policy](../../functions/src/config/SecurityConfig/to_policy.md)
 - [MemoryConfig](../../classes/src/config/MemoryConfig.md)
+- [MemoryCodeKnowledgeConfig](../../classes/src/config/MemoryCodeKnowledgeConfig.md)
+- [default](../../functions/src/config/MemoryCodeKnowledgeConfig/default/default.md)
+- [default_code_knowledge_enabled](../../functions/src/config/default_code_knowledge_enabled.md)
+- [default_code_knowledge_command](../../functions/src/config/default_code_knowledge_command.md)
+- [default_code_knowledge_timeout_ms](../../functions/src/config/default_code_knowledge_timeout_ms.md)
 - [MemoryEmbeddingsConfig](../../classes/src/config/MemoryEmbeddingsConfig.md)
 - [default](../../functions/src/config/MemoryEmbeddingsConfig/default/default.md)
 - [default_embed_provider](../../functions/src/config/default_embed_provider.md)
@@ -90,6 +95,7 @@ relationships:
 - [default_compaction_threshold](../../functions/src/config/default_compaction_threshold.md)
 - [default_true](../../functions/src/config/default_true.md)
 - [McpServerConfig](../../classes/src/config/McpServerConfig.md)
+- [McpExpose](../../classes/src/config/McpExpose.md)
 - [ToolCacheConfig](../../classes/src/config/ToolCacheConfig.md)
 - [default_read_file_ttl](../../functions/src/config/default_read_file_ttl.md)
 - [default_glob_ttl](../../functions/src/config/default_glob_ttl.md)
@@ -148,6 +154,7 @@ relationships:
 - [empty_security_config_trusts_nothing](../../functions/src/config/empty_security_config_trusts_nothing.md)
 - [test_default_config](../../functions/src/config/test_default_config.md)
 - [test_config_validation](../../functions/src/config/test_config_validation.md)
+- [an_mcp_server_can_limit_when_its_tools_are_offered](../../functions/src/config/an_mcp_server_can_limit_when_its_tools_are_offered.md)
 - [test_config_validation_invalid_log_level](../../functions/src/config/test_config_validation_invalid_log_level.md)
 - [test_config_validation_empty_crabrace_url](../../functions/src/config/test_config_validation_empty_crabrace_url.md)
 - [test_config_from_toml](../../functions/src/config/test_config_from_toml.md)

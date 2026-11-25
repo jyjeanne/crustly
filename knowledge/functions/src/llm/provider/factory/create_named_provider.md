@@ -3,7 +3,7 @@ type: Rust Function
 title: create_named_provider
 resource: src/llm/provider/factory.rs#L202-L220
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/factory/create_anthropic

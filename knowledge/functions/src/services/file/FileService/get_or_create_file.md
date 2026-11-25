@@ -3,7 +3,7 @@ type: Rust Method
 title: get_or_create_file
 resource: src/services/file.rs#L143-L156
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/file/FileService/find_file_by_path

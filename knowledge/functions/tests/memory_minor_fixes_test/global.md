@@ -4,7 +4,7 @@ title: global
 resource: tests/memory_minor_fixes_test.rs#L26-L37
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_minor_fixes_test/a_duplicate_still_supersedes_the_memory_it_replaces

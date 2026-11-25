@@ -3,7 +3,7 @@ type: Rust Function
 title: parse_lesson
 resource: src/memory/consolidate.rs#L260-L266
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/consolidate/MemoryStore/lesson_from_episodes

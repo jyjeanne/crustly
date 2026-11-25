@@ -1,12 +1,12 @@
 ---
 type: Rust Method
 title: capabilities
-resource: src/llm/agent/service.rs#L3479-L3481
+resource: src/llm/agent/service.rs#L3493-L3495
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

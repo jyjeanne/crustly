@@ -4,7 +4,7 @@ title: perf_metrics_from_final_data
 resource: src/llm/provider/ollama.rs#L917-L926
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/llm/provider/ollama/OllamaProvider/from_ollama_response

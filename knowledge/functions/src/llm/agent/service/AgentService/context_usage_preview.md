@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: context_usage_preview
-resource: src/llm/agent/service.rs#L886-L893
+resource: src/llm/agent/service.rs#L899-L906
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/AgentService/default_context_window

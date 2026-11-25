@@ -4,7 +4,7 @@ title: build_context
 resource: tests/compaction_test.rs#L39-L53
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/context/AgentContext/new

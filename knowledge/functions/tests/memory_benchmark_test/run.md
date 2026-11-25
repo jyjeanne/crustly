@@ -4,7 +4,7 @@ title: run
 resource: tests/memory_benchmark_test.rs#L116-L247
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/tests/memory_benchmark_test/load_fixture

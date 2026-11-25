@@ -4,7 +4,7 @@ title: to_qwen_request
 resource: src/llm/provider/qwen.rs#L623-L906
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/qwen/QwenProvider/format_hermes_tools

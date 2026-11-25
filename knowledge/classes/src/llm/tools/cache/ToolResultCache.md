@@ -3,7 +3,7 @@ type: Rust Struct
 title: ToolResultCache
 resource: src/llm/tools/cache.rs#L75-L78
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

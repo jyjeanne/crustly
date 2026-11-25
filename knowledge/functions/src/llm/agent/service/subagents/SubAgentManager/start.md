@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: start
-resource: src/llm/agent/service/subagents.rs#L190-L209
+resource: src/llm/agent/service/subagents.rs#L192-L211
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/subagents/profile_name

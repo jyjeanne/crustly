@@ -3,7 +3,7 @@ type: Rust Function
 title: is_file_edit
 resource: src/llm/agent/middleware.rs#L434-L436
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector_index/VectorIndex/contains

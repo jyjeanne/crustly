@@ -3,7 +3,7 @@ type: Rust Module
 title: ssrf_guard
 resource: src/llm/tools/ssrf_guard.rs#L1-L288
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/reqwest-dns-addrs-name-resolve-resolving

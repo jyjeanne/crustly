@@ -4,7 +4,7 @@ title: execute
 resource: src/llm/tools/bash.rs#L309-L426
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/tools/bash/is_read_only_command
@@ -13,6 +13,9 @@ relationships:
   - target: functions/src/llm/tools/trait/ToolResult/error
     resolved_by: tree-sitter-receiver
     confidence: semantic
+  - target: functions/src/memory/code_knowledge/CodeKnowledge/exists
+    resolved_by: tree-sitter
+    confidence: exact
   - target: functions/src/llm/tools/bash/resolve_shell
     resolved_by: tree-sitter
     confidence: exact
@@ -63,6 +66,7 @@ relationships:
 
 - [is_read_only_command](../../../../../../../functions/src/llm/tools/bash/is_read_only_command.md)
 - [error](../../../../../../../functions/src/llm/tools/trait/ToolResult/error.md)
+- [exists](../../../../../../../functions/src/memory/code_knowledge/CodeKnowledge/exists.md)
 - [resolve_shell](../../../../../../../functions/src/llm/tools/bash/resolve_shell.md)
 - [code](../../../../../../../functions/src/error/CrustlyError/code.md)
 - [success](../../../../../../../functions/src/llm/tools/trait/ToolResult/success.md)

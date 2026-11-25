@@ -3,7 +3,7 @@ type: Rust Method
 title: notice
 resource: src/tui/app.rs#L741-L746
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/app/App/handle_event

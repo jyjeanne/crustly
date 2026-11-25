@@ -3,7 +3,7 @@ type: Rust Method
 title: execute_tool_round
 resource: src/llm/agent/service/tool_round.rs#L119-L385
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/tool_profile/ToolSelection/exposes

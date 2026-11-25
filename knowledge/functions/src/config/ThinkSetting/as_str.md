@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: as_str
-resource: src/config/mod.rs#L1085-L1091
+resource: src/config/mod.rs#L1170-L1176
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature

@@ -4,7 +4,7 @@ title: new
 resource: tests/error_scenarios_test.rs#L38-L40
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/error_scenarios_test/create_error_agent

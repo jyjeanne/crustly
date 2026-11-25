@@ -4,7 +4,7 @@ title: render_approval_header
 resource: src/tui/render.rs#L1710-L1762
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/events/ToolApprovalRequest/time_remaining

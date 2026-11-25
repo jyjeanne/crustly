@@ -4,7 +4,7 @@ title: handle_model_download_key
 resource: src/tui/app.rs#L3404-L3492
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/app/App/start_model_delete

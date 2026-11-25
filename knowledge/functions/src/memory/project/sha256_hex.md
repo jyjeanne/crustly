@@ -4,7 +4,7 @@ title: sha256_hex
 resource: src/memory/project.rs#L119-L124
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/memory/project/id_for_root

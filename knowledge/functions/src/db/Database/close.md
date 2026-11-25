@@ -3,7 +3,7 @@ type: Rust Method
 title: close
 resource: src/db/mod.rs#L187-L191
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/tests/memory_migration_test/a_database_from_before_memory_upgrades_and_keeps_its_sessions

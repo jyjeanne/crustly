@@ -1,12 +1,12 @@
 ---
 type: Rust Function
 title: approval_callback_sees_the_canonical_tool_name
-resource: src/llm/agent/service.rs#L2754-L2780
+resource: src/llm/agent/service.rs#L2768-L2794
 tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/agent/service/test_context

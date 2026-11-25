@@ -4,7 +4,7 @@ title: from
 resource: src/tui/error.rs#L225-L231
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/tui/error/ErrorInfo/error

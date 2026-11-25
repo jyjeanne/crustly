@@ -1,9 +1,9 @@
 ---
 type: Rust Method
 title: vectors_for
-resource: src/db/repository/memory.rs#L716-L750
+resource: src/db/repository/memory.rs#L789-L823
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/memory/vector/decode

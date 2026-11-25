@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: user_turn
-resource: src/llm/agent/service.rs#L544-L557
+resource: src/llm/agent/service.rs#L548-L561
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/llm/provider/types/Message/user

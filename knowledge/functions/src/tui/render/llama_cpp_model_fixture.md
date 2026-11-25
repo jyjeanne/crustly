@@ -6,7 +6,7 @@ tags:
 - test
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/tui/render/llama_cpp_model_lines_prefers_display_name_over_the_raw_filename

@@ -3,7 +3,7 @@ type: Rust Module
 title: db
 resource: src/db/mod.rs#L1-L535
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   imports:
   - target: external/pub-use-models

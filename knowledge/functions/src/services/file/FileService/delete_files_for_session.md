@@ -3,7 +3,7 @@ type: Rust Method
 title: delete_files_for_session
 resource: src/services/file.rs#L118-L126
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/db/repository/file/FileRepository/new

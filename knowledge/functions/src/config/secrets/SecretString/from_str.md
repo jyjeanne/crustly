@@ -3,7 +3,7 @@ type: Rust Method
 title: from_str
 resource: src/config/secrets.rs#L33-L37
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   called_by:
   - target: functions/src/cli/cmd_keyring

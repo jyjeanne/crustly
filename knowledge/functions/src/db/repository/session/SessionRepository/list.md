@@ -3,7 +3,7 @@ type: Rust Method
 title: list
 resource: src/db/repository/session.rs#L110-L146
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 relationships:
   calls:
   - target: functions/src/services/ServiceManager/context

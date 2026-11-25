@@ -4,7 +4,7 @@ title: Raw
 resource: src/memory/extract.rs#L165-L175
 visibility: private
 generated:
-  by: okf-rs/0.7.0
+  by: okf-rs/0.8.0
 ---
 
 # Signature
