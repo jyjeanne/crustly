@@ -1022,6 +1022,81 @@ fn display_path(path: &std::path::Path) -> String {
         .unwrap_or(text)
 }
 
+/// The lines of `crustly memory status`: what is stored, and how recall,
+/// embeddings and extraction are set up. `memories` are the project's and
+/// the global ones, archived included; `embedding` is (model, indexed,
+/// active) when semantic recall is on.
+fn memory_status_lines(
+    config: &crate::config::Config,
+    project: &crate::memory::project::ProjectIdentity,
+    memories: &[crate::memory::model::Memory],
+    embedding: Option<(String, i64, i64)>,
+) -> Vec<String> {
+    use crate::memory::model::{MemoryScope, MemorySource, MemoryStatus};
+    let count = |f: &dyn Fn(&crate::memory::model::Memory) -> bool| {
+        memories.iter().filter(|m| f(m)).count()
+    };
+    let active = |m: &crate::memory::model::Memory| m.status == MemoryStatus::Active;
+    let global = count(&|m| active(m) && matches!(m.scope, MemoryScope::Global));
+    let here = count(&|m| active(m) && matches!(m.scope, MemoryScope::Project(_)));
+    let pending = count(&|m| m.status == MemoryStatus::Pending);
+    let history = count(&|m| matches!(m.status, MemoryStatus::Superseded | MemoryStatus::Archived));
+
+    let mut lines = vec![
+        "Crustly memory".to_string(),
+        format!(
+            "  Long-term memory:  {}",
+            if config.memory.long_term { "on" } else { "off" }
+        ),
+        format!("  Database:          {}", config.database.path.display()),
+        format!(
+            "  Project:           {} ({}), id {}",
+            project.name,
+            display_path(&project.root),
+            &project.id[..8]
+        ),
+        format!(
+            "  Memories:          {global} global, {here} in this project ({history} superseded or archived)"
+        ),
+        format!(
+            "  Recall:            {}, up to {} tokens",
+            if embedding.is_some() {
+                "keyword and semantic"
+            } else {
+                "keyword"
+            },
+            config.memory.recall_max_tokens
+        ),
+        match &embedding {
+            Some((model, indexed, active)) => {
+                format!("  Embeddings:        {model}, {indexed} of {active} memories indexed")
+            }
+            None => "  Embeddings:        off (keyword recall only)".to_string(),
+        },
+    ];
+    let extraction = &config.memory.extraction;
+    if extraction.enabled {
+        let model = if extraction.model.is_empty() {
+            "the chat model".to_string()
+        } else {
+            extraction.model.clone()
+        };
+        let since = chrono::Utc::now() - chrono::Duration::days(30);
+        let recent = count(&|m| m.source == MemorySource::Extracted && m.created_at >= since);
+        lines.push(format!(
+            "  Extraction:        on, every {} user messages, with {model}{}",
+            extraction.every_n_user_messages,
+            if extraction.review { ", review on" } else { "" }
+        ));
+        lines.push(format!(
+            "                     {recent} extracted in the last 30 days, {pending} waiting for review"
+        ));
+    } else {
+        lines.push("  Extraction:        off".to_string());
+    }
+    lines
+}
+
 /// One line per memory: id, scope, category, status, and the text.
 fn memory_line(memory: &crate::memory::model::Memory) -> String {
     use crate::memory::model::MemoryScope;
@@ -1100,42 +1175,10 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
     match operation {
         MemoryCommands::Status => {
             let memories = store.list(&project, true).await?;
-            let active = |m: &crate::memory::model::Memory| m.status == MemoryStatus::Active;
-            let global = memories
-                .iter()
-                .filter(|m| active(m) && matches!(m.scope, MemoryScope::Global))
-                .count();
-            let here = memories
-                .iter()
-                .filter(|m| active(m) && matches!(m.scope, MemoryScope::Project(_)))
-                .count();
-            let history = memories.iter().filter(|m| !active(m)).count();
-            println!("Crustly memory");
-            println!(
-                "  Long-term memory:  {}",
-                if config.memory.long_term { "on" } else { "off" }
-            );
-            println!("  Database:          {}", config.database.path.display());
-            println!(
-                "  Project:           {} ({}), id {}",
-                project.name,
-                display_path(&project.root),
-                &project.id[..8]
-            );
-            println!(
-                "  Memories:          {global} global, {here} in this project ({history} superseded or archived)"
-            );
-            println!(
-                "  Recall:            keyword, up to {} tokens",
-                config.memory.recall_max_tokens
-            );
-            match store.embedding_status().await? {
-                Some((model, indexed, active)) => {
-                    println!("  Embeddings:        {model}, {indexed} of {active} memories indexed")
-                }
-                None => println!("  Embeddings:        off (keyword recall only)"),
+            let embedding = store.embedding_status().await?;
+            for line in memory_status_lines(config, &project, &memories, embedding) {
+                println!("{line}");
             }
-            println!("  Extraction:        off");
         }
         MemoryCommands::List {
             scope,
@@ -3819,5 +3862,62 @@ mod memory_cli_tests {
         .await
         .unwrap();
         assert!(store.get(pending).await.unwrap().is_none());
+    }
+
+    /// `memory status` reports the recall mode and extraction as configured,
+    /// not fixed values.
+    #[test]
+    fn memory_status_reports_semantic_recall_and_extraction_when_on() {
+        use crate::memory::model::{
+            Memory, MemoryCategory, MemoryScope, MemorySource, MemoryStatus,
+        };
+        let project = crate::memory::project::ProjectIdentity {
+            id: "a".repeat(64),
+            root: std::path::PathBuf::from("/work/p"),
+            name: "p".into(),
+            remote_url: None,
+        };
+        let memory = |source, status| Memory {
+            id: uuid::Uuid::new_v4(),
+            scope: MemoryScope::Project("a".repeat(64)),
+            category: MemoryCategory::Fact,
+            content: "x".into(),
+            source,
+            importance: 3,
+            status,
+            superseded_by: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            last_recalled_at: None,
+            recall_count: 0,
+            expires_at: None,
+        };
+        let memories = vec![
+            memory(MemorySource::Extracted, MemoryStatus::Active),
+            memory(MemorySource::Extracted, MemoryStatus::Pending),
+            memory(MemorySource::User, MemoryStatus::Archived),
+        ];
+
+        let off = crate::config::Config::default();
+        let text = memory_status_lines(&off, &project, &memories, None).join("\n");
+        assert!(text.contains("Recall:            keyword,"), "{text}");
+        assert!(text.contains("Extraction:        off"), "{text}");
+        assert!(text.contains("(1 superseded or archived)"), "{text}");
+
+        let mut on = crate::config::Config::default();
+        on.memory.extraction.enabled = true;
+        on.memory.extraction.review = true;
+        let embedding = Some(("nomic-embed-text".to_string(), 1, 1));
+        let text = memory_status_lines(&on, &project, &memories, embedding).join("\n");
+        assert!(text.contains("keyword and semantic"), "{text}");
+        assert!(
+            text.contains("Extraction:        on, every 6 user messages"),
+            "{text}"
+        );
+        assert!(text.contains("review on"), "{text}");
+        assert!(
+            text.contains("2 extracted in the last 30 days, 1 waiting for review"),
+            "{text}"
+        );
     }
 }
