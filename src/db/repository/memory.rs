@@ -304,6 +304,79 @@ impl MemoryRepository {
         Ok(())
     }
 
+    /// Replace a memory's code anchors (§23.3) with `concepts`, each recorded
+    /// with `anchored_at`, the bundle's modification time when it was made.
+    pub async fn set_anchors(
+        &self,
+        id: Uuid,
+        concepts: &[String],
+        anchored_at: DateTime<Utc>,
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM memory_anchors WHERE memory_id = ?")
+            .bind(id.to_string())
+            .execute(&mut *tx)
+            .await?;
+        for concept in concepts {
+            sqlx::query(
+                "INSERT OR IGNORE INTO memory_anchors (memory_id, concept_id, anchored_at) \
+                 VALUES (?, ?, ?)",
+            )
+            .bind(id.to_string())
+            .bind(concept)
+            .bind(anchored_at.timestamp())
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// The code anchors of one memory: (concept id, anchored at), by id.
+    pub async fn anchors_of(&self, id: Uuid) -> Result<Vec<(String, DateTime<Utc>)>> {
+        let rows = sqlx::query(
+            "SELECT concept_id, anchored_at FROM memory_anchors WHERE memory_id = ? \
+             ORDER BY concept_id",
+        )
+        .bind(id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter()
+            .map(|r| {
+                let concept: String = r.try_get("concept_id")?;
+                let at: i64 = r.try_get("anchored_at")?;
+                Ok((concept, timestamp(at)))
+            })
+            .collect()
+    }
+
+    /// Every (memory, concept, anchored at) of the active, unexpired project
+    /// memories of `project_id`.
+    pub async fn anchors_for(
+        &self,
+        project_id: &ProjectId,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<(Uuid, String, DateTime<Utc>)>> {
+        let rows = sqlx::query(
+            "SELECT a.memory_id, a.concept_id, a.anchored_at FROM memory_anchors a \
+             JOIN memories m ON m.id = a.memory_id \
+             WHERE m.status = 'active' AND (m.expires_at IS NULL OR m.expires_at > ?) \
+             AND m.project_id = ? ORDER BY a.memory_id, a.concept_id",
+        )
+        .bind(now.timestamp())
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter()
+            .map(|r| {
+                let id: String = r.try_get("memory_id")?;
+                let concept: String = r.try_get("concept_id")?;
+                let at: i64 = r.try_get("anchored_at")?;
+                Ok((id.parse()?, concept, timestamp(at)))
+            })
+            .collect()
+    }
+
     /// The globs of one memory.
     pub async fn paths_of(&self, id: Uuid) -> Result<Vec<String>> {
         let rows = sqlx::query("SELECT glob FROM memory_paths WHERE memory_id = ? ORDER BY glob")
