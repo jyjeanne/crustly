@@ -25,6 +25,7 @@ Crustly remembers facts and preferences across sessions and repositories. Design
 - `crustly memory export FILE`, `crustly memory import FILE`, `crustly memory import --from-notes` (moves the bullets of `.crustly/memory.md` into the database, with a backup)
 - `crustly memory projects`, `crustly memory relink-project OLD_ID`
 - In the chat: `/remember [--global] <text>`, `/forget <id> [--yes]`, `/memory`
+- `/memories` in the TUI: browse, filter by scope and category, search, see a memory's history, approve or reject memories waiting for review, and forget (after a `y`)
 
 #### Safety
 - Secrets are refused on every write path, and the model is never shown them during extraction. Only the rule name is reported, never the text.
@@ -36,8 +37,8 @@ Crustly remembers facts and preferences across sessions and repositories. Design
 Every key is optional; defaults are in the README's Long-Term Memory section.
 
 #### Not Yet
-- Automatic extraction at idle time (only at request and compaction time, and at the end of `crustly run`).
-- A full memory screen in the TUI (the chat commands and the CLI cover it).
+- Automatic extraction at idle time (only at request and compaction time, when a TUI session ends, is left for another or the TUI quits, and at the end of `crustly run`).
+- Editing a memory from the `/memories` screen (`crustly memory edit` does it).
 - Extraction with a provider other than the active one (`provider = "inherit"` only).
 - Global memories are not checked for near-duplicates on save.
 - The okf-rs code-knowledge integration (Phase 6 of the spec) is deferred until okf-rs supports it.
