@@ -1,15 +1,19 @@
 ---
 type: Rust Function
 title: render_approval_capabilities
-resource: src/tui/render.rs#L1291-L1308
+resource: src/tui/render.rs#L1765-L1782
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/llm/agent/service/tool_round/ToolRound/push
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render_approval
+  - target: functions/src/tui/render/render_approval
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,7 +22,7 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [push](../../../../functions/src/llm/agent/service/tool_round/ToolRound/push.md)
 
 # Called by
 

@@ -1,14 +1,18 @@
 ---
 type: Rust Module
 title: components
-resource: src/tui/components/mod.rs#L1-L5
+resource: src/tui/components/mod.rs#L1-L6
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/pub-use-logo-get-croissant-get-logo-get-logo-with-version-get-small-logo
+  - target: external/pub-use-logo-get-croissant-get-logo-get-logo-with-version-get-small-logo
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Imports

@@ -1,13 +1,18 @@
 ---
 type: Rust Function
 title: resolve_llama_cpp_model_path
-resource: src/cli/mod.rs#L1241-L1248
+resource: src/cli/mod.rs#L2402-L2409
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_llama_cpp
+  - target: functions/src/cli/cmd_llama_cpp
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +22,4 @@ relationships:
 # Called by
 
 - [cmd_llama_cpp](../../../functions/src/cli/cmd_llama_cpp.md)
+- [resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir](../../../functions/src/cli/resolve_llama_cpp_model_path_treats_bare_names_as_relative_to_models_dir.md)

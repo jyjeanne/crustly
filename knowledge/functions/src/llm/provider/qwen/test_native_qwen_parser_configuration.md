@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_native_qwen_parser_configuration
-resource: src/llm/provider/qwen.rs#L2495-L2499
+resource: src/llm/provider/qwen.rs#L2551-L2555
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/QwenProvider/with_tool_parser
+  - target: functions/src/llm/provider/qwen/QwenProvider/local
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/qwen/QwenProvider/with_tool_parser
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [local](../../../../../functions/src/llm/provider/qwen/QwenProvider/local.md)
 - [with_tool_parser](../../../../../functions/src/llm/provider/qwen/QwenProvider/with_tool_parser.md)

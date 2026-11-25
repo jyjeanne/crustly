@@ -1,16 +1,25 @@
 ---
 type: Rust Method
 title: extract_text_from_docx_xml
-resource: src/llm/tools/doc_parser.rs#L334-L372
+resource: src/llm/tools/doc_parser.rs#L354-L393
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/from_str
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/resolve_general_ref
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/doc_parser/DocParserTool/parse_docx
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/parse_docx
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/doc_parser/test_extract_text_from_docx_xml_reads_paragraphs_and_unescapes_entities
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/doc_parser/test_extract_text_from_docx_xml_ignores_text_outside_w_t
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,9 +28,10 @@ relationships:
 
 # Calls
 
-- [from_str](../../../../../../functions/src/config/secrets/SecretString/from_str.md)
-- [is_empty](../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [resolve_general_ref](../../../../../../functions/src/llm/tools/doc_parser/DocParserTool/resolve_general_ref.md)
 
 # Called by
 
 - [parse_docx](../../../../../../functions/src/llm/tools/doc_parser/DocParserTool/parse_docx.md)
+- [test_extract_text_from_docx_xml_reads_paragraphs_and_unescapes_entities](../../../../../../functions/src/llm/tools/doc_parser/test_extract_text_from_docx_xml_reads_paragraphs_and_unescapes_entities.md)
+- [test_extract_text_from_docx_xml_ignores_text_outside_w_t](../../../../../../functions/src/llm/tools/doc_parser/test_extract_text_from_docx_xml_ignores_text_outside_w_t.md)

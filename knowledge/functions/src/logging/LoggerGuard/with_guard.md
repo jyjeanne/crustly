@@ -4,10 +4,12 @@ title: with_guard
 resource: src/logging.rs#L94-L98
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/logging/init_debug_logging
+  - target: functions/src/logging/init_debug_logging
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

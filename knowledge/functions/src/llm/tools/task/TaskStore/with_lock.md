@@ -4,13 +4,25 @@ title: with_lock
 resource: src/llm/tools/task.rs#L197-L217
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/task/FileLock/acquire
-  - functions/src/llm/tools/task/FileLock/release
+  - target: functions/src/llm/tools/task/FileLock/acquire
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/task/TaskStore/load
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/task/TaskStore/save
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/task/FileLock/release
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/task/TaskTool/tool/execute
+  - target: functions/src/llm/tools/task/TaskTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,6 +32,8 @@ relationships:
 # Calls
 
 - [acquire](../../../../../../functions/src/llm/tools/task/FileLock/acquire.md)
+- [load](../../../../../../functions/src/llm/tools/task/TaskStore/load.md)
+- [save](../../../../../../functions/src/llm/tools/task/TaskStore/save.md)
 - [release](../../../../../../functions/src/llm/tools/task/FileLock/release.md)
 
 # Called by

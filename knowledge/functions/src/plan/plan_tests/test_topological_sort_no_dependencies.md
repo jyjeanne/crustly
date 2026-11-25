@@ -2,14 +2,22 @@
 type: Rust Function
 title: test_topological_sort_no_dependencies
 resource: src/plan/plan_tests.rs#L210-L226
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/plan/plan_tests/create_test_task
-  - functions/src/plan/PlanDocument/add_task
-  - functions/src/plan/PlanDocument/tasks_in_order
+  - target: functions/src/plan/plan_tests/create_test_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/add_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/tasks_in_order
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

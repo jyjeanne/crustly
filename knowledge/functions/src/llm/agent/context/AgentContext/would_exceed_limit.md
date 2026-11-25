@@ -1,12 +1,17 @@
 ---
 type: Rust Method
 title: would_exceed_limit
-resource: src/llm/agent/context.rs#L111-L113
+resource: src/llm/agent/context.rs#L161-L163
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/agent/context/AgentContext/trim_to_fit
+  - target: functions/src/llm/agent/context/AgentContext/trim_to_fit
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/context/test_would_exceed_limit
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,3 +21,4 @@ relationships:
 # Called by
 
 - [trim_to_fit](../../../../../../functions/src/llm/agent/context/AgentContext/trim_to_fit.md)
+- [test_would_exceed_limit](../../../../../../functions/src/llm/agent/context/test_would_exceed_limit.md)

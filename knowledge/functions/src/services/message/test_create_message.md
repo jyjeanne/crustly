@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_create_message
-resource: src/services/message.rs#L262-L278
+resource: src/services/message.rs#L277-L293
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/message/MessageService/create_message
+  - target: functions/src/services/session/SessionService/create_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/MessageService/create_message
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [create_session](../../../../functions/src/services/session/SessionService/create_session.md)
 - [create_message](../../../../functions/src/services/message/MessageService/create_message.md)

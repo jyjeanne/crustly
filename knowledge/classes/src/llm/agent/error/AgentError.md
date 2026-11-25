@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: AgentError
-resource: src/llm/agent/error.rs#L8-L44
+resource: src/llm/agent/error.rs#L8-L48
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

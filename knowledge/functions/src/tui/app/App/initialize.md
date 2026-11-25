@@ -1,17 +1,27 @@
 ---
 type: Rust Method
 title: initialize
-resource: src/tui/app.rs#L496-L509
+resource: src/tui/app.rs#L781-L794
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/session/SessionService/get_most_recent_session
-  - functions/src/tui/app/App/load_session
-  - functions/src/tui/app/App/create_new_session
-  - functions/src/tui/app/App/load_sessions
+  - target: functions/src/services/session/SessionService/get_most_recent_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/load_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/create_new_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/load_sessions
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/runner/run_inner
+  - target: functions/src/tui/runner/run_inner
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

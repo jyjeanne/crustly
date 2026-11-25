@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: default_model
-resource: src/tui/runner.rs#L173-L175
+resource: src/tui/runner.rs#L178-L180
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

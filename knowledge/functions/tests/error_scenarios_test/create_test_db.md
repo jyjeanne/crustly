@@ -4,10 +4,15 @@ title: create_test_db
 resource: tests/error_scenarios_test.rs#L88-L92
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/Database/run_migrations
+  - target: functions/src/db/Database/connect_in_memory
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/db/Database/run_migrations
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +21,5 @@ relationships:
 
 # Calls
 
+- [connect_in_memory](../../../functions/src/db/Database/connect_in_memory.md)
 - [run_migrations](../../../functions/src/db/Database/run_migrations.md)

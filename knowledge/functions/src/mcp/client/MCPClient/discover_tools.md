@@ -3,12 +3,16 @@ type: Rust Method
 title: discover_tools
 resource: src/mcp/client.rs#L129-L136
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/mcp/client/MCPClient/send_request
+  - target: functions/src/mcp/client/MCPClient/send_request
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/registry/ToolRegistry/register_mcp_server
+  - target: functions/src/llm/tools/registry/ToolRegistry/register_mcp_server
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

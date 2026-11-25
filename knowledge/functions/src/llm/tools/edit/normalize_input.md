@@ -4,11 +4,15 @@ title: normalize_input
 resource: src/llm/tools/edit.rs#L93-L105
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/edit/EditTool/tool/validate_input
-  - functions/src/llm/tools/edit/EditTool/tool/execute
+  - target: functions/src/llm/tools/edit/EditTool/tool/validate_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/edit/EditTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

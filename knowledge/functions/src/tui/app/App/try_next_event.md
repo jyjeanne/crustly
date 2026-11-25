@@ -1,14 +1,18 @@
 ---
 type: Rust Method
 title: try_next_event
-resource: src/tui/app.rs#L628-L630
+resource: src/tui/app.rs#L996-L998
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/EventHandler/try_next
+  - target: functions/src/tui/events/EventHandler/try_next
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/runner/run_loop
+  - target: functions/src/tui/runner/run_loop
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

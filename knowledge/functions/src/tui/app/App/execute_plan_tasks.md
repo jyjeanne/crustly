@@ -1,15 +1,19 @@
 ---
 type: Rust Method
 title: execute_plan_tasks
-resource: src/tui/app.rs#L2177-L2180
+resource: src/tui/app.rs#L3021-L3024
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/execute_next_plan_task
+  - target: functions/src/tui/app/App/execute_next_plan_task
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_plan_key
+  - target: functions/src/tui/app/App/handle_plan_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,13 +1,15 @@
 ---
 type: Rust Method
 title: supports_vision
-resource: src/llm/provider/openai.rs#L893-L898
+resource: src/llm/provider/openai.rs#L691-L696
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/model_hints/is_vision_model
+  - target: functions/src/llm/provider/model_hints/is_vision_model
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

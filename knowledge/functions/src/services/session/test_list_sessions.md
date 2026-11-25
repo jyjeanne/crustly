@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_list_sessions
-resource: src/services/session.rs#L367-L392
+resource: src/services/session.rs#L311-L336
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/session/SessionService/list_sessions
+  - target: functions/src/services/session/SessionService/create_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/list_sessions
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [create_session](../../../../functions/src/services/session/SessionService/create_session.md)
 - [list_sessions](../../../../functions/src/services/session/SessionService/list_sessions.md)

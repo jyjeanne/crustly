@@ -3,10 +3,12 @@ type: Rust Function
 title: supported_languages
 resource: src/tui/highlight.rs#L136-L142
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/highlight/test_supported_languages
+  - target: functions/src/tui/highlight/test_supported_languages
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

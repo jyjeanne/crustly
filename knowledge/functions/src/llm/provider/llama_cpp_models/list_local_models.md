@@ -1,19 +1,33 @@
 ---
 type: Rust Function
 title: list_local_models
-resource: src/llm/provider/llama_cpp_models.rs#L77-L113
+resource: src/llm/provider/llama_cpp_models.rs#L192-L261
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/error/ErrorInfo/with_context
-  - functions/src/config/secrets/SecretString/len
+  - target: functions/src/tui/error/ErrorInfo/with_context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gguf_metadata/read_gguf_metadata
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp_models/estimate_default_context_length
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gguf_metadata/estimate_memory_bytes
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/cmd_llama_cpp
-  - functions/src/llm/provider/llama_cpp_models/list_local_models_on_nonexistent_dir_returns_empty_not_error
-  - functions/src/llm/provider/llama_cpp_models/list_local_models_only_lists_gguf_files
-  - functions/src/llm/provider/ollama_models/list_models
-  - functions/src/tui/llama_cpp_download/list_local
+  - target: functions/src/llm/provider/llama_cpp_models/list_all_local_models
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp_models/list_local_models_on_nonexistent_dir_returns_empty_not_error
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/llama_cpp_models/list_local_models_only_lists_gguf_files
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -23,12 +37,12 @@ relationships:
 # Calls
 
 - [with_context](../../../../../functions/src/tui/error/ErrorInfo/with_context.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
+- [read_gguf_metadata](../../../../../functions/src/llm/provider/gguf_metadata/read_gguf_metadata.md)
+- [estimate_default_context_length](../../../../../functions/src/llm/provider/llama_cpp_models/estimate_default_context_length.md)
+- [estimate_memory_bytes](../../../../../functions/src/llm/provider/gguf_metadata/estimate_memory_bytes.md)
 
 # Called by
 
-- [cmd_llama_cpp](../../../../../functions/src/cli/cmd_llama_cpp.md)
+- [list_all_local_models](../../../../../functions/src/llm/provider/llama_cpp_models/list_all_local_models.md)
 - [list_local_models_on_nonexistent_dir_returns_empty_not_error](../../../../../functions/src/llm/provider/llama_cpp_models/list_local_models_on_nonexistent_dir_returns_empty_not_error.md)
 - [list_local_models_only_lists_gguf_files](../../../../../functions/src/llm/provider/llama_cpp_models/list_local_models_only_lists_gguf_files.md)
-- [list_models](../../../../../functions/src/llm/provider/ollama_models/list_models.md)
-- [list_local](../../../../../functions/src/tui/llama_cpp_download/list_local.md)

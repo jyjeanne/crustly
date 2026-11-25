@@ -1,47 +1,108 @@
 ---
 type: Rust Module
 title: app
-resource: src/tui/app.rs#L1-L4755
+resource: src/tui/app.rs#L1-L6462
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-events-appmode-eventhandler-toolapprovalrequest-toolapprovalresponse-tuievent
-  - external/super-prompt-analyzer-promptanalyzer
-  - external/crate-config-planexecmode
-  - external/crate-db-models-message-session
-  - external/crate-llm-agent-agentservice
-  - external/crate-plan-plandocument
-  - external/crate-services-messageservice-planservice-servicecontext-sessionservice
-  - external/anyhow-result
-  - external/ratatui-textarea-cursormove-textarea
-  - external/std-sync-arc-mutex
-  - external/uuid-uuid
-  - external/super-events-keys
-  - external/crossterm-event-keycode-keymodifiers
-  - external/crate-db-repository-sessionlistoptions
-  - external/crossterm-event-keycode
-  - external/super
-  - external/crate-db-database
-  - external/crate-llm-provider-llmrequest-llmresponse-provider-providerstream-result-as-providerresult
-  - external/crossterm-event-keyevent-keyeventkind
-  - external/ratatui-style-style
+  - target: external/super-events-appmode-eventhandler-toolapprovalrequest-toolapprovalresponse-tuievent
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-prompt-analyzer-promptanalyzer
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-config-planexecmode
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-models-message-session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-agent-agentservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-plan-plandocument
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-services-messageservice-planservice-servicecontext-sessionservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ratatui-textarea-cursormove-textarea
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc-mutex
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-memory-model-memoryscope
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-events-keys
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crossterm-event-keycode-keymodifiers
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-memory-model-memorycategory-memoryscope-memorysource-newmemory-saveoutcome
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-memory-model-memorycategory-memorystatus
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crossterm-event-keycode
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-repository-sessionlistoptions
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-llmrequest-llmresponse-provider-providerstream-result-as-providerresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crossterm-event-keyevent-keyeventkind
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ratatui-style-style
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-memory-model-memorycategory-memoryscope-memorysource-memorystatus-newmemory
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
 
 - [DisplayMessage](../../../classes/src/tui/app/DisplayMessage.md)
 - [from](../../../functions/src/tui/app/DisplayMessage/from-message/from.md)
+- [visible_memories](../../../functions/src/tui/app/visible_memories.md)
+- [MemoryView](../../../classes/src/tui/app/MemoryView.md)
 - [App](../../../classes/src/tui/app/App.md)
+- [plural](../../../functions/src/tui/app/plural.md)
+- [first_line](../../../functions/src/tui/app/first_line.md)
 - [plain_textarea](../../../functions/src/tui/app/plain_textarea.md)
-- [quantization_hint_for_path](../../../functions/src/tui/app/quantization_hint_for_path.md)
-- [quantization_hint_for_path](../../../functions/src/tui/app/quantization_hint_for_path-2.md)
+- [llama_cpp_model_header_summary_for_path](../../../functions/src/tui/app/llama_cpp_model_header_summary_for_path.md)
+- [llama_cpp_model_header_summary_for_path](../../../functions/src/tui/app/llama_cpp_model_header_summary_for_path-2.md)
 - [new](../../../functions/src/tui/app/App/new.md)
 - [provider_name](../../../functions/src/tui/app/App/provider_name.md)
 - [provider_model](../../../functions/src/tui/app/App/provider_model.md)
 - [provider_context_window](../../../functions/src/tui/app/App/provider_context_window.md)
+- [context_usage](../../../functions/src/tui/app/App/context_usage.md)
+- [cancel_request](../../../functions/src/tui/app/App/cancel_request.md)
+- [refresh_context_usage](../../../functions/src/tui/app/App/refresh_context_usage.md)
 - [last_assistant_message](../../../functions/src/tui/app/App/last_assistant_message.md)
 - [input_text](../../../functions/src/tui/app/App/input_text.md)
 - [input_is_blank](../../../functions/src/tui/app/App/input_is_blank.md)
@@ -55,14 +116,25 @@ relationships:
 - [history_next](../../../functions/src/tui/app/App/history_next.md)
 - [copy_last_response_to_clipboard](../../../functions/src/tui/app/App/copy_last_response_to_clipboard.md)
 - [paste_from_clipboard](../../../functions/src/tui/app/App/paste_from_clipboard.md)
+- [clipboard](../../../functions/src/tui/app/App/clipboard.md)
+- [paste_text](../../../functions/src/tui/app/App/paste_text.md)
+- [notify](../../../functions/src/tui/app/App/notify.md)
+- [notice](../../../functions/src/tui/app/App/notice.md)
+- [processing_elapsed](../../../functions/src/tui/app/App/processing_elapsed.md)
+- [handle_ctrl_c](../../../functions/src/tui/app/App/handle_ctrl_c.md)
 - [initialize](../../../functions/src/tui/app/App/initialize.md)
 - [event_handler](../../../functions/src/tui/app/App/event_handler.md)
 - [event_handler_mut](../../../functions/src/tui/app/App/event_handler_mut.md)
 - [event_sender](../../../functions/src/tui/app/App/event_sender.md)
 - [set_agent_service](../../../functions/src/tui/app/App/set_agent_service.md)
 - [set_ollama_host](../../../functions/src/tui/app/App/set_ollama_host.md)
+- [set_memory](../../../functions/src/tui/app/App/set_memory.md)
+- [end_session_in_background](../../../functions/src/tui/app/App/end_session_in_background.md)
+- [finish_memory](../../../functions/src/tui/app/App/finish_memory.md)
+- [announce_memory_saves](../../../functions/src/tui/app/App/announce_memory_saves.md)
 - [set_ollama_config](../../../functions/src/tui/app/App/set_ollama_config.md)
 - [set_llama_cpp_models_dir](../../../functions/src/tui/app/App/set_llama_cpp_models_dir.md)
+- [set_llama_cpp_discovery_sources](../../../functions/src/tui/app/App/set_llama_cpp_discovery_sources.md)
 - [set_llama_cpp_config](../../../functions/src/tui/app/App/set_llama_cpp_config.md)
 - [llama_cpp_model_details](../../../functions/src/tui/app/App/llama_cpp_model_details.md)
 - [set_kitty_keyboard_protocol_active](../../../functions/src/tui/app/App/set_kitty_keyboard_protocol_active.md)
@@ -78,6 +150,18 @@ relationships:
 - [handle_sessions_key](../../../functions/src/tui/app/App/handle_sessions_key.md)
 - [open_skills](../../../functions/src/tui/app/App/open_skills.md)
 - [handle_skills_key](../../../functions/src/tui/app/App/handle_skills_key.md)
+- [push_memory_note](../../../functions/src/tui/app/App/push_memory_note.md)
+- [remember_command](../../../functions/src/tui/app/App/remember_command.md)
+- [forget_command](../../../functions/src/tui/app/App/forget_command.md)
+- [memory_command](../../../functions/src/tui/app/App/memory_command.md)
+- [open_memory_view](../../../functions/src/tui/app/App/open_memory_view.md)
+- [reload_memory_rows](../../../functions/src/tui/app/App/reload_memory_rows.md)
+- [clamp_memory_selection](../../../functions/src/tui/app/App/clamp_memory_selection.md)
+- [load_memory_history](../../../functions/src/tui/app/App/load_memory_history.md)
+- [handle_memory_key](../../../functions/src/tui/app/App/handle_memory_key.md)
+- [selected_memory](../../../functions/src/tui/app/App/selected_memory.md)
+- [approve_selected_memory](../../../functions/src/tui/app/App/approve_selected_memory.md)
+- [forget_selected_memory](../../../functions/src/tui/app/App/forget_selected_memory.md)
 - [open_mcp](../../../functions/src/tui/app/App/open_mcp.md)
 - [handle_mcp_key](../../../functions/src/tui/app/App/handle_mcp_key.md)
 - [try_handle_slash_command](../../../functions/src/tui/app/App/try_handle_slash_command.md)
@@ -121,6 +205,9 @@ relationships:
 - [start_llama_cpp_switch](../../../functions/src/tui/app/App/start_llama_cpp_switch.md)
 - [handle_llama_cpp_models_key](../../../functions/src/tui/app/App/handle_llama_cpp_models_key.md)
 - [test_display_message_from_db_message](../../../functions/src/tui/app/test_display_message_from_db_message.md)
+- [llama_cpp_model_header_summary_for_path_reads_a_real_header_once](../../../functions/src/tui/app/llama_cpp_model_header_summary_for_path_reads_a_real_header_once.md)
+- [push_string](../../../functions/src/tui/app/push_string.md)
+- [llama_cpp_model_header_summary_for_path_degrades_cleanly_on_a_missing_file](../../../functions/src/tui/app/llama_cpp_model_header_summary_for_path_degrades_cleanly_on_a_missing_file.md)
 - [DummyProvider](../../../classes/src/tui/app/DummyProvider.md)
 - [complete](../../../functions/src/tui/app/DummyProvider/provider/complete.md)
 - [stream](../../../functions/src/tui/app/DummyProvider/provider/stream.md)
@@ -171,6 +258,14 @@ relationships:
 - [paste_with_embedded_newline_produces_multiple_lines](../../../functions/src/tui/app/paste_with_embedded_newline_produces_multiple_lines.md)
 - [ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard](../../../functions/src/tui/app/ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard.md)
 - [ctrl_y_copies_last_code_block_when_present](../../../functions/src/tui/app/ctrl_y_copies_last_code_block_when_present.md)
+- [ctrl_c_clears_the_input_first_and_quits_on_a_second_press](../../../functions/src/tui/app/ctrl_c_clears_the_input_first_and_quits_on_a_second_press.md)
+- [ctrl_c_quits_only_if_the_second_press_comes_soon](../../../functions/src/tui/app/ctrl_c_quits_only_if_the_second_press_comes_soon.md)
+- [a_multi_line_paste_is_inserted_whole_without_sending](../../../functions/src/tui/app/a_multi_line_paste_is_inserted_whole_without_sending.md)
+- [a_paste_in_the_download_dialog_fills_its_input_with_one_line](../../../functions/src/tui/app/a_paste_in_the_download_dialog_fills_its_input_with_one_line.md)
+- [ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it](../../../functions/src/tui/app/ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it.md)
+- [a_paste_in_a_view_without_text_input_does_nothing](../../../functions/src/tui/app/a_paste_in_a_view_without_text_input_does_nothing.md)
+- [page_up_stops_at_the_top_of_the_transcript](../../../functions/src/tui/app/page_up_stops_at_the_top_of_the_transcript.md)
+- [help_scrolls_within_its_height](../../../functions/src/tui/app/help_scrolls_within_its_height.md)
 - [ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking](../../../functions/src/tui/app/ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking.md)
 - [auto_mode_defaults_to_interactive](../../../functions/src/tui/app/auto_mode_defaults_to_interactive.md)
 - [shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps](../../../functions/src/tui/app/shift_tab_cycles_auto_mode_through_all_three_levels_and_wraps.md)
@@ -180,6 +275,9 @@ relationships:
 - [slash_mcp_command_opens_mcp_view](../../../functions/src/tui/app/slash_mcp_command_opens_mcp_view.md)
 - [slash_help_command_opens_help_view](../../../functions/src/tui/app/slash_help_command_opens_help_view.md)
 - [unrecognized_slash_word_falls_through_instead_of_being_swallowed](../../../functions/src/tui/app/unrecognized_slash_word_falls_through_instead_of_being_swallowed.md)
+- [slash_review_resolves_to_the_builtin_skill](../../../functions/src/tui/app/slash_review_resolves_to_the_builtin_skill.md)
+- [slash_review_with_arguments_appends_them_to_the_skill_prompt](../../../functions/src/tui/app/slash_review_with_arguments_appends_them_to_the_skill_prompt.md)
+- [slash_spec_resolves_to_the_builtin_skill_with_arguments](../../../functions/src/tui/app/slash_spec_resolves_to_the_builtin_skill_with_arguments.md)
 - [chat_input_text_is_not_underlined](../../../functions/src/tui/app/chat_input_text_is_not_underlined.md)
 - [non_slash_message_is_never_treated_as_a_command](../../../functions/src/tui/app/non_slash_message_is_never_treated_as_a_command.md)
 - [typing_and_submitting_slash_skills_opens_the_dialog_end_to_end](../../../functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end.md)
@@ -199,6 +297,8 @@ relationships:
 - [switch_provider_without_ollama_feature_shows_clear_error](../../../functions/src/tui/app/switch_provider_without_ollama_feature_shows_clear_error.md)
 - [switch_provider_with_ollama_feature_swaps_provider_in_place](../../../functions/src/tui/app/switch_provider_with_ollama_feature_swaps_provider_in_place.md)
 - [ctrl_g_opens_llama_cpp_models_dialog_in_loading_state](../../../functions/src/tui/app/ctrl_g_opens_llama_cpp_models_dialog_in_loading_state.md)
+- [ctrl_g_does_not_re_trigger_hardware_detection_on_a_second_open](../../../functions/src/tui/app/ctrl_g_does_not_re_trigger_hardware_detection_on_a_second_open.md)
+- [llama_cpp_hardware_detected_clears_loading_state_and_stores_the_result](../../../functions/src/tui/app/llama_cpp_hardware_detected_clears_loading_state_and_stores_the_result.md)
 - [llama_cpp_models_listed_clears_loading_state](../../../functions/src/tui/app/llama_cpp_models_listed_clears_loading_state.md)
 - [llama_cpp_up_down_navigation_clamps_at_bounds](../../../functions/src/tui/app/llama_cpp_up_down_navigation_clamps_at_bounds.md)
 - [llama_cpp_esc_returns_to_chat](../../../functions/src/tui/app/llama_cpp_esc_returns_to_chat.md)
@@ -217,6 +317,34 @@ relationships:
 - [switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state](../../../functions/src/tui/app/switching_back_to_a_session_with_a_still_in_flight_request_restores_processing_state.md)
 - [send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight](../../../functions/src/tui/app/send_message_is_a_no_op_while_a_request_for_the_same_session_is_in_flight.md)
 - [send_message_still_works_for_a_different_session_than_the_one_processing](../../../functions/src/tui/app/send_message_still_works_for_a_different_session_than_the_one_processing.md)
+- [memory_test_app](../../../functions/src/tui/app/memory_test_app.md)
+- [last_note](../../../functions/src/tui/app/last_note.md)
+- [remember_saves_a_project_memory_and_global_with_the_flag](../../../functions/src/tui/app/remember_saves_a_project_memory_and_global_with_the_flag.md)
+- [remember_without_text_shows_usage_and_saves_nothing](../../../functions/src/tui/app/remember_without_text_shows_usage_and_saves_nothing.md)
+- [forget_asks_first_and_deletes_only_with_yes](../../../functions/src/tui/app/forget_asks_first_and_deletes_only_with_yes.md)
+- [memory_lists_the_project_and_global_memories](../../../functions/src/tui/app/memory_lists_the_project_and_global_memories.md)
+- [memory_commands_say_so_when_memory_is_off](../../../functions/src/tui/app/memory_commands_say_so_when_memory_is_off.md)
+- [a_save_during_a_response_is_announced_in_the_chat](../../../functions/src/tui/app/a_save_during_a_response_is_announced_in_the_chat.md)
+- [memory_screen_app](../../../functions/src/tui/app/memory_screen_app.md)
+- [memories_opens_the_screen_with_pending_memories_first](../../../functions/src/tui/app/memories_opens_the_screen_with_pending_memories_first.md)
+- [scope_and_category_filters_narrow_the_list](../../../functions/src/tui/app/scope_and_category_filters_narrow_the_list.md)
+- [search_filters_by_words_in_the_content](../../../functions/src/tui/app/search_filters_by_words_in_the_content.md)
+- [approve_makes_a_pending_memory_active](../../../functions/src/tui/app/approve_makes_a_pending_memory_active.md)
+- [reject_deletes_a_pending_memory](../../../functions/src/tui/app/reject_deletes_a_pending_memory.md)
+- [forget_asks_first_and_deletes_only_on_y](../../../functions/src/tui/app/forget_asks_first_and_deletes_only_on_y.md)
+- [enter_shows_details_with_the_history](../../../functions/src/tui/app/enter_shows_details_with_the_history.md)
+- [EpisodeProvider](../../../classes/src/tui/app/EpisodeProvider.md)
+- [complete](../../../functions/src/tui/app/EpisodeProvider/provider/complete.md)
+- [stream](../../../functions/src/tui/app/EpisodeProvider/provider/stream.md)
+- [name](../../../functions/src/tui/app/EpisodeProvider/provider/name.md)
+- [default_model](../../../functions/src/tui/app/EpisodeProvider/provider/default_model.md)
+- [supported_models](../../../functions/src/tui/app/EpisodeProvider/provider/supported_models.md)
+- [context_window](../../../functions/src/tui/app/EpisodeProvider/provider/context_window.md)
+- [calculate_cost](../../../functions/src/tui/app/EpisodeProvider/provider/calculate_cost.md)
+- [app_with_extraction](../../../functions/src/tui/app/app_with_extraction.md)
+- [episodes](../../../functions/src/tui/app/episodes.md)
+- [quitting_writes_the_session_episode_before_exit](../../../functions/src/tui/app/quitting_writes_the_session_episode_before_exit.md)
+- [starting_a_new_session_ends_the_previous_one](../../../functions/src/tui/app/starting_a_new_session_ends_the_previous_one.md)
 
 # Imports
 
@@ -231,10 +359,15 @@ relationships:
 - `ratatui_textarea::{CursorMove, TextArea}`
 - `std::sync::{Arc, Mutex}`
 - `uuid::Uuid`
+- `crate::memory::model::MemoryScope`
 - `super::events::keys`
 - `crossterm::event::{KeyCode, KeyModifiers}`
-- `crate::db::repository::SessionListOptions`
+- `crate::memory::model::{
+            MemoryCategory, MemoryScope, MemorySource, NewMemory, SaveOutcome,
+        }`
+- `crate::memory::model::{MemoryCategory, MemoryStatus}`
 - `crossterm::event::KeyCode`
+- `crate::db::repository::SessionListOptions`
 - `super::*`
 - `crate::db::Database`
 - `crate::llm::provider::{
@@ -242,6 +375,9 @@ relationships:
     }`
 - `crossterm::event::{KeyEvent, KeyEventKind}`
 - `ratatui::style::Style`
+- `crate::memory::model::{
+            MemoryCategory, MemoryScope, MemorySource, MemoryStatus, NewMemory,
+        }`
 
 # Member of
 

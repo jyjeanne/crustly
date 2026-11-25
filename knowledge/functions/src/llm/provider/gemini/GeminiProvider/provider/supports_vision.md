@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supports_vision
-resource: src/llm/provider/gemini.rs#L651-L654
+resource: src/llm/provider/gemini.rs#L657-L660
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

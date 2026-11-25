@@ -1,58 +1,163 @@
 ---
 type: Rust Method
 title: handle_chat_key
-resource: src/tui/app.rs#L1126-L1234
+resource: src/tui/app.rs#L1513-L1638
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/is_submit
-  - functions/src/tui/app/App/input_is_blank
-  - functions/src/tui/app/App/input_text
-  - functions/src/tui/app/App/clear_input
-  - functions/src/tui/app/App/push_input_history
-  - functions/src/tui/app/App/try_handle_slash_command
-  - functions/src/tui/events/is_newline
-  - functions/src/tui/events/is_cancel
-  - functions/src/tui/events/is_page_up
-  - functions/src/tui/events/is_page_down
-  - functions/src/tui/events/is_copy_response
-  - functions/src/tui/app/App/copy_last_response_to_clipboard
-  - functions/src/tui/events/is_paste_clipboard
-  - functions/src/tui/app/App/paste_from_clipboard
-  - functions/src/tui/app/App/open_file_picker
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/tui/app/App/cursor_on_first_line
-  - functions/src/tui/app/App/history_prev
-  - functions/src/tui/app/App/cursor_on_last_line
-  - functions/src/tui/app/App/history_next
+  - target: functions/src/tui/events/is_submit
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/input_is_blank
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/input_text
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/clear_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/push_input_history
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/try_handle_slash_command
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/send_message
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/events/is_newline
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_cancel
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/cancel_request
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_page_up
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_page_down
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_copy_response
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/copy_last_response_to_clipboard
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_paste_clipboard
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/paste_from_clipboard
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/open_file_picker
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/MemoryStore/find
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/cursor_on_first_line
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/history_prev
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/cursor_on_last_line
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/history_next
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
-  - functions/src/tui/app/up_recalls_previous_messages_without_sending_them
-  - functions/src/tui/app/recalled_message_can_be_edited_before_resending
-  - functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft
-  - functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history
-  - functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once
-  - functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting
-  - functions/src/tui/app/chat_alt_enter_inserts_newline_as_non_kitty_fallback
-  - functions/src/tui/app/chat_left_arrow_moves_cursor_for_mid_buffer_insert
-  - functions/src/tui/app/chat_backspace_deletes_at_cursor_not_always_the_last_char
-  - functions/src/tui/app/chat_home_and_end_move_cursor_to_line_boundaries
-  - functions/src/tui/app/chat_ctrl_left_right_jump_by_word
-  - functions/src/tui/app/chat_ctrl_backspace_deletes_whole_word
-  - functions/src/tui/app/altgr_backslash_reaches_the_input
-  - functions/src/tui/app/altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut
-  - functions/src/tui/app/plain_at_sign_still_opens_the_file_picker
-  - functions/src/tui/app/typed_backslashes_reach_the_input
-  - functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end
-  - functions/src/tui/app/ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard
-  - functions/src/tui/app/ctrl_y_copies_last_code_block_when_present
-  - functions/src/tui/app/ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking
-  - functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end
-  - functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer
-  - functions/src/tui/app/chat_plain_enter_on_empty_buffer_does_nothing
-  - functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_recalls_previous_messages_without_sending_them
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/recalled_message_can_be_edited_before_resending
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/consecutive_duplicate_submissions_are_stored_once
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_shift_enter_inserts_newline_instead_of_submitting
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_alt_enter_inserts_newline_as_non_kitty_fallback
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_left_arrow_moves_cursor_for_mid_buffer_insert
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_backspace_deletes_at_cursor_not_always_the_last_char
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_home_and_end_move_cursor_to_line_boundaries
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_ctrl_left_right_jump_by_word
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_ctrl_backspace_deletes_whole_word
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/altgr_backslash_reaches_the_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/altgr_at_sign_is_typed_not_treated_as_the_file_picker_shortcut
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/plain_at_sign_still_opens_the_file_picker
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/typed_backslashes_reach_the_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/ctrl_y_copies_last_code_block_when_present
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/page_up_stops_at_the_top_of_the_transcript
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_plain_enter_on_empty_buffer_does_nothing
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_ctrl_enter_still_submits_as_legacy_alias
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -67,16 +172,19 @@ relationships:
 - [clear_input](../../../../../functions/src/tui/app/App/clear_input.md)
 - [push_input_history](../../../../../functions/src/tui/app/App/push_input_history.md)
 - [try_handle_slash_command](../../../../../functions/src/tui/app/App/try_handle_slash_command.md)
+- [send_message](../../../../../functions/src/tui/app/App/send_message.md)
 - [is_newline](../../../../../functions/src/tui/events/is_newline.md)
 - [is_cancel](../../../../../functions/src/tui/events/is_cancel.md)
+- [cancel_request](../../../../../functions/src/tui/app/App/cancel_request.md)
 - [is_page_up](../../../../../functions/src/tui/events/is_page_up.md)
 - [is_page_down](../../../../../functions/src/tui/events/is_page_down.md)
 - [is_copy_response](../../../../../functions/src/tui/events/is_copy_response.md)
 - [copy_last_response_to_clipboard](../../../../../functions/src/tui/app/App/copy_last_response_to_clipboard.md)
 - [is_paste_clipboard](../../../../../functions/src/tui/events/is_paste_clipboard.md)
 - [paste_from_clipboard](../../../../../functions/src/tui/app/App/paste_from_clipboard.md)
+- [contains](../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 - [open_file_picker](../../../../../functions/src/tui/app/App/open_file_picker.md)
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [find](../../../../../functions/src/memory/MemoryStore/find.md)
 - [cursor_on_first_line](../../../../../functions/src/tui/app/App/cursor_on_first_line.md)
 - [history_prev](../../../../../functions/src/tui/app/App/history_prev.md)
 - [cursor_on_last_line](../../../../../functions/src/tui/app/App/cursor_on_last_line.md)
@@ -104,6 +212,8 @@ relationships:
 - [paste_inserts_at_cursor_not_always_appended_at_the_end](../../../../../functions/src/tui/app/paste_inserts_at_cursor_not_always_appended_at_the_end.md)
 - [ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard](../../../../../functions/src/tui/app/ctrl_y_with_no_response_yet_shows_error_without_touching_clipboard.md)
 - [ctrl_y_copies_last_code_block_when_present](../../../../../functions/src/tui/app/ctrl_y_copies_last_code_block_when_present.md)
+- [ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it](../../../../../functions/src/tui/app/ctrl_z_undoes_a_paste_and_ctrl_shift_z_redoes_it.md)
+- [page_up_stops_at_the_top_of_the_transcript](../../../../../functions/src/tui/app/page_up_stops_at_the_top_of_the_transcript.md)
 - [ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking](../../../../../functions/src/tui/app/ctrl_v_paste_from_clipboard_fails_gracefully_without_panicking.md)
 - [typing_and_submitting_slash_skills_opens_the_dialog_end_to_end](../../../../../functions/src/tui/app/typing_and_submitting_slash_skills_opens_the_dialog_end_to_end.md)
 - [chat_plain_enter_submits_and_clears_buffer](../../../../../functions/src/tui/app/chat_plain_enter_submits_and_clears_buffer.md)

@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: GeminiError
-resource: src/llm/provider/gemini.rs#L884-L888
+resource: src/llm/provider/gemini.rs#L890-L894
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

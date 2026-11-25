@@ -1,14 +1,18 @@
 ---
 type: Rust Method
 title: send_message_with_tools_and_mode
-resource: src/llm/agent/service.rs#L788-L797
+resource: src/llm/agent/service.rs#L1218-L1234
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+  - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools
+  - target: functions/src/llm/agent/service/AgentService/send_message_with_tools
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

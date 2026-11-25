@@ -1,0 +1,12 @@
+---
+type: Rust Method
+title: embed
+resource: tests/memory_semantic_test.rs#L390-L396
+visibility: private
+generated:
+  by: okf-rs/0.7.0
+---
+
+# Signature
+
+`async fn embed( &self, _purpose: EmbedPurpose, texts: &[String], ) -> Result<Vec<Vec<f32>>, EmbedError>`

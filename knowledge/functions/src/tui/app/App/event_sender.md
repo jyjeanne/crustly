@@ -1,26 +1,54 @@
 ---
 type: Rust Method
 title: event_sender
-resource: src/tui/app.rs#L522-L524
+resource: src/tui/app.rs#L807-L809
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/EventHandler/sender
+  - target: functions/src/tui/events/EventHandler/sender
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/tui/app/App/handle_event
-  - functions/src/tui/app/App/send_message
-  - functions/src/tui/app/App/handle_approval_key
-  - functions/src/tui/app/App/open_model_download
-  - functions/src/tui/app/App/start_model_pull
-  - functions/src/tui/app/App/start_model_delete
-  - functions/src/tui/app/App/open_provider_switch
-  - functions/src/tui/app/App/open_llama_cpp_models
-  - functions/src/tui/app/App/start_llama_cpp_download
-  - functions/src/tui/app/App/start_llama_cpp_delete
-  - functions/src/tui/app/App/start_llama_cpp_switch
-  - functions/src/tui/runner/run_inner
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/send_message
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_approval_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/open_model_download
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/start_model_pull
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/start_model_delete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/open_provider_switch
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/open_llama_cpp_models
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/start_llama_cpp_download
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/start_llama_cpp_delete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/start_llama_cpp_switch
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/runner/run_inner
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

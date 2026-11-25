@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: GeminiTool
-resource: src/llm/provider/gemini.rs#L798-L800
+resource: src/llm/provider/gemini.rs#L804-L806
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

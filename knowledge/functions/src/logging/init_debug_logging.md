@@ -4,14 +4,28 @@ title: init_debug_logging
 resource: src/logging.rs#L128-L203
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTaskStatus/parse
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/logging/LoggerGuard/with_guard
+  - target: functions/src/memory/project/write
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/subagents/ChildTemplate/build
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/middleware/Pipeline/with
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/logging/LoggerGuard/with_guard
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/logging/init_logging
+  - target: functions/src/logging/init_logging
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,8 +34,10 @@ relationships:
 
 # Calls
 
+- [write](../../../functions/src/memory/project/write.md)
+- [build](../../../functions/src/llm/agent/service/subagents/ChildTemplate/build.md)
 - [parse](../../../functions/src/db/models/PlanTaskStatus/parse.md)
-- [is_empty](../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [with](../../../functions/src/llm/agent/middleware/Pipeline/with.md)
 - [with_guard](../../../functions/src/logging/LoggerGuard/with_guard.md)
 
 # Called by

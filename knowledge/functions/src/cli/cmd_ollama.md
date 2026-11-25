@@ -1,20 +1,36 @@
 ---
 type: Rust Function
 title: cmd_ollama
-resource: src/cli/mod.rs#L1136-L1227
+resource: src/cli/mod.rs#L2297-L2388
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/cli/ollama_host
-  - functions/src/llm/provider/ollama_models/list_models
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/llm/provider/ollama_models/pull_model
-  - functions/src/tui/error/ErrorInfo/with_context
-  - functions/src/llm/provider/ollama_models/show_model
-  - functions/src/llm/provider/ollama_models/generate_embeddings
-  - functions/src/tui/events/EventHandler/next
+  - target: functions/src/cli/ollama_host
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/list_models
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/pull_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/error/ErrorInfo/with_context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/show_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/generate_embeddings
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/EventHandler/next
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -25,8 +41,8 @@ relationships:
 
 - [ollama_host](../../../functions/src/cli/ollama_host.md)
 - [list_models](../../../functions/src/llm/provider/ollama_models/list_models.md)
-- [is_empty](../../../functions/src/config/secrets/SecretString/is_empty.md)
 - [pull_model](../../../functions/src/llm/provider/ollama_models/pull_model.md)
+- [context](../../../functions/src/services/ServiceManager/context.md)
 - [with_context](../../../functions/src/tui/error/ErrorInfo/with_context.md)
 - [show_model](../../../functions/src/llm/provider/ollama_models/show_model.md)
 - [generate_embeddings](../../../functions/src/llm/provider/ollama_models/generate_embeddings.md)

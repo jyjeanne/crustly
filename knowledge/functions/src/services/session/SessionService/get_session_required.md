@@ -1,19 +1,33 @@
 ---
 type: Rust Method
 title: get_session_required
-resource: src/services/session.rs#L59-L63
+resource: src/services/session.rs#L57-L61
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/session/SessionService/get_session
+  - target: functions/src/services/session/SessionService/get_session
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/session/SessionService/update_session_title
-  - functions/src/services/session/SessionService/update_session_usage
-  - functions/src/services/session/test_get_session_required
-  - functions/src/services/session/test_update_session_title
-  - functions/src/services/session/test_update_session_usage
-  - functions/src/services/session/test_archive_unarchive_session
+  - target: functions/src/services/session/SessionService/update_session_title
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/update_session_usage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/test_get_session_required
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/test_update_session_title
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/test_update_session_usage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/test_archive_unarchive_session
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

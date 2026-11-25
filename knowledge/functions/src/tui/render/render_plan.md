@@ -1,17 +1,22 @@
 ---
 type: Rust Function
 title: render_plan
-resource: src/tui/render.rs#L1161-L1183
+resource: src/tui/render.rs#L1635-L1657
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_plan_document
-  - functions/src/plan/PlanTask/block
-  - functions/src/tui/render/render_plan_empty_state
+  - target: functions/src/tui/render/render_plan_document
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_plan_empty_state
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render
+  - target: functions/src/tui/render/render
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,7 +26,6 @@ relationships:
 # Calls
 
 - [render_plan_document](../../../../functions/src/tui/render/render_plan_document.md)
-- [block](../../../../functions/src/plan/PlanTask/block.md)
 - [render_plan_empty_state](../../../../functions/src/tui/render/render_plan_empty_state.md)
 
 # Called by

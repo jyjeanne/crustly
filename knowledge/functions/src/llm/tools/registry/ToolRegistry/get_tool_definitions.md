@@ -1,12 +1,17 @@
 ---
 type: Rust Method
 title: get_tool_definitions
-resource: src/llm/tools/registry.rs#L119-L128
+resource: src/llm/tools/registry.rs#L144-L153
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+  - target: functions/src/cli/core_profile_fixed_overhead_fits_a_small_window
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/AgentService/exposed_tool_definitions
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -15,4 +20,5 @@ relationships:
 
 # Called by
 
-- [send_message_with_tools_inner](../../../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.md)
+- [core_profile_fixed_overhead_fits_a_small_window](../../../../../../functions/src/cli/core_profile_fixed_overhead_fits_a_small_window.md)
+- [exposed_tool_definitions](../../../../../../functions/src/llm/agent/service/AgentService/exposed_tool_definitions.md)

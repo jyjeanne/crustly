@@ -3,11 +3,15 @@ type: Rust Method
 title: reject
 resource: src/plan/mod.rs#L189-L192
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/plan/plan_tests/test_plan_rejection
-  - functions/src/tui/app/App/handle_plan_key
+  - target: functions/src/plan/plan_tests/test_plan_rejection
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_plan_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

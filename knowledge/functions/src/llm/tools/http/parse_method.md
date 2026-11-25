@@ -4,11 +4,15 @@ title: parse_method
 resource: src/llm/tools/http.rs#L54-L68
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/http/HttpClientTool/tool/validate_input
-  - functions/src/llm/tools/http/HttpClientTool/tool/execute
+  - target: functions/src/llm/tools/http/HttpClientTool/tool/validate_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/http/HttpClientTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

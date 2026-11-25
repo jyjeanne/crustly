@@ -1,13 +1,25 @@
 ---
 type: Rust Method
 title: calculate_cost
-resource: src/llm/provider/qwen.rs#L1586-L1614
+resource: src/llm/provider/qwen.rs#L1612-L1640
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/QwenProvider/is_local
+  - target: functions/src/llm/provider/qwen/QwenProvider/is_local
+    resolved_by: tree-sitter
+    confidence: exact
+  called_by:
+  - target: functions/src/llm/provider/qwen/test_calculate_cost_local
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/qwen/test_calculate_cost_cloud
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/qwen/test_calculate_cost_unknown_cloud_model_returns_zero
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,3 +29,9 @@ relationships:
 # Calls
 
 - [is_local](../../../../../../../functions/src/llm/provider/qwen/QwenProvider/is_local.md)
+
+# Called by
+
+- [test_calculate_cost_local](../../../../../../../functions/src/llm/provider/qwen/test_calculate_cost_local.md)
+- [test_calculate_cost_cloud](../../../../../../../functions/src/llm/provider/qwen/test_calculate_cost_cloud.md)
+- [test_calculate_cost_unknown_cloud_model_returns_zero](../../../../../../../functions/src/llm/provider/qwen/test_calculate_cost_unknown_cloud_model_returns_zero.md)

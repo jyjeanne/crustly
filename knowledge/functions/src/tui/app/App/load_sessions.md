@@ -1,17 +1,25 @@
 ---
 type: Rust Method
 title: load_sessions
-resource: src/tui/app.rs#L1497-L1510
+resource: src/tui/app.rs#L2326-L2339
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/session/SessionService/list_sessions
+  - target: functions/src/services/session/SessionService/list_sessions
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/initialize
-  - functions/src/tui/app/App/create_new_session
-  - functions/src/tui/app/App/switch_mode
+  - target: functions/src/tui/app/App/initialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/create_new_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/switch_mode
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

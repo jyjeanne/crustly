@@ -4,22 +4,20 @@ title: clean_incomplete_markers
 resource: src/llm/provider/qwen.rs#L601-L620
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/len
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
-  - functions/src/llm/provider/qwen/test_clean_incomplete_markers
+  - target: functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_clean_incomplete_markers
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn clean_incomplete_markers(&self, text: &str) -> String`
-
-# Calls
-
-- [len](../../../../../../functions/src/config/secrets/SecretString/len.md)
 
 # Called by
 

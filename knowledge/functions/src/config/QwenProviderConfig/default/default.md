@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: default
-resource: src/config/mod.rs#L447-L464
+resource: src/config/mod.rs#L960-L977
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

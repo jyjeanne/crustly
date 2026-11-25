@@ -1,15 +1,19 @@
 ---
 type: Rust Function
 title: cmd_autoplan
-resource: src/cli/mod.rs#L1368-L1391
+resource: src/cli/mod.rs#L2912-L2935
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/cli/cmd_run
+  - target: functions/src/cli/cmd_run
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/run
+  - target: functions/src/cli/run
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

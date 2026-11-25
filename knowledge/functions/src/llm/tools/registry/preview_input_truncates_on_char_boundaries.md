@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: preview_input_truncates_on_char_boundaries
-resource: src/llm/tools/registry.rs#L299-L303
+resource: src/llm/tools/registry.rs#L324-L328
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/registry/preview_input
+  - target: functions/src/llm/tools/registry/preview_input
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

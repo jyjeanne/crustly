@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_parse_markdown_file
-resource: src/llm/tools/doc_parser.rs#L605-L618
+resource: src/llm/tools/doc_parser.rs#L664-L677
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/doc_parser/context_with_file
+  - target: functions/src/llm/tools/doc_parser/context_with_file
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/tool/execute
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [context_with_file](../../../../../functions/src/llm/tools/doc_parser/context_with_file.md)
+- [execute](../../../../../functions/src/llm/tools/doc_parser/DocParserTool/tool/execute.md)

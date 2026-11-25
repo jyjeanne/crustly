@@ -2,13 +2,19 @@
 type: Rust Function
 title: test_error_info_summary
 resource: src/tui/error.rs#L278-L289
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/error/ErrorInfo/warning
-  - functions/src/tui/error/ErrorInfo/summary
+  - target: functions/src/tui/error/ErrorInfo/warning
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/error/ErrorInfo/summary
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

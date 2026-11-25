@@ -3,12 +3,16 @@ type: Rust Method
 title: is_file_tracked
 resource: src/services/file.rs#L137-L140
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/file/FileService/find_file_by_path
+  - target: functions/src/services/file/FileService/find_file_by_path
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/file/test_is_file_tracked
+  - target: functions/src/services/file/test_is_file_tracked
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

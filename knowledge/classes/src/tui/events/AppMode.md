@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: AppMode
-resource: src/tui/events.rs#L174-L211
+resource: src/tui/events.rs#L183-L221
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: handle_ollama_delete_finished_failure_keeps_installed_and_posts_error
-resource: src/tui/app.rs#L3290-L3310
+resource: src/tui/app.rs#L4214-L4234
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [handle_event](../../../../functions/src/tui/app/App/handle_event.md)
+- [contains](../../../../functions/src/memory/vector_index/VectorIndex/contains.md)

@@ -3,29 +3,69 @@ type: Rust Method
 title: add_task
 resource: src/plan/mod.rs#L79-L82
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/db/repository/plan/create_test_plan
-  - functions/src/db/repository/plan/test_plan_update
-  - functions/src/db/repository/plan/test_plan_with_complex_task_graph
-  - functions/src/llm/tools/plan_tool/PlanTool/tool/execute
-  - functions/src/plan/plan_tests/test_add_task
-  - functions/src/plan/plan_tests/test_get_task
-  - functions/src/plan/plan_tests/test_get_task_mut
-  - functions/src/plan/plan_tests/test_count_by_status
-  - functions/src/plan/plan_tests/test_progress_percentage
-  - functions/src/plan/plan_tests/test_is_complete
-  - functions/src/plan/plan_tests/test_topological_sort_no_dependencies
-  - functions/src/plan/plan_tests/test_topological_sort_with_dependencies
-  - functions/src/plan/plan_tests/test_topological_sort_circular_dependency
-  - functions/src/plan/plan_tests/test_validate_dependencies_success
-  - functions/src/plan/plan_tests/test_validate_dependencies_invalid_reference
-  - functions/src/plan/plan_tests/test_validate_dependencies_circular
-  - functions/src/plan/plan_tests/test_complex_dependency_chain
-  - functions/src/services/plan/create_test_plan
-  - functions/src/tui/app/plan_task_error_marks_task_failed_and_stops_auto_execution
-  - functions/tests/plan_mode_integration_test/create_multi_task_plan
+  - target: functions/src/db/repository/plan/create_test_plan
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/plan/test_plan_update
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/plan/test_plan_with_complex_task_graph
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/plan_tool/PlanTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_add_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_get_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_get_task_mut
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_count_by_status
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_progress_percentage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_is_complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_topological_sort_no_dependencies
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_topological_sort_with_dependencies
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_topological_sort_circular_dependency
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_validate_dependencies_success
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_validate_dependencies_invalid_reference
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_validate_dependencies_circular
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_complex_dependency_chain
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/plan/create_test_plan
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/plan_task_error_marks_task_failed_and_stops_auto_execution
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/plan_mode_integration_test/create_multi_task_plan
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

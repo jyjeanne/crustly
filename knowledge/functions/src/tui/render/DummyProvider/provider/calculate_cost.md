@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: calculate_cost
-resource: src/tui/render.rs#L2417-L2419
+resource: src/tui/render.rs#L3168-L3170
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

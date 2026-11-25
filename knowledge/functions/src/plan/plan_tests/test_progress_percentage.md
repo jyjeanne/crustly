@@ -2,13 +2,22 @@
 type: Rust Function
 title: test_progress_percentage
 resource: src/plan/plan_tests.rs#L116-L142
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/plan/plan_tests/create_test_task
-  - functions/src/plan/PlanDocument/add_task
+  - target: functions/src/plan/plan_tests/create_test_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/add_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanDocument/progress_percentage
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,3 +28,4 @@ relationships:
 
 - [create_test_task](../../../../functions/src/plan/plan_tests/create_test_task.md)
 - [add_task](../../../../functions/src/plan/PlanDocument/add_task.md)
+- [progress_percentage](../../../../functions/src/plan/PlanDocument/progress_percentage.md)

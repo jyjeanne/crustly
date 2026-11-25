@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: TrackedFile
-resource: src/llm/agent/context.rs#L39-L44
+resource: src/llm/agent/context.rs#L46-L51
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

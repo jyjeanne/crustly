@@ -3,15 +3,25 @@ type: Rust Module
 title: plan_tool_security_tests
 resource: src/llm/tools/plan_tool_security_tests.rs#L1-L223
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-super
-  - external/std-path-pathbuf
-  - external/tempfile-tempdir
-  - external/std-os-unix-fs-symlink
+  - target: external/super-super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-os-unix-fs-symlink
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

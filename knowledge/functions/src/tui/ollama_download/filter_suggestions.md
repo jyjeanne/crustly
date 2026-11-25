@@ -3,15 +3,25 @@ type: Rust Function
 title: filter_suggestions
 resource: src/tui/ollama_download.rs#L53-L73
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/refresh_model_download_suggestions
-  - functions/src/tui/ollama_download/filter_suggestions_empty_query_returns_all_deduped
-  - functions/src/tui/ollama_download/filter_suggestions_matches_substring_case_insensitive
-  - functions/src/tui/ollama_download/filter_suggestions_includes_ornith
+  - target: functions/src/tui/app/App/refresh_model_download_suggestions
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/ollama_download/filter_suggestions_empty_query_returns_all_deduped
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/ollama_download/filter_suggestions_matches_substring_case_insensitive
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/ollama_download/filter_suggestions_includes_ornith
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,7 +30,7 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [contains](../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 
 # Called by
 

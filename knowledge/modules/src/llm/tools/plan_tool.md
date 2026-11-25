@@ -3,21 +3,43 @@ type: Rust Module
 title: plan_tool
 resource: src/llm/tools/plan_tool.rs#L1-L1168
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-result-toolerror
-  - external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
-  - external/crate-plan-plandocument-planstatus-plantask-tasktype-toolcall-as-plantoolcall
-  - external/async-trait-async-trait
-  - external/chrono-utc
-  - external/serde-deserialize-serialize
-  - external/serde-json-value
-  - external/std-path-path
-  - external/super
-  - external/tempfile-tempdir
+  - target: external/super-error-result-toolerror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-plan-plandocument-planstatus-plantask-tasktype-toolcall-as-plantoolcall
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/chrono-utc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

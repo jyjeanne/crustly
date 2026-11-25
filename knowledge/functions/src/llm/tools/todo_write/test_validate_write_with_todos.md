@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_validate_write_with_todos
 resource: src/llm/tools/todo_write.rs#L319-L328
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

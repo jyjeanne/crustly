@@ -3,10 +3,15 @@ type: Rust Function
 title: validate_directory_path
 resource: src/llm/tools/error.rs#L154-L183
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/error/validate_path_safety
+  - target: functions/src/llm/tools/error/validate_path_safety
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,3 +21,4 @@ relationships:
 # Calls
 
 - [validate_path_safety](../../../../../functions/src/llm/tools/error/validate_path_safety.md)
+- [display](../../../../../functions/src/llm/tools/skill/SkillSource/display.md)

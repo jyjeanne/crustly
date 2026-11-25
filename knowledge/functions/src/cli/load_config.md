@@ -1,16 +1,25 @@
 ---
 type: Rust Function
 title: load_config
-resource: src/cli/mod.rs#L412-L427
+resource: src/cli/mod.rs#L915-L930
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/Config/load_from_path
-  - functions/src/config/Config/validate
+  - target: functions/src/config/Config/load_from_path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/Config/load
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/config/Config/validate
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/run
+  - target: functions/src/cli/run
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,6 +29,7 @@ relationships:
 # Calls
 
 - [load_from_path](../../../functions/src/config/Config/load_from_path.md)
+- [load](../../../functions/src/config/Config/load.md)
 - [validate](../../../functions/src/config/Config/validate.md)
 
 # Called by

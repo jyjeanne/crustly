@@ -1,11 +1,32 @@
 ---
 type: Rust Method
 title: provider_model
-resource: src/llm/agent/service.rs#L647-L649
+resource: src/llm/agent/service.rs#L838-L840
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
+relationships:
+  called_by:
+  - target: functions/src/cli/configure_agent
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/app/App/provider_model
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/app/App/create_new_session
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/app/App/load_session
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
 
 `pub fn provider_model(&self) -> &str`
+
+# Called by
+
+- [configure_agent](../../../../../../functions/src/cli/configure_agent.md)
+- [provider_model](../../../../../../functions/src/tui/app/App/provider_model.md)
+- [create_new_session](../../../../../../functions/src/tui/app/App/create_new_session.md)
+- [load_session](../../../../../../functions/src/tui/app/App/load_session.md)

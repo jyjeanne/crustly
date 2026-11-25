@@ -1,16 +1,22 @@
 ---
 type: Rust Function
 title: help_plan_mode
-resource: src/tui/render.rs#L851-L871
+resource: src/tui/render.rs#L1283-L1303
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/help_section_header
-  - functions/src/tui/render/help_row
+  - target: functions/src/tui/render/help_section_header
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/help_row
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render_help
+  - target: functions/src/tui/render/render_help
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

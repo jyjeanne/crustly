@@ -4,14 +4,22 @@ title: extract_thinking
 resource: src/llm/provider/qwen.rs#L481-L500
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/find_after
+  - target: functions/src/llm/provider/qwen/find_after
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
-  - functions/src/llm/provider/qwen/test_thinking_extraction
-  - functions/src/llm/provider/qwen/test_thinking_extraction_out_of_order_tags_does_not_panic
+  - target: functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_thinking_extraction
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_thinking_extraction_out_of_order_tags_does_not_panic
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

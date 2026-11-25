@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: line_text
-resource: src/tui/render.rs#L2449-L2451
+resource: src/tui/render.rs#L3200-L3202
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/message_header_timestamp_is_shown_in_local_time
+  - target: functions/src/tui/render/message_header_timestamp_is_shown_in_local_time
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,24 +1,48 @@
 ---
 type: Rust Module
 title: client
-resource: src/mcp/client.rs#L1-L602
+resource: src/mcp/client.rs#L1-L601
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/anyhow-context-result
-  - external/serde-deserialize-serialize
-  - external/serde-json-value
-  - external/tokio-process-command
-  - external/tokio-io-asyncwriteext
-  - external/tokio-io-asyncreadext
-  - external/crate-llm-tools-tool-toolcapability-toolexecutioncontext-toolresult
-  - external/async-trait-async-trait
-  - external/std-sync-arc
-  - external/tokio-sync-mutex
-  - external/super
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-process-command
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-io-asyncwriteext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-io-asyncreadext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-tools-tool-toolcapability-toolexecutioncontext-toolresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-sync-mutex
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

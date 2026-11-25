@@ -3,10 +3,12 @@ type: Rust Method
 title: add_reflection
 resource: src/plan/mod.rs#L658-L660
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/plan_tool/PlanTool/tool/execute
+  - target: functions/src/llm/tools/plan_tool/PlanTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

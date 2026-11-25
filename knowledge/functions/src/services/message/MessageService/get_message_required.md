@@ -1,18 +1,33 @@
 ---
 type: Rust Method
 title: get_message_required
-resource: src/services/message.rs#L69-L73
+resource: src/services/message.rs#L70-L74
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/message/MessageService/get_message
+  - target: functions/src/services/message/MessageService/get_message
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/message/MessageService/update_message_usage
-  - functions/src/services/message/MessageService/update_message_metrics
-  - functions/src/services/message/test_update_message_usage
-  - functions/src/services/message/test_update_message_metrics_with_perf_data
-  - functions/src/services/message/test_update_message_metrics_without_perf_data
+  - target: functions/src/services/message/MessageService/update_message_usage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/MessageService/update_message_tool_log
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/MessageService/update_message_metrics
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/test_update_message_usage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/test_update_message_metrics_with_perf_data
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/test_update_message_metrics_without_perf_data
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -26,6 +41,7 @@ relationships:
 # Called by
 
 - [update_message_usage](../../../../../functions/src/services/message/MessageService/update_message_usage.md)
+- [update_message_tool_log](../../../../../functions/src/services/message/MessageService/update_message_tool_log.md)
 - [update_message_metrics](../../../../../functions/src/services/message/MessageService/update_message_metrics.md)
 - [test_update_message_usage](../../../../../functions/src/services/message/test_update_message_usage.md)
 - [test_update_message_metrics_with_perf_data](../../../../../functions/src/services/message/test_update_message_metrics_with_perf_data.md)

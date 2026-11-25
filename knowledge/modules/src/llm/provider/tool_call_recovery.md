@@ -3,13 +3,19 @@ type: Rust Module
 title: tool_call_recovery
 resource: src/llm/provider/tool_call_recovery.rs#L1-L493
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-types-tool
-  - external/super
+  - target: external/super-types-tool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

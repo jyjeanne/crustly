@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_task_type_display
 resource: src/plan/plan_tests.rs#L424-L438
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

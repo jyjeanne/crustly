@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: QwenFunctionCallDelta
-resource: src/llm/provider/qwen.rs#L1830-L1835
+resource: src/llm/provider/qwen.rs#L1856-L1861
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

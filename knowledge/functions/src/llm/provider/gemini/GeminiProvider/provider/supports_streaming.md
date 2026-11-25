@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: supports_streaming
-resource: src/llm/provider/gemini.rs#L643-L645
+resource: src/llm/provider/gemini.rs#L649-L651
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

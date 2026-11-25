@@ -3,13 +3,19 @@ type: Rust Module
 title: plan_tests
 resource: src/plan/plan_tests.rs#L1-L568
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-plan
-  - external/uuid-uuid
+  - target: external/crate-plan
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

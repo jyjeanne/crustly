@@ -1,15 +1,26 @@
 ---
 type: Rust Function
 title: paste_inserts_at_cursor_not_always_appended_at_the_end
-resource: src/tui/app.rs#L3646-L3659
+resource: src/tui/app.rs#L4570-L4583
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/handle_chat_key
-  - functions/src/tui/app/key
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/input_text
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,3 +32,4 @@ relationships:
 - [handle_chat_key](../../../../functions/src/tui/app/App/handle_chat_key.md)
 - [key](../../../../functions/src/tui/app/key.md)
 - [handle_event](../../../../functions/src/tui/app/App/handle_event.md)
+- [input_text](../../../../functions/src/tui/app/App/input_text.md)

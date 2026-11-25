@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: set_ollama_config
-resource: src/tui/app.rs#L540-L542
+resource: src/tui/app.rs#L888-L890
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_chat
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

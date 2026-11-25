@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: name
-resource: src/tui/render.rs#L2405-L2407
+resource: src/tui/render.rs#L3156-L3158
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

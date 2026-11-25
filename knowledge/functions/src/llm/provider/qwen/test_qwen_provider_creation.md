@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_qwen_provider_creation
-resource: src/llm/provider/qwen.rs#L2093-L2097
+resource: src/llm/provider/qwen.rs#L2119-L2123
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/QwenProvider/dashscope_intl
+  - target: functions/src/llm/provider/qwen/QwenProvider/dashscope_intl
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/QwenProvider/provider/name
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [dashscope_intl](../../../../../functions/src/llm/provider/qwen/QwenProvider/dashscope_intl.md)
+- [name](../../../../../functions/src/llm/provider/qwen/QwenProvider/provider/name.md)

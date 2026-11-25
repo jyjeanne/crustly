@@ -1,24 +1,20 @@
 ---
 type: Rust Function
 title: render_model_download_progress
-resource: src/tui/render.rs#L1883-L1936
+resource: src/tui/render.rs#L2426-L2479
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/plan/PlanTask/block
   called_by:
-  - functions/src/tui/render/render_model_download
+  - target: functions/src/tui/render/render_model_download
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn render_model_download_progress(f: &mut Frame, app: &App, area: Rect)`
-
-# Calls
-
-- [block](../../../../functions/src/plan/PlanTask/block.md)
 
 # Called by
 

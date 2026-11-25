@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: supported_models
-resource: src/tui/app.rs#L2984-L2986
+resource: src/tui/app.rs#L3908-L3910
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

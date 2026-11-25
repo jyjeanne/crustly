@@ -1,17 +1,25 @@
 ---
 type: Rust Method
 title: estimate_tokens
-resource: src/llm/agent/context.rs#L146-L148
+resource: src/llm/agent/context.rs#L196-L198
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/context/token_count
+  - target: functions/src/llm/agent/context/token_count
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/agent/context/AgentContext/with_system_prompt
-  - functions/src/llm/agent/context/AgentContext/estimate_message_tokens
-  - functions/src/llm/agent/context/test_token_estimation
+  - target: functions/src/llm/agent/context/AgentContext/with_system_prompt
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/context/AgentContext/estimate_message_tokens
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/context/test_token_estimation
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_model_info_key
-resource: src/tui/events.rs#L516-L522
+resource: src/tui/events.rs#L660-L666
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/logging/LoggerGuard/empty
+  - target: functions/src/tui/events/is_model_info
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +20,4 @@ relationships:
 
 # Calls
 
-- [empty](../../../../functions/src/logging/LoggerGuard/empty.md)
+- [is_model_info](../../../../functions/src/tui/events/is_model_info.md)

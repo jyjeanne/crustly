@@ -1,16 +1,15 @@
 ---
 type: Rust Function
 title: build_prompt
-resource: src/llm/provider/llama_cpp.rs#L1325-L1375
+resource: src/llm/provider/llama_cpp.rs#L1426-L1476
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp/merged_system_prompt
-  - functions/src/config/secrets/SecretString/is_empty
-  called_by:
-  - functions/src/llm/provider/llama_cpp/prepare_generation
+  - target: functions/src/llm/provider/llama_cpp/merged_system_prompt
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,8 +19,3 @@ relationships:
 # Calls
 
 - [merged_system_prompt](../../../../../functions/src/llm/provider/llama_cpp/merged_system_prompt.md)
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
-
-# Called by
-
-- [prepare_generation](../../../../../functions/src/llm/provider/llama_cpp/prepare_generation.md)

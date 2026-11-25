@@ -1,14 +1,21 @@
 ---
 type: Rust Function
 title: is_model_info
-resource: src/tui/events.rs#L340-L342
+resource: src/tui/events.rs#L484-L486
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/key_matches
+  - target: functions/src/tui/events/key_matches
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/test_model_info_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -22,3 +29,4 @@ relationships:
 # Called by
 
 - [handle_key_event](../../../../functions/src/tui/app/App/handle_key_event.md)
+- [test_model_info_key](../../../../functions/src/tui/events/test_model_info_key.md)

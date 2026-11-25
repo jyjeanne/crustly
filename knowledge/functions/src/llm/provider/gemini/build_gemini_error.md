@@ -1,18 +1,30 @@
 ---
 type: Rust Function
 title: build_gemini_error
-resource: src/llm/provider/gemini.rs#L355-L397
+resource: src/llm/provider/gemini.rs#L361-L403
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/gemini/GeminiProvider/handle_error
-  - functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_with_retry_after
-  - functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_without_retry_after
-  - functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_no_body
-  - functions/src/llm/provider/gemini/test_build_gemini_error_api_error_with_body
-  - functions/src/llm/provider/gemini/test_build_gemini_error_no_body_falls_back_to_unknown
+  - target: functions/src/llm/provider/gemini/GeminiProvider/handle_error
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_with_retry_after
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_without_retry_after
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/test_build_gemini_error_rate_limit_no_body
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/test_build_gemini_error_api_error_with_body
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/test_build_gemini_error_no_body_falls_back_to_unknown
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

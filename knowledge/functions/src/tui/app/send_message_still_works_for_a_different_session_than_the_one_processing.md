@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: send_message_still_works_for_a_different_session_than_the_one_processing
-resource: src/tui/app.rs#L4735-L4754
+resource: src/tui/app.rs#L5994-L6013
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/create_new_session
-  - functions/src/config/secrets/SecretString/len
+  - target: functions/src/tui/app/App/create_new_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/send_message
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -18,4 +24,4 @@ relationships:
 # Calls
 
 - [create_new_session](../../../../functions/src/tui/app/App/create_new_session.md)
-- [len](../../../../functions/src/config/secrets/SecretString/len.md)
+- [send_message](../../../../functions/src/tui/app/App/send_message.md)

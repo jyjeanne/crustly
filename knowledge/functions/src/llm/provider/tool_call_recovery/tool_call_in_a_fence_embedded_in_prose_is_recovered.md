@@ -2,12 +2,16 @@
 type: Rust Function
 title: tool_call_in_a_fence_embedded_in_prose_is_recovered
 resource: src/llm/provider/tool_call_recovery.rs#L313-L323
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/tool_call_recovery/tool_call_from_content
+  - target: functions/src/llm/provider/tool_call_recovery/tool_call_from_content
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

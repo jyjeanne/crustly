@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: list_local_without_feature_is_empty
-resource: src/tui/llama_cpp_download.rs#L341-L343
+resource: src/tui/llama_cpp_download.rs#L521-L525
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

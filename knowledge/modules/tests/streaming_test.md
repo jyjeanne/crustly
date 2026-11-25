@@ -3,15 +3,25 @@ type: Rust Module
 title: streaming_test
 resource: tests/streaming_test.rs#L1-L341
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/anyhow-result
-  - external/async-trait-async-trait
-  - external/crustly-llm-provider-error-providererror-result-as-providerresult-types-contentblock-contentdelta-llmrequest-llmresponse-messagedelta-role-stopreason-streamevent-streammessage-tokenusage-provider-providerstream
-  - external/futures-stream-streamext
+  - target: external/anyhow-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-llm-provider-error-providererror-result-as-providerresult-types-contentblock-contentdelta-llmrequest-llmresponse-messagedelta-role-stopreason-streamevent-streammessage-tokenusage-provider-providerstream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/futures-stream-streamext
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

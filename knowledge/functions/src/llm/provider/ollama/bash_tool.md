@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: bash_tool
-resource: src/llm/provider/ollama.rs#L1165-L1175
+resource: src/llm/provider/ollama.rs#L1223-L1233
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

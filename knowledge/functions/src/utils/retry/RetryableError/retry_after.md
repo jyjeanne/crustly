@@ -4,10 +4,12 @@ title: retry_after
 resource: src/utils/retry.rs#L15-L17
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/utils/retry/retry
+  - target: functions/src/utils/retry/retry
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

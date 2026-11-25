@@ -4,10 +4,12 @@ title: validate_input
 resource: src/llm/tools/edit.rs#L206-L210
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/edit/normalize_input
+  - target: functions/src/llm/tools/edit/normalize_input
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

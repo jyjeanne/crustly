@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_validate_title_at_limit
 resource: src/llm/tools/plan_tool_security_tests.rs#L155-L159
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/plan_tool/validate_string
+  - target: functions/src/llm/tools/plan_tool/validate_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

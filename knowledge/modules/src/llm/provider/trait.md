@@ -3,17 +3,31 @@ type: Rust Module
 title: trait
 resource: src/llm/provider/trait.rs#L1-L142
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-result
-  - external/super-types-llmrequest-llmresponse-streamevent
-  - external/async-trait-async-trait
-  - external/futures-stream
-  - external/std-pin-pin
-  - external/super
+  - target: external/super-error-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-types-llmrequest-llmresponse-streamevent
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/futures-stream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-pin-pin
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

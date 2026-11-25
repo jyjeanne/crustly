@@ -4,17 +4,31 @@ title: parse_hermes_tool_calls
 resource: src/llm/provider/qwen.rs#L294-L341
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/find_after
-  - functions/src/llm/provider/qwen/QwenProvider/generate_call_id
+  - target: functions/src/llm/provider/qwen/find_after
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/QwenProvider/generate_call_id
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
-  - functions/src/llm/provider/qwen/test_hermes_tool_call_parsing
-  - functions/src/llm/provider/qwen/test_multiple_hermes_tool_calls
-  - functions/src/llm/provider/qwen/test_hermes_malformed_json_is_skipped_without_panicking
-  - functions/src/llm/provider/qwen/test_hermes_json_missing_required_fields_is_skipped
+  - target: functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_hermes_tool_call_parsing
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_multiple_hermes_tool_calls
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_hermes_malformed_json_is_skipped_without_panicking
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_hermes_json_missing_required_fields_is_skipped
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

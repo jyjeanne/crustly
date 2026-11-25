@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_validate_valid_input
-resource: src/llm/tools/agent.rs#L250-L257
+resource: src/llm/tools/agent.rs#L307-L314
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

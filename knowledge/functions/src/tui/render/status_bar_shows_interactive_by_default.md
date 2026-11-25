@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: status_bar_shows_interactive_by_default
-resource: src/tui/render.rs#L2551-L2557
+resource: src/tui/render.rs#L3302-L3308
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_to_string
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

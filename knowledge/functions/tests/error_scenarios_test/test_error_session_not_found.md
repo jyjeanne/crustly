@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_error_session_not_found
 resource: tests/error_scenarios_test.rs#L220-L232
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/tests/error_scenarios_test/create_error_agent
+  - target: functions/tests/error_scenarios_test/create_error_agent
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

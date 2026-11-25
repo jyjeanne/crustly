@@ -3,16 +3,28 @@ type: Rust Module
 title: file_read_cache
 resource: src/llm/tools/file_read_cache.rs#L1-L141
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/std-collections-hashmap
-  - external/std-path-path-pathbuf
-  - external/std-sync-mutex
-  - external/std-time-systemtime
-  - external/super
+  - target: external/std-collections-hashmap
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-mutex
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-systemtime
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

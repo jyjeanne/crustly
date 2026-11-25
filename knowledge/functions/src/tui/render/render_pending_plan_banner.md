@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: render_pending_plan_banner
-resource: src/tui/render.rs#L204-L243
+resource: src/tui/render.rs#L310-L349
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/render_chat
+  - target: functions/src/tui/render/render_chat
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

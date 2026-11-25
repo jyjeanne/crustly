@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: sse_stream_yields_every_event_in_a_single_chunk
-resource: src/llm/provider/anthropic.rs#L562-L584
+resource: src/llm/provider/anthropic.rs#L575-L597
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/anthropic/parse_anthropic_sse_stream
+  - target: functions/src/llm/provider/anthropic/parse_anthropic_sse_stream
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

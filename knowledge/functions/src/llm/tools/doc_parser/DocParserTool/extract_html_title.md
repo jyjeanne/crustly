@@ -1,19 +1,31 @@
 ---
 type: Rust Method
 title: extract_html_title
-resource: src/llm/tools/doc_parser.rs#L488-L497
+resource: src/llm/tools/doc_parser.rs#L528-L537
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
+  calls:
+  - target: functions/src/memory/MemoryStore/find
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/doc_parser/DocParserTool/parse_html
-  - functions/src/llm/tools/doc_parser/test_extract_html_title
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/parse_html
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/doc_parser/test_extract_html_title
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn extract_html_title(html: &str) -> Option<String>`
+
+# Calls
+
+- [find](../../../../../../functions/src/memory/MemoryStore/find.md)
 
 # Called by
 

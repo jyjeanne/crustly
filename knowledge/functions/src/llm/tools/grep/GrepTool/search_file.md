@@ -4,13 +4,16 @@ title: search_file
 resource: src/llm/tools/grep.rs#L238-L312
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/plan/PlanTask/skip
+  - target: functions/src/plan/PlanTask/skip
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/grep/GrepTool/tool/execute
+  - target: functions/src/llm/tools/grep/GrepTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +22,6 @@ relationships:
 
 # Calls
 
-- [len](../../../../../../functions/src/config/secrets/SecretString/len.md)
 - [skip](../../../../../../functions/src/plan/PlanTask/skip.md)
 
 # Called by

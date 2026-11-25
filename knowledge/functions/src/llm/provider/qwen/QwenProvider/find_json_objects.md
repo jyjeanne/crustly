@@ -4,22 +4,20 @@ title: find_json_objects
 resource: src/llm/provider/qwen.rs#L350-L405
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/len
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls
-  - functions/src/llm/provider/qwen/test_find_json_objects_recovers_nested_object_after_failed_outer_parse
+  - target: functions/src/llm/provider/qwen/QwenProvider/parse_fallback_tool_calls
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_find_json_objects_recovers_nested_object_after_failed_outer_parse
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn find_json_objects(text: &str) -> Vec<(usize, usize, serde_json::Value)>`
-
-# Calls
-
-- [len](../../../../../../functions/src/config/secrets/SecretString/len.md)
 
 # Called by
 

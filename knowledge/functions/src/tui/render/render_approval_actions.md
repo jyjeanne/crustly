@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: render_approval_actions
-resource: src/tui/render.rs#L1376-L1405
+resource: src/tui/render.rs#L1870-L1899
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/render_approval
+  - target: functions/src/tui/render/render_approval
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

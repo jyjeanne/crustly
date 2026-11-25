@@ -3,10 +3,15 @@ type: Rust Function
 title: retry_db_anyhow
 resource: src/db/retry.rs#L164-L172
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/retry/retry_db_operation
+  - target: functions/src/db/retry/retry_db_operation
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,3 +21,4 @@ relationships:
 # Calls
 
 - [retry_db_operation](../../../../functions/src/db/retry/retry_db_operation.md)
+- [context](../../../../functions/src/services/ServiceManager/context.md)

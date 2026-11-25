@@ -1,24 +1,48 @@
 ---
 type: Rust Module
 title: doc_parser
-resource: src/llm/tools/doc_parser.rs#L1-L779
+resource: src/llm/tools/doc_parser.rs#L1-L902
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-result-toolerror
-  - external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
-  - external/async-trait-async-trait
-  - external/serde-deserialize-serialize
-  - external/serde-json-value
-  - external/std-io-read
-  - external/std-path-path-pathbuf
-  - external/super
-  - external/std-io-write
-  - external/tempfile-tempdir
-  - external/uuid-uuid
+  - target: external/super-error-result-toolerror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-io-read
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-path-path-pathbuf
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-io-write
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -36,6 +60,7 @@ relationships:
 - [ParsedMetadata](../../../../classes/src/llm/tools/doc_parser/ParsedMetadata.md)
 - [parse_pdf](../../../../functions/src/llm/tools/doc_parser/DocParserTool/parse_pdf.md)
 - [parse_docx](../../../../functions/src/llm/tools/doc_parser/DocParserTool/parse_docx.md)
+- [resolve_general_ref](../../../../functions/src/llm/tools/doc_parser/DocParserTool/resolve_general_ref.md)
 - [extract_text_from_docx_xml](../../../../functions/src/llm/tools/doc_parser/DocParserTool/extract_text_from_docx_xml.md)
 - [extract_metadata_from_core_xml](../../../../functions/src/llm/tools/doc_parser/DocParserTool/extract_metadata_from_core_xml.md)
 - [parse_text](../../../../functions/src/llm/tools/doc_parser/DocParserTool/parse_text.md)
@@ -57,6 +82,11 @@ relationships:
 - [test_tool_schema](../../../../functions/src/llm/tools/doc_parser/test_tool_schema.md)
 - [test_strip_html_tags](../../../../functions/src/llm/tools/doc_parser/test_strip_html_tags.md)
 - [test_extract_html_title](../../../../functions/src/llm/tools/doc_parser/test_extract_html_title.md)
+- [test_parse_xml_file](../../../../functions/src/llm/tools/doc_parser/test_parse_xml_file.md)
+- [test_extract_text_from_docx_xml_reads_paragraphs_and_unescapes_entities](../../../../functions/src/llm/tools/doc_parser/test_extract_text_from_docx_xml_reads_paragraphs_and_unescapes_entities.md)
+- [test_extract_text_from_docx_xml_ignores_text_outside_w_t](../../../../functions/src/llm/tools/doc_parser/test_extract_text_from_docx_xml_ignores_text_outside_w_t.md)
+- [test_extract_metadata_from_core_xml](../../../../functions/src/llm/tools/doc_parser/test_extract_metadata_from_core_xml.md)
+- [test_extract_metadata_from_core_xml_missing_fields](../../../../functions/src/llm/tools/doc_parser/test_extract_metadata_from_core_xml_missing_fields.md)
 
 # Imports
 

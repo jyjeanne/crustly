@@ -1,14 +1,18 @@
 ---
 type: Rust Method
 title: is_failover_error
-resource: src/llm/provider/factory.rs#L36-L43
+resource: src/llm/provider/factory.rs#L56-L63
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/factory/FailoverProvider/provider/complete
-  - functions/src/llm/provider/factory/FailoverProvider/provider/stream
+  - target: functions/src/llm/provider/factory/FailoverProvider/provider/complete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/FailoverProvider/provider/stream
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: SaveMemoryInput
-resource: src/llm/tools/save_memory.rs#L29-L31
+resource: src/llm/tools/save_memory.rs#L157-L173
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

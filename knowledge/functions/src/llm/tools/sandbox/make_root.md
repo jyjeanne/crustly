@@ -2,16 +2,28 @@
 type: Rust Function
 title: make_root
 resource: src/llm/tools/sandbox.rs#L487-L491
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/sandbox/absolute_path_outside_root_denied
-  - functions/src/llm/tools/sandbox/valid_path_inside_root_allowed
-  - functions/src/llm/tools/sandbox/path_traversal_denied
-  - functions/src/llm/tools/sandbox/deny_path_prefix_allows_unrelated_path
-  - functions/src/llm/tools/sandbox/symlink_outside_root_denied
+  - target: functions/src/llm/tools/sandbox/absolute_path_outside_root_denied
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/sandbox/valid_path_inside_root_allowed
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/sandbox/path_traversal_denied
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/sandbox/deny_path_prefix_allows_unrelated_path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/sandbox/symlink_outside_root_denied
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

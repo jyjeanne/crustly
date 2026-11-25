@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: set_mcp_status
-resource: src/tui/app.rs#L618-L620
+resource: src/tui/app.rs#L986-L988
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_chat
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

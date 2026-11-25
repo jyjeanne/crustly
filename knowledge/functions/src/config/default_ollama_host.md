@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: default_ollama_host
-resource: src/config/mod.rs#L691-L693
+resource: src/config/mod.rs#L1223-L1225
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/config/OllamaProviderConfig/default/default
+  - target: functions/src/config/OllamaProviderConfig/default/default
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

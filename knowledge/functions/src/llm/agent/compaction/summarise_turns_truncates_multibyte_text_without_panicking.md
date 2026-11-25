@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: summarise_turns_truncates_multibyte_text_without_panicking
-resource: src/llm/agent/compaction.rs#L167-L178
+resource: src/llm/agent/compaction.rs#L281-L292
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/compaction/summarise_turns
+  - target: functions/src/llm/agent/compaction/summarise_turns
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

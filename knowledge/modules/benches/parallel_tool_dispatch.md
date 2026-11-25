@@ -3,15 +3,25 @@ type: Rust Module
 title: parallel_tool_dispatch
 resource: benches/parallel_tool_dispatch.rs#L1-L64
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/criterion-criterion-group-criterion-main-criterion
-  - external/std-time-duration
-  - external/tempfile-tempdir
-  - external/tokio-runtime-runtime
+  - target: external/criterion-criterion-group-criterion-main-criterion
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-runtime-runtime
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

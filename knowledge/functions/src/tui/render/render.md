@@ -1,31 +1,75 @@
 ---
 type: Rust Function
 title: render
-resource: src/tui/render.rs#L19-L88
+resource: src/tui/render.rs#L23-L91
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_header
-  - functions/src/tui/render/render_chat
-  - functions/src/tui/render/render_input
-  - functions/src/tui/render/render_plan
-  - functions/src/tui/render/render_plan_help
-  - functions/src/tui/render/render_sessions
-  - functions/src/tui/render/render_help
-  - functions/src/tui/render/render_settings
-  - functions/src/tui/render/render_approval
-  - functions/src/tui/render/render_file_picker
-  - functions/src/tui/render/render_model_download
-  - functions/src/tui/render/render_model_info
-  - functions/src/tui/render/render_provider_switch
-  - functions/src/tui/render/render_llama_cpp_models
-  - functions/src/tui/render/render_skills
-  - functions/src/tui/render/render_mcp
-  - functions/src/tui/render/render_status_bar
+  - target: functions/src/tui/render/input_box_height
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_header
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_plan
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_plan_help
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_sessions
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_help
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_settings
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_approval
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_file_picker
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_model_download
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_model_info
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_provider_switch
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_llama_cpp_models
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_skills
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_mcp
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_memory
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_status_bar
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render_to_string
-  - functions/src/tui/runner/run_loop
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/runner/run_loop
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -34,6 +78,7 @@ relationships:
 
 # Calls
 
+- [input_box_height](../../../../functions/src/tui/render/input_box_height.md)
 - [render_header](../../../../functions/src/tui/render/render_header.md)
 - [render_chat](../../../../functions/src/tui/render/render_chat.md)
 - [render_input](../../../../functions/src/tui/render/render_input.md)
@@ -50,6 +95,7 @@ relationships:
 - [render_llama_cpp_models](../../../../functions/src/tui/render/render_llama_cpp_models.md)
 - [render_skills](../../../../functions/src/tui/render/render_skills.md)
 - [render_mcp](../../../../functions/src/tui/render/render_mcp.md)
+- [render_memory](../../../../functions/src/tui/render/render_memory.md)
 - [render_status_bar](../../../../functions/src/tui/render/render_status_bar.md)
 
 # Called by

@@ -2,13 +2,25 @@
 type: Rust Function
 title: test_error_recovery_after_failure
 resource: tests/error_scenarios_test.rs#L290-L315
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/tests/error_scenarios_test/create_error_agent
-  - functions/src/services/session/SessionService/get_session
+  - target: functions/tests/error_scenarios_test/create_error_agent
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/session/SessionService/create_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/get_session
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,4 +30,6 @@ relationships:
 # Calls
 
 - [create_error_agent](../../../functions/tests/error_scenarios_test/create_error_agent.md)
+- [new](../../../functions/src/services/session/SessionService/new.md)
+- [create_session](../../../functions/src/services/session/SessionService/create_session.md)
 - [get_session](../../../functions/src/services/session/SessionService/get_session.md)

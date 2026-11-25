@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_provider_capabilities
 resource: src/llm/provider/trait.rs#L135-L141
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/trait/ProviderCapabilities/for_provider
+  - target: functions/src/llm/provider/trait/ProviderCapabilities/for_provider
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

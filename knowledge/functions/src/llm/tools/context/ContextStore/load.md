@@ -4,10 +4,16 @@ title: load
 resource: src/llm/tools/context.rs#L55-L66
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/from_str
+  - target: functions/src/llm/tools/context/ContextStore/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  called_by:
+  - target: functions/src/llm/tools/context/ContextTool/tool/execute
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -16,4 +22,8 @@ relationships:
 
 # Calls
 
-- [from_str](../../../../../../functions/src/config/secrets/SecretString/from_str.md)
+- [new](../../../../../../functions/src/llm/tools/context/ContextStore/new.md)
+
+# Called by
+
+- [execute](../../../../../../functions/src/llm/tools/context/ContextTool/tool/execute.md)

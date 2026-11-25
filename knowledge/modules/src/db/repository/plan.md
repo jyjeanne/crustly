@@ -3,23 +3,49 @@ type: Rust Module
 title: plan
 resource: src/db/repository/plan.rs#L1-L1317
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-db-models-plan-plantask-plantaskstatus
-  - external/crate-plan-plandocument-planstatus-taskstatus-tasktype
-  - external/anyhow-context-result
-  - external/sqlx-sqlitepool
-  - external/uuid-uuid
-  - external/chrono-datetime
-  - external/super
-  - external/crate-db-models-session
-  - external/crate-db-repository-session-sessionrepository
-  - external/crate-db-database
-  - external/crate-plan-plantask-tasktype
-  - external/chrono-utc
+  - target: external/crate-db-models-plan-plantask-plantaskstatus
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-plan-plandocument-planstatus-taskstatus-tasktype
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/sqlx-sqlitepool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/chrono-datetime
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-models-session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-repository-session-sessionrepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-plan-plantask-tasktype
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/chrono-utc
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

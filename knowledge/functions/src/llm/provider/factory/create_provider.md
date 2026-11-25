@@ -1,34 +1,81 @@
 ---
 type: Rust Function
 title: create_provider
-resource: src/llm/provider/factory.rs#L141-L174
+resource: src/llm/provider/factory.rs#L161-L194
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/factory/try_create_qwen
-  - functions/src/llm/provider/factory/try_create_openai
-  - functions/src/llm/provider/factory/try_create_gemini
-  - functions/src/llm/provider/factory/try_create_azure
-  - functions/src/llm/provider/factory/create_anthropic
+  - target: functions/src/llm/provider/factory/try_create_qwen
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/try_create_openai
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/try_create_gemini
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/try_create_azure
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/create_anthropic
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/cli/cmd_run
-  - functions/src/llm/provider/factory/test_create_provider_with_anthropic
-  - functions/src/llm/provider/factory/test_create_provider_with_openai
-  - functions/src/llm/provider/factory/test_create_provider_with_azure
-  - functions/src/llm/provider/factory/test_disabled_azure_falls_through_to_anthropic
-  - functions/src/llm/provider/factory/test_create_provider_with_gemini
-  - functions/src/llm/provider/factory/test_create_provider_with_gemini_custom_base_url_and_model
-  - functions/src/llm/provider/factory/gemini_without_api_key_falls_through_to_anthropic
-  - functions/src/llm/provider/factory/disabled_gemini_is_skipped_in_favour_of_the_next_provider
-  - functions/src/llm/provider/factory/disabled_openai_is_skipped_in_favour_of_the_next_provider
-  - functions/src/llm/provider/factory/disabled_qwen_is_skipped_in_favour_of_the_next_provider
-  - functions/src/llm/provider/factory/disabled_llama_cpp_is_skipped_in_favour_of_the_next_provider
-  - functions/src/llm/provider/factory/absent_llama_cpp_config_does_not_affect_resolution
-  - functions/src/llm/provider/factory/disabled_anthropic_fallback_fails_with_a_clear_message
-  - functions/src/llm/provider/factory/test_create_provider_with_qwen
-  - functions/src/llm/provider/factory/test_create_provider_no_credentials
+  - target: functions/src/cli/cmd_memory
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/cmd_run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/test_create_provider_with_anthropic
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/test_create_provider_with_openai
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/test_create_provider_with_azure
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/test_disabled_azure_falls_through_to_anthropic
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/test_create_provider_with_gemini
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/test_create_provider_with_gemini_custom_base_url_and_model
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/gemini_without_api_key_falls_through_to_anthropic
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/disabled_gemini_is_skipped_in_favour_of_the_next_provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/disabled_openai_is_skipped_in_favour_of_the_next_provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/disabled_qwen_is_skipped_in_favour_of_the_next_provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/disabled_llama_cpp_is_skipped_in_favour_of_the_next_provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/absent_llama_cpp_config_does_not_affect_resolution
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/disabled_anthropic_fallback_fails_with_a_clear_message
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/test_create_provider_with_qwen
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/factory/test_create_provider_no_credentials
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -45,6 +92,7 @@ relationships:
 
 # Called by
 
+- [cmd_memory](../../../../../functions/src/cli/cmd_memory.md)
 - [cmd_chat](../../../../../functions/src/cli/cmd_chat.md)
 - [cmd_run](../../../../../functions/src/cli/cmd_run.md)
 - [test_create_provider_with_anthropic](../../../../../functions/src/llm/provider/factory/test_create_provider_with_anthropic.md)

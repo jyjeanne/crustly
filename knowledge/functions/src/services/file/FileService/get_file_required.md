@@ -3,13 +3,19 @@ type: Rust Method
 title: get_file_required
 resource: src/services/file.rs#L55-L59
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/file/FileService/get_file
+  - target: functions/src/services/file/FileService/get_file
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/file/FileService/update_file_content
-  - functions/src/services/file/test_update_file_content
+  - target: functions/src/services/file/FileService/update_file_content
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/file/test_update_file_content
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

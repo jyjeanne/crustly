@@ -3,24 +3,52 @@ type: Rust Module
 title: read
 resource: src/llm/tools/read.rs#L1-L402
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-validate-file-path-result-toolerror
-  - external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
-  - external/async-trait-async-trait
-  - external/serde-deserialize-serialize
-  - external/serde-json-value
-  - external/tokio-fs
-  - external/tokio-io-asyncbufreadext-bufreader
-  - external/super
-  - external/std-io-write
-  - external/tempfile-tempdir
-  - external/uuid-uuid
-  - external/futures-future-join-all
-  - external/std-sync-arc
+  - target: external/super-error-validate-file-path-result-toolerror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-tool-toolcapability-toolexecutioncontext-toolresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-fs
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-io-asyncbufreadext-bufreader
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-io-write
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/futures-future-join-all
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

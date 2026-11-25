@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_extract_retry_after
 resource: src/llm/provider/retry.rs#L398-L412
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/retry/extract_retry_after
+  - target: functions/src/llm/provider/retry/extract_retry_after
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

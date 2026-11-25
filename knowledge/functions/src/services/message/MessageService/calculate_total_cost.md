@@ -1,14 +1,18 @@
 ---
 type: Rust Method
 title: calculate_total_cost
-resource: src/services/message.rs#L192-L196
+resource: src/services/message.rs#L207-L211
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/message/MessageService/list_messages_for_session
+  - target: functions/src/services/message/MessageService/list_messages_for_session
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/message/test_calculate_totals
+  - target: functions/src/services/message/test_calculate_totals
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

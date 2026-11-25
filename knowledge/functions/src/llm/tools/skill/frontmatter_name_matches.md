@@ -1,15 +1,19 @@
 ---
 type: Rust Function
 title: frontmatter_name_matches
-resource: src/llm/tools/skill.rs#L272-L277
+resource: src/llm/tools/skill.rs#L360-L365
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/skill/parse_skill_frontmatter_value
+  - target: functions/src/llm/tools/skill/parse_skill_frontmatter_value
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/skill/resolve_skill_path
+  - target: functions/src/llm/tools/skill/resolve_skill_path
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

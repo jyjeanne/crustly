@@ -3,20 +3,40 @@ type: Rust Module
 title: update
 resource: src/config/update.rs#L1-L277
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/anyhow-context-result
-  - external/crabrace-provider
-  - external/std-time-duration-systemtime
-  - external/tokio-time
-  - external/tracing-debug-info-warn
-  - external/super-crabrace-crabraceintegration
-  - external/super-config-providerconfig
-  - external/super
-  - external/crate-config-crabrace-crabraceconfig
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crabrace-provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration-systemtime
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-time
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tracing-debug-info-warn
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-crabrace-crabraceintegration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-config-providerconfig
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-config-crabrace-crabraceconfig
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

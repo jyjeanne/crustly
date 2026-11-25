@@ -1,13 +1,23 @@
 ---
 type: Rust Method
 title: with_auto_approve_tools
-resource: src/llm/agent/service.rs#L585-L588
+resource: src/llm/agent/service.rs#L744-L747
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/cli/cmd_run
-  - functions/src/llm/agent/service/test_send_message_with_tool_execution
+  - target: functions/src/cli/cmd_run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/test_send_message_with_tool_execution
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/stopping_mid_round_answers_every_pending_tool_call
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/subagents/ChildTemplate/build
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,3 +28,5 @@ relationships:
 
 - [cmd_run](../../../../../../functions/src/cli/cmd_run.md)
 - [test_send_message_with_tool_execution](../../../../../../functions/src/llm/agent/service/test_send_message_with_tool_execution.md)
+- [stopping_mid_round_answers_every_pending_tool_call](../../../../../../functions/src/llm/agent/service/stopping_mid_round_answers_every_pending_tool_call.md)
+- [build](../../../../../../functions/src/llm/agent/service/subagents/ChildTemplate/build.md)

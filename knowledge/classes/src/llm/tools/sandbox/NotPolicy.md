@@ -3,7 +3,7 @@ type: Rust Struct
 title: NotPolicy
 resource: src/llm/tools/sandbox.rs#L376
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

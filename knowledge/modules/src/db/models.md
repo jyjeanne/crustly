@@ -1,19 +1,33 @@
 ---
 type: Rust Module
 title: models
-resource: src/db/models.rs#L1-L446
+resource: src/db/models.rs#L1-L451
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/chrono-datetime-utc
-  - external/serde-deserialize-serialize
-  - external/sqlx-fromrow
-  - external/uuid-uuid
-  - external/sqlx-row
-  - external/super
+  - target: external/chrono-datetime-utc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/sqlx-fromrow
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/sqlx-row
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

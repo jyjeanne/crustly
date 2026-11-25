@@ -1,14 +1,18 @@
 ---
 type: Rust Method
 title: next_event
-resource: src/tui/app.rs#L623-L625
+resource: src/tui/app.rs#L991-L993
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/EventHandler/next
+  - target: functions/src/tui/events/EventHandler/next
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/runner/run_loop
+  - target: functions/src/tui/runner/run_loop
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

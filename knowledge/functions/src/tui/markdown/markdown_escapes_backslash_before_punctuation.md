@@ -2,13 +2,19 @@
 type: Rust Function
 title: markdown_escapes_backslash_before_punctuation
 resource: src/tui/markdown.rs#L322-L329
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/markdown/rendered_text
-  - functions/src/tui/markdown/parse_markdown
+  - target: functions/src/tui/markdown/rendered_text
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/markdown/parse_markdown
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

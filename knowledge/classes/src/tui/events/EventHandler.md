@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: EventHandler
-resource: src/tui/events.rs#L214-L220
+resource: src/tui/events.rs#L224-L230
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

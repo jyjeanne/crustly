@@ -1,18 +1,30 @@
 ---
 type: Rust Module
 title: ssrf_guard
-resource: src/llm/tools/ssrf_guard.rs#L1-L291
+resource: src/llm/tools/ssrf_guard.rs#L1-L288
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/reqwest-dns-addrs-name-resolve-resolving
-  - external/std-net-ipaddr-ipv4addr-ipv6addr-socketaddr
-  - external/std-sync-arc
-  - external/super
-  - external/tokio-io-asyncreadext-asyncwriteext
+  - target: external/reqwest-dns-addrs-name-resolve-resolving
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-net-ipaddr-ipv4addr-ipv6addr-socketaddr
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-io-asyncreadext-asyncwriteext
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

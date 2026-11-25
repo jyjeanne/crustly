@@ -2,9 +2,11 @@
 type: Rust Method
 title: fmt
 resource: src/utils/retry.rs#L241-L243
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

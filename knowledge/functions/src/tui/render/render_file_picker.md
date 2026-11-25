@@ -1,17 +1,19 @@
 ---
 type: Rust Function
 title: render_file_picker
-resource: src/tui/render.rs#L1445-L1562
+resource: src/tui/render.rs#L1941-L2058
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/plan/PlanTask/skip
-  - functions/src/plan/PlanTask/block
+  - target: functions/src/plan/PlanTask/skip
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render
+  - target: functions/src/tui/render/render
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,9 +22,7 @@ relationships:
 
 # Calls
 
-- [len](../../../../functions/src/config/secrets/SecretString/len.md)
 - [skip](../../../../functions/src/plan/PlanTask/skip.md)
-- [block](../../../../functions/src/plan/PlanTask/block.md)
 
 # Called by
 

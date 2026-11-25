@@ -1,17 +1,37 @@
 ---
 type: Rust Function
 title: cmd_keyring
-resource: src/cli/mod.rs#L1026-L1121
+resource: src/cli/mod.rs#L2187-L2282
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/from_str
-  - functions/src/tui/error/ErrorInfo/with_context
-  - functions/src/config/secrets/SecretString/from_keyring_optional
+  - target: functions/src/config/secrets/SecretString/from_str
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/config/secrets/SecretString/save_to_keyring
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/error/ErrorInfo/with_context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/secrets/SecretString/from_keyring_optional
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/secrets/SecretString/delete_from_keyring
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/config/secrets/SecretString/expose_secret
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/secrets/SecretString/len
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   called_by:
-  - functions/src/cli/run
+  - target: functions/src/cli/run
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,8 +41,12 @@ relationships:
 # Calls
 
 - [from_str](../../../functions/src/config/secrets/SecretString/from_str.md)
+- [save_to_keyring](../../../functions/src/config/secrets/SecretString/save_to_keyring.md)
 - [with_context](../../../functions/src/tui/error/ErrorInfo/with_context.md)
 - [from_keyring_optional](../../../functions/src/config/secrets/SecretString/from_keyring_optional.md)
+- [delete_from_keyring](../../../functions/src/config/secrets/SecretString/delete_from_keyring.md)
+- [expose_secret](../../../functions/src/config/secrets/SecretString/expose_secret.md)
+- [len](../../../functions/src/config/secrets/SecretString/len.md)
 
 # Called by
 

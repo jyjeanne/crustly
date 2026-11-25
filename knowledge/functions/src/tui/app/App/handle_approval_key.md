@@ -1,19 +1,31 @@
 ---
 type: Rust Method
 title: handle_approval_key
-resource: src/tui/app.rs#L2358-L2399
+resource: src/tui/app.rs#L3206-L3247
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/is_approve
-  - functions/src/tui/app/App/event_sender
-  - functions/src/tui/events/is_deny
-  - functions/src/tui/events/is_cancel
-  - functions/src/tui/events/is_view_details
+  - target: functions/src/tui/events/is_approve
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/event_sender
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_deny
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_cancel
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_view_details
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

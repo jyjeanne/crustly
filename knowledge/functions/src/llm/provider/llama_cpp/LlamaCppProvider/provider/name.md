@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: name
-resource: src/llm/provider/llama_cpp.rs#L1431-L1433
+resource: src/llm/provider/llama_cpp.rs#L1532-L1534
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

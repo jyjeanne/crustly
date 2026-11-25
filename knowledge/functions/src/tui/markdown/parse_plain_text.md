@@ -3,13 +3,21 @@ type: Rust Function
 title: parse_plain_text
 resource: src/tui/markdown.rs#L19-L23
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/markdown/plain_text_keeps_windows_path_backslashes
-  - functions/src/tui/markdown/plain_text_keeps_markdown_syntax_literal
-  - functions/src/tui/markdown/plain_text_preserves_line_structure
-  - functions/src/tui/render/render_message_lines
+  - target: functions/src/tui/markdown/plain_text_keeps_windows_path_backslashes
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/markdown/plain_text_keeps_markdown_syntax_literal
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/markdown/plain_text_preserves_line_structure
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_message_lines
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

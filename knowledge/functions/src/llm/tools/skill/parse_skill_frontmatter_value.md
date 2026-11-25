@@ -1,18 +1,37 @@
 ---
 type: Rust Function
 title: parse_skill_frontmatter_value
-resource: src/llm/tools/skill.rs#L279-L302
+resource: src/llm/tools/skill.rs#L367-L390
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/EventHandler/next
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/tui/events/EventHandler/next
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/skill/SkillTool/tool/execute
-  - functions/src/llm/tools/skill/list_skills
-  - functions/src/llm/tools/skill/frontmatter_name_matches
+  - target: functions/src/llm/tools/skill/SkillTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/resolve_skill_content
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/list_skills
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/frontmatter_name_matches
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/test_parse_frontmatter_description
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/test_parse_frontmatter_no_frontmatter
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/test_parse_frontmatter_missing_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -22,10 +41,13 @@ relationships:
 # Calls
 
 - [next](../../../../../functions/src/tui/events/EventHandler/next.md)
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 
 # Called by
 
 - [execute](../../../../../functions/src/llm/tools/skill/SkillTool/tool/execute.md)
+- [resolve_skill_content](../../../../../functions/src/llm/tools/skill/resolve_skill_content.md)
 - [list_skills](../../../../../functions/src/llm/tools/skill/list_skills.md)
 - [frontmatter_name_matches](../../../../../functions/src/llm/tools/skill/frontmatter_name_matches.md)
+- [test_parse_frontmatter_description](../../../../../functions/src/llm/tools/skill/test_parse_frontmatter_description.md)
+- [test_parse_frontmatter_no_frontmatter](../../../../../functions/src/llm/tools/skill/test_parse_frontmatter_no_frontmatter.md)
+- [test_parse_frontmatter_missing_key](../../../../../functions/src/llm/tools/skill/test_parse_frontmatter_missing_key.md)

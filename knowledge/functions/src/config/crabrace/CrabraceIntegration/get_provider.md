@@ -3,12 +3,19 @@ type: Rust Method
 title: get_provider
 resource: src/config/crabrace.rs#L87-L90
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/crabrace/CrabraceIntegration/fetch_providers
+  - target: functions/src/config/crabrace/CrabraceIntegration/fetch_providers
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/MemoryStore/find
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/config/crabrace/CrabraceIntegration/is_provider_available
+  - target: functions/src/config/crabrace/CrabraceIntegration/is_provider_available
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,6 +25,7 @@ relationships:
 # Calls
 
 - [fetch_providers](../../../../../functions/src/config/crabrace/CrabraceIntegration/fetch_providers.md)
+- [find](../../../../../functions/src/memory/MemoryStore/find.md)
 
 # Called by
 

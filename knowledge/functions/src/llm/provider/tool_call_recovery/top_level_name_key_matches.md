@@ -4,14 +4,19 @@ title: top_level_name_key_matches
 resource: src/llm/provider/tool_call_recovery.rs#L110-L116
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/tool_call_recovery/name_key_immediately_precedes
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/llm/provider/tool_call_recovery/brace_depth_at
+  - target: functions/src/llm/provider/tool_call_recovery/name_key_immediately_precedes
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/tool_call_recovery/brace_depth_at
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/tool_call_recovery/commits_to_an_offered_tool_call
+  - target: functions/src/llm/provider/tool_call_recovery/commits_to_an_offered_tool_call
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,7 +26,6 @@ relationships:
 # Calls
 
 - [name_key_immediately_precedes](../../../../../functions/src/llm/provider/tool_call_recovery/name_key_immediately_precedes.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 - [brace_depth_at](../../../../../functions/src/llm/provider/tool_call_recovery/brace_depth_at.md)
 
 # Called by

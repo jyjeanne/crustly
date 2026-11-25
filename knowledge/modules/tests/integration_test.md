@@ -3,16 +3,28 @@ type: Rust Module
 title: integration_test
 resource: tests/integration_test.rs#L1-L463
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/anyhow-result
-  - external/async-trait-async-trait
-  - external/crustly-config-config-db-database-llm-agent-agentservice-provider-types-contentblock-llmrequest-llmresponse-stopreason-tokenusage-provider-providerstream-tools-bash-bashtool-read-readtool-registry-toolregistry-write-writetool-services-messageservice-servicecontext-sessionservice
-  - external/std-sync-arc
-  - external/uuid-uuid
+  - target: external/anyhow-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-config-config-db-database-llm-agent-agentservice-provider-types-contentblock-llmrequest-llmresponse-stopreason-tokenusage-provider-providerstream-tools-bash-bashtool-read-readtool-registry-toolregistry-write-writetool-services-messageservice-servicecontext-sessionservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

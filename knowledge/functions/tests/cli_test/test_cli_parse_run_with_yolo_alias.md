@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_cli_parse_run_with_yolo_alias
 resource: tests/cli_test.rs#L108-L121
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

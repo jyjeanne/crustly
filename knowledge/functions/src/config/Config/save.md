@@ -1,12 +1,27 @@
 ---
 type: Rust Method
 title: save
-resource: src/config/mod.rs#L1111-L1126
+resource: src/config/mod.rs#L1675-L1690
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/error/ErrorInfo/with_context
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/error/ErrorInfo/with_context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/project/write
+    resolved_by: tree-sitter
+    confidence: exact
+  called_by:
+  - target: functions/src/cli/cmd_init
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/config/test_config_save_and_load
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -15,4 +30,11 @@ relationships:
 
 # Calls
 
+- [context](../../../../functions/src/services/ServiceManager/context.md)
 - [with_context](../../../../functions/src/tui/error/ErrorInfo/with_context.md)
+- [write](../../../../functions/src/memory/project/write.md)
+
+# Called by
+
+- [cmd_init](../../../../functions/src/cli/cmd_init.md)
+- [test_config_save_and_load](../../../../functions/src/config/test_config_save_and_load.md)

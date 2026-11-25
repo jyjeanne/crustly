@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: LlamaCppDownloadProgress
-resource: src/tui/llama_cpp_download.rs#L42-L45
+resource: src/tui/llama_cpp_download.rs#L66-L69
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -4,16 +4,18 @@ title: load
 resource: src/llm/tools/todo_write.rs#L75-L82
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/from_str
+  called_by:
+  - target: functions/src/llm/tools/todo_write/TodoWriteTool/tool/execute
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
 
 `async fn load(path: &Path) -> Result<Self>`
 
-# Calls
+# Called by
 
-- [from_str](../../../../../../functions/src/config/secrets/SecretString/from_str.md)
+- [execute](../../../../../../functions/src/llm/tools/todo_write/TodoWriteTool/tool/execute.md)

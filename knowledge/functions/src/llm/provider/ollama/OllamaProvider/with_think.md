@@ -3,14 +3,22 @@ type: Rust Method
 title: with_think
 resource: src/llm/provider/ollama.rs#L204-L207
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/ollama/parse_think
+  - target: functions/src/llm/provider/ollama/parse_think
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/factory/ollama_provider_from_config
-  - functions/src/llm/provider/ollama/request_thinking_wins_over_configured_think
-  - functions/src/llm/provider/ollama/invalid_think_value_is_ignored
+  - target: functions/src/llm/provider/factory/ollama_provider_from_config
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/request_thinking_wins_over_configured_think
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/invalid_think_value_is_ignored
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

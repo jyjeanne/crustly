@@ -2,9 +2,11 @@
 type: Rust Function
 title: title_only_create_and_add_task_are_valid
 resource: src/llm/tools/plan_tool.rs#L1012-L1026
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

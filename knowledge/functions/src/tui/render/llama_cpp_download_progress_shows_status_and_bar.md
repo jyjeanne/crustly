@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: llama_cpp_download_progress_shows_status_and_bar
-resource: src/tui/render.rs#L2720-L2732
+resource: src/tui/render.rs#L3672-L3684
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_to_string
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: description
-resource: src/llm/tools/save_memory.rs#L73-L79
+resource: src/llm/tools/save_memory.rs#L215-L221
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

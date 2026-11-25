@@ -4,13 +4,22 @@ title: task_to_db
 resource: src/db/repository/plan.rs#L352-L375
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/repository/plan/PlanRepository/format_task_type
-  - functions/src/db/repository/plan/PlanRepository/format_task_status
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/plan/PlanRepository/format_task_type
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/plan/PlanRepository/format_task_status
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/db/repository/plan/PlanRepository/plan_to_db
+  - target: functions/src/db/repository/plan/PlanRepository/plan_to_db
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,6 +28,7 @@ relationships:
 
 # Calls
 
+- [context](../../../../../../functions/src/services/ServiceManager/context.md)
 - [format_task_type](../../../../../../functions/src/db/repository/plan/PlanRepository/format_task_type.md)
 - [format_task_status](../../../../../../functions/src/db/repository/plan/PlanRepository/format_task_status.md)
 

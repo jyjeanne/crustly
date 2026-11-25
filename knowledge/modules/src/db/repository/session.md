@@ -3,18 +3,34 @@ type: Rust Module
 title: session
 resource: src/db/repository/session.rs#L1-L334
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-db-models-session
-  - external/anyhow-context-result
-  - external/chrono-utc
-  - external/sqlx-sqlitepool
-  - external/uuid-uuid
-  - external/super
-  - external/crate-db-database
+  - target: external/crate-db-models-session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/chrono-utc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/sqlx-sqlitepool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: chat_input_text_is_not_underlined
-resource: src/tui/app.rs#L3857-L3880
+resource: src/tui/app.rs#L4999-L5022
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/clear_input
-  - functions/src/tui/app/App/set_input_text
+  - target: functions/src/tui/app/App/clear_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/set_input_text
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

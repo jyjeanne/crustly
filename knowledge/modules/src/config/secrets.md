@@ -3,17 +3,31 @@ type: Rust Module
 title: secrets
 resource: src/config/secrets.rs#L1-L393
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/anyhow-context-result
-  - external/keyring-entry
-  - external/serde-deserialize-serialize
-  - external/std-fmt
-  - external/zeroize-zeroize-zeroizeondrop
-  - external/super
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/keyring-entry
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-fmt
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/zeroize-zeroize-zeroizeondrop
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

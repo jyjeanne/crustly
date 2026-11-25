@@ -3,16 +3,28 @@ type: Rust Function
 title: retry
 resource: src/utils/retry.rs#L120-L174
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/utils/retry/RetryableError/retry_after
+  - target: functions/src/utils/retry/RetryableError/retry_after
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/utils/retry/test_successful_operation_no_retry
-  - functions/src/utils/retry/test_non_retryable_error_fails_immediately
-  - functions/src/utils/retry/test_retryable_error_retries
-  - functions/src/utils/retry/test_max_attempts_exceeded
-  - functions/src/utils/retry/test_no_retry_config
+  - target: functions/src/utils/retry/test_successful_operation_no_retry
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/utils/retry/test_non_retryable_error_fails_immediately
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/utils/retry/test_retryable_error_retries
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/utils/retry/test_max_attempts_exceeded
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/utils/retry/test_no_retry_config
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

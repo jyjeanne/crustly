@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: typing_and_submitting_slash_skills_opens_the_dialog_end_to_end
-resource: src/tui/app.rs#L3893-L3908
+resource: src/tui/app.rs#L5035-L5050
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/handle_chat_key
-  - functions/src/tui/app/key
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

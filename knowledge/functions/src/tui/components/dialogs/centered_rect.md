@@ -4,11 +4,15 @@ title: centered_rect
 resource: src/tui/components/dialogs/mod.rs#L153-L171
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/components/dialogs/render_crash_recovery_dialog
-  - functions/src/tui/components/dialogs/render_policy_denial
+  - target: functions/src/tui/components/dialogs/render_crash_recovery_dialog
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/components/dialogs/render_policy_denial
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

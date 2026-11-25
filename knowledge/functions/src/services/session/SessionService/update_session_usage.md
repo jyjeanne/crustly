@@ -1,16 +1,36 @@
 ---
 type: Rust Method
 title: update_session_usage
-resource: src/services/session.rs#L103-L121
+resource: src/services/session.rs#L101-L119
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/session/SessionService/get_session_required
+  - target: functions/src/services/session/SessionService/get_session_required
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/session/SessionRepository/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/ServiceContext/pool
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/db/repository/session/SessionRepository/update
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
-  - functions/src/services/session/test_update_session_usage
+  - target: functions/src/llm/agent/service/AgentService/send_message
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/test_update_session_usage
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,6 +40,10 @@ relationships:
 # Calls
 
 - [get_session_required](../../../../../functions/src/services/session/SessionService/get_session_required.md)
+- [new](../../../../../functions/src/db/repository/session/SessionRepository/new.md)
+- [pool](../../../../../functions/src/services/ServiceContext/pool.md)
+- [update](../../../../../functions/src/db/repository/session/SessionRepository/update.md)
+- [context](../../../../../functions/src/services/ServiceManager/context.md)
 
 # Called by
 

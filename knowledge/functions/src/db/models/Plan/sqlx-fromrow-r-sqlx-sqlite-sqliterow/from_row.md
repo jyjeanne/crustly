@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: from_row
-resource: src/db/models.rs#L340-L363
+resource: src/db/models.rs#L345-L368
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: spawn_download
-resource: src/tui/llama_cpp_download.rs#L212-L227
+resource: src/tui/llama_cpp_download.rs#L356-L371
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

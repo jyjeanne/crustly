@@ -1,20 +1,34 @@
 ---
 type: Rust Method
 title: set_input_text
-resource: src/tui/app.rs#L378-L381
+resource: src/tui/app.rs#L572-L575
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/plain_textarea
+  - target: functions/src/tui/app/plain_textarea
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/load_history_entry
-  - functions/src/tui/app/App/handle_plan_key
-  - functions/src/tui/app/up_recalls_previous_messages_without_sending_them
-  - functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft
-  - functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history
-  - functions/src/tui/app/chat_input_text_is_not_underlined
+  - target: functions/src/tui/app/App/load_history_entry
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_plan_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_recalls_previous_messages_without_sending_them
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_moves_the_cursor_inside_a_multiline_draft
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/up_is_plain_cursor_movement_when_there_is_no_history
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/chat_input_text_is_not_underlined
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

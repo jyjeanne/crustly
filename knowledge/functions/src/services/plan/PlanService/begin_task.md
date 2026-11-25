@@ -3,10 +3,12 @@ type: Rust Method
 title: begin_task
 resource: src/services/plan.rs#L60-L64
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/repository/plan/PlanTaskRepository/update_task_status
+  - target: functions/src/db/repository/plan/PlanTaskRepository/update_task_status
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

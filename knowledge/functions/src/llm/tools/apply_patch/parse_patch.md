@@ -4,19 +4,34 @@ title: parse_patch
 resource: src/llm/tools/apply_patch.rs#L92-L215
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/llm/agent/service/tool_round/ToolRound/push
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/validate_input
-  - functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/execute
-  - functions/src/llm/tools/apply_patch/parse_rejects_missing_begin_marker
-  - functions/src/llm/tools/apply_patch/parse_rejects_missing_end_marker
-  - functions/src/llm/tools/apply_patch/parse_add_file_collects_plus_prefixed_lines
-  - functions/src/llm/tools/apply_patch/parse_multiple_file_ops_in_one_patch
-  - functions/src/llm/tools/apply_patch/parse_update_with_move_to
+  - target: functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/validate_input
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/apply_patch/ApplyPatchTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/apply_patch/parse_rejects_missing_begin_marker
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/apply_patch/parse_rejects_missing_end_marker
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/apply_patch/parse_add_file_collects_plus_prefixed_lines
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/apply_patch/parse_multiple_file_ops_in_one_patch
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/apply_patch/parse_update_with_move_to
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -25,8 +40,7 @@ relationships:
 
 # Calls
 
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [push](../../../../../functions/src/llm/agent/service/tool_round/ToolRound/push.md)
 
 # Called by
 

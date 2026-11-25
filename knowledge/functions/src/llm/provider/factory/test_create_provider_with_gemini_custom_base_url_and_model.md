@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_create_provider_with_gemini_custom_base_url_and_model
-resource: src/llm/provider/factory.rs#L812-L829
+resource: src/llm/provider/factory.rs#L906-L923
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/factory/create_provider
+  - target: functions/src/llm/provider/factory/create_provider
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

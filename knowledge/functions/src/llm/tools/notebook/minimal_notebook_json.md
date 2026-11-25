@@ -2,13 +2,19 @@
 type: Rust Function
 title: minimal_notebook_json
 resource: src/llm/tools/notebook.rs#L344-L346
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/notebook/test_add_cell_within_working_directory_succeeds
-  - functions/src/llm/tools/notebook/test_path_outside_working_directory_is_denied
+  - target: functions/src/llm/tools/notebook/test_add_cell_within_working_directory_succeeds
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/notebook/test_path_outside_working_directory_is_denied
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -3,17 +3,28 @@ type: Rust Method
 title: validate_dependencies
 resource: src/plan/mod.rs#L208-L247
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/plan/PlanDocument/tasks_in_order
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/plan/PlanDocument/tasks_in_order
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/plan_tool/PlanTool/tool/execute
-  - functions/src/plan/plan_tests/test_validate_dependencies_success
-  - functions/src/plan/plan_tests/test_validate_dependencies_invalid_reference
-  - functions/src/plan/plan_tests/test_validate_dependencies_circular
-  - functions/src/plan/plan_tests/test_complex_dependency_chain
+  - target: functions/src/llm/tools/plan_tool/PlanTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_validate_dependencies_success
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_validate_dependencies_invalid_reference
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_validate_dependencies_circular
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/plan_tests/test_complex_dependency_chain
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -23,7 +34,6 @@ relationships:
 # Calls
 
 - [tasks_in_order](../../../../functions/src/plan/PlanDocument/tasks_in_order.md)
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
 
 # Called by
 

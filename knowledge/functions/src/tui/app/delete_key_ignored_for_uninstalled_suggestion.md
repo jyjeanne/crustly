@@ -1,15 +1,23 @@
 ---
 type: Rust Function
 title: delete_key_ignored_for_uninstalled_suggestion
-resource: src/tui/app.rs#L3175-L3186
+resource: src/tui/app.rs#L4099-L4110
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/open_model_download
-  - functions/src/tui/app/App/handle_model_download_key
-  - functions/src/tui/app/key
+  - target: functions/src/tui/app/App/open_model_download
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_model_download_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

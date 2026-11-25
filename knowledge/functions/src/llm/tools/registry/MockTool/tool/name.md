@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: name
-resource: src/llm/tools/registry.rs#L313-L315
+resource: src/llm/tools/registry.rs#L338-L340
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

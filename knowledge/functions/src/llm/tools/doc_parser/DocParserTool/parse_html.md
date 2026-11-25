@@ -1,16 +1,22 @@
 ---
 type: Rust Method
 title: parse_html
-resource: src/llm/tools/doc_parser.rs#L426-L441
+resource: src/llm/tools/doc_parser.rs#L466-L481
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags
-  - functions/src/llm/tools/doc_parser/DocParserTool/extract_html_title
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/strip_html_tags
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/extract_html_title
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/doc_parser/DocParserTool/tool/execute
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

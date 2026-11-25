@@ -3,12 +3,16 @@ type: Rust Method
 title: list_for_session
 resource: src/db/repository/compaction.rs#L38-L64
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTaskStatus/parse
+  - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/tests/compaction_test/compaction_writes_one_record_to_db
+  - target: functions/tests/compaction_test/compaction_writes_one_record_to_db
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

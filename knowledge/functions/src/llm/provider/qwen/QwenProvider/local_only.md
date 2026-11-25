@@ -1,13 +1,15 @@
 ---
 type: Rust Method
 title: local_only
-resource: src/llm/provider/qwen.rs#L902-L908
+resource: src/llm/provider/qwen.rs#L912-L918
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/to_qwen_request
+  - target: functions/src/llm/provider/qwen/QwenProvider/to_qwen_request
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

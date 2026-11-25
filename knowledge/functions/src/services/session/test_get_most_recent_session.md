@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_get_most_recent_session
-resource: src/services/session.rs#L395-L412
+resource: src/services/session.rs#L339-L356
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/session/SessionService/get_most_recent_session
+  - target: functions/src/services/session/SessionService/create_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/get_most_recent_session
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +23,5 @@ relationships:
 
 # Calls
 
+- [create_session](../../../../functions/src/services/session/SessionService/create_session.md)
 - [get_most_recent_session](../../../../functions/src/services/session/SessionService/get_most_recent_session.md)

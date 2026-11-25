@@ -4,10 +4,12 @@ title: validate_input
 resource: src/llm/tools/http.rs#L137-L169
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/http/parse_method
+  - target: functions/src/llm/tools/http/parse_method
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

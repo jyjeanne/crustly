@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_cli_db_invalid_operation
 resource: tests/cli_test.rs#L270-L273
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

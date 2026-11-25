@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: OpenAIStreamChunk
-resource: src/llm/provider/openai.rs#L1080-L1089
+resource: src/llm/provider/openai.rs#L884-L893
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

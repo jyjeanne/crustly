@@ -3,18 +3,34 @@ type: Rust Module
 title: ollama_models
 resource: src/llm/provider/ollama_models.rs#L1-L349
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/anyhow-context-result
-  - external/futures-streamext-as
-  - external/ollama-rs-generation-embeddings-request-embeddingsinput-generateembeddingsrequest
-  - external/ollama-rs-ollama
-  - external/tokio-sync-mpsc-unboundedsender
-  - external/super
-  - external/tokio-io-asyncreadext-asyncwriteext
+  - target: external/anyhow-context-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/futures-streamext-as
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ollama-rs-generation-embeddings-request-embeddingsinput-generateembeddingsrequest
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ollama-rs-ollama
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-sync-mpsc-unboundedsender
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-io-asyncreadext-asyncwriteext
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

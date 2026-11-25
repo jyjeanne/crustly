@@ -4,10 +4,12 @@ title: get_theme
 resource: src/tui/highlight.rs#L24-L26
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/highlight/highlight_code
+  - target: functions/src/tui/highlight/highlight_code
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

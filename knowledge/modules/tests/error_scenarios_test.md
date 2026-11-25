@@ -3,16 +3,28 @@ type: Rust Module
 title: error_scenarios_test
 resource: tests/error_scenarios_test.rs#L1-L362
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/anyhow-result
-  - external/async-trait-async-trait
-  - external/crustly-db-database-llm-agent-agentservice-provider-error-providererror-result-as-providerresult-types-contentblock-llmrequest-llmresponse-stopreason-tokenusage-provider-providerstream-tools-bash-bashtool-read-readtool-registry-toolregistry-write-writetool-services-servicecontext-sessionservice
-  - external/std-sync-arc
-  - external/uuid-uuid
+  - target: external/anyhow-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-db-database-llm-agent-agentservice-provider-error-providererror-result-as-providerresult-types-contentblock-llmrequest-llmresponse-stopreason-tokenusage-provider-providerstream-tools-bash-bashtool-read-readtool-registry-toolregistry-write-writetool-services-servicecontext-sessionservice
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

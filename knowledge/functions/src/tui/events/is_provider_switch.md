@@ -1,14 +1,21 @@
 ---
 type: Rust Function
 title: is_provider_switch
-resource: src/tui/events.rs#L345-L347
+resource: src/tui/events.rs#L489-L491
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/key_matches
+  - target: functions/src/tui/events/key_matches
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/test_provider_switch_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -22,3 +29,4 @@ relationships:
 # Called by
 
 - [handle_key_event](../../../../functions/src/tui/app/App/handle_key_event.md)
+- [test_provider_switch_key](../../../../functions/src/tui/events/test_provider_switch_key.md)

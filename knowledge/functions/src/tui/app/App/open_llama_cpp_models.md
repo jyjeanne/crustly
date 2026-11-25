@@ -1,16 +1,22 @@
 ---
 type: Rust Method
 title: open_llama_cpp_models
-resource: src/tui/app.rs#L2767-L2785
+resource: src/tui/app.rs#L3616-L3655
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/event_sender
-  - functions/src/tui/app/App/switch_mode
+  - target: functions/src/tui/app/App/event_sender
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/switch_mode
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

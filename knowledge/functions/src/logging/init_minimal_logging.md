@@ -4,14 +4,22 @@ title: init_minimal_logging
 resource: src/logging.rs#L206-L233
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTaskStatus/parse
-  - functions/src/llm/agent/compaction/compact
-  - functions/src/logging/LoggerGuard/empty
+  - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/middleware/Pipeline/with
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/logging/LoggerGuard/empty
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/logging/init_logging
+  - target: functions/src/logging/init_logging
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,7 +29,7 @@ relationships:
 # Calls
 
 - [parse](../../../functions/src/db/models/PlanTaskStatus/parse.md)
-- [compact](../../../functions/src/llm/agent/compaction/compact.md)
+- [with](../../../functions/src/llm/agent/middleware/Pipeline/with.md)
 - [empty](../../../functions/src/logging/LoggerGuard/empty.md)
 
 # Called by

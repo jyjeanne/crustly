@@ -3,11 +3,15 @@ type: Rust Method
 title: with_thinking_budget
 resource: src/llm/provider/qwen.rs#L208-L211
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/factory/configure_qwen
-  - functions/src/llm/provider/qwen/test_thinking_mode_configuration
+  - target: functions/src/llm/provider/factory/configure_qwen
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_thinking_mode_configuration
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

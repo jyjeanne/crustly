@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: input_schema
-resource: src/llm/tools/skill.rs#L52-L67
+resource: src/llm/tools/skill.rs#L77-L92
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

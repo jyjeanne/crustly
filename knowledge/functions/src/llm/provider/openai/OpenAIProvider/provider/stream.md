@@ -1,19 +1,43 @@
 ---
 type: Rust Method
 title: stream
-resource: src/llm/provider/openai.rs#L599-L883
+resource: src/llm/provider/openai.rs#L611-L681
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/llm/provider/openai/OpenAIProvider/to_openai_request
-  - functions/src/llm/provider/retry/retry_with_backoff
-  - functions/src/llm/provider/ollama_models/PullProgress/is_success
-  - functions/src/tui/events/EventHandler/next
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/config/secrets/SecretString/from_str
+  - target: functions/src/llm/provider/openai/OpenAIProvider/to_openai_request
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/retry/retry_with_backoff
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/OpenAIProvider/headers
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/ollama_models/PullProgress/is_success
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/OpenAIProvider/handle_error
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/openai/OpenAIStreamState/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/events/EventHandler/next
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/OpenAIStreamState/on_bytes
+    resolved_by: tree-sitter
+    confidence: exact
+  called_by:
+  - target: functions/src/llm/provider/azure/AzureOpenAIProvider/provider/stream
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/openai/text_arrives_before_the_response_is_complete
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -22,10 +46,16 @@ relationships:
 
 # Calls
 
-- [len](../../../../../../../functions/src/config/secrets/SecretString/len.md)
 - [to_openai_request](../../../../../../../functions/src/llm/provider/openai/OpenAIProvider/to_openai_request.md)
 - [retry_with_backoff](../../../../../../../functions/src/llm/provider/retry/retry_with_backoff.md)
+- [headers](../../../../../../../functions/src/llm/provider/openai/OpenAIProvider/headers.md)
 - [is_success](../../../../../../../functions/src/llm/provider/ollama_models/PullProgress/is_success.md)
+- [handle_error](../../../../../../../functions/src/llm/provider/openai/OpenAIProvider/handle_error.md)
+- [new](../../../../../../../functions/src/llm/provider/openai/OpenAIStreamState/new.md)
 - [next](../../../../../../../functions/src/tui/events/EventHandler/next.md)
-- [is_empty](../../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
-- [from_str](../../../../../../../functions/src/config/secrets/SecretString/from_str.md)
+- [on_bytes](../../../../../../../functions/src/llm/provider/openai/OpenAIStreamState/on_bytes.md)
+
+# Called by
+
+- [stream](../../../../../../../functions/src/llm/provider/azure/AzureOpenAIProvider/provider/stream.md)
+- [text_arrives_before_the_response_is_complete](../../../../../../../functions/src/llm/provider/openai/text_arrives_before_the_response_is_complete.md)

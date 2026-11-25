@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_local_config_path
-resource: src/config/mod.rs#L1558-L1561
+resource: src/config/mod.rs#L2226-L2229
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/Config/local_config_path
+  - target: functions/src/config/Config/local_config_path
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

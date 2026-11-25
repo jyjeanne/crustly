@@ -3,12 +3,16 @@ type: Rust Method
 title: get_files_with_content
 resource: src/services/file.rs#L159-L162
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/file/FileService/list_files_for_session
+  - target: functions/src/services/file/FileService/list_files_for_session
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/services/file/test_get_files_with_content
+  - target: functions/src/services/file/test_get_files_with_content
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

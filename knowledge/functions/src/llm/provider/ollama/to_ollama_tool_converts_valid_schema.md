@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: to_ollama_tool_converts_valid_schema
-resource: src/llm/provider/ollama.rs#L1423-L1436
+resource: src/llm/provider/ollama.rs#L1481-L1494
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/ollama/to_ollama_tool
+  - target: functions/src/llm/provider/ollama/to_ollama_tool
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

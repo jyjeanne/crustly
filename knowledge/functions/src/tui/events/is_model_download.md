@@ -1,14 +1,18 @@
 ---
 type: Rust Function
 title: is_model_download
-resource: src/tui/events.rs#L335-L337
+resource: src/tui/events.rs#L479-L481
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/key_matches
+  - target: functions/src/tui/events/key_matches
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

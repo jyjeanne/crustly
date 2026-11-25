@@ -3,7 +3,7 @@ type: Rust Function
 title: fetch_installed_models
 resource: src/tui/ollama_download.rs#L87-L89
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: input_schema
-resource: src/llm/tools/agent.rs#L64-L88
+resource: src/llm/tools/agent.rs#L63-L93
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

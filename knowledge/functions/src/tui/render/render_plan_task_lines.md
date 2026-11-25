@@ -1,15 +1,22 @@
 ---
 type: Rust Function
 title: render_plan_task_lines
-resource: src/tui/render.rs#L1012-L1047
+resource: src/tui/render.rs#L1486-L1521
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/llm/agent/service/tool_round/ToolRound/push
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/plan/PlanTask/complexity_stars
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render_plan_document
+  - target: functions/src/tui/render/render_plan_document
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,7 +25,8 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [push](../../../../functions/src/llm/agent/service/tool_round/ToolRound/push.md)
+- [complexity_stars](../../../../functions/src/plan/PlanTask/complexity_stars.md)
 
 # Called by
 

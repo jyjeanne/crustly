@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: ToolApprovalRequest
-resource: src/tui/events.rs#L122-L143
+resource: src/tui/events.rs#L128-L152
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

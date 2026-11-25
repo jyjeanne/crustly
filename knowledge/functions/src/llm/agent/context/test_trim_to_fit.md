@@ -1,16 +1,26 @@
 ---
 type: Rust Function
 title: test_trim_to_fit
-resource: src/llm/agent/context.rs#L282-L298
+resource: src/llm/agent/context.rs#L321-L337
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/types/Message/user
-  - functions/src/llm/agent/context/AgentContext/add_message
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/llm/agent/context/AgentContext/trim_to_fit
+  - target: functions/src/llm/agent/context/AgentContext/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/types/Message/user
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/context/AgentContext/add_message
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/context/AgentContext/trim_to_fit
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +29,7 @@ relationships:
 
 # Calls
 
+- [new](../../../../../functions/src/llm/agent/context/AgentContext/new.md)
 - [user](../../../../../functions/src/llm/provider/types/Message/user.md)
 - [add_message](../../../../../functions/src/llm/agent/context/AgentContext/add_message.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
 - [trim_to_fit](../../../../../functions/src/llm/agent/context/AgentContext/trim_to_fit.md)

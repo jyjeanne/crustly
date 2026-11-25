@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: cmd_llama_cpp
-resource: src/cli/mod.rs#L1357-L1365
+resource: src/cli/mod.rs#L2901-L2909
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

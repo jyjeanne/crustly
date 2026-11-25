@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_logo_with_version
 resource: src/tui/components/logo.rs#L80-L83
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/components/logo/get_logo_with_version
+  - target: functions/src/tui/components/logo/get_logo_with_version
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,14 +1,18 @@
 ---
 type: Rust Function
 title: is_help
-resource: src/tui/events.rs#L320-L322
+resource: src/tui/events.rs#L464-L466
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/events/key_matches
+  - target: functions/src/tui/events/key_matches
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_key_event
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

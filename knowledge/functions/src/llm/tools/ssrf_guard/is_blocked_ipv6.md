@@ -1,15 +1,19 @@
 ---
 type: Rust Function
 title: is_blocked_ipv6
-resource: src/llm/tools/ssrf_guard.rs#L56-L77
+resource: src/llm/tools/ssrf_guard.rs#L53-L74
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/ssrf_guard/is_blocked_ipv4
+  - target: functions/src/llm/tools/ssrf_guard/is_blocked_ipv4
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/ssrf_guard/is_blocked_ip
+  - target: functions/src/llm/tools/ssrf_guard/is_blocked_ip
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

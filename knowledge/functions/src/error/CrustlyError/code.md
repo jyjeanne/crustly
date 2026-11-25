@@ -3,12 +3,18 @@ type: Rust Method
 title: code
 resource: src/error.rs#L56-L63
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/bash/BashTool/tool/execute
-  - functions/src/llm/tools/code_exec/CodeExecTool/tool/execute
-  - functions/src/llm/tools/powershell/PowerShellTool/tool/execute
+  - target: functions/src/llm/tools/bash/BashTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/code_exec/CodeExecTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/powershell/PowerShellTool/tool/execute
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

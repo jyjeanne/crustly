@@ -2,12 +2,19 @@
 type: Rust Function
 title: test_validate_string_empty
 resource: src/llm/tools/plan_tool_security_tests.rs#L105-L109
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/plan_tool/validate_string
+  - target: functions/src/llm/tools/plan_tool/validate_string
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [validate_string](../../../../../functions/src/llm/tools/plan_tool/validate_string.md)
+- [contains](../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)

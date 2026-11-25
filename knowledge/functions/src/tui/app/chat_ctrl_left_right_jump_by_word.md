@@ -1,15 +1,23 @@
 ---
 type: Rust Function
 title: chat_ctrl_left_right_jump_by_word
-resource: src/tui/app.rs#L3527-L3540
+resource: src/tui/app.rs#L4451-L4464
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/handle_chat_key
-  - functions/src/tui/app/key
-  - functions/src/tui/app/key_mod
+  - target: functions/src/tui/app/App/handle_chat_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/key_mod
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -4,13 +4,19 @@ title: handle_start_tag
 resource: src/tui/markdown.rs#L83-L91
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/markdown/MarkdownRenderer/start_code_block
-  - functions/src/tui/markdown/MarkdownRenderer/flush_current_line
+  - target: functions/src/tui/markdown/MarkdownRenderer/start_code_block
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/markdown/MarkdownRenderer/flush_current_line
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/markdown/parse_markdown
+  - target: functions/src/tui/markdown/parse_markdown
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

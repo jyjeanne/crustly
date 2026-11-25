@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: QwenMessageDelta
-resource: src/llm/provider/qwen.rs#L1808-L1815
+resource: src/llm/provider/qwen.rs#L1834-L1841
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

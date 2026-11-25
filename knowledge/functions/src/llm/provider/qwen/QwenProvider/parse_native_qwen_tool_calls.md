@@ -4,17 +4,28 @@ title: parse_native_qwen_tool_calls
 resource: src/llm/provider/qwen.rs#L537-L593
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/plan/PlanTask/skip
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/llm/provider/qwen/QwenProvider/generate_call_id
+  - target: functions/src/plan/PlanTask/skip
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/MemoryStore/find
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/QwenProvider/generate_call_id
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
-  - functions/src/llm/provider/qwen/test_native_qwen_tool_call_parsing
-  - functions/src/llm/provider/qwen/test_multiple_native_qwen_tool_calls
+  - target: functions/src/llm/provider/qwen/QwenProvider/from_qwen_response
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_native_qwen_tool_call_parsing
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_multiple_native_qwen_tool_calls
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -24,8 +35,7 @@ relationships:
 # Calls
 
 - [skip](../../../../../../functions/src/plan/PlanTask/skip.md)
-- [len](../../../../../../functions/src/config/secrets/SecretString/len.md)
-- [is_empty](../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [find](../../../../../../functions/src/memory/MemoryStore/find.md)
 - [generate_call_id](../../../../../../functions/src/llm/provider/qwen/QwenProvider/generate_call_id.md)
 
 # Called by

@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: CompactionRecord
-resource: src/llm/agent/compaction.rs#L10-L19
+resource: src/llm/agent/compaction.rs#L33-L42
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: help_footer
-resource: src/tui/render.rs#L895-L913
+resource: src/tui/render.rs#L1357-L1378
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/render/render_help
+  - target: functions/src/tui/render/render_help
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

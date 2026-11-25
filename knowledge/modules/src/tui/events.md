@@ -1,20 +1,45 @@
 ---
 type: Rust Module
 title: events
-resource: src/tui/events.rs#L1-L594
+resource: src/tui/events.rs#L1-L848
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-llm-agent-agentresponse
-  - external/crossterm-event-keycode-keyevent-keymodifiers
-  - external/serde-json-value
-  - external/std-time-duration
-  - external/tokio-sync-mpsc
-  - external/uuid-uuid
-  - external/super
+  - target: external/crate-llm-agent-agentresponse
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crossterm-event-keycode-keyevent-keymodifiers
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-sync-mpsc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crossterm-event-poll-read
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-instant
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crossterm-event-event-keyeventkind
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -31,6 +56,12 @@ relationships:
 - [try_next](../../../functions/src/tui/events/EventHandler/try_next.md)
 - [next](../../../functions/src/tui/events/EventHandler/next.md)
 - [start_terminal_listener](../../../functions/src/tui/events/EventHandler/start_terminal_listener.md)
+- [read_terminal_events](../../../functions/src/tui/events/read_terminal_events.md)
+- [coalesce_input](../../../functions/src/tui/events/coalesce_input.md)
+- [flush_run](../../../functions/src/tui/events/flush_run.md)
+- [pasted_text](../../../functions/src/tui/events/pasted_text.md)
+- [is_text_press](../../../functions/src/tui/events/is_text_press.md)
+- [typed_char](../../../functions/src/tui/events/typed_char.md)
 - [default](../../../functions/src/tui/events/EventHandler/default/default.md)
 - [key_matches](../../../functions/src/tui/events/key_matches.md)
 - [is_quit](../../../functions/src/tui/events/is_quit.md)
@@ -68,6 +99,16 @@ relationships:
 - [test_paste_clipboard_key](../../../functions/src/tui/events/test_paste_clipboard_key.md)
 - [test_toggle_auto_mode_key](../../../functions/src/tui/events/test_toggle_auto_mode_key.md)
 - [test_newline_key](../../../functions/src/tui/events/test_newline_key.md)
+- [press](../../../functions/src/tui/events/press.md)
+- [typed](../../../functions/src/tui/events/typed.md)
+- [pasted](../../../functions/src/tui/events/pasted.md)
+- [keys_read_together_become_one_paste](../../../functions/src/tui/events/keys_read_together_become_one_paste.md)
+- [a_single_key_stays_a_key](../../../functions/src/tui/events/a_single_key_stays_a_key.md)
+- [shortcuts_and_navigation_split_a_paste_and_pass_through](../../../functions/src/tui/events/shortcuts_and_navigation_split_a_paste_and_pass_through.md)
+- [releases_are_dropped_without_splitting_a_paste](../../../functions/src/tui/events/releases_are_dropped_without_splitting_a_paste.md)
+- [shifted_and_altgr_characters_are_text](../../../functions/src/tui/events/shifted_and_altgr_characters_are_text.md)
+- [a_crlf_pair_is_one_line_break](../../../functions/src/tui/events/a_crlf_pair_is_one_line_break.md)
+- [bracketed_pastes_and_resizes_keep_their_order](../../../functions/src/tui/events/bracketed_pastes_and_resizes_keep_their_order.md)
 
 # Imports
 
@@ -77,6 +118,9 @@ relationships:
 - `std::time::Duration`
 - `tokio::sync::mpsc`
 - `uuid::Uuid`
+- `crossterm::event::{poll, read}`
+- `std::time::Instant`
+- `crossterm::event::{Event, KeyEventKind}`
 - `super::*`
 
 # Member of

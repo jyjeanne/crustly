@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: OllamaModelConfig
-resource: src/config/mod.rs#L523-L557
+resource: src/config/mod.rs#L1036-L1070
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

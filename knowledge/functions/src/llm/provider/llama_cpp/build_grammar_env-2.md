@@ -1,10 +1,10 @@
 ---
 type: Rust Function
 title: build_grammar_env
-resource: src/llm/provider/llama_cpp.rs#L1155-L1157
+resource: src/llm/provider/llama_cpp.rs#L1249-L1251
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

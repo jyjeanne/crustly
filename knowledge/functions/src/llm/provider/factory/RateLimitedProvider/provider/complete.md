@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: complete
-resource: src/llm/provider/factory.rs#L569-L571
+resource: src/llm/provider/factory.rs#L592-L594
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

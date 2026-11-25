@@ -1,13 +1,29 @@
 ---
 type: Rust Function
 title: test_sampling_defaults_qwen3_thinking
-resource: src/llm/provider/qwen.rs#L2417-L2425
+resource: src/llm/provider/qwen.rs#L2473-L2481
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/QwenProvider/to_qwen_request
+  - target: functions/src/llm/provider/qwen/QwenProvider/local
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/qwen/QwenProvider/with_thinking
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/types/LLMRequest/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/qwen/QwenProvider/to_qwen_request
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/types/Message/user
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +32,8 @@ relationships:
 
 # Calls
 
+- [local](../../../../../functions/src/llm/provider/qwen/QwenProvider/local.md)
+- [with_thinking](../../../../../functions/src/llm/provider/qwen/QwenProvider/with_thinking.md)
+- [new](../../../../../functions/src/llm/provider/types/LLMRequest/new.md)
 - [to_qwen_request](../../../../../functions/src/llm/provider/qwen/QwenProvider/to_qwen_request.md)
+- [user](../../../../../functions/src/llm/provider/types/Message/user.md)

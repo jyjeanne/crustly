@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: default_llama_cpp_n_ctx
-resource: src/config/mod.rs#L670-L672
+resource: src/config/mod.rs#L1202-L1204
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/config/LlamaCppProviderConfig/default/default
+  - target: functions/src/config/LlamaCppProviderConfig/default/default
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

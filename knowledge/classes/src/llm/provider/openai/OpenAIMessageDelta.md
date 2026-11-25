@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: OpenAIMessageDelta
-resource: src/llm/provider/openai.rs#L1101-L1108
+resource: src/llm/provider/openai.rs#L905-L912
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

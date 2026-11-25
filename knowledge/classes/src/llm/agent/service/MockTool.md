@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: MockTool
-resource: src/llm/agent/service.rs#L2360
+resource: src/llm/agent/service.rs#L2211
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

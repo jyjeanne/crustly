@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: complete
-resource: src/tui/app.rs#L2972-L2974
+resource: src/tui/app.rs#L3896-L3898
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

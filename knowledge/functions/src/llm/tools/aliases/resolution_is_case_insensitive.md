@@ -2,9 +2,11 @@
 type: Rust Function
 title: resolution_is_case_insensitive
 resource: src/llm/tools/aliases.rs#L105-L109
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

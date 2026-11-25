@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: llama_cpp_switching_shows_loading_message
-resource: src/tui/render.rs#L2746-L2753
+resource: src/tui/render.rs#L3698-L3705
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_to_string
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

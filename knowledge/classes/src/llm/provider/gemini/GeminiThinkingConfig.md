@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: GeminiThinkingConfig
-resource: src/llm/provider/gemini.rs#L843-L847
+resource: src/llm/provider/gemini.rs#L849-L853
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

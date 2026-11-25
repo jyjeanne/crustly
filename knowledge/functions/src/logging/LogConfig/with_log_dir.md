@@ -3,7 +3,7 @@ type: Rust Method
 title: with_log_dir
 resource: src/logging.rs#L62-L65
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

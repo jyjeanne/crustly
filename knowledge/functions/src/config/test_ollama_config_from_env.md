@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: test_ollama_config_from_env
-resource: src/config/mod.rs#L1501-L1536
+resource: src/config/mod.rs#L2169-L2204
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/Config/apply_env_overrides
+  - target: functions/src/config/Config/apply_env_overrides
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/Config/default/default
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [apply_env_overrides](../../../functions/src/config/Config/apply_env_overrides.md)
+- [default](../../../functions/src/config/Config/default/default.md)

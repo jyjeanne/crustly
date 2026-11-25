@@ -2,12 +2,19 @@
 type: Rust Function
 title: debug_filter_is_scoped_to_crustly
 resource: src/logging.rs#L381-L392
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTaskStatus/parse
+  - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [parse](../../../functions/src/db/models/PlanTaskStatus/parse.md)
+- [contains](../../../functions/src/memory/vector_index/VectorIndex/contains.md)

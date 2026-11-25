@@ -3,14 +3,22 @@ type: Rust Function
 title: show_model
 resource: src/llm/provider/ollama_models.rs#L86-L99
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/ollama_models/client_for
-  - functions/src/tui/error/ErrorInfo/with_context
+  - target: functions/src/llm/provider/ollama_models/client_for
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/error/ErrorInfo/with_context
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/cmd_ollama
-  - functions/src/llm/provider/ollama_models/show_model_parses_minimal_response
+  - target: functions/src/cli/cmd_ollama
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/show_model_parses_minimal_response
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

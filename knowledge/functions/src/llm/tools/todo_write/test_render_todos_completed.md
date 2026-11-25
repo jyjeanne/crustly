@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_render_todos_completed
 resource: src/llm/tools/todo_write.rs#L289-L301
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/todo_write/render_todos
+  - target: functions/src/llm/tools/todo_write/render_todos
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

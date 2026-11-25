@@ -1,13 +1,26 @@
 ---
 type: Rust Function
 title: test_thinking_extraction_out_of_order_tags_does_not_panic
-resource: src/llm/provider/qwen.rs#L2320-L2330
+resource: src/llm/provider/qwen.rs#L2346-L2356
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/qwen/QwenProvider/extract_thinking
+  - target: functions/src/llm/provider/qwen/QwenProvider/local
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/qwen/QwenProvider/with_thinking
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/qwen/QwenProvider/extract_thinking
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +29,7 @@ relationships:
 
 # Calls
 
+- [local](../../../../../functions/src/llm/provider/qwen/QwenProvider/local.md)
+- [with_thinking](../../../../../functions/src/llm/provider/qwen/QwenProvider/with_thinking.md)
 - [extract_thinking](../../../../../functions/src/llm/provider/qwen/QwenProvider/extract_thinking.md)
+- [contains](../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)

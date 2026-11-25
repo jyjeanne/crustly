@@ -1,23 +1,50 @@
 ---
 type: Rust Function
 title: key_matches
-resource: src/tui/events.rs#L296-L298
+resource: src/tui/events.rs#L440-L442
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/events/is_quit
-  - functions/src/tui/events/is_new_session
-  - functions/src/tui/events/is_list_sessions
-  - functions/src/tui/events/is_help
-  - functions/src/tui/events/is_clear_session
-  - functions/src/tui/events/is_toggle_plan
-  - functions/src/tui/events/is_model_download
-  - functions/src/tui/events/is_model_info
-  - functions/src/tui/events/is_provider_switch
-  - functions/src/tui/events/is_llama_cpp_models
-  - functions/src/tui/events/is_copy_response
-  - functions/src/tui/events/is_paste_clipboard
+  - target: functions/src/tui/events/is_quit
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_new_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_list_sessions
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_help
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_clear_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_toggle_plan
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_model_download
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_model_info
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_provider_switch
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_llama_cpp_models
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_copy_response
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/is_paste_clipboard
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/events/test_key_matches
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -38,3 +65,4 @@ relationships:
 - [is_llama_cpp_models](../../../../functions/src/tui/events/is_llama_cpp_models.md)
 - [is_copy_response](../../../../functions/src/tui/events/is_copy_response.md)
 - [is_paste_clipboard](../../../../functions/src/tui/events/is_paste_clipboard.md)
+- [test_key_matches](../../../../functions/src/tui/events/test_key_matches.md)

@@ -1,13 +1,20 @@
 ---
 type: Rust Function
 title: filter_local_matches_substring_case_insensitive
-resource: src/tui/llama_cpp_download.rs#L323-L331
+resource: src/tui/llama_cpp_download.rs#L488-L496
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/llama_cpp_download/filter_local
+  - target: functions/src/tui/llama_cpp_download/filter_local
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/llama_cpp_download/model
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -17,3 +24,4 @@ relationships:
 # Calls
 
 - [filter_local](../../../../functions/src/tui/llama_cpp_download/filter_local.md)
+- [model](../../../../functions/src/tui/llama_cpp_download/model.md)

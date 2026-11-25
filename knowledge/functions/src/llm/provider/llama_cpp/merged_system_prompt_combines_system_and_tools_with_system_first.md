@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: merged_system_prompt_combines_system_and_tools_with_system_first
-resource: src/llm/provider/llama_cpp.rs#L1648-L1657
+resource: src/llm/provider/llama_cpp.rs#L1749-L1758
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/llama_cpp/merged_system_prompt
+  - target: functions/src/llm/provider/llama_cpp/merged_system_prompt
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

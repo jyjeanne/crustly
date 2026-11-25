@@ -2,14 +2,31 @@
 type: Rust Function
 title: test_end_to_end_session_management
 resource: tests/integration_test.rs#L222-L276
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/tests/integration_test/create_test_agent
-  - functions/src/services/message/MessageService/list_messages_for_session
-  - functions/src/services/session/SessionService/list_sessions
+  - target: functions/tests/integration_test/create_test_agent
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/session/SessionService/create_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/MessageService/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/message/MessageService/list_messages_for_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/list_sessions
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,5 +36,8 @@ relationships:
 # Calls
 
 - [create_test_agent](../../../functions/tests/integration_test/create_test_agent.md)
+- [new](../../../functions/src/services/session/SessionService/new.md)
+- [create_session](../../../functions/src/services/session/SessionService/create_session.md)
+- [new](../../../functions/src/services/message/MessageService/new.md)
 - [list_messages_for_session](../../../functions/src/services/message/MessageService/list_messages_for_session.md)
 - [list_sessions](../../../functions/src/services/session/SessionService/list_sessions.md)

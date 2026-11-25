@@ -2,9 +2,11 @@
 type: Rust Function
 title: test_plan_delete
 resource: src/db/repository/plan.rs#L929-L954
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

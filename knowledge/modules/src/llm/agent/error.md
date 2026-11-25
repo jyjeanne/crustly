@@ -1,15 +1,21 @@
 ---
 type: Rust Module
 title: error
-resource: src/llm/agent/error.rs#L1-L47
+resource: src/llm/agent/error.rs#L1-L51
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-llm-provider-providererror
-  - external/thiserror-error
+  - target: external/crate-llm-provider-providererror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/thiserror-error
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

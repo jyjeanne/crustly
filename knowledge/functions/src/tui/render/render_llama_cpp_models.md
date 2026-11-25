@@ -1,20 +1,34 @@
 ---
 type: Rust Function
 title: render_llama_cpp_models
-resource: src/tui/render.rs#L2012-L2144
+resource: src/tui/render.rs#L2762-L2883
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/render_llama_cpp_confirm_delete
-  - functions/src/tui/render/render_llama_cpp_deleting
-  - functions/src/tui/render/render_llama_cpp_switching
-  - functions/src/tui/render/render_llama_cpp_download_progress
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/plan/PlanTask/block
+  - target: functions/src/tui/render/render_llama_cpp_confirm_delete
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_llama_cpp_deleting
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_llama_cpp_switching
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_llama_cpp_download_progress
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/llama_cpp_hardware_line
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/llama_cpp_model_lines
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/render/render
+  - target: functions/src/tui/render/render
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -27,8 +41,8 @@ relationships:
 - [render_llama_cpp_deleting](../../../../functions/src/tui/render/render_llama_cpp_deleting.md)
 - [render_llama_cpp_switching](../../../../functions/src/tui/render/render_llama_cpp_switching.md)
 - [render_llama_cpp_download_progress](../../../../functions/src/tui/render/render_llama_cpp_download_progress.md)
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
-- [block](../../../../functions/src/plan/PlanTask/block.md)
+- [llama_cpp_hardware_line](../../../../functions/src/tui/render/llama_cpp_hardware_line.md)
+- [llama_cpp_model_lines](../../../../functions/src/tui/render/llama_cpp_model_lines.md)
 
 # Called by
 

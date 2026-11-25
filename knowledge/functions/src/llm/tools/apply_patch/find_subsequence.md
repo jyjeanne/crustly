@@ -4,13 +4,19 @@ title: find_subsequence
 resource: src/llm/tools/apply_patch.rs#L220-L229
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/config/secrets/SecretString/len
+  - target: functions/src/memory/MemoryStore/find
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/memory/MemoryStore/all
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/tools/apply_patch/apply_hunks
+  - target: functions/src/llm/tools/apply_patch/apply_hunks
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,8 +25,8 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
-- [len](../../../../../functions/src/config/secrets/SecretString/len.md)
+- [find](../../../../../functions/src/memory/MemoryStore/find.md)
+- [all](../../../../../functions/src/memory/MemoryStore/all.md)
 
 # Called by
 

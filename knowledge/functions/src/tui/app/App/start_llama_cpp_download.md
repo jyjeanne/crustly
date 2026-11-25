@@ -1,16 +1,19 @@
 ---
 type: Rust Method
 title: start_llama_cpp_download
-resource: src/tui/app.rs#L2789-L2803
+resource: src/tui/app.rs#L3659-L3673
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/tui/app/App/event_sender
+  - target: functions/src/tui/app/App/event_sender
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_llama_cpp_models_key
+  - target: functions/src/tui/app/App/handle_llama_cpp_models_key
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,7 +22,6 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 - [event_sender](../../../../../functions/src/tui/app/App/event_sender.md)
 
 # Called by

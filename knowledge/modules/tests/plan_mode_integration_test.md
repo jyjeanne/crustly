@@ -3,18 +3,34 @@ type: Rust Module
 title: plan_mode_integration_test
 resource: tests/plan_mode_integration_test.rs#L1-L467
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crustly-db-models-session
-  - external/crustly-db-repository-session-sessionrepository
-  - external/crustly-db-database
-  - external/crustly-plan-plandocument-planstatus-plantask-taskstatus-tasktype
-  - external/crustly-services-planservice-servicecontext
-  - external/tempfile-tempdir
-  - external/uuid-uuid
+  - target: external/crustly-db-models-session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-db-repository-session-sessionrepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-plan-plandocument-planstatus-plantask-taskstatus-tasktype
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-services-planservice-servicecontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

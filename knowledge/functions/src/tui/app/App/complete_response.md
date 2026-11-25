@@ -1,19 +1,31 @@
 ---
 type: Rust Method
 title: complete_response
-resource: src/tui/app.rs#L1691-L1780
+resource: src/tui/app.rs#L2531-L2624
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/check_task_completion
-  - functions/src/llm/provider/types/PerfMetrics/tokens_per_second
-  - functions/src/services/session/SessionService/update_session
-  - functions/src/tui/app/App/execute_next_plan_task
-  - functions/src/tui/app/App/check_and_load_plan
+  - target: functions/src/tui/app/App/check_task_completion
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/types/PerfMetrics/tokens_per_second
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/update_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/execute_next_plan_task
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/check_and_load_plan
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

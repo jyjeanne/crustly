@@ -1,10 +1,12 @@
 ---
 type: Rust Function
 title: test_tool_call_index_in_bounds
-resource: src/llm/provider/openai.rs#L1306-L1311
+resource: src/llm/provider/openai.rs#L1435-L1440
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

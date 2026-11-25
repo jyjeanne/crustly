@@ -3,12 +3,19 @@ type: Rust Method
 title: insert_for_tool
 resource: src/llm/tools/cache.rs#L114-L117
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/cache/ToolTtlConfig/ttl_for
+  - target: functions/src/llm/tools/cache/ToolTtlConfig/ttl_for
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/cache/ToolResultCache/insert
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+  - target: functions/src/llm/agent/service/tool_round/AgentService/execute_tool_round
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,7 +25,8 @@ relationships:
 # Calls
 
 - [ttl_for](../../../../../../functions/src/llm/tools/cache/ToolTtlConfig/ttl_for.md)
+- [insert](../../../../../../functions/src/llm/tools/cache/ToolResultCache/insert.md)
 
 # Called by
 
-- [send_message_with_tools_inner](../../../../../../functions/src/llm/agent/service/AgentService/send_message_with_tools_inner.md)
+- [execute_tool_round](../../../../../../functions/src/llm/agent/service/tool_round/AgentService/execute_tool_round.md)

@@ -3,13 +3,21 @@ type: Rust Method
 title: with_top_p
 resource: src/llm/provider/types.rs#L210-L213
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/ollama/test_to_ollama_request_maps_common_fields
-  - functions/src/llm/provider/openai/test_llm_request_new_fields
-  - functions/src/llm/provider/openai/test_new_fields_forwarded_to_openai_request
-  - functions/src/llm/provider/qwen/test_sampling_explicit_request_top_p_wins
+  - target: functions/src/llm/provider/ollama/test_to_ollama_request_maps_common_fields
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/test_llm_request_new_fields
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/test_new_fields_forwarded_to_openai_request
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/test_sampling_explicit_request_top_p_wins
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

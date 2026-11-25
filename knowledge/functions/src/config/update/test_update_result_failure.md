@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_update_result_failure
 resource: src/config/update.rs#L271-L276
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/update/UpdateResult/failure
+  - target: functions/src/config/update/UpdateResult/failure
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

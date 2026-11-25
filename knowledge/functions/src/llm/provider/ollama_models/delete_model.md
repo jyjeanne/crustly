@@ -3,11 +3,15 @@ type: Rust Function
 title: delete_model
 resource: src/llm/provider/ollama_models.rs#L102-L109
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/ollama_models/client_for
-  - functions/src/tui/error/ErrorInfo/with_context
+  - target: functions/src/llm/provider/ollama_models/client_for
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/error/ErrorInfo/with_context
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

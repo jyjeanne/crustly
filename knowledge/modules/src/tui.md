@@ -1,17 +1,27 @@
 ---
 type: Rust Module
 title: tui
-resource: src/tui/mod.rs#L1-L29
+resource: src/tui/mod.rs#L1-L28
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/pub-use-app-app-displaymessage
-  - external/pub-use-events-appmode-eventhandler-tuievent
-  - external/pub-use-prompt-analyzer-promptanalyzer
-  - external/pub-use-runner-run
+  - target: external/pub-use-app-app-displaymessage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-events-appmode-eventhandler-tuievent
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-prompt-analyzer-promptanalyzer
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/pub-use-runner-run
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Imports

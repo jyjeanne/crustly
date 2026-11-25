@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: LlamaCppCommands
-resource: src/cli/mod.rs#L270-L284
+resource: src/cli/mod.rs#L399-L450
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

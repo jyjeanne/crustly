@@ -1,13 +1,17 @@
 ---
 type: Rust Method
 title: send_message_streaming
-resource: src/llm/agent/service.rs#L741-L768
+resource: src/llm/agent/service.rs#L1171-L1198
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/service/AgentService/prepare_message_context
-  - functions/src/llm/provider/types/LLMRequest/with_streaming
+  - target: functions/src/llm/agent/service/AgentService/prepare_message_context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/types/LLMRequest/with_streaming
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

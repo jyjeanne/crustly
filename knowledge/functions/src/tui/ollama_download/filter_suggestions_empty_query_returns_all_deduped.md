@@ -2,12 +2,16 @@
 type: Rust Function
 title: filter_suggestions_empty_query_returns_all_deduped
 resource: src/tui/ollama_download.rs#L266-L279
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/ollama_download/filter_suggestions
+  - target: functions/src/tui/ollama_download/filter_suggestions
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

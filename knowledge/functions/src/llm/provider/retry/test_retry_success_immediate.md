@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_retry_success_immediate
 resource: src/llm/provider/retry.rs#L292-L315
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/retry/retry_with_backoff
+  - target: functions/src/llm/provider/retry/retry_with_backoff
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

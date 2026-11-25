@@ -1,14 +1,20 @@
 ---
 type: Rust Method
 title: with_timeout
-resource: src/llm/tools/trait.rs#L94-L97
+resource: src/llm/tools/trait.rs#L170-L173
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/tools/bash/test_bash_timeout
-  - functions/src/llm/tools/bash/test_bash_timeout_field_overrides_context_default
-  - functions/src/llm/tools/trait/test_execution_context
+  - target: functions/src/llm/tools/bash/test_bash_timeout
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/bash/test_bash_timeout_field_overrides_context_default
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/trait/test_execution_context
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

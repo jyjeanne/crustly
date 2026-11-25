@@ -1,15 +1,20 @@
 ---
 type: Rust Function
 title: stale_session_response_complete_is_dropped_after_switching_sessions
-resource: src/tui/app.rs#L4516-L4557
+resource: src/tui/app.rs#L5773-L5816
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/create_new_session
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/create_new_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -19,5 +24,4 @@ relationships:
 # Calls
 
 - [create_new_session](../../../../functions/src/tui/app/App/create_new_session.md)
-- [len](../../../../functions/src/config/secrets/SecretString/len.md)
 - [handle_event](../../../../functions/src/tui/app/App/handle_event.md)

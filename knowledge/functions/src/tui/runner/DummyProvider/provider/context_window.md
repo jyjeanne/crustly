@@ -1,10 +1,12 @@
 ---
 type: Rust Method
 title: context_window
-resource: src/tui/runner.rs#L179-L181
+resource: src/tui/runner.rs#L184-L186
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

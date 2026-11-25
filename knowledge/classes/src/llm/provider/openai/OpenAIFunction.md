@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: OpenAIFunction
-resource: src/llm/provider/openai.rs#L1048-L1052
+resource: src/llm/provider/openai.rs#L852-L856
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

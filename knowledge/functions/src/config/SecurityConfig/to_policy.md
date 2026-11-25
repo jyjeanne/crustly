@@ -3,15 +3,28 @@ type: Rust Method
 title: to_policy
 resource: src/config/mod.rs#L67-L93
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/is_empty
+  - target: functions/src/llm/tools/sandbox/DenyToolRule/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/sandbox/DenyPathPrefixRule/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   called_by:
-  - functions/src/cli/cmd_chat
-  - functions/src/cli/cmd_run
-  - functions/src/config/allow_bash_trusts_only_the_listed_read_only_programs
-  - functions/src/config/empty_security_config_trusts_nothing
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/cli/cmd_run
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/allow_bash_trusts_only_the_listed_read_only_programs
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/empty_security_config_trusts_nothing
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -20,7 +33,8 @@ relationships:
 
 # Calls
 
-- [is_empty](../../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [new](../../../../functions/src/llm/tools/sandbox/DenyToolRule/new.md)
+- [new](../../../../functions/src/llm/tools/sandbox/DenyPathPrefixRule/new.md)
 
 # Called by
 

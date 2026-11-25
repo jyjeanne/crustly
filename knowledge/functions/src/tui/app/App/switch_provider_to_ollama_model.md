@@ -1,19 +1,34 @@
 ---
 type: Rust Method
 title: switch_provider_to_ollama_model
-resource: src/tui/app.rs#L2712-L2762
+resource: src/tui/app.rs#L3560-L3611
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/service/AgentService/set_provider
-  - functions/src/services/session/SessionService/update_session
-  - functions/src/tui/app/App/switch_mode
+  - target: functions/src/llm/agent/service/AgentService/set_provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/refresh_context_usage
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/session/SessionService/update_session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/switch_mode
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/handle_provider_switch_key
-  - functions/src/tui/app/switch_provider_without_ollama_feature_shows_clear_error
-  - functions/src/tui/app/switch_provider_with_ollama_feature_swaps_provider_in_place
+  - target: functions/src/tui/app/App/handle_provider_switch_key
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/switch_provider_without_ollama_feature_shows_clear_error
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/switch_provider_with_ollama_feature_swaps_provider_in_place
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -23,6 +38,7 @@ relationships:
 # Calls
 
 - [set_provider](../../../../../functions/src/llm/agent/service/AgentService/set_provider.md)
+- [refresh_context_usage](../../../../../functions/src/tui/app/App/refresh_context_usage.md)
 - [update_session](../../../../../functions/src/services/session/SessionService/update_session.md)
 - [switch_mode](../../../../../functions/src/tui/app/App/switch_mode.md)
 

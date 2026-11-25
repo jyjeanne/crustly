@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: description
-resource: src/llm/tools/skill.rs#L46-L50
+resource: src/llm/tools/skill.rs#L71-L75
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

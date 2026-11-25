@@ -1,16 +1,22 @@
 ---
 type: Rust Method
 title: load_history_entry
-resource: src/tui/app.rs#L410-L414
+resource: src/tui/app.rs#L604-L608
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/set_input_text
+  - target: functions/src/tui/app/App/set_input_text
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/history_prev
-  - functions/src/tui/app/App/history_next
+  - target: functions/src/tui/app/App/history_prev
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/history_next
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

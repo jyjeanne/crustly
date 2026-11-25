@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_extract_html_title
-resource: src/llm/tools/doc_parser.rs#L774-L778
+resource: src/llm/tools/doc_parser.rs#L833-L837
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/doc_parser/DocParserTool/extract_html_title
+  - target: functions/src/llm/tools/doc_parser/DocParserTool/extract_html_title
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

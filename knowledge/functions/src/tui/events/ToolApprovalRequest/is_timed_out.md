@@ -1,12 +1,14 @@
 ---
 type: Rust Method
 title: is_timed_out
-resource: src/tui/events.rs#L147-L149
+resource: src/tui/events.rs#L156-L158
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

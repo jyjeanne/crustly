@@ -3,18 +3,34 @@ type: Rust Module
 title: retry
 resource: src/utils/retry.rs#L1-L424
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/std-future-future
-  - external/std-time-duration
-  - external/tokio-time-sleep
-  - external/rand-rng
-  - external/super
-  - external/std-sync-atomic-atomicu32-ordering
-  - external/std-sync-arc
+  - target: external/std-future-future
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-time-sleep
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/rand-rng
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-atomic-atomicu32-ordering
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

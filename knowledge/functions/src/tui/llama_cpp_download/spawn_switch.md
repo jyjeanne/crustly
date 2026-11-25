@@ -1,12 +1,14 @@
 ---
 type: Rust Function
 title: spawn_switch
-resource: src/tui/llama_cpp_download.rs#L130-L157
+resource: src/tui/llama_cpp_download.rs#L274-L301
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/app/App/start_llama_cpp_switch
+  - target: functions/src/tui/app/App/start_llama_cpp_switch
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

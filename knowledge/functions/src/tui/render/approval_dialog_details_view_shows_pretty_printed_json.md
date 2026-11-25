@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: approval_dialog_details_view_shows_pretty_printed_json
-resource: src/tui/render.rs#L3025-L3037
+resource: src/tui/render.rs#L4092-L4104
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/render/test_approval_request
-  - functions/src/tui/render/render_to_string
+  - target: functions/src/tui/render/test_approval_request
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/render/render_to_string
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

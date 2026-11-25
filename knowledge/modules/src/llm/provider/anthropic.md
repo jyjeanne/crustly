@@ -1,23 +1,45 @@
 ---
 type: Rust Module
 title: anthropic
-resource: src/llm/provider/anthropic.rs#L1-L620
+resource: src/llm/provider/anthropic.rs#L1-L633
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-providererror-result
-  - external/super-r-trait-provider-providerstream
-  - external/super-types
-  - external/async-trait-async-trait
-  - external/futures-stream-streamext
-  - external/reqwest-client
-  - external/serde-deserialize-serialize
-  - external/std-time-duration
-  - external/super-retry-retry-with-backoff-retryconfig
-  - external/super
+  - target: external/super-error-providererror-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-provider-providerstream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-types
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/futures-stream-streamext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/reqwest-client
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-retry-retry-with-backoff-retryconfig
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

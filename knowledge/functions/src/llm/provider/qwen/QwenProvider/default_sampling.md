@@ -1,18 +1,28 @@
 ---
 type: Rust Method
 title: default_sampling
-resource: src/llm/provider/qwen.rs#L918-L936
+resource: src/llm/provider/qwen.rs#L928-L946
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
+  calls:
+  - target: functions/src/memory/vector_index/VectorIndex/contains
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/llm/provider/qwen/QwenProvider/to_qwen_request
+  - target: functions/src/llm/provider/qwen/QwenProvider/to_qwen_request
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn default_sampling( model: &str, thinking_enabled: bool, ) -> (Option<f32>, Option<u32>, Option<f32>)`
+
+# Calls
+
+- [contains](../../../../../../functions/src/memory/vector_index/VectorIndex/contains.md)
 
 # Called by
 

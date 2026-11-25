@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: ctrl_g_opens_llama_cpp_models_dialog_in_loading_state
-resource: src/tui/app.rs#L4195-L4206
+resource: src/tui/app.rs#L5337-L5352
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/app/App/handle_key_event
-  - functions/src/tui/app/key_mod
+  - target: functions/src/tui/app/App/handle_key_event
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/key_mod
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

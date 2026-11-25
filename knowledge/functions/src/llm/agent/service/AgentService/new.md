@@ -1,11 +1,240 @@
 ---
 type: Rust Method
 title: new
-resource: src/llm/agent/service.rs#L536-L552
+resource: src/llm/agent/service.rs#L561-L592
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
+relationships:
+  calls:
+  - target: functions/src/llm/tools/registry/ToolRegistry/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/cache/ToolResultCache/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/cache/ToolTtlConfig/default/default
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/tools/file_read_cache/FileReadCache/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/subagents/SubAgentManager/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/profiles/builtin_profiles
+    resolved_by: tree-sitter
+    confidence: exact
+  called_by:
+  - target: functions/src/cli/cmd_chat
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/cli/cmd_run
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/create_test_service
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/test_send_message_with_tool_execution
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/auto_profile_sends_core_tools_on_a_small_window
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/auto_profile_sends_every_tool_on_a_large_window
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/approval_callback_sees_the_canonical_tool_name
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/context_overflow_compacts_and_retries_the_round
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/context_overflow_with_nothing_to_free_is_an_error
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/estimated_context_overflow_is_rejected_before_dispatch
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/estimated_context_overflow_is_rejected_without_tools
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/estimated_overflow_tries_deeper_compaction_first
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/a_nearly_full_window_is_cut_deeper_before_sending
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/make_room_elides_old_tool_output_when_the_budget_is_tight
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/calibration_learns_from_the_provider_and_resets_on_switch
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/round_limit_ends_with_an_answer_instead_of_an_error
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/stopping_mid_round_answers_every_pending_tool_call
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/a_cancelled_request_stops_with_cancelled
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/cancelling_during_an_approval_prompt_ends_the_request
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/verification_sends_the_model_back_to_check_its_edit
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/verification_is_off_unless_enabled
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/tool_work_is_remembered_across_requests
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/project_notes_are_added_to_the_system_prompt_when_enabled
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/bad_tool_arguments_get_the_expected_arguments_back
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/a_sub_agent_s_answer_comes_back_to_the_parent
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/sub_agents_without_an_approval_prompt_cannot_run_gated_tools
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/sub_agent_tool_calls_are_approved_through_the_parent_s_prompt
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/a_background_sub_agent_is_collected_with_its_report
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/an_unknown_profile_fails_with_the_available_ones
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/sub_agents_run_one_at_a_time_by_default
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/a_running_sub_agent_can_be_cancelled
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/a_failing_provider_falls_back_and_says_so
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/an_overflow_falls_back_only_when_allowed
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/an_estimated_overflow_reaches_a_fallback_with_an_unknown_window
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/errors_that_a_retry_cannot_fix_do_not_fall_back
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/the_router_picks_the_model_for_the_request
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/recall_block_reaches_the_model_but_not_the_database
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/without_memory_the_user_turn_is_unchanged
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/a_refused_forget_deletes_nothing_and_the_prompt_shows_the_memory
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/a_refused_global_save_stores_nothing
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/agent/service/subagents/ChildTemplate/build
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/app/test_app
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/app/app_with_extraction
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/render/test_app
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/tui/runner/run_loop_exits_immediately_when_should_quit_is_set
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/error_scenarios_test/create_error_agent
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/error_scenarios_test/test_error_empty_message
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/integration_test/create_test_agent
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/tests/integration_test/test_end_to_end_system_prompt
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
 ---
 
 # Signature
 
 `pub fn new(provider: Arc<dyn Provider>, context: ServiceContext) -> Self`
+
+# Calls
+
+- [new](../../../../../../functions/src/llm/tools/registry/ToolRegistry/new.md)
+- [new](../../../../../../functions/src/llm/tools/cache/ToolResultCache/new.md)
+- [default](../../../../../../functions/src/llm/tools/cache/ToolTtlConfig/default/default.md)
+- [new](../../../../../../functions/src/llm/tools/file_read_cache/FileReadCache/new.md)
+- [new](../../../../../../functions/src/llm/agent/service/subagents/SubAgentManager/new.md)
+- [builtin_profiles](../../../../../../functions/src/llm/agent/profiles/builtin_profiles.md)
+
+# Called by
+
+- [cmd_chat](../../../../../../functions/src/cli/cmd_chat.md)
+- [cmd_run](../../../../../../functions/src/cli/cmd_run.md)
+- [create_test_service](../../../../../../functions/src/llm/agent/service/create_test_service.md)
+- [test_send_message_with_tool_execution](../../../../../../functions/src/llm/agent/service/test_send_message_with_tool_execution.md)
+- [auto_profile_sends_core_tools_on_a_small_window](../../../../../../functions/src/llm/agent/service/auto_profile_sends_core_tools_on_a_small_window.md)
+- [auto_profile_sends_every_tool_on_a_large_window](../../../../../../functions/src/llm/agent/service/auto_profile_sends_every_tool_on_a_large_window.md)
+- [approval_callback_sees_the_canonical_tool_name](../../../../../../functions/src/llm/agent/service/approval_callback_sees_the_canonical_tool_name.md)
+- [context_overflow_compacts_and_retries_the_round](../../../../../../functions/src/llm/agent/service/context_overflow_compacts_and_retries_the_round.md)
+- [context_overflow_with_nothing_to_free_is_an_error](../../../../../../functions/src/llm/agent/service/context_overflow_with_nothing_to_free_is_an_error.md)
+- [estimated_context_overflow_is_rejected_before_dispatch](../../../../../../functions/src/llm/agent/service/estimated_context_overflow_is_rejected_before_dispatch.md)
+- [estimated_context_overflow_is_rejected_without_tools](../../../../../../functions/src/llm/agent/service/estimated_context_overflow_is_rejected_without_tools.md)
+- [estimated_overflow_tries_deeper_compaction_first](../../../../../../functions/src/llm/agent/service/estimated_overflow_tries_deeper_compaction_first.md)
+- [a_nearly_full_window_is_cut_deeper_before_sending](../../../../../../functions/src/llm/agent/service/a_nearly_full_window_is_cut_deeper_before_sending.md)
+- [make_room_elides_old_tool_output_when_the_budget_is_tight](../../../../../../functions/src/llm/agent/service/make_room_elides_old_tool_output_when_the_budget_is_tight.md)
+- [calibration_learns_from_the_provider_and_resets_on_switch](../../../../../../functions/src/llm/agent/service/calibration_learns_from_the_provider_and_resets_on_switch.md)
+- [round_limit_ends_with_an_answer_instead_of_an_error](../../../../../../functions/src/llm/agent/service/round_limit_ends_with_an_answer_instead_of_an_error.md)
+- [stopping_mid_round_answers_every_pending_tool_call](../../../../../../functions/src/llm/agent/service/stopping_mid_round_answers_every_pending_tool_call.md)
+- [a_cancelled_request_stops_with_cancelled](../../../../../../functions/src/llm/agent/service/a_cancelled_request_stops_with_cancelled.md)
+- [cancelling_during_an_approval_prompt_ends_the_request](../../../../../../functions/src/llm/agent/service/cancelling_during_an_approval_prompt_ends_the_request.md)
+- [verification_sends_the_model_back_to_check_its_edit](../../../../../../functions/src/llm/agent/service/verification_sends_the_model_back_to_check_its_edit.md)
+- [verification_is_off_unless_enabled](../../../../../../functions/src/llm/agent/service/verification_is_off_unless_enabled.md)
+- [tool_work_is_remembered_across_requests](../../../../../../functions/src/llm/agent/service/tool_work_is_remembered_across_requests.md)
+- [project_notes_are_added_to_the_system_prompt_when_enabled](../../../../../../functions/src/llm/agent/service/project_notes_are_added_to_the_system_prompt_when_enabled.md)
+- [bad_tool_arguments_get_the_expected_arguments_back](../../../../../../functions/src/llm/agent/service/bad_tool_arguments_get_the_expected_arguments_back.md)
+- [a_sub_agent_s_answer_comes_back_to_the_parent](../../../../../../functions/src/llm/agent/service/a_sub_agent_s_answer_comes_back_to_the_parent.md)
+- [sub_agents_without_an_approval_prompt_cannot_run_gated_tools](../../../../../../functions/src/llm/agent/service/sub_agents_without_an_approval_prompt_cannot_run_gated_tools.md)
+- [sub_agent_tool_calls_are_approved_through_the_parent_s_prompt](../../../../../../functions/src/llm/agent/service/sub_agent_tool_calls_are_approved_through_the_parent_s_prompt.md)
+- [a_background_sub_agent_is_collected_with_its_report](../../../../../../functions/src/llm/agent/service/a_background_sub_agent_is_collected_with_its_report.md)
+- [an_unknown_profile_fails_with_the_available_ones](../../../../../../functions/src/llm/agent/service/an_unknown_profile_fails_with_the_available_ones.md)
+- [sub_agents_run_one_at_a_time_by_default](../../../../../../functions/src/llm/agent/service/sub_agents_run_one_at_a_time_by_default.md)
+- [a_running_sub_agent_can_be_cancelled](../../../../../../functions/src/llm/agent/service/a_running_sub_agent_can_be_cancelled.md)
+- [a_failing_provider_falls_back_and_says_so](../../../../../../functions/src/llm/agent/service/a_failing_provider_falls_back_and_says_so.md)
+- [an_overflow_falls_back_only_when_allowed](../../../../../../functions/src/llm/agent/service/an_overflow_falls_back_only_when_allowed.md)
+- [an_estimated_overflow_reaches_a_fallback_with_an_unknown_window](../../../../../../functions/src/llm/agent/service/an_estimated_overflow_reaches_a_fallback_with_an_unknown_window.md)
+- [errors_that_a_retry_cannot_fix_do_not_fall_back](../../../../../../functions/src/llm/agent/service/errors_that_a_retry_cannot_fix_do_not_fall_back.md)
+- [the_router_picks_the_model_for_the_request](../../../../../../functions/src/llm/agent/service/the_router_picks_the_model_for_the_request.md)
+- [recall_block_reaches_the_model_but_not_the_database](../../../../../../functions/src/llm/agent/service/recall_block_reaches_the_model_but_not_the_database.md)
+- [without_memory_the_user_turn_is_unchanged](../../../../../../functions/src/llm/agent/service/without_memory_the_user_turn_is_unchanged.md)
+- [a_refused_forget_deletes_nothing_and_the_prompt_shows_the_memory](../../../../../../functions/src/llm/agent/service/a_refused_forget_deletes_nothing_and_the_prompt_shows_the_memory.md)
+- [a_refused_global_save_stores_nothing](../../../../../../functions/src/llm/agent/service/a_refused_global_save_stores_nothing.md)
+- [build](../../../../../../functions/src/llm/agent/service/subagents/ChildTemplate/build.md)
+- [test_app](../../../../../../functions/src/tui/app/test_app.md)
+- [app_with_extraction](../../../../../../functions/src/tui/app/app_with_extraction.md)
+- [test_app](../../../../../../functions/src/tui/render/test_app.md)
+- [run_loop_exits_immediately_when_should_quit_is_set](../../../../../../functions/src/tui/runner/run_loop_exits_immediately_when_should_quit_is_set.md)
+- [create_error_agent](../../../../../../functions/tests/error_scenarios_test/create_error_agent.md)
+- [test_error_empty_message](../../../../../../functions/tests/error_scenarios_test/test_error_empty_message.md)
+- [create_test_agent](../../../../../../functions/tests/integration_test/create_test_agent.md)
+- [test_end_to_end_system_prompt](../../../../../../functions/tests/integration_test/test_end_to_end_system_prompt.md)

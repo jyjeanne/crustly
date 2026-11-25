@@ -2,12 +2,16 @@
 type: Rust Function
 title: first_of_several_fenced_calls_is_recovered
 resource: src/llm/provider/tool_call_recovery.rs#L328-L338
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/tool_call_recovery/tool_call_from_content
+  - target: functions/src/llm/provider/tool_call_recovery/tool_call_from_content
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

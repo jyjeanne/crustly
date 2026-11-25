@@ -1,16 +1,22 @@
 ---
 type: Rust Method
 title: open_skills
-resource: src/tui/app.rs#L1261-L1265
+resource: src/tui/app.rs#L1665-L1669
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/skill/list_skills
-  - functions/src/tui/app/App/switch_mode
+  - target: functions/src/llm/tools/skill/list_skills
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/switch_mode
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/try_handle_slash_command
+  - target: functions/src/tui/app/App/try_handle_slash_command
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

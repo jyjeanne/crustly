@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: PlanTaskStatus
-resource: src/db/models.rs#L114-L120
+resource: src/db/models.rs#L117-L123
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

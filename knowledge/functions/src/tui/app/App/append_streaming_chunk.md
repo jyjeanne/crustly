@@ -1,13 +1,15 @@
 ---
 type: Rust Method
 title: append_streaming_chunk
-resource: src/tui/app.rs#L1680-L1688
+resource: src/tui/app.rs#L2520-L2528
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/app/App/handle_event
+  - target: functions/src/tui/app/App/handle_event
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

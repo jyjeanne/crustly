@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_plan_rejection
 resource: src/plan/plan_tests.rs#L201-L207
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/plan/PlanDocument/reject
+  - target: functions/src/plan/PlanDocument/reject
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

@@ -1,9 +1,9 @@
 ---
 type: Rust Function
 title: spawn_delete
-resource: src/tui/llama_cpp_download.rs#L248-L262
+resource: src/tui/llama_cpp_download.rs#L392-L406
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

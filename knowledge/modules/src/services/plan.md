@@ -3,23 +3,49 @@ type: Rust Module
 title: plan
 resource: src/services/plan.rs#L1-L658
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crate-db-models-plantaskstatus
-  - external/crate-db-repository-planrepository-plantaskrepository
-  - external/crate-plan-plandocument-planstatus-taskstatus
-  - external/crate-services-servicecontext
-  - external/anyhow-result
-  - external/uuid-uuid
-  - external/super
-  - external/crate-db-models-session
-  - external/crate-db-repository-session-sessionrepository
-  - external/crate-db-database
-  - external/crate-plan-planstatus-plantask-taskstatus-tasktype
-  - external/tempfile-tempdir
+  - target: external/crate-db-models-plantaskstatus
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-repository-planrepository-plantaskrepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-plan-plandocument-planstatus-taskstatus
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-services-servicecontext
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/anyhow-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-models-session
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-repository-session-sessionrepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-plan-planstatus-plantask-taskstatus-tasktype
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tempfile-tempdir
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

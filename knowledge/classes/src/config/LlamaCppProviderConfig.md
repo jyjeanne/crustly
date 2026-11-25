@@ -1,9 +1,9 @@
 ---
 type: Rust Struct
 title: LlamaCppProviderConfig
-resource: src/config/mod.rs#L588-L647
+resource: src/config/mod.rs#L1101-L1177
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

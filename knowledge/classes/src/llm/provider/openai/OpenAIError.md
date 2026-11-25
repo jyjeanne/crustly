@@ -1,10 +1,10 @@
 ---
 type: Rust Struct
 title: OpenAIError
-resource: src/llm/provider/openai.rs#L1140-L1144
+resource: src/llm/provider/openai.rs#L1222-L1226
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

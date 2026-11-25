@@ -1,19 +1,26 @@
 ---
 type: Rust Method
 title: send_message_with_tools_and_mode_streaming
-resource: src/llm/agent/service.rs#L801-L817
+resource: src/llm/agent/service.rs#L1282-L1300
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+  - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/tui/app/App/send_message
+  - target: functions/src/llm/agent/service/a_cancelled_request_stops_with_cancelled
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/app/App/send_message
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
-`pub async fn send_message_with_tools_and_mode_streaming( &self, session_id: Uuid, user_message: String, model: Option<String>, read_only_mode: bool, chunk_tx: mpsc::UnboundedSender<String>, ) -> Result<AgentResponse>`
+`pub async fn send_message_with_tools_and_mode_streaming( &self, session_id: Uuid, user_message: String, model: Option<String>, read_only_mode: bool, chunk_tx: mpsc::UnboundedSender<String>, cancel: CancellationToken, ) -> Result<AgentResponse>`
 
 # Calls
 
@@ -21,4 +28,5 @@ relationships:
 
 # Called by
 
+- [a_cancelled_request_stops_with_cancelled](../../../../../../functions/src/llm/agent/service/a_cancelled_request_stops_with_cancelled.md)
 - [send_message](../../../../../../functions/src/tui/app/App/send_message.md)

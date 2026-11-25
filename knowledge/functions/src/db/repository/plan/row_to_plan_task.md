@@ -4,12 +4,16 @@ title: row_to_plan_task
 resource: src/db/repository/plan.rs#L654-L708
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/db/models/PlanTaskStatus/parse
+  - target: functions/src/db/models/PlanTaskStatus/parse
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/db/repository/plan/PlanTaskRepository/get_task
+  - target: functions/src/db/repository/plan/PlanTaskRepository/get_task
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

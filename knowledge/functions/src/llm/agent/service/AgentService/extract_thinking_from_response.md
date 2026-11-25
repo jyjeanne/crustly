@@ -1,24 +1,20 @@
 ---
 type: Rust Method
 title: extract_thinking_from_response
-resource: src/llm/agent/service.rs#L1720-L1735
+resource: src/llm/agent/service.rs#L1679-L1694
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
-  calls:
-  - functions/src/config/secrets/SecretString/is_empty
   called_by:
-  - functions/src/llm/agent/service/AgentService/final_text_and_thinking
+  - target: functions/src/llm/agent/service/AgentService/final_text_and_thinking
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `fn extract_thinking_from_response(response: &LLMResponse) -> Option<String>`
-
-# Calls
-
-- [is_empty](../../../../../../functions/src/config/secrets/SecretString/is_empty.md)
 
 # Called by
 

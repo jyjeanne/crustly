@@ -2,12 +2,16 @@
 type: Rust Function
 title: invalid_host_returns_error
 resource: src/llm/provider/ollama_models.rs#L203-L206
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/ollama_models/client_for
+  - target: functions/src/llm/provider/ollama_models/client_for
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

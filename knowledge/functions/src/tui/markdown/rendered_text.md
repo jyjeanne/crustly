@@ -2,15 +2,25 @@
 type: Rust Function
 title: rendered_text
 resource: src/tui/markdown.rs#L270-L281
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/tui/markdown/plain_text_keeps_windows_path_backslashes
-  - functions/src/tui/markdown/plain_text_keeps_markdown_syntax_literal
-  - functions/src/tui/markdown/plain_text_preserves_line_structure
-  - functions/src/tui/markdown/markdown_escapes_backslash_before_punctuation
+  - target: functions/src/tui/markdown/plain_text_keeps_windows_path_backslashes
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/markdown/plain_text_keeps_markdown_syntax_literal
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/markdown/plain_text_preserves_line_structure
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/markdown/markdown_escapes_backslash_before_punctuation
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

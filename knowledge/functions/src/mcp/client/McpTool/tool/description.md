@@ -1,10 +1,10 @@
 ---
 type: Rust Method
 title: description
-resource: src/mcp/client.rs#L326-L328
+resource: src/mcp/client.rs#L325-L327
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

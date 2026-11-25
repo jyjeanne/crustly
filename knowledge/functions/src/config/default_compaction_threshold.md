@@ -1,13 +1,15 @@
 ---
 type: Rust Function
 title: default_compaction_threshold
-resource: src/config/mod.rs#L123-L125
+resource: src/config/mod.rs#L549-L551
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/config/MemoryConfig/default/default
+  - target: functions/src/config/MemoryConfig/default/default
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

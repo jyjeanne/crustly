@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_retry_non_retryable_error
 resource: src/llm/provider/retry.rs#L373-L395
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/retry/retry_with_backoff
+  - target: functions/src/llm/provider/retry/retry_with_backoff
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

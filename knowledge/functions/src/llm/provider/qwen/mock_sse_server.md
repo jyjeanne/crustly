@@ -1,14 +1,20 @@
 ---
 type: Rust Function
 title: mock_sse_server
-resource: src/llm/provider/qwen.rs#L1968-L2004
+resource: src/llm/provider/qwen.rs#L1994-L2030
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/qwen/stream_assembles_openai_style_tool_call_across_sse_chunks
-  - functions/src/llm/provider/qwen/stream_skips_malformed_sse_chunk_and_continues
+  - target: functions/src/llm/provider/qwen/stream_assembles_openai_style_tool_call_across_sse_chunks
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/qwen/stream_skips_malformed_sse_chunk_and_continues
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

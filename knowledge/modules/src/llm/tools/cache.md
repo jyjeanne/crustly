@@ -3,17 +3,31 @@ type: Rust Module
 title: cache
 resource: src/llm/tools/cache.rs#L1-L198
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/dashmap-dashmap
-  - external/serde-json-value
-  - external/std-hash-hash-hasher
-  - external/std-time-duration-instant
-  - external/std-collections-hash-map-defaulthasher
-  - external/super
+  - target: external/dashmap-dashmap
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-hash-hash-hasher
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration-instant
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-collections-hash-map-defaulthasher
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

@@ -1,13 +1,17 @@
 ---
 type: Rust Function
 title: test_create_provider_with_openai
-resource: src/llm/provider/factory.rs#L696-L720
+resource: src/llm/provider/factory.rs#L790-L814
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/factory/create_provider
+  - target: functions/src/llm/provider/factory/create_provider
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

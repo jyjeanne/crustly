@@ -4,10 +4,12 @@ title: text_message
 resource: tests/compaction_test.rs#L29-L36
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/tests/compaction_test/build_context
+  - target: functions/tests/compaction_test/build_context
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

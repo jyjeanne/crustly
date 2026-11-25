@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_code_with_special_characters
 resource: src/tui/highlight.rs#L209-L213
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/highlight/highlight_code
+  - target: functions/src/tui/highlight/highlight_code
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

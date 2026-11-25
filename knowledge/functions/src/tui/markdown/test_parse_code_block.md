@@ -2,12 +2,16 @@
 type: Rust Function
 title: test_parse_code_block
 resource: src/tui/markdown.rs#L346-L350
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/tui/markdown/parse_markdown
+  - target: functions/src/tui/markdown/parse_markdown
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

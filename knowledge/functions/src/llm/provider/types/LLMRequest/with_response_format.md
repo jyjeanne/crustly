@@ -3,14 +3,24 @@ type: Rust Method
 title: with_response_format
 resource: src/llm/provider/types.rs#L241-L244
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   called_by:
-  - functions/src/llm/provider/gemini/test_json_mode_sets_response_mime_type
-  - functions/src/llm/provider/gemini/test_full_json_schema_sets_response_schema
-  - functions/src/llm/provider/ollama/to_ollama_request_maps_thinking_and_response_format
-  - functions/src/llm/provider/openai/test_llm_request_new_fields
-  - functions/src/llm/provider/openai/test_new_fields_forwarded_to_openai_request
+  - target: functions/src/llm/provider/gemini/test_json_mode_sets_response_mime_type
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/gemini/test_full_json_schema_sets_response_schema
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama/to_ollama_request_maps_thinking_and_response_format
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/test_llm_request_new_fields
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/openai/test_new_fields_forwarded_to_openai_request
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

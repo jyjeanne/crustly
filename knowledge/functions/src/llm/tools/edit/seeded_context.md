@@ -2,13 +2,19 @@
 type: Rust Function
 title: seeded_context
 resource: src/llm/tools/edit.rs#L433-L440
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/tools/file_read_cache/FileReadCache/record
-  - functions/src/llm/tools/file_read_cache/FileFingerprint/of
+  - target: functions/src/llm/tools/file_read_cache/FileReadCache/record
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/file_read_cache/FileFingerprint/of
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature

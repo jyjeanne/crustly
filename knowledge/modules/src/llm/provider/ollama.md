@@ -1,21 +1,45 @@
 ---
 type: Rust Module
 title: ollama
-resource: src/llm/provider/ollama.rs#L1-L1592
+resource: src/llm/provider/ollama.rs#L1-L1967
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-providererror-result
-  - external/super-r-trait-provider-providerstream
-  - external/super-tool-call-recovery-maybe-tool-call-json-tool-call-from-content
-  - external/super-types
-  - external/async-trait-async-trait
-  - external/ollama-rs-error-ollamaerror-generation-chat-request-chatmessagerequest-chatmessage-chatmessagefinalresponsedata-chatmessageresponse-messagerole-generation-images-image-generation-parameters-formattype-jsonstructure-keepalive-thinktype-timeunit-generation-tools-toolcall-toolcallfunction-toolfunctioninfo-toolinfo-tooltype-models-modeloptions-ollama
-  - external/futures-streamext-as
-  - external/super
+  - target: external/super-error-providererror-result
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-provider-providerstream
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-tool-call-recovery-maybe-tool-call-json-tool-call-from-content
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-types
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/ollama-rs-error-ollamaerror-generation-chat-request-chatmessagerequest-chatmessage-chatmessagefinalresponsedata-chatmessageresponse-messagerole-generation-images-image-generation-parameters-formattype-jsonstructure-keepalive-thinktype-timeunit-generation-tools-toolcall-toolcallfunction-toolfunctioninfo-toolinfo-tooltype-models-modeloptions-ollama
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/futures-streamext-as
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-provider-test-support-held-response-server
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-time-duration
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -48,6 +72,12 @@ relationships:
 - [calculate_cost](../../../../functions/src/llm/provider/ollama/OllamaProvider/provider/calculate_cost.md)
 - [collect_tool_calls](../../../../functions/src/llm/provider/ollama/collect_tool_calls.md)
 - [stop_reason_for](../../../../functions/src/llm/provider/ollama/stop_reason_for.md)
+- [ok_events](../../../../functions/src/llm/provider/ollama/ok_events.md)
+- [OllamaStreamState](../../../../classes/src/llm/provider/ollama/OllamaStreamState.md)
+- [new](../../../../functions/src/llm/provider/ollama/OllamaStreamState/new.md)
+- [open_text_block](../../../../functions/src/llm/provider/ollama/OllamaStreamState/open_text_block.md)
+- [on_chunk](../../../../functions/src/llm/provider/ollama/OllamaStreamState/on_chunk.md)
+- [finish](../../../../functions/src/llm/provider/ollama/OllamaStreamState/finish.md)
 - [to_ollama_tool](../../../../functions/src/llm/provider/ollama/to_ollama_tool.md)
 - [to_ollama_format](../../../../functions/src/llm/provider/ollama/to_ollama_format.md)
 - [parse_keep_alive](../../../../functions/src/llm/provider/ollama/parse_keep_alive.md)
@@ -88,11 +118,24 @@ relationships:
 - [to_ollama_format_json_object_marker](../../../../functions/src/llm/provider/ollama/to_ollama_format_json_object_marker.md)
 - [to_ollama_format_structured_schema](../../../../functions/src/llm/provider/ollama/to_ollama_format_structured_schema.md)
 - [to_ollama_request_maps_tool_messages](../../../../functions/src/llm/provider/ollama/to_ollama_request_maps_tool_messages.md)
+- [to_ollama_request_keeps_text_sent_with_tool_results](../../../../functions/src/llm/provider/ollama/to_ollama_request_keeps_text_sent_with_tool_results.md)
 - [to_ollama_request_maps_thinking_and_response_format](../../../../functions/src/llm/provider/ollama/to_ollama_request_maps_thinking_and_response_format.md)
 - [per_model_think_false_is_sent_when_request_has_no_thinking](../../../../functions/src/llm/provider/ollama/per_model_think_false_is_sent_when_request_has_no_thinking.md)
 - [request_thinking_wins_over_configured_think](../../../../functions/src/llm/provider/ollama/request_thinking_wins_over_configured_think.md)
 - [invalid_think_value_is_ignored](../../../../functions/src/llm/provider/ollama/invalid_think_value_is_ignored.md)
 - [to_ollama_request_embeds_base64_image](../../../../functions/src/llm/provider/ollama/to_ollama_request_embeds_base64_image.md)
+- [chunk](../../../../functions/src/llm/provider/ollama/chunk.md)
+- [texts](../../../../functions/src/llm/provider/ollama/texts.md)
+- [stop_reason](../../../../functions/src/llm/provider/ollama/stop_reason.md)
+- [read_file_tool](../../../../functions/src/llm/provider/ollama/read_file_tool.md)
+- [text_is_forwarded_as_each_chunk_arrives](../../../../functions/src/llm/provider/ollama/text_is_forwarded_as_each_chunk_arrives.md)
+- [printed_tool_call_is_withheld_then_recovered](../../../../functions/src/llm/provider/ollama/printed_tool_call_is_withheld_then_recovered.md)
+- [withheld_text_that_is_not_a_tool_call_is_flushed](../../../../functions/src/llm/provider/ollama/withheld_text_that_is_not_a_tool_call_is_flushed.md)
+- [usage_comes_from_the_done_chunk](../../../../functions/src/llm/provider/ollama/usage_comes_from_the_done_chunk.md)
+- [text_arrives_before_the_response_is_complete](../../../../functions/src/llm/provider/ollama/text_arrives_before_the_response_is_complete.md)
+- [json_after_text_is_streamed_as_text_and_never_run](../../../../functions/src/llm/provider/ollama/json_after_text_is_streamed_as_text_and_never_run.md)
+- [a_code_block_after_text_streams_immediately](../../../../functions/src/llm/provider/ollama/a_code_block_after_text_streams_immediately.md)
+- [a_reply_cut_off_before_the_done_chunk_is_an_error](../../../../functions/src/llm/provider/ollama/a_reply_cut_off_before_the_done_chunk_is_an_error.md)
 
 # Imports
 
@@ -115,6 +158,8 @@ relationships:
 }`
 - `futures::StreamExt as _`
 - `super::*`
+- `crate::llm::provider::test_support::held_response_server`
+- `std::time::Duration`
 
 # Member of
 

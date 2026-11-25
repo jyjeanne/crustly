@@ -1,17 +1,39 @@
 ---
 type: Rust Method
 title: update_message_metrics
-resource: src/services/message.rs#L118-L142
+resource: src/services/message.rs#L133-L157
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/message/MessageService/get_message_required
+  - target: functions/src/services/message/MessageService/get_message_required
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/db/repository/message/MessageRepository/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/services/ServiceContext/pool
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/db/repository/message/MessageRepository/update
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   called_by:
-  - functions/src/llm/agent/service/AgentService/send_message
-  - functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
-  - functions/src/services/message/test_update_message_metrics_with_perf_data
-  - functions/src/services/message/test_update_message_metrics_without_perf_data
+  - target: functions/src/llm/agent/service/AgentService/send_message
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/agent/service/AgentService/send_message_with_tools_inner
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/test_update_message_metrics_with_perf_data
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/message/test_update_message_metrics_without_perf_data
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,6 +43,10 @@ relationships:
 # Calls
 
 - [get_message_required](../../../../../functions/src/services/message/MessageService/get_message_required.md)
+- [context](../../../../../functions/src/services/ServiceManager/context.md)
+- [new](../../../../../functions/src/db/repository/message/MessageRepository/new.md)
+- [pool](../../../../../functions/src/services/ServiceContext/pool.md)
+- [update](../../../../../functions/src/db/repository/message/MessageRepository/update.md)
 
 # Called by
 

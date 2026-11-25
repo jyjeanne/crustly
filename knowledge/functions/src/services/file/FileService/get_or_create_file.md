@@ -3,12 +3,19 @@ type: Rust Method
 title: get_or_create_file
 resource: src/services/file.rs#L143-L156
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/services/file/FileService/find_file_by_path
+  - target: functions/src/services/file/FileService/find_file_by_path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/file/FileService/track_file
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
   called_by:
-  - functions/src/services/file/test_get_or_create_file
+  - target: functions/src/services/file/test_get_or_create_file
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,6 +25,7 @@ relationships:
 # Calls
 
 - [find_file_by_path](../../../../../functions/src/services/file/FileService/find_file_by_path.md)
+- [track_file](../../../../../functions/src/services/file/FileService/track_file.md)
 
 # Called by
 

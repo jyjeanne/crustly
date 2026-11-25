@@ -3,17 +3,31 @@ type: Rust Method
 title: fetch_providers
 resource: src/config/crabrace.rs#L71-L76
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
+  calls:
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/config/crabrace/CrabraceIntegration/get_provider
-  - functions/src/config/crabrace/CrabraceIntegration/get_all_model_ids
-  - functions/src/config/update/ProviderUpdater/update
+  - target: functions/src/config/crabrace/CrabraceIntegration/get_provider
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/crabrace/CrabraceIntegration/get_all_model_ids
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/update/ProviderUpdater/update
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
 
 `pub async fn fetch_providers(&self) -> Result<Vec<Provider>>`
+
+# Calls
+
+- [context](../../../../../functions/src/services/ServiceManager/context.md)
 
 # Called by
 

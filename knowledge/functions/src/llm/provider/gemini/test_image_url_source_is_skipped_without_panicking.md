@@ -1,13 +1,23 @@
 ---
 type: Rust Function
 title: test_image_url_source_is_skipped_without_panicking
-resource: src/llm/provider/gemini.rs#L1132-L1145
+resource: src/llm/provider/gemini.rs#L1166-L1179
+tags:
+- test
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request
+  - target: functions/src/llm/provider/gemini/GeminiProvider/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/types/LLMRequest/new
+    resolved_by: tree-sitter-receiver
+    confidence: semantic
+  - target: functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -16,4 +26,6 @@ relationships:
 
 # Calls
 
+- [new](../../../../../functions/src/llm/provider/gemini/GeminiProvider/new.md)
+- [new](../../../../../functions/src/llm/provider/types/LLMRequest/new.md)
 - [to_gemini_request](../../../../../functions/src/llm/provider/gemini/GeminiProvider/to_gemini_request.md)

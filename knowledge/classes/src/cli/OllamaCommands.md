@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: OllamaCommands
-resource: src/cli/mod.rs#L241-L267
+resource: src/cli/mod.rs#L370-L396
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

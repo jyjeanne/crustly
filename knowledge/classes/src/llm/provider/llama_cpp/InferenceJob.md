@@ -1,10 +1,10 @@
 ---
 type: Rust Enum
 title: InferenceJob
-resource: src/llm/provider/llama_cpp.rs#L83-L98
+resource: src/llm/provider/llama_cpp.rs#L82-L97
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

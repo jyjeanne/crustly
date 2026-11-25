@@ -1,9 +1,9 @@
 ---
 type: Rust Enum
 title: OutputFormat
-resource: src/cli/mod.rs#L346-L350
+resource: src/cli/mod.rs#L823-L827
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 ---
 
 # Signature

@@ -1,27 +1,57 @@
 ---
 type: Rust Module
 title: registry
-resource: src/llm/tools/registry.rs#L1-L626
+resource: src/llm/tools/registry.rs#L1-L692
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/super-error-result-toolerror
-  - external/super-r-trait-tool-toolexecutioncontext-toolresult
-  - external/serde-json-value
-  - external/std-collections-hashmap
-  - external/std-sync-arc
-  - external/crate-llm-tools-sandbox-policydecision
-  - external/crate-mcp-client-mcpclient-mcptool
-  - external/tokio-sync-mutex
-  - external/super
-  - external/crate-llm-tools-r-trait-toolcapability
-  - external/async-trait-async-trait
-  - external/uuid-uuid
-  - external/crate-llm-tools-sandbox-denytoolrule
-  - external/crate-llm-tools-sandbox-allowtoolrule
+  - target: external/super-error-result-toolerror
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super-r-trait-tool-toolexecutioncontext-toolresult
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-json-value
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-collections-hashmap
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-sync-arc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-tools-sandbox-policydecision
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-mcp-client-mcpclient-mcptool
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/tokio-sync-mutex
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/super
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-tools-r-trait-toolcapability
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/async-trait-async-trait
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-tools-sandbox-denytoolrule
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crate-llm-tools-sandbox-allowtoolrule
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains
@@ -31,6 +61,8 @@ relationships:
 - [new](../../../../functions/src/llm/tools/registry/ToolRegistry/new.md)
 - [set_policy](../../../../functions/src/llm/tools/registry/ToolRegistry/set_policy.md)
 - [is_trusted](../../../../functions/src/llm/tools/registry/ToolRegistry/is_trusted.md)
+- [is_denied](../../../../functions/src/llm/tools/registry/ToolRegistry/is_denied.md)
+- [resolve_name](../../../../functions/src/llm/tools/registry/ToolRegistry/resolve_name.md)
 - [register](../../../../functions/src/llm/tools/registry/ToolRegistry/register.md)
 - [canonical_name](../../../../functions/src/llm/tools/registry/ToolRegistry/canonical_name.md)
 - [get](../../../../functions/src/llm/tools/registry/ToolRegistry/get.md)
@@ -62,6 +94,9 @@ relationships:
 - [get_resolves_a_known_alias_to_the_registered_canonical_tool](../../../../functions/src/llm/tools/registry/get_resolves_a_known_alias_to_the_registered_canonical_tool.md)
 - [has_tool_is_false_for_an_alias_whose_target_is_not_registered](../../../../functions/src/llm/tools/registry/has_tool_is_false_for_an_alias_whose_target_is_not_registered.md)
 - [an_exact_match_wins_over_an_alias_entry](../../../../functions/src/llm/tools/registry/an_exact_match_wins_over_an_alias_entry.md)
+- [resolve_name_maps_aliases_and_keeps_unknown_names](../../../../functions/src/llm/tools/registry/resolve_name_maps_aliases_and_keeps_unknown_names.md)
+- [is_denied_follows_the_policy_through_aliases](../../../../functions/src/llm/tools/registry/is_denied_follows_the_policy_through_aliases.md)
+- [is_denied_is_false_without_a_policy](../../../../functions/src/llm/tools/registry/is_denied_is_false_without_a_policy.md)
 - [execute_resolves_an_alias_name_to_the_registered_tool](../../../../functions/src/llm/tools/registry/execute_resolves_an_alias_name_to_the_registered_tool.md)
 - [execute_reports_not_found_using_the_original_unresolved_name](../../../../functions/src/llm/tools/registry/execute_reports_not_found_using_the_original_unresolved_name.md)
 - [execute_evaluates_policy_against_the_canonical_name_not_the_alias](../../../../functions/src/llm/tools/registry/execute_evaluates_policy_against_the_canonical_name_not_the_alias.md)

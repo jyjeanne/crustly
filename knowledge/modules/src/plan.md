@@ -1,17 +1,27 @@
 ---
 type: Rust Module
 title: plan
-resource: src/plan/mod.rs#L1-L960
+resource: src/plan/mod.rs#L1-L966
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/chrono-datetime-utc
-  - external/serde-deserialize-serialize
-  - external/uuid-uuid
-  - external/std-collections-hashmap-vecdeque
+  - target: external/chrono-datetime-utc
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/serde-deserialize-serialize
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/std-collections-hashmap-vecdeque
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

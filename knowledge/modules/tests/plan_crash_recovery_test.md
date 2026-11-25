@@ -3,15 +3,25 @@ type: Rust Module
 title: plan_crash_recovery_test
 resource: tests/plan_crash_recovery_test.rs#L1-L236
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   imports:
-  - external/crustly-db-models-interrupted-plan-from-tasks-plantaskstatus
-  - external/crustly-db-repository-plantaskrepository
-  - external/crustly-db-database
-  - external/uuid-uuid
+  - target: external/crustly-db-models-interrupted-plan-from-tasks-plantaskstatus
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-db-repository-plantaskrepository
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/crustly-db-database
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: external/uuid-uuid
+    resolved_by: tree-sitter
+    confidence: exact
   member_of:
-  - packages/crustly
+  - target: packages/crustly
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Contains

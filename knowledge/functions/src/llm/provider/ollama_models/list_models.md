@@ -3,15 +3,25 @@ type: Rust Function
 title: list_models
 resource: src/llm/provider/ollama_models.rs#L68-L83
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/llm/provider/ollama_models/client_for
-  - functions/src/llm/provider/llama_cpp_models/list_local_models
+  - target: functions/src/llm/provider/ollama_models/client_for
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/cmd_ollama
-  - functions/src/llm/provider/ollama_models/list_models_parses_tags_response
-  - functions/src/tui/ollama_download/fetch_installed_models
+  - target: functions/src/cli/cmd_ollama
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/provider/ollama_models/list_models_parses_tags_response
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/tui/ollama_download/fetch_installed_models
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,7 +31,7 @@ relationships:
 # Calls
 
 - [client_for](../../../../../functions/src/llm/provider/ollama_models/client_for.md)
-- [list_local_models](../../../../../functions/src/llm/provider/llama_cpp_models/list_local_models.md)
+- [context](../../../../../functions/src/services/ServiceManager/context.md)
 
 # Called by
 

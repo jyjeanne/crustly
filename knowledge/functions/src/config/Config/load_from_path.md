@@ -1,15 +1,21 @@
 ---
 type: Rust Method
 title: load_from_path
-resource: src/config/mod.rs#L815-L834
+resource: src/config/mod.rs#L1378-L1392
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/Config/merge_from_file
-  - functions/src/config/Config/apply_env_overrides
+  - target: functions/src/config/Config/from_layers
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/config/Config/apply_env_overrides
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/load_config
+  - target: functions/src/cli/load_config
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -18,7 +24,7 @@ relationships:
 
 # Calls
 
-- [merge_from_file](../../../../functions/src/config/Config/merge_from_file.md)
+- [from_layers](../../../../functions/src/config/Config/from_layers.md)
 - [apply_env_overrides](../../../../functions/src/config/Config/apply_env_overrides.md)
 
 # Called by

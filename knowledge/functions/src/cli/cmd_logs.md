@@ -1,18 +1,31 @@
 ---
 type: Rust Function
 title: cmd_logs
-resource: src/cli/mod.rs#L1394-L1556
+resource: src/cli/mod.rs#L2938-L3100
 visibility: private
 generated:
-  by: okf-rs/0.3.0
+  by: okf-rs/0.7.0
 relationships:
   calls:
-  - functions/src/config/secrets/SecretString/len
-  - functions/src/logging/get_log_path
-  - functions/src/config/secrets/SecretString/is_empty
-  - functions/src/logging/cleanup_old_logs
+  - target: functions/src/logging/get_log_path
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/tests/memory_acceptance_test/open
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/logging/cleanup_old_logs
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/services/ServiceManager/context
+    resolved_by: tree-sitter
+    confidence: exact
+  - target: functions/src/llm/tools/skill/SkillSource/display
+    resolved_by: tree-sitter
+    confidence: exact
   called_by:
-  - functions/src/cli/run
+  - target: functions/src/cli/run
+    resolved_by: tree-sitter
+    confidence: exact
 ---
 
 # Signature
@@ -21,10 +34,11 @@ relationships:
 
 # Calls
 
-- [len](../../../functions/src/config/secrets/SecretString/len.md)
 - [get_log_path](../../../functions/src/logging/get_log_path.md)
-- [is_empty](../../../functions/src/config/secrets/SecretString/is_empty.md)
+- [open](../../../functions/tests/memory_acceptance_test/open.md)
 - [cleanup_old_logs](../../../functions/src/logging/cleanup_old_logs.md)
+- [context](../../../functions/src/services/ServiceManager/context.md)
+- [display](../../../functions/src/llm/tools/skill/SkillSource/display.md)
 
 # Called by
 
