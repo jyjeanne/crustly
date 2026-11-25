@@ -208,7 +208,7 @@ pub fn short_id(memory: &Memory) -> String {
 
 /// Remove the block delimiters from memory text, so a memory cannot close
 /// the block early and turn its content into prompt structure.
-fn clean(text: &str) -> String {
+pub(crate) fn clean(text: &str) -> String {
     text.replace("<recalled_memories>", "")
         .replace("</recalled_memories>", "")
 }

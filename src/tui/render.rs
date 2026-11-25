@@ -875,7 +875,6 @@ fn render_skills(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(widget, area);
 }
 
-/// Render the `/mcp` list view.
 /// The `/memories` screen: a filtered list, the selected memory's details
 /// and history, and the status line.
 fn render_memory(f: &mut Frame, app: &App, area: Rect) {
@@ -883,6 +882,32 @@ fn render_memory(f: &mut Frame, app: &App, area: Rect) {
     use crate::memory::model::{MemoryScope, MemoryStatus};
 
     let view = &app.memory_view;
+    let visible = visible_memories(view);
+
+    // The list shows a window of rows that follows the selection, one line
+    // per memory; what is left of the screen goes to the header, the
+    // details and the note.
+    let inner_height = area.height.saturating_sub(2) as usize;
+    let inner_width = area.width.saturating_sub(2) as usize;
+    let mut reserved = 3;
+    if view.detail {
+        let content_lines = visible
+            .get(view.selected)
+            .map(|m| m.content.chars().count() / inner_width.max(1) + 1)
+            .unwrap_or(0);
+        reserved += 2 + content_lines + view.history.len();
+    }
+    if !view.note.is_empty() {
+        reserved += 2;
+    }
+    let room = inner_height.saturating_sub(reserved).max(1);
+    let start = if view.selected < room {
+        0
+    } else {
+        view.selected + 1 - room
+    };
+    let end = (start + room).min(visible.len());
+
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::from(Span::styled(
         "Memories (↑/↓ move · Enter details · f scope · c category · / search · a approve · r reject · d forget · Esc close)",
@@ -897,23 +922,30 @@ fn render_memory(f: &mut Frame, app: &App, area: Rect) {
     } else {
         format!("search: \"{}\"", view.query)
     };
+    let position = if visible.len() > room {
+        format!(" · {}-{} of {}", start + 1, end, visible.len())
+    } else {
+        String::new()
+    };
     lines.push(Line::from(Span::styled(
         format!(
-            "scope: {scope} · category: {category} · {search} · {}",
+            "scope: {scope} · category: {category} · {search} · {}{position}",
             view.embedding
         ),
         Style::default().fg(Color::DarkGray),
     )));
     lines.push(Line::from(""));
 
-    let visible = visible_memories(view);
     if visible.is_empty() {
         lines.push(Line::from(Span::styled(
             "No memories match. Use /remember <text> to add one.",
             Style::default().fg(Color::DarkGray),
         )));
     }
-    for (idx, memory) in visible.iter().enumerate() {
+    // Id, scope, category and status take this many columns before the text.
+    const ROW_PREFIX: usize = 2 + 8 + 1 + 7 + 1 + 10 + 1 + 8 + 1;
+    let text_width = inner_width.saturating_sub(ROW_PREFIX).max(10);
+    for (idx, memory) in visible.iter().enumerate().take(end).skip(start) {
         let selected = idx == view.selected;
         let prefix = if selected { "> " } else { "  " };
         let scope_name = match memory.scope {
@@ -937,7 +969,7 @@ fn render_memory(f: &mut Frame, app: &App, area: Rect) {
                 scope_name,
                 memory.category.as_str(),
                 status,
-                memory.content
+                one_line(&memory.content, text_width)
             ),
             style,
         )));
@@ -958,6 +990,7 @@ fn render_memory(f: &mut Frame, app: &App, area: Rect) {
                 ),
                 Style::default().fg(Color::DarkGray),
             )));
+            lines.push(Line::from(memory.content.clone()));
             for (event, actor, at) in &view.history {
                 lines.push(Line::from(Span::styled(
                     format!("  {at}  {event} by {actor}"),
@@ -996,6 +1029,19 @@ fn render_memory(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(widget, area);
 }
 
+/// `text` on one line of at most `width` characters, cut with "…".
+fn one_line(text: &str, width: usize) -> String {
+    let flat = text.replace(['\n', '\r'], " ");
+    if flat.chars().count() <= width {
+        flat
+    } else {
+        let mut cut: String = flat.chars().take(width.saturating_sub(1)).collect();
+        cut.push('…');
+        cut
+    }
+}
+
+/// Render the `/mcp` list view.
 fn render_mcp(f: &mut Frame, app: &App, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
 
@@ -4085,5 +4131,43 @@ mod tests {
         assert!(screen.contains("scope: all"), "{screen}");
         assert!(screen.contains("Prefers short answers"), "{screen}");
         assert!(screen.contains("keyword recall only"), "{screen}");
+    }
+
+    /// A list longer than the screen scrolls with the selection.
+    #[tokio::test]
+    async fn the_memories_screen_scrolls_to_the_selection() {
+        use crate::memory::model::{
+            Memory, MemoryCategory, MemoryScope, MemorySource, MemoryStatus,
+        };
+        let mut app = test_app().await;
+        app.mode = AppMode::Memory;
+        app.memory_view.rows = (0..40)
+            .map(|i| Memory {
+                id: uuid::Uuid::new_v4(),
+                scope: MemoryScope::Global,
+                category: MemoryCategory::Fact,
+                content: format!("Rule {i:02} {}", "with a long tail of words ".repeat(10)),
+                source: MemorySource::User,
+                importance: 3,
+                status: MemoryStatus::Active,
+                superseded_by: None,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                last_recalled_at: None,
+                recall_count: 0,
+                expires_at: None,
+            })
+            .collect();
+        app.memory_view.selected = 39;
+        let screen = render_to_string(&app, 120, 24);
+        assert!(
+            screen.contains("Rule 39"),
+            "the selection is on screen: {screen}"
+        );
+        assert!(
+            !screen.contains("Rule 00"),
+            "the top scrolled away: {screen}"
+        );
+        assert!(screen.contains("of 40"), "the position is shown: {screen}");
     }
 }

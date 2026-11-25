@@ -60,14 +60,24 @@ fn find_root(start: &Path) -> Option<(PathBuf, Option<PathBuf>)> {
             let linked = dir.join(linked);
             // Only a worktree belongs to its main repository. A submodule's
             // ".git" file points into <super>/.git/modules/, and a submodule
-            // is its own project.
-            let is_worktree = linked.components().any(|c| c.as_os_str() == "worktrees");
-            if !is_worktree {
+            // is its own project. Git writes a `commondir` file in a
+            // worktree's git directory, naming the main one; without it, the
+            // git directory must sit directly in a `worktrees` directory (a
+            // `worktrees` directory higher up the path proves nothing).
+            let main_git = if let Ok(common) = fs::read_to_string(linked.join("commondir")) {
+                linked.join(common.trim())
+            } else if linked
+                .parent()
+                .and_then(Path::file_name)
+                .is_some_and(|name| name == "worktrees")
+            {
+                // <main>/.git/worktrees/<name> -> <main>/.git
+                linked.parent()?.parent()?.to_path_buf()
+            } else {
                 return Some((dir.to_path_buf(), None));
-            }
-            // <main>/.git/worktrees/<name> -> <main>/.git -> <main>
-            let main_git = linked.parent()?.parent()?.to_path_buf();
-            let main_root = fs::canonicalize(main_git.parent()?).ok()?;
+            };
+            let main_git = fs::canonicalize(&main_git).ok()?;
+            let main_root = main_git.parent()?.to_path_buf();
             return Some((main_root, Some(main_git)));
         }
     }
@@ -162,6 +172,43 @@ mod tests {
         let from_worktree = identify(worktree.path());
         assert_eq!(from_worktree.id, from_main.id);
         assert_eq!(from_worktree.root, from_main.root);
+    }
+
+    /// Git names the main git directory in the worktree's `commondir` file,
+    /// which is followed wherever the worktree's git directory is.
+    #[test]
+    fn a_worktree_is_found_through_its_commondir_file() {
+        let main = tempfile::tempdir().unwrap();
+        let main_git = main.path().join(".git");
+        write(&main_git.join("config"), "[core]\n\tbare = false\n");
+        let worktree_git = main_git.join("worktrees").join("feature");
+        write(&worktree_git.join("commondir"), "../..\n");
+
+        let worktree = tempfile::tempdir().unwrap();
+        write(
+            &worktree.path().join(".git"),
+            &format!("gitdir: {}\n", worktree_git.display()),
+        );
+        assert_eq!(identify(worktree.path()).id, identify(main.path()).id);
+    }
+
+    /// A submodule is its own project, even when a directory higher up its
+    /// path happens to be called `worktrees`.
+    #[test]
+    fn a_submodule_under_a_worktrees_directory_is_its_own_project() {
+        let base = tempfile::tempdir().unwrap();
+        let superproject = base.path().join("worktrees").join("super");
+        let module_git = superproject.join(".git").join("modules").join("lib");
+        write(&module_git.join("config"), "[core]\n\tbare = false\n");
+        let submodule = superproject.join("lib");
+        write(
+            &submodule.join(".git"),
+            &format!("gitdir: {}\n", module_git.display()),
+        );
+
+        let from_submodule = identify(&submodule);
+        assert_eq!(from_submodule.root, fs::canonicalize(&submodule).unwrap());
+        assert_ne!(from_submodule.id, identify(&superproject).id);
     }
 
     #[test]

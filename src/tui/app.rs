@@ -1853,10 +1853,6 @@ impl App {
         self.push_memory_note(lines.join("\n"));
     }
 
-    /// Open the `/mcp` list view. Shows the status snapshot taken once at
-    /// startup (`App::mcp_status`, set via `set_mcp_status`) rather than
-    /// reconnecting live - see the "Open Decisions" note in
-    /// ergonomy-improvment.md about deferring live reconnect-on-open.
     /// Open `/memories`: load this project's memories and the global ones.
     pub async fn open_memory_view(&mut self) {
         self.memory_view = MemoryView::default();
@@ -2061,6 +2057,10 @@ impl App {
         self.reload_memory_rows().await;
     }
 
+    /// Open the `/mcp` list view. Shows the status snapshot taken once at
+    /// startup (`App::mcp_status`, set via `set_mcp_status`) rather than
+    /// reconnecting live - see the "Open Decisions" note in
+    /// ergonomy-improvment.md about deferring live reconnect-on-open.
     async fn open_mcp(&mut self) -> Result<()> {
         self.mcp_selected = 0;
         self.switch_mode(AppMode::Mcp).await

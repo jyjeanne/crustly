@@ -466,7 +466,7 @@ impl MemoryStore {
             .collect();
         let mut path_hits: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
         if !mentioned.is_empty() {
-            for (id, glob) in self.repo.path_globs_for(&project_id).await? {
+            for (id, glob) in self.repo.path_globs_for(&project_id, now).await? {
                 if mentioned
                     .iter()
                     .any(|m| paths::matches(std::slice::from_ref(&glob), m))
@@ -783,7 +783,7 @@ impl MemoryStore {
         };
         let mut hits: Vec<Uuid> = self
             .repo
-            .path_globs_for(&project.id)
+            .path_globs_for(&project.id, Utc::now())
             .await?
             .into_iter()
             .filter(|(_, glob)| paths::matches(std::slice::from_ref(glob), &relative))

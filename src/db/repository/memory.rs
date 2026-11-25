@@ -140,7 +140,6 @@ impl MemoryRepository {
         row.as_ref().map(row_to_memory).transpose()
     }
 
-    /// Set `updated_at` to show the memory was seen again.
     /// Archive a memory: kept for history, never recalled, and the event
     /// records who archived it.
     pub async fn archive(&self, id: Uuid, actor: &str, now: DateTime<Utc>) -> Result<()> {
@@ -314,13 +313,20 @@ impl MemoryRepository {
         rows.iter().map(|r| Ok(r.try_get("glob")?)).collect()
     }
 
-    /// Every (memory, glob) pair of the active memories `project_id` may use.
-    pub async fn path_globs_for(&self, project_id: &ProjectId) -> Result<Vec<(Uuid, String)>> {
+    /// Every (memory, glob) pair of the active, unexpired memories `project_id`
+    /// may use.
+    pub async fn path_globs_for(
+        &self,
+        project_id: &ProjectId,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<(Uuid, String)>> {
         let rows = sqlx::query(
             "SELECT mp.memory_id, mp.glob FROM memory_paths mp \
              JOIN memories m ON m.id = mp.memory_id \
-             WHERE m.status = 'active' AND (m.scope = 'global' OR m.project_id = ?)",
+             WHERE m.status = 'active' AND (m.expires_at IS NULL OR m.expires_at > ?) \
+             AND (m.scope = 'global' OR m.project_id = ?)",
         )
+        .bind(now.timestamp())
         .bind(project_id)
         .fetch_all(&self.pool)
         .await?;
@@ -362,6 +368,7 @@ impl MemoryRepository {
         Ok(())
     }
 
+    /// Set `updated_at` to show the memory was seen again.
     pub async fn touch(&self, id: Uuid, now: DateTime<Utc>) -> Result<()> {
         sqlx::query("UPDATE memories SET updated_at = ? WHERE id = ?")
             .bind(now.timestamp())
