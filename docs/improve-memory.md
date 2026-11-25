@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Status | Phases 0 to 4 built on `feat/memory-v2-finish`, with fake-model tests. Phase 5: the upgrade test, docs, minor review fixes and the TUI notice test are done; the TUI memory screen (P5.1) and the reranker experiment (P5.4) are not. Phase 6 deferred (§21). Real-model runs (embedding benchmark, extraction with a local model) are pending. |
+| Status | Phases 0 to 4 built on `feat/memory-v2-finish`, with fake-model tests. Phase 5: the upgrade test, docs, minor review fixes, the TUI notice test and the TUI memory screen (P5.1: `/memories` browses, filters, searches, approves, rejects and forgets; editing stays with `crustly memory edit`) are done; the reranker experiment (P5.4) is not. Phase 6 deferred (§21). Real-model runs (embedding benchmark, extraction with a local model) are pending. |
 | Revised | 2026-11-21, with ideas from `docs/harness-memory-study.md` (what was adopted and why: Appendix C), and an optional integration with [okf-rs](https://github.com/jyjeanne/okf-rs) for code knowledge (§23) |
 | Date | 2026-11-21 |
 | Target | Next minor release after 0.5.x (new migrations, new config keys) |
@@ -65,7 +65,7 @@ Non-goals for v2:
 - Loading SQLite extensions (sqlite-vec and similar).
 - A knowledge graph of memories, a separate store per memory type, or a reranking model by default (Appendix C explains why). The graph of the code comes from okf-rs instead (§23).
 - Building or maintaining a code index inside Crustly (D13).
-- A full memory screen in the TUI for the first release. The CLI and three slash commands are enough.
+- A full memory editor in the TUI for the first release. The CLI and the slash commands cover editing; Phase 5 adds a `/memories` screen to browse, filter, approve and forget.
 
 ## 4. Requirements
 

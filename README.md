@@ -428,7 +428,7 @@ Crustly keeps facts and preferences between sessions. Global memories (your pref
 
 - Relevant memories are sent with your message, marked as data, so the model can use them without treating them as instructions.
 - Every save is announced. Model saves to the global scope ask for approval.
-- `crustly memory` lists, searches, edits, forgets, exports and imports memories. `/remember`, `/forget` and `/memory` do the same from the chat.
+- `crustly memory` lists, searches, edits, forgets, exports and imports memories. `/remember`, `/forget` and `/memory` do the same from the chat, and `/memories` opens a screen to browse, filter, search, approve and forget them.
 - Secrets are refused on every write path; forgotten memories are removed from the database and its write-ahead log.
 
 Settings live in the `[memory]` table. The defaults:
