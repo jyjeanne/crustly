@@ -6,7 +6,7 @@
 //! tools needed to read, search, edit and run code, plus any configured
 //! `extra` tools and MCP tools (which the user configured explicitly).
 
-use crate::config::ToolProfile;
+use crate::config::{McpExpose, ToolProfile};
 
 /// Tools every profile exposes.
 pub const CORE_TOOLS: &[&str] = &[
@@ -29,6 +29,9 @@ pub struct ToolSelection {
     extra: Vec<String>,
     /// When set, exactly these tools and nothing else (a sub-agent profile).
     only: Option<Vec<String>>,
+    /// MCP servers whose tools are not offered with every profile:
+    /// (server name, setting). A server not listed is `Always`.
+    mcp_exposure: Vec<(String, McpExpose)>,
 }
 
 impl ToolSelection {
@@ -38,6 +41,7 @@ impl ToolSelection {
             core_only: false,
             extra: Vec::new(),
             only: None,
+            mcp_exposure: Vec::new(),
         }
     }
 
@@ -48,6 +52,34 @@ impl ToolSelection {
             core_only: true,
             extra: Vec::new(),
             only: Some(names.to_vec()),
+            mcp_exposure: Vec::new(),
+        }
+    }
+
+    /// The same selection, with each MCP server's `expose` setting
+    /// (`[[mcp.servers]] expose`).
+    pub fn with_mcp_exposure(mut self, exposure: &[(String, McpExpose)]) -> Self {
+        self.mcp_exposure = exposure.to_vec();
+        self
+    }
+
+    /// Whether an MCP tool (`mcp__<server>__<tool>`) is offered, by its
+    /// server's setting.
+    fn exposes_mcp(&self, name: &str) -> bool {
+        let setting = self
+            .mcp_exposure
+            .iter()
+            .find(|(server, _)| {
+                name.strip_prefix("mcp__")
+                    .and_then(|rest| rest.strip_prefix(server.as_str()))
+                    .is_some_and(|rest| rest.starts_with("__"))
+            })
+            .map(|(_, setting)| *setting)
+            .unwrap_or_default();
+        match setting {
+            McpExpose::Always => true,
+            McpExpose::FullProfile => !self.core_only,
+            McpExpose::Never => false,
         }
     }
 
@@ -66,6 +98,7 @@ impl ToolSelection {
                 Vec::new()
             },
             only: None,
+            mcp_exposure: Vec::new(),
         }
     }
 
@@ -80,10 +113,10 @@ impl ToolSelection {
         if let Some(only) = &self.only {
             return only.iter().any(|n| n == name);
         }
-        !self.core_only
-            || CORE_TOOLS.contains(&name)
-            || name.starts_with("mcp__")
-            || self.extra.iter().any(|e| e == name)
+        if name.starts_with("mcp__") {
+            return self.exposes_mcp(name);
+        }
+        !self.core_only || CORE_TOOLS.contains(&name) || self.extra.iter().any(|e| e == name)
     }
 
     /// `"core"` or `"full"`, for messages to the model and the user.
@@ -143,6 +176,36 @@ mod tests {
         );
         assert!(!s.exposes("mcp__github__list_issues"), "MCP tools too");
         assert!(s.is_core_only(), "uses the short system prompt");
+    }
+
+    /// A server set to `full_profile` is hidden on a small window, and shown
+    /// on a large one; `never` is always hidden; others stay `always`.
+    #[test]
+    fn mcp_exposure_follows_each_servers_setting() {
+        let exposure = vec![
+            ("okf".to_string(), McpExpose::FullProfile),
+            ("noisy".to_string(), McpExpose::Never),
+        ];
+        let small =
+            ToolSelection::resolve(ToolProfile::Auto, &[], 8192).with_mcp_exposure(&exposure);
+        assert!(
+            !small.exposes("mcp__okf__explore"),
+            "hidden on an 8k window"
+        );
+        assert!(!small.exposes("mcp__noisy__ping"));
+        assert!(
+            small.exposes("mcp__github__list_issues"),
+            "unlisted: always"
+        );
+        assert!(
+            small.exposes("mcp__okfx__search"),
+            "a server whose name only starts like another is its own"
+        );
+
+        let large =
+            ToolSelection::resolve(ToolProfile::Auto, &[], 128_000).with_mcp_exposure(&exposure);
+        assert!(large.exposes("mcp__okf__explore"));
+        assert!(!large.exposes("mcp__noisy__ping"));
     }
 
     #[test]

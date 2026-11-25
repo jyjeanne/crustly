@@ -258,6 +258,10 @@ pub struct AgentService {
     /// Tools exposed on top of the core set when the core profile applies.
     extra_tools: Vec<String>,
 
+    /// Each MCP server's `expose` setting, for servers not offered with
+    /// every profile.
+    mcp_exposure: Vec<(String, crate::config::McpExpose)>,
+
     /// Shorter system prompt used while only the core tools are exposed, so
     /// the prompt does not describe tools the model cannot call.
     core_system_prompt: Option<String>,
@@ -575,6 +579,7 @@ impl AgentService {
             allow_sub_agents: true,
             tool_profile: ToolProfile::Full,
             extra_tools: Vec::new(),
+            mcp_exposure: Vec::new(),
             core_system_prompt: None,
             token_calibration: std::sync::Mutex::new(1.0),
             max_wall_time: None,
@@ -700,6 +705,13 @@ impl AgentService {
     pub fn with_tool_profile(mut self, profile: ToolProfile, extra: Vec<String>) -> Self {
         self.tool_profile = profile;
         self.extra_tools = extra;
+        self
+    }
+
+    /// Set when each MCP server's tools are offered (`[[mcp.servers]]
+    /// expose`), as (server name, setting).
+    pub fn with_mcp_exposure(mut self, exposure: Vec<(String, crate::config::McpExpose)>) -> Self {
+        self.mcp_exposure = exposure;
         self
     }
 
@@ -849,7 +861,8 @@ impl AgentService {
     fn tool_selection(&self, context_window: u32) -> ToolSelection {
         match &self.tool_allowlist {
             Some(tools) => ToolSelection::only(tools),
-            None => ToolSelection::resolve(self.tool_profile, &self.extra_tools, context_window),
+            None => ToolSelection::resolve(self.tool_profile, &self.extra_tools, context_window)
+                .with_mcp_exposure(&self.mcp_exposure),
         }
     }
 
@@ -1266,6 +1279,7 @@ impl AgentService {
             core_system_prompt: self.core_system_prompt.clone(),
             tool_profile: self.tool_profile,
             extra_tools: self.extra_tools.clone(),
+            mcp_exposure: self.mcp_exposure.clone(),
             approval_callback: self.approval_callback.clone(),
             auto_approve_tools: self.auto_approve_tools,
             verification: self.verification,

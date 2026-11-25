@@ -560,6 +560,25 @@ pub struct McpServerConfig {
     pub command: String,
     #[serde(default)]
     pub args: Vec<String>,
+    /// When this server's tools are offered to the model. Every tool schema
+    /// is sent with every request, so a server with several tools can cost
+    /// a small window more than it is worth.
+    #[serde(default)]
+    pub expose: McpExpose,
+}
+
+/// When an MCP server's tools are offered to the model (`expose`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum McpExpose {
+    /// With every tool profile, core included (the default).
+    #[default]
+    Always,
+    /// Only with the full tool profile (windows of 32k tokens or more
+    /// under `profile = "auto"`).
+    FullProfile,
+    /// Never: the server is connected but its tools are not offered.
+    Never,
 }
 
 /// Tool result cache configuration (`[tool_cache]` section).
@@ -1947,6 +1966,31 @@ mod tests {
     fn test_config_validation() {
         let config = Config::default();
         assert!(config.validate().is_ok());
+    }
+
+    /// `expose` limits when a server's tools are offered; without it, they
+    /// always are, as before.
+    #[test]
+    fn an_mcp_server_can_limit_when_its_tools_are_offered() {
+        let config: Config = toml::from_str(
+            r#"
+[[mcp.servers]]
+name = "okf"
+command = "okf-mcp"
+expose = "full_profile"
+
+[[mcp.servers]]
+name = "github"
+command = "github-mcp"
+"#,
+        )
+        .unwrap();
+        assert_eq!(config.mcp.servers[0].expose, McpExpose::FullProfile);
+        assert_eq!(config.mcp.servers[1].expose, McpExpose::Always);
+        assert!(toml::from_str::<Config>(
+            "[[mcp.servers]]\nname = \"x\"\ncommand = \"x\"\nexpose = \"sometimes\"\n"
+        )
+        .is_err());
     }
 
     #[test]
