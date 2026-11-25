@@ -222,6 +222,17 @@ fn build_memory_store(
         let model = provider.default_model().to_string();
         store = store.with_extraction(provider.clone(), model);
     }
+    // Code knowledge (§23): for the project Crustly runs in. A chat or a run
+    // starts okf-mcp in the background; one-shot commands start it when they
+    // need it.
+    let root = crate::memory::project::identify(&std::env::current_dir().unwrap_or_default()).root;
+    store = store.with_code_knowledge(crate::memory::code_knowledge::CodeKnowledge::detect(
+        &config.memory.code_knowledge,
+        &root,
+    ));
+    if background {
+        store.start_code_knowledge_in_background();
+    }
     match crate::memory::embedder_from_config(&config.memory.embeddings) {
         Ok(Some((embedder, runtime))) => store.attach_embedder(embedder, runtime, background),
         Ok(None) => store,
@@ -246,6 +257,14 @@ fn configure_agent_loop(
                 .servers
                 .iter()
                 .map(|server| (server.name.clone(), server.expose))
+                // okf-mcp's own tools (`expose_tools`), with the full
+                // profile only: their schemas cost about 1,300 tokens.
+                .chain(okf_tools_exposed(config).then(|| {
+                    (
+                        OKF_SERVER_NAME.to_string(),
+                        crate::config::McpExpose::FullProfile,
+                    )
+                }))
                 .collect(),
         )
         .with_max_tool_iterations(config.agent.max_tool_rounds)
@@ -721,6 +740,23 @@ pub enum MemoryCommands {
         /// A file or folder (glob, relative to the project) this fact is about; repeat for more
         #[arg(long = "path")]
         paths: Vec<String>,
+        /// An okf-rs concept id this fact is about (code knowledge); repeat for more, up to 3.
+        /// Without it, names in the text are anchored automatically.
+        #[arg(long = "anchor")]
+        anchors: Vec<String>,
+    },
+    /// Show or change the code concepts a project memory is anchored to (okf-rs)
+    Anchors {
+        id: String,
+        /// Replace the anchors with these concept ids (up to 3)
+        #[arg(long = "set", conflicts_with_all = ["clear", "auto"])]
+        set: Vec<String>,
+        /// Remove every anchor
+        #[arg(long, conflicts_with = "auto")]
+        clear: bool,
+        /// Anchor again from the names in the text
+        #[arg(long)]
+        auto: bool,
     },
     /// Change the text of a memory
     Edit { id: String, text: String },
@@ -1179,6 +1215,17 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
     let cwd = std::env::current_dir()?;
     let project = identify(&cwd);
     store.register_project(&project).await?;
+    // The commands that anchor memories or check anchors wait for okf-mcp
+    // (about a second); the others never start it.
+    if matches!(
+        operation,
+        MemoryCommands::Status
+            | MemoryCommands::Add { .. }
+            | MemoryCommands::Anchors { .. }
+            | MemoryCommands::Consolidate { .. }
+    ) {
+        store.start_code_knowledge().await;
+    }
 
     match operation {
         MemoryCommands::Status => {
@@ -1186,6 +1233,21 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
             let embedding = store.embedding_status().await?;
             for line in memory_status_lines(config, &project, &memories, embedding) {
                 println!("{line}");
+            }
+            println!("  Code knowledge:    {}", store.code_knowledge_status());
+            if let Some(code) = store.code_knowledge() {
+                if code.is_ready() && code.bundle_is_older_than_sources(&project.root) {
+                    println!(
+                        "                     the bundle is older than the source: run `okf-rs generate` (or `okf-rs watch`)"
+                    );
+                }
+                let drifted = store.drifted(&project).await?;
+                if !drifted.is_empty() {
+                    println!(
+                        "                     {} memories refer to code that was removed or renamed (crustly memory consolidate)",
+                        drifted.len()
+                    );
+                }
             }
         }
         MemoryCommands::List {
@@ -1251,6 +1313,9 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                 memory.updated_at.format("%Y-%m-%d %H:%M")
             );
             println!("Recalled:    {} times", memory.recall_count);
+            for (concept, _) in store.anchors(memory.id).await? {
+                println!("Anchored to: {concept}");
+            }
             println!("\n{}", memory.content);
             let events = store.events(memory.id).await?;
             if !events.is_empty() {
@@ -1283,6 +1348,7 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
             importance,
             expires,
             paths,
+            anchors,
         } => {
             let scope = if global {
                 MemoryScope::Global
@@ -1320,7 +1386,17 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                             anyhow::bail!("saved, but the paths were refused: {reason}");
                         }
                     }
-                    println!("Saved [m:{}]", &id.simple().to_string()[..8])
+                    if !anchors.is_empty() {
+                        if let Err(reason) = store.set_anchors(id, &anchors).await? {
+                            anyhow::bail!("saved, but the anchors were refused: {reason}");
+                        }
+                    }
+                    println!("Saved [m:{}]", &id.simple().to_string()[..8]);
+                    let anchored = store.anchors(id).await?;
+                    if !anchored.is_empty() {
+                        let names: Vec<&str> = anchored.iter().map(|(c, _)| c.as_str()).collect();
+                        println!("Anchored to {}", names.join(", "));
+                    }
                 }
                 SaveOutcome::Duplicate(id) => {
                     println!("Already remembered [m:{}]", &id.simple().to_string()[..8])
@@ -1516,6 +1592,25 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
                     println!("{}", memory_line(memory));
                 }
             }
+            // Drift (§23.4): listed for review, never changed here.
+            let drifted = store.drifted(&project).await?;
+            if !drifted.is_empty() {
+                println!("The code they refer to was removed or renamed (re-anchor, keep, archive or forget them):");
+                for drift in &drifted {
+                    println!("{}", memory_line(&drift.memory));
+                    let hint = drift
+                        .closest
+                        .as_ref()
+                        .map(|c| {
+                            format!(
+                                "; closest now: {c} (crustly memory anchors {} --set {c})",
+                                &drift.memory.id.simple().to_string()[..8]
+                            )
+                        })
+                        .unwrap_or_default();
+                    println!("      was {}{hint}", drift.concept);
+                }
+            }
             if !yes {
                 println!("Run with --yes to apply.");
             }
@@ -1551,6 +1646,48 @@ async fn cmd_memory(config: &crate::config::Config, operation: MemoryCommands) -
             }
             store.forget(memory.id, "user").await?;
             println!("Rejected [m:{short}]");
+        }
+        MemoryCommands::Anchors {
+            id,
+            set,
+            clear,
+            auto,
+        } => {
+            let memory = resolve_memory(&store, &id).await?;
+            let short = &memory.id.simple().to_string()[..8];
+            if clear {
+                store
+                    .set_anchors(memory.id, &[])
+                    .await?
+                    .map_err(anyhow::Error::msg)?;
+            } else if !set.is_empty() {
+                store
+                    .set_anchors(memory.id, &set)
+                    .await?
+                    .map_err(anyhow::Error::msg)?;
+            } else if auto {
+                if store.code_knowledge().is_none_or(|c| !c.is_ready()) {
+                    anyhow::bail!("code knowledge is {}", store.code_knowledge_status());
+                }
+                if store.anchor_automatically(memory.id).await?.is_empty() {
+                    println!("[m:{short}] names no function or type found in the bundle; anchors unchanged.");
+                }
+            }
+            let anchors = store.anchors(memory.id).await?;
+            if anchors.is_empty() {
+                println!("[m:{short}] is not anchored to code.");
+            }
+            for (concept, at) in anchors {
+                let location = match store.code_knowledge() {
+                    Some(code) => code.location(&concept).await,
+                    None => None,
+                };
+                let location = location.map(|l| format!("  {l}")).unwrap_or_default();
+                println!(
+                    "[m:{short}] {concept}{location}  (anchored {})",
+                    at.format("%Y-%m-%d")
+                );
+            }
         }
         MemoryCommands::Reindex { prune } => {
             let (embedded, pruned) = store.reindex(prune).await?;
@@ -1744,36 +1881,64 @@ fn build_tool_registry(
 /// effect. Failures are caught per-server (recorded in the status snapshot
 /// for the TUI's `/mcp` view) rather than aborting startup - one broken MCP
 /// server shouldn't block the whole TUI.
+/// The MCP server name okf-mcp's tools are offered under (`expose_tools`).
+const OKF_SERVER_NAME: &str = "okf";
+
+/// Whether okf-mcp's tools are offered to the model: `expose_tools` is on,
+/// code knowledge is not off, and no configured server already uses the
+/// name.
+fn okf_tools_exposed(config: &crate::config::Config) -> bool {
+    let code = &config.memory.code_knowledge;
+    config.memory.long_term
+        && code.expose_tools
+        && code.enabled != "off"
+        && !config.mcp.servers.iter().any(|s| s.name == OKF_SERVER_NAME)
+}
+
 async fn connect_configured_mcp_servers(
     tool_registry: &mut crate::llm::tools::registry::ToolRegistry,
     config: &crate::config::Config,
 ) -> Vec<crate::mcp::McpServerStatus> {
+    let mut servers: Vec<(String, String, Vec<String>)> = config
+        .mcp
+        .servers
+        .iter()
+        .map(|s| (s.name.clone(), s.command.clone(), s.args.clone()))
+        .collect();
+    // okf-mcp for the model (`expose_tools`), when the project has a bundle.
+    if okf_tools_exposed(config) {
+        let root =
+            crate::memory::project::identify(&std::env::current_dir().unwrap_or_default()).root;
+        if crate::memory::code_knowledge::bundle_dir(&root).is_some() {
+            servers.push((
+                OKF_SERVER_NAME.to_string(),
+                config.memory.code_knowledge.command.clone(),
+                vec![root.to_string_lossy().into_owned()],
+            ));
+        }
+    }
     let mut mcp_status = Vec::new();
-    for server in &config.mcp.servers {
-        let args: Vec<&str> = server.args.iter().map(String::as_str).collect();
+    for (name, command, args) in &servers {
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
         match tool_registry
-            .register_mcp_server(&server.name, &server.command, &args)
+            .register_mcp_server(name, command, &args)
             .await
         {
             Ok(tool_count) => {
-                tracing::info!(
-                    "Connected to MCP server '{}' ({} tools)",
-                    server.name,
-                    tool_count
-                );
+                tracing::info!("Connected to MCP server '{}' ({} tools)", name, tool_count);
                 mcp_status.push(crate::mcp::McpServerStatus {
-                    name: server.name.clone(),
-                    command: server.command.clone(),
+                    name: name.clone(),
+                    command: command.clone(),
                     connected: true,
                     tool_count,
                     error: None,
                 });
             }
             Err(e) => {
-                tracing::warn!("Failed to connect to MCP server '{}': {}", server.name, e);
+                tracing::warn!("Failed to connect to MCP server '{}': {}", name, e);
                 mcp_status.push(crate::mcp::McpServerStatus {
-                    name: server.name.clone(),
-                    command: server.command.clone(),
+                    name: name.clone(),
+                    command: command.clone(),
                     connected: false,
                     tool_count: 0,
                     error: Some(e.to_string()),

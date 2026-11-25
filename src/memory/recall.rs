@@ -213,14 +213,17 @@ pub(crate) fn clean(text: &str) -> String {
         .replace("</recalled_memories>", "")
 }
 
-fn line(memory: &Memory, with_scope: bool) -> String {
+fn line(memory: &Memory, with_scope: bool, location: Option<&String>) -> String {
     let scope = match (&memory.scope, with_scope) {
         (MemoryScope::Global, true) => " · global",
         (MemoryScope::Project(_), true) => " · project",
         _ => "",
     };
+    let location = location
+        .map(|l| format!(" · {}", clean(l)))
+        .unwrap_or_default();
     format!(
-        "- [{}{scope} · m:{}] {}",
+        "- [{}{scope} · m:{}{location}] {}",
         memory.category.as_str(),
         short_id(memory),
         clean(&memory.content)
@@ -233,21 +236,31 @@ fn line(memory: &Memory, with_scope: bool) -> String {
 /// project memories other than lessons, lessons from either scope, and recent
 /// work (already formatted lines, given only on a session's first request).
 pub fn render_block(selected: &[Memory], recent_work: &[String]) -> Option<String> {
+    render_block_located(selected, recent_work, &std::collections::HashMap::new())
+}
+
+/// [`render_block`], with where the code of anchored memories is now
+/// (`file#Lstart-Lend`, §23.3) shown beside their id.
+pub fn render_block_located(
+    selected: &[Memory],
+    recent_work: &[String],
+    locations: &std::collections::HashMap<uuid::Uuid, String>,
+) -> Option<String> {
     let is_lesson = |m: &&Memory| m.category == MemoryCategory::Lesson;
     let about_user: Vec<String> = selected
         .iter()
         .filter(|m| !is_lesson(m) && matches!(m.scope, MemoryScope::Global))
-        .map(|m| line(m, false))
+        .map(|m| line(m, false, locations.get(&m.id)))
         .collect();
     let this_project: Vec<String> = selected
         .iter()
         .filter(|m| !is_lesson(m) && matches!(m.scope, MemoryScope::Project(_)))
-        .map(|m| line(m, false))
+        .map(|m| line(m, false, locations.get(&m.id)))
         .collect();
     let lessons: Vec<String> = selected
         .iter()
         .filter(is_lesson)
-        .map(|m| line(m, true))
+        .map(|m| line(m, true, locations.get(&m.id)))
         .collect();
     let recent: Vec<String> = recent_work
         .iter()
